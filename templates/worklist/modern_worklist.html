@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Noctis Pro PACS - Modern Worklist</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-bg: #0a0a0a;
+            --secondary-bg: #1a1a1a;
+            --card-bg: #252525;
+            --header-bg: #333333;
+            --border-color: #404040;
+            --accent-color: #00d4ff;
+            --text-primary: #ffffff;
+            --text-secondary: #b3b3b3;
+            --text-muted: #666666;
+            --success-color: #00ff88;
+            --warning-color: #ffaa00;
+            --danger-color: #ff4444;
+            --urgent-color: #ff0066;
+            --scheduled-color: #4a90e2;
+            --in-progress-color: #f5a623;
+            --completed-color: #7ed321;
+            --cancelled-color: #d0021b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--primary-bg);
+            color: var(--text-primary);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .modern-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .modern-header {
+            background: var(--header-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .logo {
+            color: var(--accent-color);
+            font-weight: bold;
+            font-size: 20px;
+            text-decoration: none;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 4px;
+        }
+
+        .nav-tab {
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 8px 16px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-radius: 6px;
+            text-decoration: none;
+        }
+
+        .nav-tab.active {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+            font-weight: bold;
+        }
+
+        .nav-tab:hover:not(.active) {
+            background: var(--card-bg);
+            color: var(--text-primary);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            background: var(--accent-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: var(--primary-bg);
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            padding: 24px;
+            display: flex;
+            gap: 24px;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .sidebar-section {
+            margin-bottom: 24px;
+        }
+
+        .sidebar-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-group {
+            margin-bottom: 16px;
+        }
+
+        .filter-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        .filter-select {
+            width: 100%;
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .status-filter {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .status-item:hover {
+            background: var(--secondary-bg);
+        }
+
+        .status-item.active {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-scheduled .status-dot { background: var(--scheduled-color); }
+        .status-in-progress .status-dot { background: var(--in-progress-color); }
+        .status-completed .status-dot { background: var(--completed-color); }
+        .status-cancelled .status-dot { background: var(--cancelled-color); }
+        .status-urgent .status-dot { background: var(--urgent-color); }
+
+        /* Main Worklist Area */
+        .worklist-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .worklist-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .worklist-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .worklist-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+        }
+
+        .btn-primary:hover {
+            background: #00b8d4;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: var(--secondary-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--card-bg);
+        }
+
+        /* Search Bar */
+        .search-container {
+            position: relative;
+        }
+
+        .search-input {
+            width: 300px;
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 10px 16px 10px 40px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        /* Studies Grid */
+        .studies-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 16px;
+        }
+
+        .study-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .study-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+            border-color: var(--accent-color);
+        }
+
+        .study-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+
+        .study-info {
+            flex: 1;
+        }
+
+        .patient-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .patient-id {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .study-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .status-scheduled { background: var(--scheduled-color); color: white; }
+        .status-in-progress { background: var(--in-progress-color); color: white; }
+        .status-completed { background: var(--completed-color); color: white; }
+        .status-cancelled { background: var(--cancelled-color); color: white; }
+        .status-urgent { background: var(--urgent-color); color: white; }
+
+        .study-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .detail-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .detail-value {
+            font-size: 13px;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .study-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .action-btn-primary {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+        }
+
+        .action-btn-secondary {
+            background: var(--secondary-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .action-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+
+        .spinner {
+            border: 2px solid var(--border-color);
+            border-top: 2px solid var(--accent-color);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            margin-right: 12px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .main-content {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+            }
+            
+            .studies-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .modern-header {
+                padding: 12px 16px;
+            }
+            
+            .header-left {
+                gap: 16px;
+            }
+            
+            .nav-tabs {
+                display: none;
+            }
+            
+            .main-content {
+                padding: 16px;
+            }
+            
+            .search-input {
+                width: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="modern-container">
+        <!-- Header -->
+        <header class="modern-header">
+            <div class="header-left">
+                <a href="{% url 'worklist:dashboard' %}" class="logo">
+                    <i class="fas fa-brain"></i> Noctis Pro
+                </a>
+                <nav class="nav-tabs">
+                    <a href="{% url 'worklist:dashboard' %}" class="nav-tab">Dashboard</a>
+                    <a href="{% url 'worklist:modern_worklist' %}" class="nav-tab active">Worklist</a>
+                    <a href="{% url 'worklist:patients' %}" class="nav-tab">Patients</a>
+                    <a href="{% url 'worklist:studies' %}" class="nav-tab">Studies</a>
+                    <a href="{% url 'worklist:reports' %}" class="nav-tab">Reports</a>
+                </nav>
+            </div>
+            <div class="header-right">
+                <div class="user-info">
+                    <div class="user-avatar">
+                        {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
+                    </div>
+                    <span>{{ user.get_full_name }}</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">
+                        <i class="fas fa-filter"></i>
+                        Filters
+                    </h3>
+                    
+                    <div class="filter-group">
+                        <label class="filter-label">Modality</label>
+                        <select class="filter-select" id="modality-filter">
+                            <option value="">All Modalities</option>
+                            <option value="CT">CT</option>
+                            <option value="MR">MR</option>
+                            <option value="XR">XR</option>
+                            <option value="US">US</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label class="filter-label">Priority</label>
+                        <select class="filter-select" id="priority-filter">
+                            <option value="">All Priorities</option>
+                            <option value="routine">Routine</option>
+                            <option value="urgent">Urgent</option>
+                            <option value="stat">Stat</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label class="filter-label">Facility</label>
+                        <select class="filter-select" id="facility-filter">
+                            <option value="">All Facilities</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">
+                        <i class="fas fa-tasks"></i>
+                        Status
+                    </h3>
+                    
+                    <div class="status-filter">
+                        <div class="status-item active" data-status="all">
+                            <div class="status-dot"></div>
+                            <span>All Studies</span>
+                        </div>
+                        <div class="status-item status-scheduled" data-status="scheduled">
+                            <div class="status-dot"></div>
+                            <span>Scheduled</span>
+                        </div>
+                        <div class="status-item status-in-progress" data-status="in-progress">
+                            <div class="status-dot"></div>
+                            <span>In Progress</span>
+                        </div>
+                        <div class="status-item status-completed" data-status="completed">
+                            <div class="status-dot"></div>
+                            <span>Completed</span>
+                        </div>
+                        <div class="status-item status-cancelled" data-status="cancelled">
+                            <div class="status-dot"></div>
+                            <span>Cancelled</span>
+                        </div>
+                        <div class="status-item status-urgent" data-status="urgent">
+                            <div class="status-dot"></div>
+                            <span>Urgent</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Worklist Area -->
+            <div class="worklist-main">
+                <div class="worklist-header">
+                    <h1 class="worklist-title">Modern Worklist</h1>
+                    <div class="worklist-actions">
+                        <div class="search-container">
+                            <i class="fas fa-search search-icon"></i>
+                            <input type="text" class="search-input" placeholder="Search studies, patients..." id="search-input">
+                        </div>
+                        <a href="{% url 'worklist:upload' %}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i>
+                            Upload Study
+                        </a>
+                        <button class="btn btn-secondary" id="refresh-btn">
+                            <i class="fas fa-sync-alt"></i>
+                            Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Studies Grid -->
+                <div id="studies-container">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Loading studies...
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Modern Worklist JavaScript
+        document.addEventListener('DOMContentLoaded', function() {
+            let studies = [];
+            let filteredStudies = [];
+
+            // Initialize the worklist
+            loadStudies();
+
+            // Event listeners
+            document.getElementById('search-input').addEventListener('input', filterStudies);
+            document.getElementById('refresh-btn').addEventListener('click', loadStudies);
+            document.getElementById('modality-filter').addEventListener('change', filterStudies);
+            document.getElementById('priority-filter').addEventListener('change', filterStudies);
+            document.getElementById('facility-filter').addEventListener('change', filterStudies);
+
+            // Status filter event listeners
+            document.querySelectorAll('.status-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    document.querySelectorAll('.status-item').forEach(i => i.classList.remove('active'));
+                    this.classList.add('active');
+                    filterStudies();
+                });
+            });
+
+            function loadStudies() {
+                const container = document.getElementById('studies-container');
+                container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading studies...</div>';
+
+                fetch('{% url "worklist:api_studies" %}')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            studies = data.studies;
+                            filteredStudies = studies;
+                            renderStudies();
+                        } else {
+                            container.innerHTML = '<div class="loading">Error loading studies</div>';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        container.innerHTML = '<div class="loading">Error loading studies</div>';
+                    });
+            }
+
+            function filterStudies() {
+                const searchTerm = document.getElementById('search-input').value.toLowerCase();
+                const modality = document.getElementById('modality-filter').value;
+                const priority = document.getElementById('priority-filter').value;
+                const facility = document.getElementById('facility-filter').value;
+                const statusFilter = document.querySelector('.status-item.active').dataset.status;
+
+                filteredStudies = studies.filter(study => {
+                    const matchesSearch = !searchTerm || 
+                        study.patient_name.toLowerCase().includes(searchTerm) ||
+                        study.accession_number.toLowerCase().includes(searchTerm) ||
+                        study.patient_id.toLowerCase().includes(searchTerm);
+
+                    const matchesModality = !modality || study.modality === modality;
+                    const matchesPriority = !priority || study.priority === priority;
+                    const matchesFacility = !facility || study.facility === facility;
+                    const matchesStatus = statusFilter === 'all' || study.status === statusFilter;
+
+                    return matchesSearch && matchesModality && matchesPriority && matchesFacility && matchesStatus;
+                });
+
+                renderStudies();
+            }
+
+            function renderStudies() {
+                const container = document.getElementById('studies-container');
+                
+                if (filteredStudies.length === 0) {
+                    container.innerHTML = '<div class="loading">No studies found</div>';
+                    return;
+                }
+
+                const studiesHTML = filteredStudies.map(study => `
+                    <div class="study-card" onclick="viewStudy(${study.id})">
+                        <div class="study-header">
+                            <div class="study-info">
+                                <div class="patient-name">${study.patient_name}</div>
+                                <div class="patient-id">ID: ${study.patient_id}</div>
+                            </div>
+                            <div class="study-status status-${study.status}">${study.status}</div>
+                        </div>
+                        <div class="study-details">
+                            <div class="detail-item">
+                                <span class="detail-label">Accession</span>
+                                <span class="detail-value">${study.accession_number}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Modality</span>
+                                <span class="detail-value">${study.modality}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Date</span>
+                                <span class="detail-value">${new Date(study.study_date).toLocaleDateString()}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Time</span>
+                                <span class="detail-value">${new Date(study.scheduled_time).toLocaleTimeString()}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Duration</span>
+                                <span class="detail-value">${study.estimated_duration}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Room</span>
+                                <span class="detail-value">${study.room}</span>
+                            </div>
+                        </div>
+                        <div class="study-actions">
+                            <button class="action-btn action-btn-primary" onclick="event.stopPropagation(); viewStudy(${study.id})">
+                                <i class="fas fa-eye"></i> View
+                            </button>
+                            <button class="action-btn action-btn-secondary" onclick="event.stopPropagation(); editStudy(${study.id})">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+
+                container.innerHTML = `<div class="studies-grid">${studiesHTML}</div>`;
+            }
+
+            // Global functions for study actions
+            window.viewStudy = function(studyId) {
+                window.location.href = `/worklist/study/${studyId}/`;
+            };
+
+            window.editStudy = function(studyId) {
+                window.location.href = `/worklist/study/${studyId}/edit/`;
+            };
+        });
+    </script>
+</body>
+</html>
