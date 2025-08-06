@@ -19,6 +19,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
+from django.http import HttpResponse
 
 def home_redirect(request):
     """Redirect home page to login or dashboard based on authentication"""
@@ -27,8 +28,13 @@ def home_redirect(request):
         return redirect('worklist:dashboard')
     return redirect('accounts:login')
 
+def favicon_view(request):
+    """Return an empty response for favicon requests to avoid 404 errors"""
+    return HttpResponse(status=204)  # No content
+
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('favicon.ico', favicon_view, name='favicon'),
     path('', home_redirect, name='home'),
     path('', include('accounts.urls')),
     path('worklist/', include('worklist.urls')),
