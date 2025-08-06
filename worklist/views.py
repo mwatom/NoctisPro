@@ -508,6 +508,54 @@ def api_search_studies(request):
     
     return JsonResponse({'studies': studies_data})
 
+@login_required
+@csrf_exempt
+def api_update_study_status(request, study_id):
+    """API endpoint to update study status"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    study = get_object_or_404(Study, id=study_id)
+    user = request.user
+    
+    # Check permissions
+    if user.is_facility_user() and study.facility != user.facility:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    
+    try:
+        data = json.loads(request.body)
+        new_status = data.get('status', '').strip()
+        
+        # Validate status
+        valid_statuses = ['scheduled', 'in_progress', 'completed', 'cancelled']
+        if new_status not in valid_statuses:
+            return JsonResponse({'error': 'Invalid status'}, status=400)
+        
+        # Update study status
+        old_status = study.status
+        study.status = new_status
+        study.save()
+        
+        # Log the status change (if you have logging)
+        # StudyStatusLog.objects.create(
+        #     study=study,
+        #     old_status=old_status,
+        #     new_status=new_status,
+        #     changed_by=user
+        # )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Study status updated from {old_status} to {new_status}',
+            'old_status': old_status,
+            'new_status': new_status
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
 def process_attachment_metadata(attachment):
     """Extract metadata from uploaded attachment"""
     try:
