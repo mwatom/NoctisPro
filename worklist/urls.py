@@ -7,6 +7,7 @@ app_name = 'worklist'
 urlpatterns = [
     # Main worklist interfaces
     path('', views.dashboard, name='dashboard'),
+    path('upload/', views.upload_study, name='upload_study'),
     path('studies/', views.study_list, name='study_list'),
     path('study/<int:study_id>/', views.study_detail, name='study_detail'),
     
