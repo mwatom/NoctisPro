@@ -24,7 +24,7 @@ scikit-image==0.22.0
 matplotlib==3.8.2
 
 # AI and machine learning
-numpy==1.24.3
+numpy==1.26.2
 scipy==1.11.4
 pandas==2.1.4
 torch==2.1.1
@@ -49,3 +49,7 @@ PyJWT==2.8.0
 python-magic==0.4.27
 requests==2.31.0
 urllib3==2.1.0
+
+# Essential build tools (for Python 3.12 compatibility)
+setuptools>=65.0.0
+wheel>=0.37.0
