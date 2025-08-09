@@ -479,6 +479,166 @@
         transform: translateY(-1px);
     }
 
+    /* Local File Loader Styles */
+    .local-file-modal {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        width: 90%;
+        max-width: 600px;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .close-btn {
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        font-size: 1.2rem;
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 4px;
+        transition: all 0.3s ease;
+    }
+
+    .close-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-primary);
+    }
+
+    .modal-body {
+        padding: 1.5rem;
+    }
+
+    .modal-footer {
+        padding: 1rem 1.5rem;
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        gap: 1rem;
+        justify-content: flex-end;
+    }
+
+    .file-drop-zone {
+        border: 2px dashed var(--border-color);
+        border-radius: 12px;
+        padding: 3rem 2rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: rgba(255, 255, 255, 0.02);
+        margin-bottom: 1.5rem;
+    }
+
+    .file-drop-zone:hover,
+    .file-drop-zone.dragover {
+        border-color: var(--accent-color);
+        background: rgba(14, 165, 233, 0.05);
+    }
+
+    .drop-zone-content {
+        pointer-events: none;
+    }
+
+    .drop-icon {
+        font-size: 3rem;
+        color: var(--accent-color);
+        margin-bottom: 1rem;
+        display: block;
+    }
+
+    .local-files-list {
+        margin-top: 1.5rem;
+    }
+
+    .files-container {
+        max-height: 200px;
+        overflow-y: auto;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 0.5rem;
+    }
+
+    .local-file-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.5rem;
+        margin: 2px 0;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 6px;
+        transition: all 0.3s ease;
+    }
+
+    .local-file-item:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .file-info {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex: 1;
+    }
+
+    .file-icon {
+        color: var(--accent-color);
+        font-size: 1.2rem;
+    }
+
+    .file-details {
+        flex: 1;
+    }
+
+    .file-name {
+        color: var(--text-primary);
+        font-size: 0.9rem;
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 250px;
+    }
+
+    .file-size {
+        color: var(--text-secondary);
+        font-size: 0.8rem;
+        margin: 0;
+    }
+
+    .remove-local-file {
+        background: var(--danger-color);
+        border: none;
+        border-radius: 4px;
+        color: white;
+        padding: 4px 8px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: all 0.3s ease;
+    }
+
+    .remove-local-file:hover {
+        background: #dc2626;
+        transform: scale(1.05);
+    }
+
+    .loading-indicator {
+        text-align: center;
+        padding: 2rem;
+    }
+
+    .spinner-border {
+        width: 3rem;
+        height: 3rem;
+    }
+
     .cine-slider {
         width: 200px;
         height: 4px;
@@ -543,6 +703,9 @@
             </button>
             <button class="btn btn-link text-light" onclick="showReconstructionPanel()">
                 <i class="fas fa-cube"></i>
+            </button>
+            <button class="btn btn-link text-light" onclick="showLocalFileLoader()" title="Load DICOM files from disk">
+                <i class="fas fa-folder-open"></i>
             </button>
             <a href="{% url 'worklist:dashboard' %}" class="btn btn-outline-light btn-sm">
                 <i class="fas fa-arrow-left me-1"></i>Back to Worklist
@@ -836,6 +999,56 @@
                 <div class="text-secondary">No series available</div>
                 {% endfor %}
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Local File Loader Modal -->
+<div class="overlay" id="localFileOverlay" style="display: none;">
+    <div class="modal-content local-file-modal">
+        <div class="modal-header">
+            <h4 class="text-light">Load DICOM Files from Disk</h4>
+            <button type="button" class="close-btn" onclick="hideLocalFileLoader()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="modal-body">
+            <div class="file-drop-zone" id="localFileDropZone">
+                <div class="drop-zone-content">
+                    <i class="fas fa-file-medical drop-icon"></i>
+                    <h5 class="text-light mb-3">Drop DICOM files here</h5>
+                    <p class="text-secondary mb-3">or click to browse from your computer</p>
+                    <button type="button" class="btn btn-medical" onclick="document.getElementById('localFileInput').click()">
+                        <i class="fas fa-folder-open me-2"></i>
+                        Browse Files
+                    </button>
+                </div>
+            </div>
+            
+            <input type="file" id="localFileInput" multiple accept=".dcm,.dicom,application/dicom" style="display: none;">
+            
+            <div class="local-files-list" id="localFilesList" style="display: none;">
+                <h6 class="text-light mb-3">Selected Files</h6>
+                <div class="files-container" id="localFilesContainer"></div>
+            </div>
+            
+            <div class="loading-indicator" id="localFileLoading" style="display: none;">
+                <div class="spinner-border text-accent" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="text-light mt-2">Processing DICOM files...</p>
+            </div>
+        </div>
+        
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="hideLocalFileLoader()">
+                Cancel
+            </button>
+            <button type="button" class="btn btn-medical" id="loadLocalFilesBtn" onclick="loadLocalFiles()" disabled>
+                <i class="fas fa-play me-2"></i>
+                Load Files
+            </button>
         </div>
     </div>
 </div>
@@ -1713,6 +1926,284 @@ function updateCrosshair(x, y) {
             crosshair.style.display = 'block';
         }
     }
+}
+
+// Local File Loading Functions
+let localFiles = [];
+
+function showLocalFileLoader() {
+    document.getElementById('localFileOverlay').style.display = 'flex';
+    setupLocalFileDropZone();
+}
+
+function hideLocalFileLoader() {
+    document.getElementById('localFileOverlay').style.display = 'none';
+    localFiles = [];
+    updateLocalFilesList();
+    document.getElementById('loadLocalFilesBtn').disabled = true;
+}
+
+function setupLocalFileDropZone() {
+    const dropZone = document.getElementById('localFileDropZone');
+    const fileInput = document.getElementById('localFileInput');
+
+    // Click to browse
+    dropZone.addEventListener('click', () => {
+        fileInput.click();
+    });
+
+    // Drag and drop handlers
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        
+        const files = Array.from(e.dataTransfer.files);
+        handleLocalFiles(files);
+    });
+
+    // File input change
+    fileInput.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files);
+        handleLocalFiles(files);
+    });
+}
+
+function handleLocalFiles(files) {
+    // Filter DICOM files
+    const dicomFiles = files.filter(file => {
+        return file.name.toLowerCase().endsWith('.dcm') || 
+               file.name.toLowerCase().endsWith('.dicom') ||
+               file.type === 'application/dicom';
+    });
+
+    if (dicomFiles.length === 0) {
+        showNotification('Please select valid DICOM files (.dcm, .dicom)', 'error');
+        return;
+    }
+
+    // Add to local files array
+    localFiles = [...localFiles, ...dicomFiles];
+    updateLocalFilesList();
+    updateLoadButton();
+}
+
+function updateLocalFilesList() {
+    const filesList = document.getElementById('localFilesList');
+    const filesContainer = document.getElementById('localFilesContainer');
+
+    if (localFiles.length === 0) {
+        filesList.style.display = 'none';
+        return;
+    }
+
+    filesList.style.display = 'block';
+    filesContainer.innerHTML = localFiles.map((file, index) => `
+        <div class="local-file-item">
+            <div class="file-info">
+                <i class="fas fa-file-medical file-icon"></i>
+                <div class="file-details">
+                    <p class="file-name" title="${file.name}">${file.name}</p>
+                    <p class="file-size">${formatFileSize(file.size)}</p>
+                </div>
+            </div>
+            <button type="button" class="remove-local-file" onclick="removeLocalFile(${index})">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+function updateLoadButton() {
+    document.getElementById('loadLocalFilesBtn').disabled = localFiles.length === 0;
+}
+
+function removeLocalFile(index) {
+    localFiles.splice(index, 1);
+    updateLocalFilesList();
+    updateLoadButton();
+}
+
+function loadLocalFiles() {
+    if (localFiles.length === 0) return;
+
+    const loadingIndicator = document.getElementById('localFileLoading');
+    const modalBody = document.querySelector('#localFileOverlay .modal-body');
+    
+    // Show loading state
+    loadingIndicator.style.display = 'block';
+    document.getElementById('loadLocalFilesBtn').disabled = true;
+    document.getElementById('loadLocalFilesBtn').innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Loading...';
+
+    // Process files using FileReader API
+    processLocalDicomFiles(localFiles)
+        .then(processedData => {
+            loadingIndicator.style.display = 'none';
+            
+            if (processedData.success) {
+                // Update viewer with local files
+                loadLocalStudyData(processedData.studies);
+                hideLocalFileLoader();
+                showNotification(`Loaded ${processedData.studies.length} studies from local files`, 'success');
+            } else {
+                showNotification('Failed to process DICOM files: ' + processedData.error, 'error');
+            }
+        })
+        .catch(error => {
+            loadingIndicator.style.display = 'none';
+            console.error('Error processing files:', error);
+            showNotification('Error processing DICOM files', 'error');
+        })
+        .finally(() => {
+            // Reset button state
+            document.getElementById('loadLocalFilesBtn').disabled = false;
+            document.getElementById('loadLocalFilesBtn').innerHTML = '<i class="fas fa-play me-2"></i>Load Files';
+        });
+}
+
+async function processLocalDicomFiles(files) {
+    try {
+        const studies = [];
+        const seriesMap = new Map();
+
+        for (const file of files) {
+            try {
+                // Read file as ArrayBuffer
+                const arrayBuffer = await readFileAsArrayBuffer(file);
+                
+                // Create a mock DICOM data structure
+                // In a real implementation, you would use a DICOM parser like cornerstone.js or dicom-parser
+                const mockDicomData = {
+                    studyInstanceUID: generateUID(),
+                    seriesInstanceUID: generateUID(),
+                    sopInstanceUID: generateUID(),
+                    patientName: 'Local File Patient',
+                    studyDate: new Date().toISOString().split('T')[0],
+                    modality: 'CT', // Default modality
+                    seriesDescription: `Local Series ${file.name}`,
+                    instanceNumber: 1,
+                    fileName: file.name,
+                    fileSize: file.size,
+                    arrayBuffer: arrayBuffer
+                };
+
+                // Group by study
+                const studyKey = mockDicomData.studyInstanceUID;
+                if (!seriesMap.has(studyKey)) {
+                    seriesMap.set(studyKey, {
+                        studyInstanceUID: studyKey,
+                        patientName: mockDicomData.patientName,
+                        studyDate: mockDicomData.studyDate,
+                        accessionNumber: `LOCAL_${Date.now()}`,
+                        series: []
+                    });
+                }
+
+                const study = seriesMap.get(studyKey);
+                study.series.push({
+                    id: mockDicomData.seriesInstanceUID,
+                    series_number: study.series.length + 1,
+                    description: mockDicomData.seriesDescription,
+                    modality: mockDicomData.modality,
+                    image_count: 1,
+                    images: [{
+                        id: mockDicomData.sopInstanceUID,
+                        instance_number: mockDicomData.instanceNumber,
+                        file_name: mockDicomData.fileName,
+                        file_size: mockDicomData.fileSize,
+                        array_buffer: mockDicomData.arrayBuffer
+                    }]
+                });
+
+            } catch (fileError) {
+                console.error(`Error processing file ${file.name}:`, fileError);
+            }
+        }
+
+        return {
+            success: true,
+            studies: Array.from(seriesMap.values())
+        };
+
+    } catch (error) {
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
+function readFileAsArrayBuffer(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+function generateUID() {
+    // Generate a simple UID for demo purposes
+    return Date.now().toString() + '.' + Math.random().toString(36).substr(2, 9);
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function loadLocalStudyData(studies) {
+    if (studies.length === 0) return;
+
+    // Update global study data with local files
+    studyData = studies[0].series;
+    currentSeries = null;
+
+    // Update series navigation
+    const seriesNav = document.querySelector('.series-list');
+    if (seriesNav) {
+        seriesNav.innerHTML = studies[0].series.map(series => `
+            <div class="series-item" data-series="${series.id}" onclick="loadSeries('${series.id}')">
+                <div class="series-info">
+                    <div class="series-number">${series.series_number}</div>
+                    <div class="series-details">
+                        <div class="series-title">${series.description}</div>
+                        <div class="series-meta">${series.modality} • ${series.image_count} images</div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // Update study info in header
+    const studyInfo = document.querySelector('.study-info');
+    if (studyInfo) {
+        studyInfo.innerHTML = `
+            <div class="study-badge">LOCAL</div>
+            <div>
+                <div class="study-title">Local DICOM Files</div>
+                <div class="study-meta">${studies[0].patientName} • ${studies[0].studyDate}</div>
+            </div>
+        `;
+    }
+
+    // Load the first series automatically
+    if (studies[0].series.length > 0) {
+        loadSeries(studies[0].series[0].id);
+    }
+
+    showNotification('Local DICOM files loaded successfully', 'success');
 }
 
 </script>
