@@ -23,6 +23,7 @@ urlpatterns = [
     path('api/attachment/<int:attachment_id>/search/', api_attachment_search, name='api_attachment_search'),
     
     # API endpoints
+    path('api/studies/', views.api_studies, name='api_studies'),
     path('api/search-studies/', views.api_search_studies, name='api_search_studies'),
     path('api/study/<int:study_id>/update-status/', views.api_update_study_status, name='api_update_study_status'),
 ]
