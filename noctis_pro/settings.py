@@ -49,7 +49,7 @@ INSTALLED_APPS = [
     'dicom_viewer',
     # 'reports',  # Temporarily disabled
     'admin_panel',
-    # 'chat',  # Temporarily disabled
+    'chat',  # Re-enabled to fix template URLs
     'notifications',  # Re-enabled to fix User.notifications relationship
     'ai_analysis',
 ]
