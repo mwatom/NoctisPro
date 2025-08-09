@@ -32,7 +32,7 @@ ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = [
-    'daphne',
+    # 'daphne',  # Temporarily disabled for testing
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -40,17 +40,17 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'corsheaders',
-    'channels',
+    # 'corsheaders',  # Temporarily disabled
+    # 'channels',  # Temporarily disabled
     
     # Custom apps
     'accounts',
     'worklist',
     'dicom_viewer',
-    'reports',
+    # 'reports',  # Temporarily disabled
     'admin_panel',
-    'chat',
-    'notifications',
+    # 'chat',  # Temporarily disabled
+    # 'notifications',  # Temporarily disabled
     'ai_analysis',
 ]
 
