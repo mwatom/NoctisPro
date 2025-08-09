@@ -50,7 +50,7 @@ INSTALLED_APPS = [
     # 'reports',  # Temporarily disabled
     'admin_panel',
     # 'chat',  # Temporarily disabled
-    # 'notifications',  # Temporarily disabled
+    'notifications',  # Re-enabled to fix User.notifications relationship
     'ai_analysis',
 ]
 

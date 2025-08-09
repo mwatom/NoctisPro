@@ -45,7 +45,11 @@ def dashboard(request):
     recent_studies = studies.order_by('-upload_date')[:10]
     
     # Get unread notifications count
-    unread_notifications_count = user.notifications.filter(is_read=False).count()
+    try:
+        unread_notifications_count = user.notifications.filter(is_read=False).count()
+    except AttributeError:
+        # Handle case where notifications app is not enabled or relationship doesn't exist
+        unread_notifications_count = 0
     
     context = {
         'user': user,
