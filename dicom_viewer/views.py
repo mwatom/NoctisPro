@@ -9,6 +9,12 @@ import json
 import base64
 import os
 import time
+import numpy as np
+import pydicom
+from io import BytesIO
+import cv2
+from PIL import Image
+from django.utils import timezone
 
 @login_required
 def viewer(request):
@@ -152,24 +158,337 @@ def api_image_data(request, image_id):
     user = request.user
     
     # Check permissions
-    study = image.series.study
-    if user.is_facility_user() and study.facility != user.facility:
+    if user.is_facility_user() and image.series.study.facility != user.facility:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
-    # This would normally process DICOM file and return pixel data
-    # For now, we'll return metadata
     data = {
         'id': image.id,
         'instance_number': image.instance_number,
+        'file_path': image.file_path.url if image.file_path else '',
         'slice_location': image.slice_location,
         'image_position': image.image_position,
-        'file_path': image.file_path.url if image.file_path else '',
-        'processed': image.processed,
+        'file_size': image.file_size,
         'series_id': image.series.id,
-        'study_id': study.id,
+        'study_id': image.series.study.id,
     }
     
     return JsonResponse(data)
+
+@login_required
+@csrf_exempt
+def api_mpr_reconstruction(request, series_id):
+    """API endpoint for Multiplanar Reconstruction (MPR)"""
+    series = get_object_or_404(Series, id=series_id)
+    user = request.user
+    
+    # Check permissions
+    if user.is_facility_user() and series.study.facility != user.facility:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    
+    try:
+        # Get all images in the series sorted by slice location
+        images = series.images.all().order_by('slice_location', 'instance_number')
+        
+        if images.count() < 2:
+            return JsonResponse({'error': 'Need at least 2 images for MPR'}, status=400)
+        
+        # Read DICOM data
+        volume_data = []
+        for img in images:
+            try:
+                dicom_path = os.path.join('/workspace/media', str(img.file_path))
+                ds = pydicom.dcmread(dicom_path)
+                volume_data.append(ds.pixel_array)
+            except Exception as e:
+                continue
+        
+        if len(volume_data) < 2:
+            return JsonResponse({'error': 'Could not read enough images for MPR'}, status=400)
+        
+        # Stack into 3D volume
+        volume = np.stack(volume_data, axis=0)
+        
+        # Generate MPR views
+        mpr_views = {}
+        
+        # Axial (original orientation)
+        axial_slice = volume[volume.shape[0] // 2]
+        mpr_views['axial'] = _array_to_base64_image(axial_slice)
+        
+        # Sagittal (YZ plane)
+        sagittal_slice = volume[:, :, volume.shape[2] // 2]
+        mpr_views['sagittal'] = _array_to_base64_image(sagittal_slice)
+        
+        # Coronal (XZ plane)
+        coronal_slice = volume[:, volume.shape[1] // 2, :]
+        mpr_views['coronal'] = _array_to_base64_image(coronal_slice)
+        
+        return JsonResponse({
+            'mpr_views': mpr_views,
+            'volume_shape': volume.shape,
+            'series_info': {
+                'id': series.id,
+                'description': series.series_description,
+                'modality': series.modality
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': f'Error generating MPR: {str(e)}'}, status=500)
+
+@login_required
+@csrf_exempt
+def api_mip_reconstruction(request, series_id):
+    """API endpoint for Maximum Intensity Projection (MIP)"""
+    series = get_object_or_404(Series, id=series_id)
+    user = request.user
+    
+    # Check permissions
+    if user.is_facility_user() and series.study.facility != user.facility:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    
+    try:
+        # Get all images in the series
+        images = series.images.all().order_by('slice_location', 'instance_number')
+        
+        if images.count() < 2:
+            return JsonResponse({'error': 'Need at least 2 images for MIP'}, status=400)
+        
+        # Read DICOM data
+        volume_data = []
+        for img in images:
+            try:
+                dicom_path = os.path.join('/workspace/media', str(img.file_path))
+                ds = pydicom.dcmread(dicom_path)
+                volume_data.append(ds.pixel_array)
+            except Exception as e:
+                continue
+        
+        if len(volume_data) < 2:
+            return JsonResponse({'error': 'Could not read enough images for MIP'}, status=400)
+        
+        # Stack into 3D volume
+        volume = np.stack(volume_data, axis=0)
+        
+        # Generate MIP projections
+        mip_views = {}
+        
+        # Axial MIP (maximum along Z-axis)
+        mip_axial = np.max(volume, axis=0)
+        mip_views['axial'] = _array_to_base64_image(mip_axial)
+        
+        # Sagittal MIP (maximum along Y-axis)
+        mip_sagittal = np.max(volume, axis=1)
+        mip_views['sagittal'] = _array_to_base64_image(mip_sagittal)
+        
+        # Coronal MIP (maximum along X-axis)
+        mip_coronal = np.max(volume, axis=2)
+        mip_views['coronal'] = _array_to_base64_image(mip_coronal)
+        
+        return JsonResponse({
+            'mip_views': mip_views,
+            'volume_shape': volume.shape,
+            'series_info': {
+                'id': series.id,
+                'description': series.series_description,
+                'modality': series.modality
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': f'Error generating MIP: {str(e)}'}, status=500)
+
+@login_required
+@csrf_exempt
+def api_bone_reconstruction(request, series_id):
+    """API endpoint for bone reconstruction using thresholding"""
+    series = get_object_or_404(Series, id=series_id)
+    user = request.user
+    
+    # Check permissions
+    if user.is_facility_user() and series.study.facility != user.facility:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    
+    try:
+        # Get threshold from request
+        threshold = int(request.GET.get('threshold', 300))  # Default bone threshold in HU
+        
+        # Get all images in the series
+        images = series.images.all().order_by('slice_location', 'instance_number')
+        
+        if images.count() < 2:
+            return JsonResponse({'error': 'Need at least 2 images for bone reconstruction'}, status=400)
+        
+        # Read DICOM data
+        volume_data = []
+        for img in images:
+            try:
+                dicom_path = os.path.join('/workspace/media', str(img.file_path))
+                ds = pydicom.dcmread(dicom_path)
+                
+                # Convert to Hounsfield Units if possible
+                pixel_array = ds.pixel_array.astype(np.float32)
+                
+                # Apply rescale slope and intercept if available
+                if hasattr(ds, 'RescaleSlope') and hasattr(ds, 'RescaleIntercept'):
+                    pixel_array = pixel_array * ds.RescaleSlope + ds.RescaleIntercept
+                
+                volume_data.append(pixel_array)
+            except Exception as e:
+                continue
+        
+        if len(volume_data) < 2:
+            return JsonResponse({'error': 'Could not read enough images for bone reconstruction'}, status=400)
+        
+        # Stack into 3D volume
+        volume = np.stack(volume_data, axis=0)
+        
+        # Apply bone threshold
+        bone_mask = volume >= threshold
+        bone_volume = volume * bone_mask
+        
+        # Generate bone reconstruction views
+        bone_views = {}
+        
+        # Axial bone view
+        axial_bone = bone_volume[bone_volume.shape[0] // 2]
+        bone_views['axial'] = _array_to_base64_image(axial_bone)
+        
+        # Sagittal bone view
+        sagittal_bone = bone_volume[:, :, bone_volume.shape[2] // 2]
+        bone_views['sagittal'] = _array_to_base64_image(sagittal_bone)
+        
+        # Coronal bone view
+        coronal_bone = bone_volume[:, bone_volume.shape[1] // 2, :]
+        bone_views['coronal'] = _array_to_base64_image(coronal_bone)
+        
+        # MIP of bone structures
+        bone_mip_axial = np.max(bone_volume, axis=0)
+        bone_views['mip_axial'] = _array_to_base64_image(bone_mip_axial)
+        
+        bone_mip_sagittal = np.max(bone_volume, axis=1)
+        bone_views['mip_sagittal'] = _array_to_base64_image(bone_mip_sagittal)
+        
+        bone_mip_coronal = np.max(bone_volume, axis=2)
+        bone_views['mip_coronal'] = _array_to_base64_image(bone_mip_coronal)
+        
+        return JsonResponse({
+            'bone_views': bone_views,
+            'threshold': threshold,
+            'volume_shape': volume.shape,
+            'series_info': {
+                'id': series.id,
+                'description': series.series_description,
+                'modality': series.modality
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': f'Error generating bone reconstruction: {str(e)}'}, status=500)
+
+@login_required
+@csrf_exempt
+def api_realtime_studies(request):
+    """API endpoint for real-time study updates"""
+    user = request.user
+    
+    # Get timestamp from request
+    last_update = request.GET.get('last_update')
+    
+    try:
+        if last_update:
+            last_update_time = timezone.datetime.fromisoformat(last_update.replace('Z', '+00:00'))
+        else:
+            last_update_time = timezone.now() - timezone.timedelta(minutes=5)
+    except:
+        last_update_time = timezone.now() - timezone.timedelta(minutes=5)
+    
+    # Get studies updated since last check
+    if user.is_facility_user():
+        studies = Study.objects.filter(
+            facility=user.facility,
+            last_updated__gt=last_update_time
+        ).order_by('-last_updated')[:20]
+    else:
+        studies = Study.objects.filter(
+            last_updated__gt=last_update_time
+        ).order_by('-last_updated')[:20]
+    
+    studies_data = []
+    for study in studies:
+        studies_data.append({
+            'id': study.id,
+            'accession_number': study.accession_number,
+            'patient_name': study.patient.full_name,
+            'patient_id': study.patient.patient_id,
+            'study_date': study.study_date.isoformat(),
+            'modality': study.modality.code,
+            'description': study.study_description,
+            'status': study.status,
+            'priority': study.priority,
+            'facility': study.facility.name,
+            'last_updated': study.last_updated.isoformat(),
+            'series_count': study.series_set.count(),
+            'image_count': sum(series.images.count() for series in study.series_set.all())
+        })
+    
+    return JsonResponse({
+        'studies': studies_data,
+        'timestamp': timezone.now().isoformat(),
+        'count': len(studies_data)
+    })
+
+@login_required
+@csrf_exempt
+def api_study_progress(request, study_id):
+    """API endpoint to get study processing progress"""
+    study = get_object_or_404(Study, id=study_id)
+    user = request.user
+    
+    # Check permissions
+    if user.is_facility_user() and study.facility != user.facility:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    
+    # Calculate progress
+    total_images = 0
+    processed_images = 0
+    
+    for series in study.series_set.all():
+        series_images = series.images.all()
+        total_images += series_images.count()
+        processed_images += series_images.filter(processed=True).count()
+    
+    progress_percentage = (processed_images / total_images * 100) if total_images > 0 else 0
+    
+    return JsonResponse({
+        'study_id': study.id,
+        'total_images': total_images,
+        'processed_images': processed_images,
+        'progress_percentage': round(progress_percentage, 2),
+        'status': study.status,
+        'last_updated': study.last_updated.isoformat()
+    })
+
+def _array_to_base64_image(array):
+    """Convert numpy array to base64 encoded image"""
+    try:
+        # Normalize to 0-255
+        if array.max() > array.min():
+            normalized = ((array - array.min()) / (array.max() - array.min()) * 255).astype(np.uint8)
+        else:
+            normalized = np.zeros_like(array, dtype=np.uint8)
+        
+        # Convert to PIL Image
+        img = Image.fromarray(normalized, mode='L')
+        
+        # Convert to base64
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        img_str = base64.b64encode(buffer.getvalue()).decode()
+        
+        return f"data:image/png;base64,{img_str}"
+    except Exception as e:
+        return None
 
 @login_required
 @csrf_exempt

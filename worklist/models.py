@@ -133,6 +133,10 @@ class StudyAttachment(models.Model):
     """Additional files attached to studies (reports, etc.)"""
     ATTACHMENT_TYPES = [
         ('report', 'Report'),
+        ('previous_study', 'Previous Study'),
+        ('dicom_study', 'DICOM Study'),
+        ('word_document', 'Word Document'),
+        ('pdf_document', 'PDF Document'),
         ('image', 'Image'),
         ('document', 'Document'),
         ('other', 'Other'),
@@ -143,14 +147,90 @@ class StudyAttachment(models.Model):
     file_type = models.CharField(max_length=20, choices=ATTACHMENT_TYPES)
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True)
+    
+    # Enhanced metadata
+    file_size = models.BigIntegerField(default=0)
+    mime_type = models.CharField(max_length=100, blank=True)
+    thumbnail = models.ImageField(upload_to='attachment_thumbnails/', null=True, blank=True)
+    
+    # For DICOM study attachments
+    attached_study = models.ForeignKey('Study', on_delete=models.SET_NULL, null=True, blank=True,
+                                     related_name='referenced_by_attachments')
+    study_date = models.DateTimeField(null=True, blank=True)
+    modality = models.CharField(max_length=10, blank=True)
+    
+    # Metadata for documents
+    page_count = models.IntegerField(null=True, blank=True)
+    author = models.CharField(max_length=200, blank=True)
+    creation_date = models.DateTimeField(null=True, blank=True)
+    
+    # Access and permissions
+    is_public = models.BooleanField(default=True)
+    allowed_roles = models.JSONField(default=list, blank=True)  # ['admin', 'radiologist', 'facility']
+    
+    # Version control
+    version = models.CharField(max_length=20, default='1.0')
+    replaced_by = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True)
+    is_current_version = models.BooleanField(default=True)
+    
+    # Audit fields
     uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     upload_date = models.DateTimeField(auto_now_add=True)
+    last_accessed = models.DateTimeField(null=True, blank=True)
+    access_count = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['-upload_date']
 
     def __str__(self):
         return f"{self.name} - {self.study.accession_number}"
 
     def get_file_extension(self):
         return os.path.splitext(self.file.name)[1].lower()
+    
+    def is_viewable_in_browser(self):
+        """Check if file can be viewed directly in browser"""
+        viewable_types = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.txt']
+        return self.get_file_extension() in viewable_types
+    
+    def is_dicom_file(self):
+        """Check if attachment is a DICOM file"""
+        return self.file_type == 'dicom_study' or self.get_file_extension() == '.dcm'
+    
+    def increment_access_count(self):
+        """Increment access count and update last accessed time"""
+        self.access_count += 1
+        self.last_accessed = timezone.now()
+        self.save(update_fields=['access_count', 'last_accessed'])
+
+class AttachmentComment(models.Model):
+    """Comments on study attachments"""
+    attachment = models.ForeignKey(StudyAttachment, on_delete=models.CASCADE, related_name='comments')
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    comment = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Comment on {self.attachment.name} by {self.user.username}"
+
+class AttachmentVersion(models.Model):
+    """Track versions of attachments"""
+    attachment = models.ForeignKey(StudyAttachment, on_delete=models.CASCADE, related_name='versions')
+    version_number = models.CharField(max_length=20)
+    file = models.FileField(upload_to='attachment_versions/')
+    change_description = models.TextField(blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = ['attachment', 'version_number']
+    
+    def __str__(self):
+        return f"{self.attachment.name} v{self.version_number}"
 
 class StudyNote(models.Model):
     """Notes and comments on studies"""
