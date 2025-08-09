@@ -248,7 +248,11 @@
         {% if messages %}
             {% for message in messages %}
                 <div class="alert alert-{{ message.tags }}-medical alert-dismissible fade show" role="alert">
-                    <i class="fas fa-{{ message.tags == 'error' and 'exclamation-triangle' or 'info-circle' }} me-2"></i>
+                    {% if message.tags == 'error' %}
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                    {% else %}
+                        <i class="fas fa-info-circle me-2"></i>
+                    {% endif %}
                     {{ message }}
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
