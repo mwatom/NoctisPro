@@ -6,6 +6,7 @@ app_name = 'dicom_viewer'
 urlpatterns = [
     # Main viewer interfaces
     path('', views.viewer, name='viewer'),
+    path('standalone/', views.standalone_viewer, name='standalone_viewer'),
     path('study/<int:study_id>/', views.view_study, name='view_study'),
     
     # API endpoints for viewer functionality
