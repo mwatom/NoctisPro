@@ -1,0 +1,340 @@
+{% extends 'base.html' %}
+
+{% block title %}DICOM Viewer - Noctis Pro PACS{% endblock %}
+
+{% block extra_css %}
+<style>
+    .viewer-landing {
+        background: var(--dark-bg);
+        min-height: 100vh;
+        padding: 2rem 0;
+    }
+
+    .viewer-header {
+        background: var(--gradient-primary);
+        border-radius: 12px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        text-align: center;
+        box-shadow: var(--shadow-lg);
+    }
+
+    .viewer-title {
+        color: white;
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .viewer-subtitle {
+        color: rgba(255,255,255,0.9);
+        font-size: 1.1rem;
+        margin-bottom: 0;
+    }
+
+    .studies-section {
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: var(--shadow-md);
+        border: 1px solid var(--border-color);
+    }
+
+    .section-title {
+        color: var(--text-primary);
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+    }
+
+    .section-title i {
+        margin-right: 0.5rem;
+        color: var(--primary-color);
+    }
+
+    .study-card {
+        background: var(--dark-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+    .study-card:hover {
+        border-color: var(--primary-color);
+        box-shadow: 0 4px 12px rgba(139, 195, 74, 0.15);
+        transform: translateY(-2px);
+    }
+
+    .study-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .study-accession {
+        color: var(--primary-color);
+        font-weight: 600;
+        font-size: 1.1rem;
+    }
+
+    .study-status {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .status-completed {
+        background: rgba(76, 175, 80, 0.2);
+        color: #4CAF50;
+    }
+
+    .status-in_progress {
+        background: rgba(255, 193, 7, 0.2);
+        color: #FFC107;
+    }
+
+    .status-scheduled {
+        background: rgba(33, 150, 243, 0.2);
+        color: #2196F3;
+    }
+
+    .study-details {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+    }
+
+    .study-detail {
+        display: flex;
+        align-items: center;
+    }
+
+    .study-detail i {
+        margin-right: 0.5rem;
+        color: var(--primary-color);
+        width: 16px;
+    }
+
+    .no-studies {
+        text-align: center;
+        padding: 3rem;
+        color: var(--text-secondary);
+    }
+
+    .no-studies i {
+        font-size: 3rem;
+        color: var(--border-color);
+        margin-bottom: 1rem;
+    }
+
+    .actions-section {
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 2rem;
+        margin-top: 2rem;
+        box-shadow: var(--shadow-md);
+        border: 1px solid var(--border-color);
+    }
+
+    .action-buttons {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+    }
+
+    .action-btn {
+        display: flex;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        background: var(--gradient-primary);
+        color: white;
+        text-decoration: none;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        font-weight: 600;
+    }
+
+    .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(139, 195, 74, 0.3);
+        color: white;
+        text-decoration: none;
+    }
+
+    .action-btn i {
+        margin-right: 0.75rem;
+        font-size: 1.2rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="viewer-landing">
+    <div class="container-fluid">
+        <!-- Header Section -->
+        <div class="viewer-header">
+            <h1 class="viewer-title">
+                <i class="fas fa-eye me-3"></i>
+                DICOM Viewer
+            </h1>
+            <p class="viewer-subtitle">
+                Advanced medical imaging visualization and analysis platform
+            </p>
+        </div>
+
+        <!-- Recent Studies Section -->
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="studies-section">
+                    <h2 class="section-title">
+                        <i class="fas fa-clock"></i>
+                        Recent Studies
+                    </h2>
+                    
+                    {% if recent_studies %}
+                        {% for study in recent_studies %}
+                        <div class="study-card" onclick="window.location.href='{% url 'dicom_viewer:view_study' study.id %}'">
+                            <div class="study-header">
+                                <div class="study-accession">{{ study.accession_number }}</div>
+                                <div class="study-status status-{{ study.status }}">{{ study.get_status_display }}</div>
+                            </div>
+                            <div class="study-details">
+                                <div class="study-detail">
+                                    <i class="fas fa-user"></i>
+                                    <span>{{ study.patient.full_name }}</span>
+                                </div>
+                                <div class="study-detail">
+                                    <i class="fas fa-calendar"></i>
+                                    <span>{{ study.study_date|date:"M d, Y" }}</span>
+                                </div>
+                                <div class="study-detail">
+                                    <i class="fas fa-hospital"></i>
+                                    <span>{{ study.facility.name }}</span>
+                                </div>
+                                <div class="study-detail">
+                                    <i class="fas fa-stethoscope"></i>
+                                    <span>{{ study.modality.name }}</span>
+                                </div>
+                                {% if study.description %}
+                                <div class="study-detail">
+                                    <i class="fas fa-file-medical"></i>
+                                    <span>{{ study.description|truncatechars:50 }}</span>
+                                </div>
+                                {% endif %}
+                                <div class="study-detail">
+                                    <i class="fas fa-images"></i>
+                                    <span>{{ study.series_set.count }} Series</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="no-studies">
+                            <i class="fas fa-folder-open"></i>
+                            <h4>No Recent Studies</h4>
+                            <p>No studies have been accessed recently. Use the actions below to browse or upload new studies.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Actions Sidebar -->
+            <div class="col-lg-4">
+                <div class="actions-section">
+                    <h2 class="section-title">
+                        <i class="fas fa-tools"></i>
+                        Quick Actions
+                    </h2>
+                    <div class="action-buttons">
+                        <a href="{% url 'worklist:study_list' %}" class="action-btn">
+                            <i class="fas fa-list"></i>
+                            Browse All Studies
+                        </a>
+                        {% if user.is_admin %}
+                        <a href="{% url 'worklist:upload_study' %}" class="action-btn">
+                            <i class="fas fa-upload"></i>
+                            Upload New Study
+                        </a>
+                        {% endif %}
+                        <a href="{% url 'reports:report_list' %}" class="action-btn">
+                            <i class="fas fa-file-medical-alt"></i>
+                            View Reports
+                        </a>
+                        <a href="{% url 'worklist:dashboard' %}" class="action-btn">
+                            <i class="fas fa-tachometer-alt"></i>
+                            Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+
+                <!-- User Info -->
+                <div class="actions-section">
+                    <h2 class="section-title">
+                        <i class="fas fa-user"></i>
+                        Session Info
+                    </h2>
+                    <div class="study-details">
+                        <div class="study-detail">
+                            <i class="fas fa-user-circle"></i>
+                            <span>{{ user.get_full_name|default:user.username }}</span>
+                        </div>
+                        <div class="study-detail">
+                            <i class="fas fa-user-tag"></i>
+                            <span>{{ user.get_role_display }}</span>
+                        </div>
+                        {% if user.facility %}
+                        <div class="study-detail">
+                            <i class="fas fa-hospital"></i>
+                            <span>{{ user.facility.name }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="study-detail">
+                            <i class="fas fa-clock"></i>
+                            <span>{{ user.last_login|date:"M d, Y H:i" }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Add keyboard shortcut for quick navigation
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey || e.metaKey) {
+            switch(e.key) {
+                case 'l':
+                    e.preventDefault();
+                    window.location.href = "{% url 'worklist:study_list' %}";
+                    break;
+                case 'h':
+                    e.preventDefault();
+                    window.location.href = "{% url 'worklist:dashboard' %}";
+                    break;
+            }
+        }
+    });
+
+    // Add loading animation for study cards
+    document.querySelectorAll('.study-card').forEach(card => {
+        card.addEventListener('click', function() {
+            this.style.opacity = '0.7';
+            this.style.transform = 'scale(0.98)';
+        });
+    });
+</script>
+{% endblock %}
