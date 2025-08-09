@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('reports', '0001_initial'),
+        # ('reports', '0001_initial'),  # Temporarily disabled
         ('worklist', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
@@ -105,7 +105,7 @@ class Migration(migrations.Migration):
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('ai_model', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='training_data', to='ai_analysis.aimodel')),
                 ('image', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='worklist.dicomimage')),
-                ('report', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='reports.report')),
+                # ('report', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='reports.report')),  # Temporarily disabled
                 ('study', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='worklist.study')),
                 ('validated_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL)),
             ],
@@ -142,7 +142,7 @@ class Migration(migrations.Migration):
                 ('reviewed_at', models.DateTimeField(blank=True, null=True)),
                 ('generated_at', models.DateTimeField(auto_now_add=True)),
                 ('ai_analysis', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='ai_analysis.aianalysis')),
-                ('final_report', models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='auto_generated_source', to='reports.report')),
+                # ('final_report', models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='auto_generated_source', to='reports.report')),  # Temporarily disabled
                 ('reviewed_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='reviewed_auto_reports', to=settings.AUTH_USER_MODEL)),
                 ('study', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='auto_report', to='worklist.study')),
                 ('template', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='ai_analysis.autoreporttemplate')),

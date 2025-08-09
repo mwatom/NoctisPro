@@ -23,10 +23,8 @@ from django.shortcuts import redirect
 def home_redirect(request):
     """Redirect home page to login or dashboard based on authentication"""
     if request.user.is_authenticated:
-        if request.user.is_admin():
-            return redirect('admin_panel:dashboard')
-        else:
-            return redirect('worklist:dashboard')
+        # Temporarily redirect all authenticated users to worklist dashboard
+        return redirect('worklist:dashboard')
     return redirect('accounts:login')
 
 urlpatterns = [
@@ -35,10 +33,10 @@ urlpatterns = [
     path('', include('accounts.urls')),
     path('worklist/', include('worklist.urls')),
     path('viewer/', include('dicom_viewer.urls')),
-    path('reports/', include('reports.urls')),
+    # path('reports/', include('reports.urls')),  # Temporarily disabled
     path('admin-panel/', include('admin_panel.urls')),
-    path('chat/', include('chat.urls')),
-    path('notifications/', include('notifications.urls')),
+    # path('chat/', include('chat.urls')),  # Temporarily disabled
+    # path('notifications/', include('notifications.urls')),  # Temporarily disabled
     path('ai/', include('ai_analysis.urls')),
 ]
 
