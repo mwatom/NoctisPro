@@ -37,15 +37,51 @@
         font-weight: 600;
     }
 
-    .main-content {
-        display: flex;
-        min-height: calc(100vh - 80px);
+    /* Quick Actions Bar - moved to top */
+    .quick-actions-bar {
+        background: var(--card-bg);
+        border-bottom: 1px solid var(--border-color);
+        padding: 1rem 0;
+        margin-bottom: 1rem;
     }
 
+    .quick-action-btn {
+        background: var(--gradient-accent);
+        border: none;
+        border-radius: 8px;
+        color: white;
+        padding: 10px 16px;
+        font-weight: 500;
+        margin-right: 0.75rem;
+        margin-bottom: 0.5rem;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        font-size: 0.9rem;
+    }
+
+    .quick-action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(14, 165, 233, 0.3);
+        color: white;
+    }
+
+    .quick-action-btn i {
+        margin-right: 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    .main-content {
+        display: flex;
+        min-height: calc(100vh - 160px);
+    }
+
+    /* Minimal sidebar */
     .sidebar {
         background: var(--card-bg);
         border-right: 1px solid var(--border-color);
-        width: 350px;
+        width: 250px;
         padding: 1.5rem;
         overflow-y: auto;
     }
@@ -54,6 +90,7 @@
         flex: 1;
         padding: 2rem;
         overflow-y: auto;
+        background: var(--dark-bg);
     }
 
     .stats-grid {
@@ -90,7 +127,7 @@
 
     .stat-header {
         display: flex;
-        justify-content: between;
+        justify-content: space-between;
         align-items: center;
         margin-bottom: 1rem;
     }
@@ -104,25 +141,30 @@
         align-items: center;
         justify-content: center;
         color: var(--accent-color);
-        font-size: 20px;
+        font-size: 1.5rem;
     }
 
     .stat-value {
         font-size: 2.5rem;
         font-weight: 700;
         color: var(--text-primary);
-        margin: 0.5rem 0;
+        margin-bottom: 0.5rem;
     }
 
     .stat-label {
         color: var(--text-secondary);
         font-size: 0.9rem;
         font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.5rem;
     }
 
     .stat-change {
         font-size: 0.8rem;
-        margin-top: 0.5rem;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
     }
 
     .stat-change.positive {
@@ -133,128 +175,24 @@
         color: var(--danger-color);
     }
 
-    .section-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 1.5rem;
-    }
-
-    .section-title {
-        font-size: 1.5rem;
-        font-weight: 600;
-        color: var(--text-primary);
-    }
-
-    .filter-controls {
-        background: var(--card-bg);
-        border: 1px solid var(--border-color);
-        border-radius: 12px;
-        padding: 1.5rem;
-        margin-bottom: 2rem;
-    }
-
-    .filter-row {
-        display: grid;
-        grid-template-columns: 1fr 200px 200px 200px auto;
-        gap: 1rem;
-        align-items: end;
-    }
-
-    .search-input {
-        position: relative;
-    }
-
-    .search-input input {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        color: var(--text-primary);
-        padding: 12px 16px 12px 45px;
-        width: 100%;
-        font-size: 0.95rem;
-    }
-
-    .search-input .search-icon {
-        position: absolute;
-        left: 15px;
-        top: 50%;
-        transform: translateY(-50%);
-        color: var(--text-secondary);
-    }
-
-    .select-input {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        color: var(--text-primary);
-        padding: 12px 16px;
-        font-size: 0.95rem;
-    }
-
     .studies-table {
         background: var(--card-bg);
         border: 1px solid var(--border-color);
-        border-radius: 8px;
+        border-radius: 16px;
         overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
     }
 
-    .table-responsive {
-        overflow-x: auto;
-    }
-
-    .worklist-table {
-        width: 100%;
-        background: var(--card-bg);
-        border-collapse: collapse;
-        margin: 0;
-    }
-
-    .worklist-table thead th {
+    .table-header {
         background: var(--secondary-color);
-        color: var(--text-primary);
-        font-weight: 500;
-        font-size: 0.85rem;
-        text-align: left;
-        padding: 12px 16px;
+        padding: 1.5rem;
         border-bottom: 1px solid var(--border-color);
-        border-right: 1px solid rgba(71, 85, 105, 0.1);
-        position: sticky;
-        top: 0;
-        z-index: 10;
     }
 
-    .worklist-table thead th:last-child {
-        border-right: none;
-    }
-
-    .worklist-table tbody tr {
-        border-bottom: 1px solid rgba(71, 85, 105, 0.1);
-        transition: background-color 0.2s ease;
-    }
-
-    .worklist-table tbody tr:nth-child(even) {
-        background: rgba(30, 41, 59, 0.3);
-    }
-
-    .worklist-table tbody tr:nth-child(odd) {
-        background: rgba(15, 23, 42, 0.3);
-    }
-
-    .worklist-table tbody tr:hover {
-        background: rgba(14, 165, 233, 0.1) !important;
-        cursor: pointer;
-    }
-
-    .worklist-table tbody td {
-        padding: 8px 16px;
+    .table-title {
         color: var(--text-primary);
-        font-size: 0.9rem;
-        border-right: 1px solid rgba(71, 85, 105, 0.05);
-    }
-
-    .worklist-table tbody td:last-child {
-        border-right: none;
+        font-size: 1.25rem;
+        font-weight: 600;
     }
 
     .studies-list {
@@ -262,15 +200,35 @@
         overflow-y: auto;
     }
 
+    .study-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr auto;
+        gap: 1rem;
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        transition: all 0.3s ease;
+        cursor: pointer;
+        align-items: center;
+    }
+
+    .study-row:hover {
+        background: rgba(14, 165, 233, 0.05);
+        transform: translateX(4px);
+    }
+
+    .study-row:last-child {
+        border-bottom: none;
+    }
+
     .study-accession {
-        font-family: 'Courier New', monospace;
         font-weight: 600;
         color: var(--accent-color);
+        font-size: 0.9rem;
     }
 
     .patient-name {
-        font-weight: 500;
         color: var(--text-primary);
+        font-weight: 500;
     }
 
     .study-modality {
@@ -288,26 +246,34 @@
         padding: 6px 12px;
         border-radius: 20px;
         font-size: 0.8rem;
-        font-weight: 500;
-        text-align: center;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        width: fit-content;
     }
 
     .status-scheduled {
-        background: rgba(245, 158, 11, 0.2);
-        color: var(--warning-color);
-        border: 1px solid rgba(245, 158, 11, 0.3);
+        background: rgba(251, 191, 36, 0.2);
+        color: #fbbf24;
+        border: 1px solid rgba(251, 191, 36, 0.3);
     }
 
     .status-in_progress {
         background: rgba(14, 165, 233, 0.2);
-        color: var(--accent-color);
+        color: #0ea5e9;
         border: 1px solid rgba(14, 165, 233, 0.3);
     }
 
     .status-completed {
         background: rgba(16, 185, 129, 0.2);
-        color: var(--success-color);
+        color: #10b981;
         border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .status-suspended {
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.3);
     }
 
     .priority-badge {
@@ -316,30 +282,27 @@
         font-size: 0.75rem;
         font-weight: 600;
         text-transform: uppercase;
+        width: fit-content;
     }
 
     .priority-urgent {
-        background: rgba(239, 68, 68, 0.2);
-        color: var(--danger-color);
-        border: 1px solid rgba(239, 68, 68, 0.3);
+        background: var(--danger-color);
+        color: white;
     }
 
     .priority-high {
-        background: rgba(245, 158, 11, 0.2);
-        color: var(--warning-color);
-        border: 1px solid rgba(245, 158, 11, 0.3);
+        background: var(--warning-color);
+        color: white;
     }
 
     .priority-normal {
-        background: rgba(14, 165, 233, 0.2);
-        color: var(--accent-color);
-        border: 1px solid rgba(14, 165, 233, 0.3);
+        background: var(--success-color);
+        color: white;
     }
 
     .priority-low {
-        background: rgba(71, 85, 105, 0.2);
-        color: var(--text-secondary);
-        border: 1px solid rgba(71, 85, 105, 0.3);
+        background: var(--text-secondary);
+        color: var(--dark-bg);
     }
 
     .action-buttons {
@@ -349,52 +312,83 @@
 
     .action-btn {
         background: rgba(14, 165, 233, 0.1);
-        border: 1px solid rgba(14, 165, 233, 0.3);
+        border: 1px solid var(--accent-color);
         border-radius: 6px;
         color: var(--accent-color);
         padding: 6px 8px;
         font-size: 0.8rem;
-        transition: all 0.2s ease;
         text-decoration: none;
+        transition: all 0.3s ease;
     }
 
     .action-btn:hover {
         background: var(--accent-color);
         color: white;
-        transform: translateY(-1px);
+        transform: scale(1.05);
     }
 
-    .nav-link {
-        display: flex;
-        align-items: center;
-        padding: 12px 16px;
-        border-radius: 8px;
-        color: var(--text-secondary);
-        text-decoration: none;
-        margin-bottom: 4px;
-        transition: all 0.3s ease;
-        font-weight: 500;
-    }
-
-    .nav-link:hover,
-    .nav-link.active {
-        background: var(--accent-color);
-        color: white;
-        transform: translateX(4px);
-    }
-
-    .nav-link i {
-        margin-right: 12px;
-        width: 16px;
-        text-align: center;
-    }
-
-    .quick-actions {
+    /* Enhanced Filter Controls */
+    .filter-controls {
         background: var(--card-bg);
         border: 1px solid var(--border-color);
-        border-radius: 12px;
+        border-radius: 16px;
         padding: 1.5rem;
         margin-bottom: 2rem;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    .filter-row {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr 1fr auto;
+        gap: 1rem;
+        align-items: center;
+    }
+
+    .search-input {
+        position: relative;
+    }
+
+    .search-input input {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-primary);
+        padding: 12px 16px 12px 44px;
+        width: 100%;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+    }
+
+    .search-input input:focus {
+        border-color: var(--accent-color);
+        box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+        outline: none;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+    }
+
+    .select-input {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-primary);
+        padding: 12px 16px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .select-input:focus {
+        border-color: var(--accent-color);
+        box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+        outline: none;
     }
 
     .filter-section {
@@ -511,26 +505,6 @@
         display: none;
     }
 
-    .quick-action-btn {
-        background: var(--gradient-accent);
-        border: none;
-        border-radius: 8px;
-        color: white;
-        padding: 12px 20px;
-        font-weight: 500;
-        margin-right: 1rem;
-        margin-bottom: 0.5rem;
-        transition: all 0.3s ease;
-        text-decoration: none;
-        display: inline-block;
-    }
-
-    .quick-action-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(14, 165, 233, 0.3);
-        color: white;
-    }
-
     .refresh-indicator {
         position: absolute;
         top: 20px;
@@ -547,6 +521,63 @@
     .refresh-indicator.show {
         display: block;
         animation: fadeIn 0.3s ease;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+
+    .section-title {
+        color: var(--text-primary);
+        font-size: 1.5rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+    }
+
+    .text-accent {
+        color: var(--accent-color);
+    }
+
+    /* Navigation styles for sidebar */
+    .nav-link {
+        display: block;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.5rem;
+        color: var(--text-secondary);
+        text-decoration: none;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        font-size: 0.9rem;
+    }
+
+    .nav-link:hover {
+        background: rgba(14, 165, 233, 0.1);
+        color: var(--accent-color);
+        transform: translateX(4px);
+    }
+
+    .nav-link.active {
+        background: var(--gradient-accent);
+        color: white;
+    }
+
+    .nav-link i {
+        margin-right: 0.75rem;
+        width: 16px;
+        text-align: center;
+    }
+
+    .badge-medical {
+        background: var(--danger-color);
+        color: white;
+        padding: 2px 6px;
+        border-radius: 10px;
+        font-size: 0.7rem;
+        font-weight: 600;
     }
 
     /* Mobile responsiveness */
@@ -570,6 +601,13 @@
             grid-template-columns: 1fr;
             gap: 1rem;
         }
+
+        .quick-action-btn {
+            margin-right: 0.5rem;
+            margin-bottom: 0.75rem;
+            padding: 8px 12px;
+            font-size: 0.8rem;
+        }
     }
 
     @media (max-width: 768px) {
@@ -579,6 +617,14 @@
         
         .stats-grid {
             grid-template-columns: 1fr;
+        }
+
+        .quick-actions-bar {
+            padding: 0.75rem 0;
+        }
+
+        .sidebar {
+            display: none;
         }
     }
 </style>
@@ -650,28 +696,33 @@
         </div>
     </nav>
 
-    <div class="main-content">
-        <!-- Sidebar Navigation -->
-        <aside class="sidebar">
-            <div class="quick-actions">
-                <h6 class="text-primary mb-3">Quick Actions</h6>
+    <!-- Quick Actions Bar - Moved from sidebar to top -->
+    <div class="quick-actions-bar">
+        <div class="container-fluid">
+            <div class="d-flex flex-wrap align-items-center">
+                <h6 class="text-primary mb-0 me-4">Quick Actions:</h6>
                 <a href="{% url 'worklist:upload_study' %}" class="quick-action-btn">
-                    <i class="fas fa-upload me-2"></i>Upload Study
+                    <i class="fas fa-upload"></i>Upload Study
                 </a>
                 <a href="{% url 'dicom_viewer:viewer' %}" class="quick-action-btn">
-                    <i class="fas fa-eye me-2"></i>DICOM Viewer
+                    <i class="fas fa-eye"></i>DICOM Viewer
                 </a>
                 <a href="{% url 'dicom_viewer:standalone_viewer' %}" class="quick-action-btn">
-                    <i class="fas fa-folder-open me-2"></i>Standalone DICOM Viewer
+                    <i class="fas fa-folder-open"></i>Standalone Viewer
                 </a>
                 <a href="{% url 'reports:report_list' %}" class="quick-action-btn">
-                    <i class="fas fa-file-medical me-2"></i>Reports
+                    <i class="fas fa-file-medical"></i>Reports
                 </a>
                 <a href="{% url 'chat:chat_rooms' %}" class="quick-action-btn">
-                    <i class="fas fa-comments me-2"></i>Chat
+                    <i class="fas fa-comments"></i>Chat
                 </a>
             </div>
+        </div>
+    </div>
 
+    <div class="main-content">
+        <!-- Minimal Sidebar Navigation -->
+        <aside class="sidebar">
             <nav>
                 <h6 class="text-secondary mb-3 text-uppercase">Navigation</h6>
                 <a href="{% url 'worklist:dashboard' %}" class="nav-link active">
@@ -795,7 +846,7 @@
                 </div>
             </div>
 
-            <!-- Filter Controls -->
+            <!-- Enhanced Filter Controls -->
             <div class="filter-controls">
                 <div class="filter-row">
                     <div class="search-input">
