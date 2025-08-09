@@ -5,7 +5,16 @@ app_name = 'admin_panel'
 
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
+    
+    # User management
     path('users/', views.user_management, name='user_management'),
+    path('users/create/', views.user_create, name='user_create'),
+    path('users/edit/<int:user_id>/', views.user_edit, name='user_edit'),
+    path('users/delete/<int:user_id>/', views.user_delete, name='user_delete'),
+    
+    # Facility management
     path('facilities/', views.facility_management, name='facility_management'),
-    path('invoices/', views.invoice_management, name='invoice_management'),
+    path('facilities/create/', views.facility_create, name='facility_create'),
+    path('facilities/edit/<int:facility_id>/', views.facility_edit, name='facility_edit'),
+    path('facilities/delete/<int:facility_id>/', views.facility_delete, name='facility_delete'),
 ]
