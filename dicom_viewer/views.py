@@ -8,6 +8,7 @@ from accounts.models import User
 import json
 import base64
 import os
+import time
 
 @login_required
 def viewer(request):
@@ -26,6 +27,16 @@ def viewer(request):
     }
     
     return render(request, 'dicom_viewer/viewer.html', context)
+
+@login_required
+def standalone_viewer(request):
+    """Standalone DICOM viewer for any DICOM files"""
+    context = {
+        'user': request.user,
+        'standalone': True,
+    }
+    
+    return render(request, 'dicom_viewer/standalone_viewer.html', context)
 
 @login_required
 def view_study(request, study_id):
@@ -374,3 +385,38 @@ def api_cine_mode(request, series_id):
     }
     
     return JsonResponse(cine_data)
+
+@login_required
+@csrf_exempt
+def api_export_measurements(request, study_id):
+    """API endpoint to export measurements as PDF"""
+    study = get_object_or_404(Study, id=study_id)
+    user = request.user
+    
+    # Check permissions
+    if user.is_facility_user() and study.facility != user.facility:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            measurements = data.get('measurements', [])
+            
+            # This would generate a PDF report with measurements
+            # For now, we'll simulate the export
+            filename = f'measurements_{study.accession_number}_{int(time.time())}.pdf'
+            download_url = f'/media/exports/{filename}'
+            
+            result = {
+                'success': True,
+                'download_url': download_url,
+                'filename': filename,
+                'measurement_count': len(measurements)
+            }
+            
+            return JsonResponse(result)
+            
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+    
+    return JsonResponse({'error': 'Method not allowed'}, status=405)

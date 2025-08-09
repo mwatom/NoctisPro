@@ -661,6 +661,9 @@
                 <a href="{% url 'dicom_viewer:viewer' %}" class="quick-action-btn">
                     <i class="fas fa-eye me-2"></i>DICOM Viewer
                 </a>
+                <a href="{% url 'dicom_viewer:standalone_viewer' %}" class="quick-action-btn">
+                    <i class="fas fa-folder-open me-2"></i>Standalone DICOM Viewer
+                </a>
                 <a href="{% url 'reports:report_list' %}" class="quick-action-btn">
                     <i class="fas fa-file-medical me-2"></i>Reports
                 </a>
@@ -975,6 +978,56 @@ document.addEventListener('DOMContentLoaded', function() {
     window.viewStudy = function(studyId) {
         window.location.href = `/worklist/study/${studyId}/`;
     };
+    
+    // Refresh studies function
+    window.refreshStudies = function() {
+        const refreshBtn = document.querySelector('[onclick="refreshStudies()"]');
+        const icon = refreshBtn.querySelector('i');
+        
+        // Show loading state
+        icon.classList.add('fa-spin');
+        
+        fetch('{% url "worklist:api_studies" %}')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateStudiesList(data.studies);
+                    updateLastUpdate();
+                    showNotification('Studies refreshed successfully', 'success');
+                } else {
+                    showNotification('Failed to refresh studies', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('Error refreshing studies', 'error');
+            })
+            .finally(() => {
+                // Remove loading state
+                icon.classList.remove('fa-spin');
+            });
+    };
+    
+    // Notification system
+    function showNotification(message, type = 'info') {
+        const alertClass = type === 'error' ? 'danger' : type;
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${alertClass} alert-dismissible fade show`;
+        alert.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        alert.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.body.appendChild(alert);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (alert.parentNode) {
+                alert.remove();
+            }
+        }, 5000);
+    }
     
     // Search on enter key
     document.getElementById('searchInput').addEventListener('keypress', function(e) {
