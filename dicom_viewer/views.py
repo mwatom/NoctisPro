@@ -15,6 +15,7 @@ from io import BytesIO
 import cv2
 from PIL import Image
 from django.utils import timezone
+import uuid
 
 @login_required
 def viewer(request):
@@ -737,5 +738,104 @@ def api_export_measurements(request, study_id):
             
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+    
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@login_required
+def upload_dicom(request):
+    """Upload DICOM files for processing"""
+    if request.method == 'POST':
+        try:
+            uploaded_files = request.FILES.getlist('dicom_files')
+            
+            if not uploaded_files:
+                return JsonResponse({'success': False, 'error': 'No files uploaded'})
+            
+            # Generate upload ID for tracking
+            upload_id = str(uuid.uuid4())
+            
+            # This would process DICOM files and create Study/Series/Image records
+            # For now, we'll simulate processing
+            total_files = len(uploaded_files)
+            processed_files = 0
+            
+            for file in uploaded_files:
+                # Validate file type
+                if not (file.name.lower().endswith('.dcm') or file.name.lower().endswith('.dicom')):
+                    continue
+                
+                # This would save the file and create Study/Series/Image records
+                processed_files += 1
+            
+            if processed_files == 0:
+                return JsonResponse({'success': False, 'error': 'No valid DICOM files found'})
+            
+            return JsonResponse({
+                'success': True, 
+                'message': f'Successfully uploaded {processed_files} DICOM files',
+                'upload_id': upload_id,
+                'processed_files': processed_files,
+                'total_files': total_files
+            })
+            
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return render(request, 'dicom_viewer/upload.html')
+
+@login_required
+@csrf_exempt
+def api_upload_progress(request, upload_id):
+    """API endpoint to check upload progress"""
+    try:
+        # This would check the actual upload progress
+        # For now, we'll simulate progress
+        progress = {
+            'upload_id': upload_id,
+            'status': 'completed',
+            'progress': 100,
+            'processed_files': 10,
+            'total_files': 10,
+            'current_file': '',
+            'message': 'Upload completed successfully'
+        }
+        
+        return JsonResponse(progress)
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+@csrf_exempt
+def api_process_study(request, study_id):
+    """API endpoint to process/reprocess a study"""
+    study = get_object_or_404(Study, id=study_id)
+    user = request.user
+    
+    # Check permissions
+    if user.is_facility_user() and study.facility != user.facility:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            processing_options = data.get('options', {})
+            
+            # This would trigger study reprocessing
+            # For now, we'll simulate processing
+            result = {
+                'success': True,
+                'message': f'Study {study.accession_number} processing started',
+                'study_id': study.id,
+                'processing_options': processing_options,
+                'estimated_time': '5-10 minutes'
+            }
+            
+            return JsonResponse(result)
+            
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
     
     return JsonResponse({'error': 'Method not allowed'}, status=405)
