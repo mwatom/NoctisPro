@@ -36,7 +36,7 @@ urlpatterns = [
     # path('reports/', include('reports.urls')),  # Temporarily disabled
     path('admin-panel/', include('admin_panel.urls')),
     # path('chat/', include('chat.urls')),  # Temporarily disabled
-    # path('notifications/', include('notifications.urls')),  # Temporarily disabled
+    path('notifications/', include('notifications.urls')),  # Re-enabled to fix template URLs
     path('ai/', include('ai_analysis.urls')),
 ]
 
