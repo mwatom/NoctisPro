@@ -12,6 +12,7 @@ urlpatterns = [
     path('api/study/<int:study_id>/data/', views.api_study_data, name='api_study_data'),
     path('api/image/<int:image_id>/data/', views.api_image_data, name='api_image_data'),
     path('api/study/<int:study_id>/measurements/', views.api_measurements, name='api_measurements'),
+    path('api/study/<int:study_id>/measurements/export/', views.api_export_measurements, name='api_export_measurements'),
     path('api/study/<int:study_id>/reconstruction/', views.api_reconstruction, name='api_reconstruction'),
     path('api/hounsfield-units/', views.api_hounsfield_units, name='api_hounsfield_units'),
     path('api/window-level/', views.api_window_level, name='api_window_level'),

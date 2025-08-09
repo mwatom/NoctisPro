@@ -53,6 +53,45 @@
         display: flex;
         flex-direction: column;
         gap: 1rem;
+        transition: width 0.3s ease;
+    }
+    
+    .toolbar.collapsed {
+        width: 60px;
+    }
+    
+    .toolbar.collapsed .tool-section h6,
+    .toolbar.collapsed .tool-btn span {
+        display: none;
+    }
+    
+    .toolbar.collapsed .tool-btn {
+        justify-content: center;
+        padding: 8px;
+    }
+    
+    .toolbar-toggle {
+        position: absolute;
+        top: 50%;
+        right: -15px;
+        background: var(--accent-color);
+        border: none;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        cursor: pointer;
+        z-index: 10;
+        transform: translateY(-50%);
+        transition: all 0.3s ease;
+    }
+    
+    .toolbar-toggle:hover {
+        background: var(--secondary-color);
+        transform: translateY(-50%) scale(1.1);
     }
 
     .tool-section {
@@ -1396,16 +1435,285 @@ function getCsrfToken() {
     return document.querySelector('[name=csrfmiddlewaretoken]').value;
 }
 
-// Additional helper functions would be implemented here for:
-// - startLengthMeasurement()
-// - startAngleMeasurement() 
-// - startAreaMeasurement()
-// - scrollSlice()
-// - zoomViewport()
-// - nextImage()
-// - previousImage()
-// - showMeasurementReport()
-// And other specific measurement and manipulation tools
+// Measurement functions
+function startLengthMeasurement(event) {
+    // Start length measurement tool
+    const rect = event.target.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    
+    const measurement = {
+        type: 'length',
+        startX: x,
+        startY: y,
+        endX: x,
+        endY: y,
+        viewport: currentViewport,
+        timestamp: new Date().toISOString()
+    };
+    
+    // Add to measurements array
+    measurements.push(measurement);
+    updateMeasurementDisplay();
+    showNotification('Length measurement started', 'info');
+}
+
+function startAngleMeasurement(event) {
+    // Start angle measurement tool
+    const rect = event.target.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    
+    const measurement = {
+        type: 'angle',
+        point1: {x: x, y: y},
+        point2: {x: x, y: y},
+        point3: {x: x, y: y},
+        viewport: currentViewport,
+        timestamp: new Date().toISOString()
+    };
+    
+    measurements.push(measurement);
+    updateMeasurementDisplay();
+    showNotification('Angle measurement started', 'info');
+}
+
+function startAreaMeasurement(event) {
+    // Start area measurement tool
+    const rect = event.target.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    
+    const measurement = {
+        type: 'area',
+        points: [{x: x, y: y}],
+        viewport: currentViewport,
+        timestamp: new Date().toISOString()
+    };
+    
+    measurements.push(measurement);
+    updateMeasurementDisplay();
+    showNotification('Area measurement started', 'info');
+}
+
+function scrollSlice(delta) {
+    // Scroll through slices in current series
+    if (!currentSeries || !currentSeries.images.length) return;
+    
+    cineFrame = Math.max(0, Math.min(currentSeries.images.length - 1, cineFrame + delta));
+    
+    // Update slice displays
+    document.querySelectorAll('[id^="slice-"]').forEach(elem => {
+        elem.textContent = `${cineFrame + 1}/${currentSeries.images.length}`;
+    });
+    
+    // Update image display
+    loadImageAtFrame(cineFrame);
+}
+
+function zoomViewport(factor) {
+    // Zoom current viewport
+    const viewport = document.getElementById(`viewport${currentViewport}`);
+    const canvas = viewport.querySelector('canvas');
+    
+    if (canvas) {
+        const currentTransform = canvas.style.transform || 'scale(1)';
+        const currentScale = parseFloat(currentTransform.match(/scale\(([\d.]+)\)/)?.[1] || '1');
+        const newScale = Math.max(0.1, Math.min(5, currentScale * factor));
+        
+        canvas.style.transform = `scale(${newScale})`;
+        canvas.style.transformOrigin = 'center';
+        
+        showNotification(`Zoom: ${Math.round(newScale * 100)}%`, 'info');
+    }
+}
+
+function nextImage() {
+    // Go to next image in series
+    if (!currentSeries || !currentSeries.images.length) return;
+    
+    cineFrame = (cineFrame + 1) % currentSeries.images.length;
+    
+    // Update slice displays
+    document.querySelectorAll('[id^="slice-"]').forEach(elem => {
+        elem.textContent = `${cineFrame + 1}/${currentSeries.images.length}`;
+    });
+    
+    loadImageAtFrame(cineFrame);
+}
+
+function previousImage() {
+    // Go to previous image in series
+    if (!currentSeries || !currentSeries.images.length) return;
+    
+    cineFrame = cineFrame > 0 ? cineFrame - 1 : currentSeries.images.length - 1;
+    
+    // Update slice displays
+    document.querySelectorAll('[id^="slice-"]').forEach(elem => {
+        elem.textContent = `${cineFrame + 1}/${currentSeries.images.length}`;
+    });
+    
+    loadImageAtFrame(cineFrame);
+}
+
+function loadImageAtFrame(frameIndex) {
+    // Load specific image frame
+    if (!currentSeries || frameIndex >= currentSeries.images.length) return;
+    
+    const image = currentSeries.images[frameIndex];
+    const canvas = document.getElementById(`canvas${currentViewport}`);
+    const ctx = canvas.getContext('2d');
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw placeholder with frame info
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = '#0ea5e9';
+    ctx.font = '16px Inter';
+    ctx.textAlign = 'center';
+    ctx.fillText(`Image ${frameIndex + 1}/${currentSeries.images.length}`, canvas.width / 2, canvas.height / 2);
+    ctx.fillText(`Instance: ${image.instance_number}`, canvas.width / 2, canvas.height / 2 + 25);
+}
+
+function showMeasurementReport() {
+    // Show measurement report modal
+    if (measurements.length === 0) {
+        showNotification('No measurements to report', 'warning');
+        return;
+    }
+    
+    const reportHTML = `
+        <div class="modal fade" id="measurementReportModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content bg-dark">
+                    <div class="modal-header">
+                        <h5 class="modal-title text-light">Measurement Report</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="table-responsive">
+                            <table class="table table-dark table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Value</th>
+                                        <th>Viewport</th>
+                                        <th>Timestamp</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${measurements.map(m => `
+                                        <tr>
+                                            <td>${m.type}</td>
+                                            <td>${m.value || 'Calculating...'}</td>
+                                            <td>${m.viewport}</td>
+                                            <td>${new Date(m.timestamp).toLocaleString()}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-medical" onclick="exportMeasurements()">Export PDF</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existingModal = document.getElementById('measurementReportModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', reportHTML);
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('measurementReportModal'));
+    modal.show();
+}
+
+function exportMeasurements() {
+    // Export measurements as PDF
+    fetch(`/viewer/api/study/{{ study.id }}/measurements/export/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken()
+        },
+        body: JSON.stringify({ measurements: measurements })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Create download link
+            const link = document.createElement('a');
+            link.href = data.download_url;
+            link.download = data.filename;
+            link.click();
+            
+            showNotification('Measurements exported successfully', 'success');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Export failed', 'error');
+    });
+}
+
+// Enhanced notification system
+function showNotification(message, type = 'info') {
+    const notifications = document.getElementById('notifications') || createNotificationContainer();
+    
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show`;
+    notification.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    notifications.appendChild(notification);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 5000);
+}
+
+function createNotificationContainer() {
+    const container = document.createElement('div');
+    container.id = 'notifications';
+    container.style.cssText = 'position: fixed; top: 0; right: 0; z-index: 10000; pointer-events: none;';
+    container.style.pointerEvents = 'none';
+    document.body.appendChild(container);
+    return container;
+}
+
+// Fix crosshair display
+function updateCrosshair(x, y) {
+    const crosshair = document.getElementById(`crosshair${currentViewport}`);
+    if (crosshair) {
+        const horizontal = crosshair.querySelector('.crosshair-horizontal');
+        const vertical = crosshair.querySelector('.crosshair-vertical');
+        
+        if (horizontal && vertical) {
+            horizontal.style.top = y + 'px';
+            vertical.style.left = x + 'px';
+            crosshair.style.display = 'block';
+        }
+    }
+}
 
 </script>
 {% endblock %}

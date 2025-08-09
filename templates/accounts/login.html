@@ -370,6 +370,27 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+
+    // Notification system
+    function showNotification(message, type = 'info') {
+        const alertClass = type === 'error' ? 'danger' : type;
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${alertClass} alert-dismissible fade show`;
+        alert.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        alert.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.body.appendChild(alert);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (alert.parentNode) {
+                alert.remove();
+            }
+        }, 5000);
+    }
 });
 </script>
 {% endblock %}
