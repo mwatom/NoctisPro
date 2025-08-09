@@ -1,0 +1,371 @@
+{% extends 'base.html' %}
+
+{% block title %}Login - Noctis Pro PACS{% endblock %}
+
+{% block extra_css %}
+<style>
+    .login-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        background: linear-gradient(135deg, 
+            rgba(15, 23, 42, 0.95) 0%, 
+            rgba(30, 41, 59, 0.9) 50%, 
+            rgba(15, 23, 42, 0.95) 100%),
+            url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><defs><radialGradient id="medical-bg" cx="0.5" cy="0.5" r="0.5"><stop offset="0%" stop-color="rgba(14,165,233,0.1)"/><stop offset="100%" stop-color="rgba(15,23,42,0.3)"/></radialGradient></defs><rect width="200" height="200" fill="url(%23medical-bg)"/><circle cx="100" cy="100" r="2" fill="rgba(14,165,233,0.2)"/><circle cx="150" cy="60" r="1.5" fill="rgba(14,165,233,0.15)"/><circle cx="50" cy="140" r="1" fill="rgba(14,165,233,0.1)"/></svg>');
+        background-size: cover, 400px 400px;
+        background-position: center, center;
+    }
+
+    .login-card {
+        background: rgba(30, 41, 59, 0.95);
+        border: 1px solid rgba(71, 85, 105, 0.3);
+        border-radius: 20px;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4), 
+                    0 0 100px rgba(14, 165, 233, 0.1);
+        backdrop-filter: blur(20px);
+        padding: 3rem;
+        width: 100%;
+        max-width: 450px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .login-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #0ea5e9, #0284c7, #0369a1);
+        border-radius: 20px 20px 0 0;
+    }
+
+    .logo-container {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .logo-icon {
+        background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+        border-radius: 50%;
+        width: 80px;
+        height: 80px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        color: white;
+        margin: 0 auto 1rem;
+        box-shadow: 0 10px 30px rgba(14, 165, 233, 0.3);
+    }
+
+    .system-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #f8fafc;
+        margin-bottom: 0.5rem;
+        letter-spacing: -0.02em;
+    }
+
+    .system-subtitle {
+        color: #cbd5e1;
+        font-size: 0.95rem;
+        font-weight: 400;
+        margin-bottom: 2rem;
+    }
+
+    .form-floating {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-control {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(71, 85, 105, 0.5);
+        border-radius: 12px;
+        color: #f8fafc;
+        padding: 1rem 1.25rem;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        height: auto;
+    }
+
+    .form-control:focus {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: #0ea5e9;
+        box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+        color: #f8fafc;
+    }
+
+    .form-control::placeholder {
+        color: #94a3b8;
+    }
+
+    .form-floating > label {
+        color: #94a3b8;
+        font-weight: 500;
+        padding: 1rem 1.25rem;
+    }
+
+    .login-btn {
+        background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+        border: none;
+        border-radius: 12px;
+        color: white;
+        font-weight: 600;
+        padding: 1rem 2rem;
+        font-size: 1rem;
+        width: 100%;
+        transition: all 0.3s ease;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .login-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 15px 35px rgba(14, 165, 233, 0.4);
+        color: white;
+    }
+
+    .login-btn:active {
+        transform: translateY(0);
+    }
+
+    .login-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        transition: left 0.5s ease;
+    }
+
+    .login-btn:hover::before {
+        left: 100%;
+    }
+
+    .features-list {
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 1px solid rgba(71, 85, 105, 0.3);
+    }
+
+    .feature-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 0.75rem;
+        color: #cbd5e1;
+        font-size: 0.9rem;
+    }
+
+    .feature-icon {
+        color: #0ea5e9;
+        margin-right: 0.75rem;
+        font-size: 1rem;
+    }
+
+    .security-badge {
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid rgba(16, 185, 129, 0.2);
+        border-radius: 20px;
+        color: #10b981;
+        padding: 0.5rem 1rem;
+        font-size: 0.8rem;
+        margin-top: 1rem;
+        text-align: center;
+        font-weight: 500;
+    }
+
+    .version-info {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: #64748b;
+        font-size: 0.8rem;
+        text-align: center;
+    }
+
+    /* Loading state */
+    .login-btn.loading {
+        pointer-events: none;
+        color: transparent;
+    }
+
+    .login-btn.loading::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 20px;
+        height: 20px;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s linear infinite;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 576px) {
+        .login-card {
+            padding: 2rem 1.5rem;
+            margin: 1rem;
+            border-radius: 16px;
+        }
+        
+        .system-title {
+            font-size: 1.75rem;
+        }
+        
+        .logo-icon {
+            width: 70px;
+            height: 70px;
+            font-size: 28px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="login-card fade-in">
+        <div class="logo-container">
+            <div class="logo-icon">
+                <i class="fas fa-user-md"></i>
+            </div>
+            <h1 class="system-title">Noctis Pro</h1>
+            <p class="system-subtitle">Professional PACS System</p>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}-medical alert-dismissible fade show" role="alert">
+                    <i class="fas fa-{{ message.tags == 'error' and 'exclamation-triangle' or 'info-circle' }} me-2"></i>
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="post" id="loginForm">
+            {% csrf_token %}
+            <div class="form-floating">
+                <input type="text" class="form-control" id="username" name="username" 
+                       placeholder="Username" required autocomplete="username">
+                <label for="username">
+                    <i class="fas fa-user me-2"></i>Username
+                </label>
+            </div>
+
+            <div class="form-floating">
+                <input type="password" class="form-control" id="password" name="password" 
+                       placeholder="Password" required autocomplete="current-password">
+                <label for="password">
+                    <i class="fas fa-lock me-2"></i>Password
+                </label>
+            </div>
+
+            <button type="submit" class="login-btn" id="loginButton">
+                <i class="fas fa-sign-in-alt me-2"></i>
+                Sign In
+            </button>
+        </form>
+
+        <div class="features-list">
+            <div class="feature-item">
+                <i class="fas fa-shield-alt feature-icon"></i>
+                Secure medical imaging platform
+            </div>
+            <div class="feature-item">
+                <i class="fas fa-cloud feature-icon"></i>
+                Cloud-based DICOM storage
+            </div>
+            <div class="feature-item">
+                <i class="fas fa-robot feature-icon"></i>
+                AI-powered diagnostics
+            </div>
+            <div class="feature-item">
+                <i class="fas fa-comments feature-icon"></i>
+                Real-time collaboration
+            </div>
+        </div>
+
+        <div class="security-badge">
+            <i class="fas fa-lock me-1"></i>
+            256-bit SSL Encryption
+        </div>
+    </div>
+
+    <div class="version-info">
+        Noctis Pro PACS v1.0 | © 2024 Medical Imaging Solutions
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const loginForm = document.getElementById('loginForm');
+    const loginButton = document.getElementById('loginButton');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+
+    // Focus on username field
+    usernameInput.focus();
+
+    // Handle form submission
+    loginForm.addEventListener('submit', function(e) {
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value;
+
+        if (!username || !password) {
+            e.preventDefault();
+            showNotification('Please enter both username and password', 'error');
+            return;
+        }
+
+        // Show loading state
+        loginButton.classList.add('loading');
+        loginButton.disabled = true;
+    });
+
+    // Remove loading state if form validation fails
+    setTimeout(() => {
+        loginButton.classList.remove('loading');
+        loginButton.disabled = false;
+    }, 100);
+
+    // Enhanced keyboard navigation
+    usernameInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            passwordInput.focus();
+        }
+    });
+
+    passwordInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            loginForm.submit();
+        }
+    });
+
+    // Input validation styling
+    [usernameInput, passwordInput].forEach(input => {
+        input.addEventListener('input', function() {
+            if (this.value.trim() === '') {
+                this.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+            } else {
+                this.style.borderColor = 'rgba(14, 165, 233, 0.5)';
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

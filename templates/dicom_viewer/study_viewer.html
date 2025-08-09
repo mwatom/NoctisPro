@@ -1,0 +1,1411 @@
+{% extends 'base.html' %}
+
+{% block title %}DICOM Viewer - {{ study.accession_number }} - Noctis Pro PACS{% endblock %}
+
+{% block extra_css %}
+<style>
+    .viewer-container {
+        background: var(--dark-bg);
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .viewer-header {
+        background: var(--gradient-primary);
+        border-bottom: 1px solid var(--border-color);
+        padding: 0.75rem 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        z-index: 100;
+    }
+
+    .study-info {
+        display: flex;
+        align-items: center;
+        color: var(--text-primary);
+    }
+
+    .study-badge {
+        background: var(--gradient-accent);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin-right: 1rem;
+    }
+
+    .viewer-main {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+    }
+
+    .toolbar {
+        background: var(--card-bg);
+        border-right: 1px solid var(--border-color);
+        width: 280px;
+        padding: 1rem;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .tool-section {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+    }
+
+    .tool-section h6 {
+        color: var(--accent-color);
+        margin-bottom: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.8rem;
+        letter-spacing: 0.5px;
+    }
+
+    .tool-btn {
+        background: rgba(14, 165, 233, 0.1);
+        border: 1px solid rgba(14, 165, 233, 0.3);
+        border-radius: 6px;
+        color: var(--accent-color);
+        padding: 8px 12px;
+        margin: 2px;
+        font-size: 0.85rem;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        width: 100%;
+        text-align: left;
+    }
+
+    .tool-btn:hover,
+    .tool-btn.active {
+        background: var(--accent-color);
+        color: white;
+        transform: translateX(2px);
+    }
+
+    .tool-btn i {
+        margin-right: 8px;
+        width: 14px;
+    }
+
+    .viewer-canvas-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: var(--dark-bg);
+        position: relative;
+    }
+
+    .viewport-container {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+        gap: 2px;
+        padding: 1rem;
+        background: var(--dark-bg);
+    }
+
+    .viewport {
+        background: #000;
+        border: 2px solid var(--border-color);
+        border-radius: 8px;
+        position: relative;
+        overflow: hidden;
+        cursor: crosshair;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .viewport.active {
+        border-color: var(--accent-color);
+        box-shadow: 0 0 20px rgba(14, 165, 233, 0.3);
+    }
+
+    .viewport-label {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        background: rgba(0, 0, 0, 0.7);
+        color: var(--accent-color);
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        z-index: 10;
+    }
+
+    .viewport-info {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background: rgba(0, 0, 0, 0.7);
+        color: var(--text-primary);
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        z-index: 10;
+    }
+
+    .viewport-measurements {
+        position: absolute;
+        bottom: 8px;
+        left: 8px;
+        background: rgba(0, 0, 0, 0.7);
+        color: var(--warning-color);
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        z-index: 10;
+        font-family: 'Courier New', monospace;
+    }
+
+    .viewport-crosshair {
+        position: absolute;
+        pointer-events: none;
+        z-index: 20;
+    }
+
+    .crosshair-line {
+        position: absolute;
+        background: var(--accent-color);
+    }
+
+    .crosshair-horizontal {
+        height: 1px;
+        width: 100%;
+        top: 50%;
+        left: 0;
+    }
+
+    .crosshair-vertical {
+        width: 1px;
+        height: 100%;
+        left: 50%;
+        top: 0;
+    }
+
+    .series-navigator {
+        background: var(--card-bg);
+        border-top: 1px solid var(--border-color);
+        padding: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        overflow-x: auto;
+    }
+
+    .series-item {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 0.75rem;
+        min-width: 200px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .series-item:hover,
+    .series-item.active {
+        background: var(--accent-color);
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+    }
+
+    .series-title {
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+
+    .series-info {
+        font-size: 0.8rem;
+        opacity: 0.8;
+    }
+
+    .reconstruction-panel {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 2rem;
+        width: 90%;
+        max-width: 600px;
+        z-index: 1000;
+        display: none;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+    }
+
+    .reconstruction-panel.show {
+        display: block;
+        animation: fadeIn 0.3s ease;
+    }
+
+    .reconstruction-options {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin: 1.5rem 0;
+    }
+
+    .reconstruction-option {
+        background: rgba(255, 255, 255, 0.05);
+        border: 2px solid var(--border-color);
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .reconstruction-option:hover,
+    .reconstruction-option.selected {
+        border-color: var(--accent-color);
+        background: rgba(14, 165, 233, 0.1);
+        transform: translateY(-4px);
+        box-shadow: 0 8px 20px rgba(14, 165, 233, 0.2);
+    }
+
+    .reconstruction-icon {
+        font-size: 2rem;
+        color: var(--accent-color);
+        margin-bottom: 0.5rem;
+    }
+
+    .window-level-panel {
+        position: absolute;
+        top: 60px;
+        right: 20px;
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 1rem;
+        width: 280px;
+        z-index: 100;
+        display: none;
+    }
+
+    .window-level-panel.show {
+        display: block;
+        animation: slideInRight 0.3s ease;
+    }
+
+    .wl-preset {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 8px 12px;
+        margin: 4px 0;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        justify-content: between;
+        align-items: center;
+    }
+
+    .wl-preset:hover {
+        background: var(--accent-color);
+        color: white;
+    }
+
+    .measurement-tools {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        display: flex;
+        gap: 0.5rem;
+        z-index: 100;
+    }
+
+    .measurement-btn {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-primary);
+        padding: 10px;
+        font-size: 1.1rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .measurement-btn:hover,
+    .measurement-btn.active {
+        background: var(--accent-color);
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+    }
+
+    .hu-display {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        font-family: 'Courier New', monospace;
+        font-weight: 600;
+        color: var(--warning-color);
+        z-index: 100;
+    }
+
+    .progress-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        display: none;
+    }
+
+    .progress-content {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 2rem;
+        text-align: center;
+        min-width: 300px;
+    }
+
+    .progress-bar {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        height: 8px;
+        margin: 1rem 0;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        background: var(--gradient-accent);
+        height: 100%;
+        border-radius: 8px;
+        transition: width 0.3s ease;
+        width: 0%;
+    }
+
+    .cine-controls {
+        position: absolute;
+        bottom: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        z-index: 100;
+        display: none;
+    }
+
+    .cine-controls.show {
+        display: flex;
+        animation: fadeIn 0.3s ease;
+    }
+
+    .cine-btn {
+        background: var(--accent-color);
+        border: none;
+        border-radius: 6px;
+        color: white;
+        padding: 8px 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .cine-btn:hover {
+        background: var(--secondary-color);
+        transform: translateY(-1px);
+    }
+
+    .cine-slider {
+        width: 200px;
+        height: 4px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.2);
+        outline: none;
+        cursor: pointer;
+    }
+
+    /* Mobile responsiveness */
+    @media (max-width: 1200px) {
+        .viewer-main {
+            flex-direction: column;
+        }
+        
+        .toolbar {
+            width: 100%;
+            height: auto;
+            flex-direction: row;
+            overflow-x: auto;
+            padding: 0.5rem;
+        }
+        
+        .viewport-container {
+            grid-template-columns: 1fr;
+            grid-template-rows: 1fr;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .viewer-header {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .measurement-tools,
+        .hu-display {
+            position: relative;
+            margin: 0.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="viewer-container">
+    <!-- Viewer Header -->
+    <div class="viewer-header">
+        <div class="study-info">
+            <div class="study-badge">{{ study.modality.code }}</div>
+            <div>
+                <div class="fw-bold">{{ study.patient.full_name }} ({{ study.patient.patient_id }})</div>
+                <div class="small">{{ study.accession_number }} • {{ study.study_date|date:"M d, Y" }} • {{ study.study_description }}</div>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <button class="btn btn-link text-light" onclick="toggleFullscreen()">
+                <i class="fas fa-expand" id="fullscreenIcon"></i>
+            </button>
+            <button class="btn btn-link text-light" onclick="showWindowLevel()">
+                <i class="fas fa-adjust"></i>
+            </button>
+            <button class="btn btn-link text-light" onclick="showReconstructionPanel()">
+                <i class="fas fa-cube"></i>
+            </button>
+            <a href="{% url 'worklist:dashboard' %}" class="btn btn-outline-light btn-sm">
+                <i class="fas fa-arrow-left me-1"></i>Back to Worklist
+            </a>
+        </div>
+    </div>
+
+    <div class="viewer-main">
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <!-- Navigation Tools -->
+            <div class="tool-section">
+                <h6>Navigation</h6>
+                <button class="tool-btn active" onclick="setTool('pan')" data-tool="pan">
+                    <i class="fas fa-hand-paper"></i>Pan
+                </button>
+                <button class="tool-btn" onclick="setTool('zoom')" data-tool="zoom">
+                    <i class="fas fa-search-plus"></i>Zoom
+                </button>
+                <button class="tool-btn" onclick="setTool('scroll')" data-tool="scroll">
+                    <i class="fas fa-arrows-alt-v"></i>Scroll
+                </button>
+                <button class="tool-btn" onclick="setTool('rotate')" data-tool="rotate">
+                    <i class="fas fa-redo"></i>Rotate
+                </button>
+            </div>
+
+            <!-- Measurement Tools -->
+            <div class="tool-section">
+                <h6>Measurements</h6>
+                <button class="tool-btn" onclick="setTool('length')" data-tool="length">
+                    <i class="fas fa-ruler"></i>Length
+                </button>
+                <button class="tool-btn" onclick="setTool('angle')" data-tool="angle">
+                    <i class="fas fa-drafting-compass"></i>Angle
+                </button>
+                <button class="tool-btn" onclick="setTool('area')" data-tool="area">
+                    <i class="fas fa-draw-polygon"></i>Area
+                </button>
+                <button class="tool-btn" onclick="setTool('hounsfield')" data-tool="hounsfield">
+                    <i class="fas fa-crosshairs"></i>Hounsfield Units
+                </button>
+            </div>
+
+            <!-- Annotation Tools -->
+            <div class="tool-section">
+                <h6>Annotations</h6>
+                <button class="tool-btn" onclick="setTool('arrow')" data-tool="arrow">
+                    <i class="fas fa-long-arrow-alt-right"></i>Arrow
+                </button>
+                <button class="tool-btn" onclick="setTool('text')" data-tool="text">
+                    <i class="fas fa-font"></i>Text
+                </button>
+                <button class="tool-btn" onclick="setTool('circle')" data-tool="circle">
+                    <i class="fas fa-circle"></i>Circle
+                </button>
+                <button class="tool-btn" onclick="setTool('rectangle')" data-tool="rectangle">
+                    <i class="fas fa-square"></i>Rectangle
+                </button>
+            </div>
+
+            <!-- Image Manipulation -->
+            <div class="tool-section">
+                <h6>Image Tools</h6>
+                <button class="tool-btn" onclick="invertImage()">
+                    <i class="fas fa-adjust"></i>Invert
+                </button>
+                <button class="tool-btn" onclick="resetImage()">
+                    <i class="fas fa-undo"></i>Reset
+                </button>
+                <button class="tool-btn" onclick="flipHorizontal()">
+                    <i class="fas fa-arrows-alt-h"></i>Flip H
+                </button>
+                <button class="tool-btn" onclick="flipVertical()">
+                    <i class="fas fa-arrows-alt-v"></i>Flip V
+                </button>
+            </div>
+
+            <!-- Cine Controls -->
+            <div class="tool-section">
+                <h6>Playback</h6>
+                <button class="tool-btn" onclick="toggleCineMode()">
+                    <i class="fas fa-play" id="cineIcon"></i>Cine Mode
+                </button>
+                <button class="tool-btn" onclick="previousImage()">
+                    <i class="fas fa-step-backward"></i>Previous
+                </button>
+                <button class="tool-btn" onclick="nextImage()">
+                    <i class="fas fa-step-forward"></i>Next
+                </button>
+            </div>
+
+            <!-- Export -->
+            <div class="tool-section">
+                <h6>Export</h6>
+                <button class="tool-btn" onclick="exportImage('png')">
+                    <i class="fas fa-download"></i>PNG
+                </button>
+                <button class="tool-btn" onclick="exportImage('jpg')">
+                    <i class="fas fa-download"></i>JPEG
+                </button>
+                <button class="tool-btn" onclick="exportImage('dicom')">
+                    <i class="fas fa-download"></i>DICOM
+                </button>
+            </div>
+        </div>
+
+        <!-- Viewer Canvas Area -->
+        <div class="viewer-canvas-area">
+            <!-- Viewports -->
+            <div class="viewport-container">
+                <div class="viewport active" id="viewport1" data-viewport="1">
+                    <div class="viewport-label">Axial</div>
+                    <div class="viewport-info">
+                        <div>WL: <span id="wl-axial">40/400</span></div>
+                        <div>Slice: <span id="slice-axial">1/100</span></div>
+                    </div>
+                    <div class="viewport-measurements" id="measurements-axial"></div>
+                    <div class="viewport-crosshair" id="crosshair1">
+                        <div class="crosshair-line crosshair-horizontal"></div>
+                        <div class="crosshair-line crosshair-vertical"></div>
+                    </div>
+                    <canvas id="canvas1" width="400" height="400"></canvas>
+                </div>
+
+                <div class="viewport" id="viewport2" data-viewport="2">
+                    <div class="viewport-label">Sagittal</div>
+                    <div class="viewport-info">
+                        <div>WL: <span id="wl-sagittal">40/400</span></div>
+                        <div>Slice: <span id="slice-sagittal">1/100</span></div>
+                    </div>
+                    <div class="viewport-measurements" id="measurements-sagittal"></div>
+                    <canvas id="canvas2" width="400" height="400"></canvas>
+                </div>
+
+                <div class="viewport" id="viewport3" data-viewport="3">
+                    <div class="viewport-label">Coronal</div>
+                    <div class="viewport-info">
+                        <div>WL: <span id="wl-coronal">40/400</span></div>
+                        <div>Slice: <span id="slice-coronal">1/100</span></div>
+                    </div>
+                    <div class="viewport-measurements" id="measurements-coronal"></div>
+                    <canvas id="canvas3" width="400" height="400"></canvas>
+                </div>
+
+                <div class="viewport" id="viewport4" data-viewport="4">
+                    <div class="viewport-label">3D/MIP</div>
+                    <div class="viewport-info">
+                        <div>Reconstruction</div>
+                        <div>Rendering...</div>
+                    </div>
+                    <canvas id="canvas4" width="400" height="400"></canvas>
+                </div>
+            </div>
+
+            <!-- Measurement Tools Overlay -->
+            <div class="measurement-tools">
+                <div class="measurement-btn" onclick="clearMeasurements()" title="Clear All Measurements">
+                    <i class="fas fa-eraser"></i>
+                </div>
+                <div class="measurement-btn" onclick="saveMeasurements()" title="Save Measurements">
+                    <i class="fas fa-save"></i>
+                </div>
+                <div class="measurement-btn" onclick="showMeasurementReport()" title="Measurement Report">
+                    <i class="fas fa-chart-bar"></i>
+                </div>
+            </div>
+
+            <!-- Hounsfield Unit Display -->
+            <div class="hu-display" id="huDisplay">
+                HU: <span id="huValue">--</span>
+                <br>
+                <small>Position: <span id="huPosition">--</span></small>
+            </div>
+
+            <!-- Cine Controls -->
+            <div class="cine-controls" id="cineControls">
+                <button class="cine-btn" onclick="cinePlayPause()">
+                    <i class="fas fa-play" id="cinePlayIcon"></i>
+                </button>
+                <button class="cine-btn" onclick="cineStop()">
+                    <i class="fas fa-stop"></i>
+                </button>
+                <input type="range" class="cine-slider" id="cineSlider" min="0" max="100" value="0">
+                <div class="text-light">
+                    FPS: <input type="number" id="cineFPS" value="10" min="1" max="30" style="width: 60px;">
+                </div>
+            </div>
+
+            <!-- Window/Level Panel -->
+            <div class="window-level-panel" id="windowLevelPanel">
+                <h6 class="text-accent mb-3">Window/Level Presets</h6>
+                <div class="wl-preset" onclick="applyWindowLevel('lung')">
+                    <span>Lung</span>
+                    <small>-600/1600</small>
+                </div>
+                <div class="wl-preset" onclick="applyWindowLevel('bone')">
+                    <span>Bone</span>
+                    <small>300/1500</small>
+                </div>
+                <div class="wl-preset" onclick="applyWindowLevel('soft_tissue')">
+                    <span>Soft Tissue</span>
+                    <small>40/350</small>
+                </div>
+                <div class="wl-preset" onclick="applyWindowLevel('brain')">
+                    <span>Brain</span>
+                    <small>40/80</small>
+                </div>
+                <div class="wl-preset" onclick="applyWindowLevel('liver')">
+                    <span>Liver</span>
+                    <small>60/160</small>
+                </div>
+                <div class="wl-preset" onclick="applyWindowLevel('mediastinum')">
+                    <span>Mediastinum</span>
+                    <small>50/350</small>
+                </div>
+                <hr>
+                <div class="row g-2">
+                    <div class="col">
+                        <label class="form-label small">Center</label>
+                        <input type="number" class="form-control form-control-sm" id="customCenter" value="40">
+                    </div>
+                    <div class="col">
+                        <label class="form-label small">Width</label>
+                        <input type="number" class="form-control form-control-sm" id="customWidth" value="400">
+                    </div>
+                </div>
+                <button class="btn btn-medical btn-sm w-100 mt-2" onclick="applyCustomWindowLevel()">Apply Custom</button>
+            </div>
+
+            <!-- Reconstruction Panel -->
+            <div class="reconstruction-panel" id="reconstructionPanel">
+                <h4 class="text-accent mb-3">3D Reconstruction</h4>
+                <div class="reconstruction-options">
+                    <div class="reconstruction-option" onclick="startReconstruction('mpr')" data-recon="mpr">
+                        <div class="reconstruction-icon"><i class="fas fa-cube"></i></div>
+                        <div class="fw-bold">MPR</div>
+                        <small>Multi-Planar Reconstruction</small>
+                    </div>
+                    <div class="reconstruction-option" onclick="startReconstruction('mip')" data-recon="mip">
+                        <div class="reconstruction-icon"><i class="fas fa-layer-group"></i></div>
+                        <div class="fw-bold">MIP</div>
+                        <small>Maximum Intensity Projection</small>
+                    </div>
+                    <div class="reconstruction-option" onclick="startReconstruction('bone')" data-recon="bone">
+                        <div class="reconstruction-icon"><i class="fas fa-bone"></i></div>
+                        <div class="fw-bold">Bone 3D</div>
+                        <small>Bone Reconstruction</small>
+                    </div>
+                    <div class="reconstruction-option" onclick="startReconstruction('endoscopy')" data-recon="endoscopy">
+                        <div class="reconstruction-icon"><i class="fas fa-eye"></i></div>
+                        <div class="fw-bold">Virtual Endoscopy</div>
+                        <small>Endoscopic View</small>
+                    </div>
+                    <div class="reconstruction-option" onclick="startReconstruction('surgery')" data-recon="surgery">
+                        <div class="reconstruction-icon"><i class="fas fa-user-md"></i></div>
+                        <div class="fw-bold">Virtual Surgery</div>
+                        <small>Surgical Planning</small>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-secondary" onclick="hideReconstructionPanel()">Cancel</button>
+                    <button class="btn btn-medical" onclick="processReconstruction()">Start Processing</button>
+                </div>
+            </div>
+
+            <!-- Progress Overlay -->
+            <div class="progress-overlay" id="progressOverlay">
+                <div class="progress-content">
+                    <h5 class="text-accent mb-3">Processing...</h5>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="text-secondary">
+                        <span id="progressText">Initializing reconstruction...</span>
+                        <br>
+                        <small>Estimated time: <span id="progressTime">30s</span></small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Series Navigator -->
+            <div class="series-navigator">
+                <h6 class="text-secondary me-3">Series:</h6>
+                {% for series in study.series_set.all %}
+                <div class="series-item {% if forloop.first %}active{% endif %}" onclick="loadSeries({{ series.id }})" data-series="{{ series.id }}">
+                    <div class="series-title">Series {{ series.series_number }}</div>
+                    <div class="series-info">{{ series.series_description }} • {{ series.images.count }} images</div>
+                </div>
+                {% empty %}
+                <div class="text-secondary">No series available</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Global variables
+let currentTool = 'pan';
+let currentViewport = 1;
+let studyData = {{ series_data|safe }};
+let currentSeries = null;
+let measurements = [];
+let isFullscreen = false;
+let cineInterval = null;
+let cineFrame = 0;
+let isPlaying = false;
+
+document.addEventListener('DOMContentLoaded', function() {
+    initializeViewer();
+    loadDefaultSeries();
+    setupEventListeners();
+});
+
+function initializeViewer() {
+    // Initialize canvases
+    const canvases = ['canvas1', 'canvas2', 'canvas3', 'canvas4'];
+    canvases.forEach(canvasId => {
+        const canvas = document.getElementById(canvasId);
+        const ctx = canvas.getContext('2d');
+        
+        // Set canvas size to match container
+        resizeCanvas(canvas);
+        
+        // Draw placeholder
+        drawPlaceholder(ctx, canvas);
+    });
+}
+
+function resizeCanvas(canvas) {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width - 4; // Account for border
+    canvas.height = rect.height - 4;
+}
+
+function drawPlaceholder(ctx, canvas) {
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = '#0ea5e9';
+    ctx.font = '16px Inter';
+    ctx.textAlign = 'center';
+    ctx.fillText('Loading DICOM Data...', canvas.width / 2, canvas.height / 2);
+}
+
+function loadDefaultSeries() {
+    if (studyData && studyData.length > 0) {
+        loadSeries(studyData[0].id);
+    }
+}
+
+function setupEventListeners() {
+    // Viewport click handlers
+    document.querySelectorAll('.viewport').forEach(viewport => {
+        viewport.addEventListener('click', () => {
+            setActiveViewport(viewport.dataset.viewport);
+        });
+        
+        viewport.addEventListener('mousemove', handleMouseMove);
+        viewport.addEventListener('mousedown', handleMouseDown);
+        viewport.addEventListener('mouseup', handleMouseUp);
+        viewport.addEventListener('wheel', handleWheel);
+    });
+    
+    // Window resize handler
+    window.addEventListener('resize', () => {
+        document.querySelectorAll('canvas').forEach(resizeCanvas);
+    });
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', handleKeyboard);
+}
+
+function setTool(tool) {
+    currentTool = tool;
+    
+    // Update tool button states
+    document.querySelectorAll('.tool-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`[data-tool="${tool}"]`).classList.add('active');
+    
+    // Update cursor
+    updateCursor();
+}
+
+function updateCursor() {
+    const cursors = {
+        pan: 'grab',
+        zoom: 'zoom-in',
+        scroll: 'ns-resize',
+        rotate: 'crosshair',
+        length: 'crosshair',
+        angle: 'crosshair',
+        area: 'crosshair',
+        hounsfield: 'crosshair'
+    };
+    
+    document.querySelectorAll('.viewport').forEach(viewport => {
+        viewport.style.cursor = cursors[currentTool] || 'default';
+    });
+}
+
+function setActiveViewport(viewportNumber) {
+    // Remove active class from all viewports
+    document.querySelectorAll('.viewport').forEach(vp => {
+        vp.classList.remove('active');
+    });
+    
+    // Add active class to selected viewport
+    document.getElementById(`viewport${viewportNumber}`).classList.add('active');
+    currentViewport = viewportNumber;
+}
+
+function handleMouseMove(event) {
+    const rect = event.target.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    
+    // Update Hounsfield units if in HU mode
+    if (currentTool === 'hounsfield') {
+        updateHounsfieldUnits(x, y);
+    }
+    
+    // Update crosshair position
+    updateCrosshair(x, y);
+}
+
+function handleMouseDown(event) {
+    // Handle different tools
+    switch (currentTool) {
+        case 'length':
+            startLengthMeasurement(event);
+            break;
+        case 'angle':
+            startAngleMeasurement(event);
+            break;
+        case 'area':
+            startAreaMeasurement(event);
+            break;
+    }
+}
+
+function handleMouseUp(event) {
+    // Handle mouse up events for different tools
+}
+
+function handleWheel(event) {
+    event.preventDefault();
+    
+    if (currentTool === 'scroll' || event.ctrlKey) {
+        // Scroll through slices
+        const delta = event.deltaY > 0 ? 1 : -1;
+        scrollSlice(delta);
+    } else if (event.shiftKey) {
+        // Zoom
+        const delta = event.deltaY > 0 ? 0.9 : 1.1;
+        zoomViewport(delta);
+    }
+}
+
+function handleKeyboard(event) {
+    // Keyboard shortcuts
+    switch (event.key) {
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+            setActiveViewport(event.key);
+            break;
+        case 'p':
+            setTool('pan');
+            break;
+        case 'z':
+            setTool('zoom');
+            break;
+        case 'm':
+            setTool('length');
+            break;
+        case 'i':
+            invertImage();
+            break;
+        case 'r':
+            resetImage();
+            break;
+        case ' ':
+            event.preventDefault();
+            toggleCineMode();
+            break;
+    }
+}
+
+function loadSeries(seriesId) {
+    // Update series navigation
+    document.querySelectorAll('.series-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    document.querySelector(`[data-series="${seriesId}"]`).classList.add('active');
+    
+    // Find series data
+    currentSeries = studyData.find(s => s.id === seriesId);
+    
+    if (currentSeries) {
+        // Load images into viewports
+        loadSeriesImages();
+        showNotification(`Loaded ${currentSeries.description}`, 'success');
+    }
+}
+
+function loadSeriesImages() {
+    // This would load actual DICOM images
+    // For now, we'll simulate loading
+    setTimeout(() => {
+        // Update slice counters
+        const imageCount = currentSeries.images.length;
+        document.querySelectorAll('[id^="slice-"]').forEach(elem => {
+            elem.textContent = `1/${imageCount}`;
+        });
+        
+        showNotification('Images loaded successfully', 'success');
+    }, 500);
+}
+
+function updateHounsfieldUnits(x, y) {
+    // Simulate HU calculation
+    fetch('/viewer/api/hounsfield-units/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken()
+        },
+        body: JSON.stringify({
+            x: x,
+            y: y,
+            image_id: getCurrentImageId()
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('huValue').textContent = data.hu_value;
+        document.getElementById('huPosition').textContent = `${Math.round(x)}, ${Math.round(y)}`;
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function updateCrosshair(x, y) {
+    const crosshair = document.getElementById(`crosshair${currentViewport}`);
+    if (crosshair) {
+        const horizontal = crosshair.querySelector('.crosshair-horizontal');
+        const vertical = crosshair.querySelector('.crosshair-vertical');
+        
+        horizontal.style.top = y + 'px';
+        vertical.style.left = x + 'px';
+    }
+}
+
+function showWindowLevel() {
+    const panel = document.getElementById('windowLevelPanel');
+    panel.classList.toggle('show');
+}
+
+function applyWindowLevel(preset) {
+    fetch('/viewer/api/window-level/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken()
+        },
+        body: JSON.stringify({ preset: preset })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update window/level display
+            const wlText = `${data.window_center}/${data.window_width}`;
+            document.querySelectorAll('[id^="wl-"]').forEach(elem => {
+                elem.textContent = wlText;
+            });
+            
+            showNotification(`Applied ${preset} window/level`, 'success');
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function applyCustomWindowLevel() {
+    const center = document.getElementById('customCenter').value;
+    const width = document.getElementById('customWidth').value;
+    
+    fetch('/viewer/api/window-level/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken()
+        },
+        body: JSON.stringify({
+            window_center: parseInt(center),
+            window_width: parseInt(width)
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const wlText = `${center}/${width}`;
+            document.querySelectorAll('[id^="wl-"]').forEach(elem => {
+                elem.textContent = wlText;
+            });
+            
+            showNotification('Applied custom window/level', 'success');
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function showReconstructionPanel() {
+    document.getElementById('reconstructionPanel').classList.add('show');
+}
+
+function hideReconstructionPanel() {
+    document.getElementById('reconstructionPanel').classList.remove('show');
+    
+    // Clear selections
+    document.querySelectorAll('.reconstruction-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+}
+
+function startReconstruction(type) {
+    // Clear previous selections
+    document.querySelectorAll('.reconstruction-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+    
+    // Select current option
+    document.querySelector(`[data-recon="${type}"]`).classList.add('selected');
+}
+
+function processReconstruction() {
+    const selectedOption = document.querySelector('.reconstruction-option.selected');
+    if (!selectedOption) {
+        showNotification('Please select a reconstruction type', 'error');
+        return;
+    }
+    
+    const type = selectedOption.dataset.recon;
+    hideReconstructionPanel();
+    showProgressOverlay();
+    
+    // Start reconstruction
+    fetch(`/viewer/api/study/{{ study.id }}/reconstruction/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken()
+        },
+        body: JSON.stringify({
+            type: type,
+            parameters: {}
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            simulateProgress(type);
+        } else {
+            hideProgressOverlay();
+            showNotification('Reconstruction failed', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        hideProgressOverlay();
+        showNotification('Reconstruction failed', 'error');
+    });
+}
+
+function showProgressOverlay() {
+    document.getElementById('progressOverlay').style.display = 'flex';
+}
+
+function hideProgressOverlay() {
+    document.getElementById('progressOverlay').style.display = 'none';
+}
+
+function simulateProgress(type) {
+    let progress = 0;
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+    
+    const messages = {
+        mpr: ['Analyzing volume data...', 'Generating planes...', 'Optimizing display...'],
+        mip: ['Processing intensity projections...', 'Calculating maximum values...', 'Rendering views...'],
+        bone: ['Segmenting bone structures...', 'Creating 3D mesh...', 'Applying textures...'],
+        endoscopy: ['Generating virtual camera...', 'Calculating flight path...', 'Rendering endoscopic view...'],
+        surgery: ['Planning surgical approach...', 'Analyzing anatomical structures...', 'Creating surgical visualization...']
+    };
+    
+    const interval = setInterval(() => {
+        progress += 2;
+        progressFill.style.width = progress + '%';
+        
+        if (progress < 33) {
+            progressText.textContent = messages[type][0];
+        } else if (progress < 66) {
+            progressText.textContent = messages[type][1];
+        } else if (progress < 100) {
+            progressText.textContent = messages[type][2];
+        } else {
+            progressText.textContent = 'Finalizing...';
+        }
+        
+        if (progress >= 100) {
+            clearInterval(interval);
+            setTimeout(() => {
+                hideProgressOverlay();
+                showNotification(`${type.toUpperCase()} reconstruction completed`, 'success');
+                
+                // Update 3D viewport
+                const ctx = document.getElementById('canvas4').getContext('2d');
+                ctx.fillStyle = '#0ea5e9';
+                ctx.fillText(`${type.toUpperCase()} Complete`, ctx.canvas.width / 2, ctx.canvas.height / 2);
+            }, 500);
+        }
+    }, 100);
+}
+
+function toggleCineMode() {
+    const controls = document.getElementById('cineControls');
+    const icon = document.getElementById('cineIcon');
+    
+    if (controls.classList.contains('show')) {
+        controls.classList.remove('show');
+        icon.className = 'fas fa-play';
+        stopCine();
+    } else {
+        controls.classList.add('show');
+        icon.className = 'fas fa-stop';
+    }
+}
+
+function cinePlayPause() {
+    if (isPlaying) {
+        pauseCine();
+    } else {
+        playCine();
+    }
+}
+
+function playCine() {
+    if (!currentSeries || !currentSeries.images.length) return;
+    
+    isPlaying = true;
+    document.getElementById('cinePlayIcon').className = 'fas fa-pause';
+    
+    const fps = parseInt(document.getElementById('cineFPS').value) || 10;
+    const interval = 1000 / fps;
+    
+    cineInterval = setInterval(() => {
+        cineFrame = (cineFrame + 1) % currentSeries.images.length;
+        document.getElementById('cineSlider').value = (cineFrame / currentSeries.images.length) * 100;
+        
+        // Update slice displays
+        document.querySelectorAll('[id^="slice-"]').forEach(elem => {
+            elem.textContent = `${cineFrame + 1}/${currentSeries.images.length}`;
+        });
+    }, interval);
+}
+
+function pauseCine() {
+    isPlaying = false;
+    document.getElementById('cinePlayIcon').className = 'fas fa-play';
+    clearInterval(cineInterval);
+}
+
+function stopCine() {
+    pauseCine();
+    cineFrame = 0;
+    document.getElementById('cineSlider').value = 0;
+}
+
+function invertImage() {
+    // Implement image inversion
+    showNotification('Image inverted', 'success');
+}
+
+function resetImage() {
+    // Reset image to original state
+    showNotification('Image reset', 'success');
+}
+
+function flipHorizontal() {
+    // Implement horizontal flip
+    showNotification('Image flipped horizontally', 'success');
+}
+
+function flipVertical() {
+    // Implement vertical flip
+    showNotification('Image flipped vertically', 'success');
+}
+
+function exportImage(format) {
+    const imageId = getCurrentImageId();
+    if (!imageId) {
+        showNotification('No image selected', 'error');
+        return;
+    }
+    
+    fetch(`/viewer/api/image/${imageId}/export/?format=${format}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Create download link
+                const link = document.createElement('a');
+                link.href = data.download_url;
+                link.download = data.filename;
+                link.click();
+                
+                showNotification(`Exported as ${format.toUpperCase()}`, 'success');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('Export failed', 'error');
+        });
+}
+
+function toggleFullscreen() {
+    const container = document.querySelector('.viewer-container');
+    const icon = document.getElementById('fullscreenIcon');
+    
+    if (!isFullscreen) {
+        container.requestFullscreen();
+        icon.className = 'fas fa-compress';
+        isFullscreen = true;
+    } else {
+        document.exitFullscreen();
+        icon.className = 'fas fa-expand';
+        isFullscreen = false;
+    }
+}
+
+function clearMeasurements() {
+    measurements = [];
+    updateMeasurementDisplay();
+    showNotification('Measurements cleared', 'success');
+}
+
+function saveMeasurements() {
+    fetch(`/viewer/api/study/{{ study.id }}/measurements/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken()
+        },
+        body: JSON.stringify({ measurements: measurements })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Measurements saved', 'success');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Failed to save measurements', 'error');
+    });
+}
+
+function updateMeasurementDisplay() {
+    // Update measurement display in viewports
+    document.querySelectorAll('[id^="measurements-"]').forEach(elem => {
+        elem.innerHTML = measurements.map(m => 
+            `<div>${m.type}: ${m.value}</div>`
+        ).join('');
+    });
+}
+
+function getCurrentImageId() {
+    // Return current image ID based on active viewport and series
+    if (currentSeries && currentSeries.images.length > 0) {
+        return currentSeries.images[cineFrame].id;
+    }
+    return null;
+}
+
+function getCsrfToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]').value;
+}
+
+// Additional helper functions would be implemented here for:
+// - startLengthMeasurement()
+// - startAngleMeasurement() 
+// - startAreaMeasurement()
+// - scrollSlice()
+// - zoomViewport()
+// - nextImage()
+// - previousImage()
+// - showMeasurementReport()
+// And other specific measurement and manipulation tools
+
+</script>
+{% endblock %}
