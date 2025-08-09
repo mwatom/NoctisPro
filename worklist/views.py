@@ -30,10 +30,14 @@ def dashboard(request):
     # Recent studies for the dashboard
     recent_studies = studies.order_by('-upload_date')[:10]
     
+    # Get unread notifications count
+    unread_notifications_count = user.notifications.filter(is_read=False).count()
+    
     context = {
         'user': user,
         'stats': stats,
         'recent_studies': recent_studies,
+        'unread_notifications_count': unread_notifications_count,
     }
     
     return render(request, 'worklist/dashboard.html', context)

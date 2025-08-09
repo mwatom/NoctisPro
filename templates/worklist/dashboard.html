@@ -524,7 +524,7 @@
                 </a>
                 <a href="{% url 'notifications:notification_list' %}" class="nav-link">
                     <i class="fas fa-bell"></i>Notifications
-                    <span class="badge badge-medical ms-auto">{{ user.notifications.filter:is_read=False|length }}</span>
+                    <span class="badge badge-medical ms-auto">{{ unread_notifications_count }}</span>
                 </a>
                 
                 {% if user.is_admin %}
