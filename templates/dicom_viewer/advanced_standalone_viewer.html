@@ -1,0 +1,1902 @@
+{% extends 'base.html' %}
+
+{% block title %}Standalone DICOM Viewer - Noctis Pro PACS{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Main viewer container */
+    .viewer-container {
+        background: #1a1a1a;
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    /* Header bar */
+    .viewer-header {
+        background: linear-gradient(135deg, #2c2c2c 0%, #1f1f1f 100%);
+        border-bottom: 1px solid #404040;
+        padding: 12px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        z-index: 100;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .viewer-title {
+        display: flex;
+        align-items: center;
+        color: #ffffff;
+        gap: 12px;
+    }
+
+    .viewer-title h3 {
+        margin: 0;
+        font-weight: 600;
+        font-size: 18px;
+    }
+
+    .viewer-title i {
+        font-size: 24px;
+        color: #0078d4;
+    }
+
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .header-btn {
+        background: #0078d4;
+        border: none;
+        border-radius: 6px;
+        color: white;
+        padding: 10px 16px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+    }
+
+    .header-btn:hover {
+        background: #106ebe;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(16, 120, 190, 0.4);
+    }
+
+    .header-btn.secondary {
+        background: #404040;
+        border: 1px solid #555;
+    }
+
+    .header-btn.secondary:hover {
+        background: #4a4a4a;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Main layout */
+    .viewer-main {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+    }
+
+    /* Left toolbar */
+    .toolbar {
+        background: #2a2a2a;
+        border-right: 1px solid #404040;
+        width: 80px;
+        padding: 10px 5px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .tool-btn {
+        background: #363636;
+        border: none;
+        border-radius: 8px;
+        color: #ffffff;
+        width: 70px;
+        height: 60px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        font-size: 11px;
+        font-weight: 500;
+    }
+
+    .tool-btn:hover {
+        background: #404040;
+        transform: translateY(-1px);
+    }
+
+    .tool-btn.active {
+        background: #0078d4;
+        box-shadow: 0 0 12px rgba(0, 120, 212, 0.4);
+    }
+
+    .tool-btn i {
+        font-size: 20px;
+        margin-bottom: 2px;
+    }
+
+    /* Center viewport */
+    .viewport-container {
+        flex: 1;
+        background: #000000;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .patient-info-bar {
+        background: #333333;
+        border-bottom: 1px solid #404040;
+        padding: 8px 20px;
+        color: #cccccc;
+        font-size: 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .viewport {
+        flex: 1;
+        position: relative;
+        overflow: hidden;
+        cursor: crosshair;
+    }
+
+    .viewport canvas {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    /* Overlay information */
+    .viewport-overlay {
+        position: absolute;
+        pointer-events: none;
+        z-index: 10;
+    }
+
+    .overlay-info {
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        font-family: 'Consolas', 'Monaco', monospace;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(4px);
+    }
+
+    .top-left {
+        top: 12px;
+        left: 12px;
+    }
+
+    .top-right {
+        top: 12px;
+        right: 12px;
+        background: rgba(0, 120, 212, 0.9);
+    }
+
+    .bottom-left {
+        bottom: 12px;
+        left: 12px;
+    }
+
+    .bottom-right {
+        bottom: 12px;
+        right: 12px;
+    }
+
+    /* Right panel */
+    .right-panel {
+        background: #2a2a2a;
+        border-left: 1px solid #404040;
+        width: 300px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .panel-section {
+        padding: 20px;
+        border-bottom: 1px solid #404040;
+    }
+
+    .panel-section:last-child {
+        border-bottom: none;
+    }
+
+    .section-title {
+        color: #ffffff;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 16px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .control-group {
+        margin-bottom: 16px;
+    }
+
+    .control-label {
+        color: #cccccc;
+        font-size: 12px;
+        margin-bottom: 6px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .control-value {
+        color: #ffffff;
+        font-weight: 600;
+        font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    .slider-container {
+        position: relative;
+        margin: 8px 0;
+    }
+
+    .custom-slider {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 6px;
+        border-radius: 3px;
+        background: #404040;
+        outline: none;
+        cursor: pointer;
+    }
+
+    .custom-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #0078d4;
+        cursor: pointer;
+        border: 2px solid #ffffff;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .custom-slider::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #0078d4;
+        cursor: pointer;
+        border: 2px solid #ffffff;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .preset-buttons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 12px;
+    }
+
+    .preset-btn {
+        background: #404040;
+        border: 1px solid #555555;
+        border-radius: 6px;
+        color: #ffffff;
+        padding: 8px 12px;
+        font-size: 11px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: center;
+    }
+
+    .preset-btn:hover {
+        background: #4a4a4a;
+        border-color: #0078d4;
+    }
+
+    .preset-btn.active {
+        background: #0078d4;
+        border-color: #0078d4;
+    }
+
+    .nav-controls {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .nav-btn {
+        background: #404040;
+        border: 1px solid #555555;
+        border-radius: 6px;
+        color: #ffffff;
+        padding: 8px 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        flex: 1;
+        text-align: center;
+        font-size: 12px;
+    }
+
+    .nav-btn:hover {
+        background: #4a4a4a;
+        border-color: #0078d4;
+    }
+
+    .nav-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .file-list {
+        max-height: 200px;
+        overflow-y: auto;
+        background: #1f1f1f;
+        border: 1px solid #404040;
+        border-radius: 6px;
+        margin-top: 8px;
+    }
+
+    .file-item {
+        padding: 8px 12px;
+        color: #cccccc;
+        font-size: 12px;
+        cursor: pointer;
+        border-bottom: 1px solid #333333;
+        transition: all 0.2s ease;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .file-item:last-child {
+        border-bottom: none;
+    }
+
+    .file-item:hover {
+        background: #333333;
+        color: #ffffff;
+    }
+
+    .file-item.active {
+        background: #0078d4;
+        color: #ffffff;
+    }
+
+    .file-number {
+        background: #404040;
+        color: #ffffff;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 10px;
+        font-weight: 600;
+    }
+
+    .dicom-info {
+        background: #1f1f1f;
+        border: 1px solid #404040;
+        border-radius: 6px;
+        padding: 12px;
+        margin-top: 12px;
+    }
+
+    .dicom-tag {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 6px 0;
+        border-bottom: 1px solid #333333;
+        font-size: 11px;
+    }
+
+    .dicom-tag:last-child {
+        border-bottom: none;
+    }
+
+    .tag-name {
+        color: #cccccc;
+        font-weight: 500;
+        min-width: 100px;
+    }
+
+    .tag-value {
+        color: #ffffff;
+        font-family: 'Consolas', 'Monaco', monospace;
+        text-align: right;
+        word-break: break-all;
+        max-width: 140px;
+    }
+
+    /* File drop overlay */
+    .file-drop-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.9);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 2000;
+        backdrop-filter: blur(8px);
+    }
+
+    .file-drop-overlay.active {
+        display: flex;
+    }
+
+    .drop-zone {
+        background: linear-gradient(135deg, #2c2c2c 0%, #1f1f1f 100%);
+        border: 3px dashed #0078d4;
+        border-radius: 20px;
+        padding: 60px 40px;
+        text-align: center;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .drop-zone-icon {
+        font-size: 5rem;
+        color: #0078d4;
+        margin-bottom: 20px;
+        animation: bounce 2s infinite;
+    }
+
+    @keyframes bounce {
+        0%, 20%, 50%, 80%, 100% {
+            transform: translateY(0);
+        }
+        40% {
+            transform: translateY(-10px);
+        }
+        60% {
+            transform: translateY(-5px);
+        }
+    }
+
+    .drop-zone h4 {
+        color: #ffffff;
+        margin-bottom: 12px;
+        font-size: 24px;
+        font-weight: 600;
+    }
+
+    .drop-zone p {
+        color: #cccccc;
+        font-size: 16px;
+        margin: 0;
+    }
+
+    /* No file message */
+    .no-file-message {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100%;
+        color: #666666;
+        text-align: center;
+        background: radial-gradient(circle at center, #1a1a1a 0%, #0f0f0f 100%);
+    }
+
+    .no-file-icon {
+        font-size: 6rem;
+        margin-bottom: 24px;
+        color: #0078d4;
+        opacity: 0.6;
+        animation: pulse 3s infinite;
+    }
+
+    @keyframes pulse {
+        0% {
+            opacity: 0.6;
+        }
+        50% {
+            opacity: 0.8;
+        }
+        100% {
+            opacity: 0.6;
+        }
+    }
+
+    .no-file-message h4 {
+        color: #ffffff;
+        margin-bottom: 12px;
+        font-size: 28px;
+        font-weight: 300;
+    }
+
+    .no-file-message p {
+        font-size: 16px;
+        line-height: 1.5;
+        max-width: 400px;
+    }
+
+    /* Scrollbar styling */
+    .right-panel::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .right-panel::-webkit-scrollbar-track {
+        background: #1f1f1f;
+    }
+
+    .right-panel::-webkit-scrollbar-thumb {
+        background: #404040;
+        border-radius: 4px;
+    }
+
+    .right-panel::-webkit-scrollbar-thumb:hover {
+        background: #4a4a4a;
+    }
+
+    .file-list::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .file-list::-webkit-scrollbar-track {
+        background: #1f1f1f;
+    }
+
+    .file-list::-webkit-scrollbar-thumb {
+        background: #404040;
+        border-radius: 3px;
+    }
+
+    /* Responsive design */
+    @media (max-width: 1200px) {
+        .right-panel {
+            width: 250px;
+        }
+    }
+
+    @media (max-width: 900px) {
+        .toolbar {
+            width: 60px;
+        }
+        
+        .tool-btn {
+            width: 50px;
+            height: 50px;
+            font-size: 10px;
+        }
+        
+        .tool-btn i {
+            font-size: 16px;
+        }
+        
+        .right-panel {
+            width: 200px;
+        }
+    }
+
+    /* Loading animation */
+    .loading {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: #0078d4;
+        animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="viewer-container">
+    <!-- Header -->
+    <div class="viewer-header">
+        <div class="viewer-title">
+            <i class="fas fa-file-medical"></i>
+            <h3>Noctis Pro - Advanced DICOM Viewer</h3>
+        </div>
+        
+        <div class="header-actions">
+            <button class="header-btn" onclick="openFileDialog()">
+                <i class="fas fa-folder-open"></i>
+                Load DICOM Files
+            </button>
+            <button class="header-btn secondary" onclick="launchDesktopViewer()" title="Launch Desktop Viewer">
+                <i class="fas fa-desktop"></i>
+                Desktop Viewer
+            </button>
+            <button class="header-btn secondary" onclick="toggleFullscreen()">
+                <i class="fas fa-expand" id="fullscreenIcon"></i>
+            </button>
+            <a href="{% url 'worklist:dashboard' %}" class="header-btn secondary">
+                <i class="fas fa-arrow-left"></i>
+                Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="viewer-main">
+        <!-- Left Toolbar -->
+        <div class="toolbar">
+            <button class="tool-btn active" data-tool="windowing" onclick="setTool('windowing')">
+                <i class="fas fa-adjust"></i>
+                W/L
+            </button>
+            <button class="tool-btn" data-tool="zoom" onclick="setTool('zoom')">
+                <i class="fas fa-search-plus"></i>
+                Zoom
+            </button>
+            <button class="tool-btn" data-tool="pan" onclick="setTool('pan')">
+                <i class="fas fa-hand-paper"></i>
+                Pan
+            </button>
+            <button class="tool-btn" data-tool="measure" onclick="setTool('measure')">
+                <i class="fas fa-ruler"></i>
+                Measure
+            </button>
+            <button class="tool-btn" data-tool="annotate" onclick="setTool('annotate')">
+                <i class="fas fa-edit"></i>
+                Annotate
+            </button>
+            <button class="tool-btn" data-tool="crosshair" onclick="toggleCrosshair()">
+                <i class="fas fa-crosshairs"></i>
+                Cross
+            </button>
+            <button class="tool-btn" data-tool="invert" onclick="toggleInvert()">
+                <i class="fas fa-adjust"></i>
+                Invert
+            </button>
+            <button class="tool-btn" data-tool="reset" onclick="resetView()">
+                <i class="fas fa-redo"></i>
+                Reset
+            </button>
+        </div>
+
+        <!-- Center Viewport -->
+        <div class="viewport-container">
+            <!-- Patient Info Bar -->
+            <div class="patient-info-bar" id="patientInfoBar">
+                <span id="patientInfo">Patient: - | Study Date: - | Modality: -</span>
+                <span id="seriesInfo">Series: - | Images: -</span>
+            </div>
+
+            <!-- Main Viewport -->
+            <div class="viewport" id="mainViewport">
+                <canvas id="dicomCanvas"></canvas>
+                
+                <!-- Overlay Information -->
+                <div class="viewport-overlay top-left">
+                    <div class="overlay-info" id="windowLevelInfo">
+                        WW: 400<br>
+                        WL: 40<br>
+                        Slice: 1/1
+                    </div>
+                </div>
+                
+                <div class="viewport-overlay top-right">
+                    <div class="overlay-info" id="toolInfo">
+                        Tool: Windowing
+                    </div>
+                </div>
+                
+                <div class="viewport-overlay bottom-left">
+                    <div class="overlay-info" id="zoomInfo">
+                        Zoom: 100%
+                    </div>
+                </div>
+                
+                <div class="viewport-overlay bottom-right">
+                    <div class="overlay-info" id="imageInfo">
+                        512 x 512<br>
+                        16 bit
+                    </div>
+                </div>
+            </div>
+
+            <!-- No Files Message -->
+            <div class="no-file-message" id="noFileMessage">
+                <i class="fas fa-file-medical no-file-icon"></i>
+                <h4>Advanced DICOM Viewer</h4>
+                <p>Load DICOM files to begin advanced medical image analysis<br>
+                Drag & drop files or click "Load DICOM Files"</p>
+            </div>
+        </div>
+
+        <!-- Right Panel -->
+        <div class="right-panel">
+            <!-- Window/Level Controls -->
+            <div class="panel-section">
+                <h6 class="section-title">Window / Level</h6>
+                
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Window Width</span>
+                        <span class="control-value" id="windowWidthValue">400</span>
+                    </div>
+                    <div class="slider-container">
+                        <input type="range" class="custom-slider" id="windowWidthSlider" 
+                               min="1" max="4000" value="400" oninput="updateWindowWidth(this.value)">
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Window Level</span>
+                        <span class="control-value" id="windowLevelValue">40</span>
+                    </div>
+                    <div class="slider-container">
+                        <input type="range" class="custom-slider" id="windowLevelSlider" 
+                               min="-1000" max="3000" value="40" oninput="updateWindowLevel(this.value)">
+                    </div>
+                </div>
+                
+                <div class="preset-buttons">
+                    <button class="preset-btn" onclick="setWindowPreset('lung')">Lung</button>
+                    <button class="preset-btn" onclick="setWindowPreset('bone')">Bone</button>
+                    <button class="preset-btn" onclick="setWindowPreset('soft')">Soft</button>
+                    <button class="preset-btn" onclick="setWindowPreset('brain')">Brain</button>
+                    <button class="preset-btn" onclick="setWindowPreset('abdomen')">Abdomen</button>
+                    <button class="preset-btn" onclick="setWindowPreset('mediastinum')">Mediastinum</button>
+                </div>
+                
+                <div class="control-group">
+                    <div class="control-label">
+                        <label>
+                            <input type="checkbox" id="invertCheck" onchange="toggleInvert()">
+                            Invert Image
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation Controls -->
+            <div class="panel-section">
+                <h6 class="section-title">Navigation</h6>
+                
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Image</span>
+                        <span class="control-value" id="imageIndex">1 / 1</span>
+                    </div>
+                    <div class="nav-controls">
+                        <button class="nav-btn" onclick="previousImage()" id="prevBtn">
+                            <i class="fas fa-step-backward"></i> Prev
+                        </button>
+                        <button class="nav-btn" onclick="nextImage()" id="nextBtn">
+                            <i class="fas fa-step-forward"></i> Next
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <div class="nav-controls">
+                        <button class="nav-btn" onclick="togglePlay()" id="playBtn">
+                            <i class="fas fa-play"></i> Play
+                        </button>
+                        <button class="nav-btn" onclick="resetView()">
+                            <i class="fas fa-redo"></i> Reset
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transform Controls -->
+            <div class="panel-section">
+                <h6 class="section-title">Transform</h6>
+                
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Zoom</span>
+                        <span class="control-value" id="zoomValue">100%</span>
+                    </div>
+                    <div class="slider-container">
+                        <input type="range" class="custom-slider" id="zoomSlider" 
+                               min="10" max="1000" value="100" oninput="updateZoom(this.value)">
+                    </div>
+                </div>
+                
+                <div class="nav-controls">
+                    <button class="nav-btn" onclick="fitToWindow()">
+                        <i class="fas fa-expand-arrows-alt"></i> Fit
+                    </button>
+                    <button class="nav-btn" onclick="actualSize()">
+                        <i class="fas fa-compress-arrows-alt"></i> 1:1
+                    </button>
+                </div>
+            </div>
+
+            <!-- File List -->
+            <div class="panel-section" id="fileListSection" style="display: none;">
+                <h6 class="section-title">Loaded Files</h6>
+                <div class="file-list" id="fileList">
+                    <!-- Files will be populated here -->
+                </div>
+            </div>
+
+            <!-- DICOM Information -->
+            <div class="panel-section" id="dicomInfoSection" style="display: none;">
+                <h6 class="section-title">DICOM Information</h6>
+                <div class="dicom-info" id="dicomInfo">
+                    <!-- DICOM tags will be populated here -->
+                </div>
+            </div>
+
+            <!-- Instructions -->
+            <div class="panel-section" id="instructionsSection">
+                <h6 class="section-title">Quick Guide</h6>
+                <div style="color: #cccccc; font-size: 12px; line-height: 1.6;">
+                    <p><strong>Mouse Controls:</strong></p>
+                    <p>• Wheel: Zoom in/out</p>
+                    <p>• Shift + Wheel: Navigate slices</p>
+                    <p>• Left Click + Drag: Pan/Window/Level</p>
+                    <p>• Right Click: Reset view</p>
+                    <br>
+                    <p><strong>Keyboard Shortcuts:</strong></p>
+                    <p>• Arrow Keys: Navigate images</p>
+                    <p>• Space: Play/Pause cine</p>
+                    <p>• R: Reset view</p>
+                    <p>• I: Invert image</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- File Drop Overlay -->
+<div class="file-drop-overlay" id="fileDropOverlay">
+    <div class="drop-zone">
+        <i class="fas fa-cloud-upload-alt drop-zone-icon"></i>
+        <h4>Drop DICOM Files Here</h4>
+        <p>Release to load files into the advanced viewer</p>
+    </div>
+</div>
+
+<!-- Hidden File Input -->
+<input type="file" id="fileInput" multiple accept=".dcm,.dicom,application/dicom" style="display: none;">
+
+<!-- CSRF Token -->
+{% csrf_token %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+// Global variables
+let currentTool = 'windowing';
+let currentViewport = 1;
+let loadedFiles = [];
+let dicomData = [];
+let currentFileIndex = 0;
+let isPlaying = false;
+let playInterval = null;
+let zoomLevel = 1;
+let panOffset = { x: 0, y: 0 };
+let windowLevel = { width: 400, center: 40 };
+let crosshairEnabled = false;
+let invertEnabled = false;
+let measurements = [];
+let annotations = [];
+
+// CSRF Token utility functions
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            // Does this cookie string begin with the name we want?
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function getCsrfToken() {
+    // Try to get from Django template first
+    const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (csrfInput) {
+        return csrfInput.value;
+    }
+    // Fallback to cookie
+    return getCookie('csrftoken');
+}
+
+// Initialize the viewer
+document.addEventListener('DOMContentLoaded', function() {
+    initializeViewer();
+    setupFileHandling();
+    setupViewportInteractions();
+});
+
+function initializeViewer() {
+    // Initialize canvases
+    const canvas = document.getElementById('dicomCanvas');
+    const ctx = canvas.getContext('2d');
+    resizeCanvas(canvas);
+    
+    // Add click handler for viewport selection
+    document.getElementById('mainViewport').addEventListener('click', () => {
+        setActiveViewport(1);
+    });
+
+    // Show no file message initially
+    showNoFileMessage(true);
+}
+
+function setupFileHandling() {
+    const fileInput = document.getElementById('fileInput');
+    const dropOverlay = document.getElementById('fileDropOverlay');
+    
+    // File input change
+    fileInput.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files);
+        handleFiles(files);
+    });
+    
+    // Global drag and drop
+    document.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropOverlay.classList.add('active');
+    });
+    
+    document.addEventListener('dragleave', (e) => {
+        if (e.clientX === 0 && e.clientY === 0) {
+            dropOverlay.classList.remove('active');
+        }
+    });
+    
+    document.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropOverlay.classList.remove('active');
+        
+        const files = Array.from(e.dataTransfer.files);
+        handleFiles(files);
+    });
+}
+
+function setupViewportInteractions() {
+    const viewport = document.getElementById('mainViewport');
+    
+    viewport.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        
+        if (e.shiftKey) {
+            // Scroll through images
+            const delta = e.deltaY > 0 ? 1 : -1;
+            changeImage(delta);
+        } else {
+            // Zoom
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            zoom(delta);
+        }
+    });
+    
+    let isDragging = false;
+    let lastPos = { x: 0, y: 0 };
+    
+    viewport.addEventListener('mousedown', (e) => {
+        if (currentTool === 'pan') {
+            isDragging = true;
+            lastPos = { x: e.clientX, y: e.clientY };
+        }
+    });
+    
+    viewport.addEventListener('mousemove', (e) => {
+        if (isDragging && currentTool === 'pan') {
+            const deltaX = e.clientX - lastPos.x;
+            const deltaY = e.clientY - lastPos.y;
+            
+            panOffset.x += deltaX;
+            panOffset.y += deltaY;
+            
+            updateViewport(currentViewport);
+            
+            lastPos = { x: e.clientX, y: e.clientY };
+        }
+    });
+    
+    viewport.addEventListener('mouseup', () => {
+        isDragging = false;
+    });
+}
+
+function openFileDialog() {
+    document.getElementById('fileInput').click();
+}
+
+async function handleFiles(files) {
+    // Filter DICOM files
+    const dicomFiles = files.filter(file => {
+        return file.name.toLowerCase().endsWith('.dcm') || 
+               file.name.toLowerCase().endsWith('.dicom') ||
+               file.type === 'application/dicom';
+    });
+    
+    if (dicomFiles.length === 0) {
+        showNotification('Please select valid DICOM files (.dcm, .dicom)', 'error');
+        return;
+    }
+    
+    showNotification(`Loading ${dicomFiles.length} DICOM files...`, 'info');
+    
+    // Clear previous data
+    loadedFiles = [];
+    dicomData = [];
+    currentFileIndex = 0;
+    
+    // Process each file
+    for (const file of dicomFiles) {
+        try {
+            const dicomInfo = await parseDicomFile(file);
+            loadedFiles.push(file);
+            dicomData.push(dicomInfo);
+        } catch (error) {
+            console.error(`Error processing ${file.name}:`, error);
+        }
+    }
+    
+    if (dicomData.length > 0) {
+        showNoFileMessage(false);
+        updateFileList();
+        updateDicomInfo();
+        loadImageToViewport(0, 1);
+        showNotification(`Loaded ${dicomData.length} DICOM files successfully`, 'success');
+    } else {
+        showNotification('No valid DICOM files could be processed', 'error');
+    }
+}
+
+async function parseDicomFile(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            try {
+                const arrayBuffer = e.target.result;
+                const dicomInfo = extractDicomInfo(arrayBuffer, file);
+                resolve(dicomInfo);
+            } catch (error) {
+                reject(error);
+            }
+        };
+        
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+function extractDicomInfo(arrayBuffer, file) {
+    // Basic DICOM header parsing (simplified)
+    const dataView = new DataView(arrayBuffer);
+    
+    // Check for DICOM preamble and DICM signature
+    let isDicom = false;
+    if (arrayBuffer.byteLength > 132) {
+        const signature = new Uint8Array(arrayBuffer, 128, 4);
+        isDicom = String.fromCharCode(...signature) === 'DICM';
+    }
+    
+    // Extract basic information (this is a simplified parser)
+    const dicomInfo = {
+        fileName: file.name,
+        fileSize: file.size,
+        isDicom: isDicom,
+        width: 512, // Default values
+        height: 512,
+        bitsAllocated: 16,
+        pixelData: null,
+        tags: {
+            'Patient Name': 'Unknown',
+            'Study Date': new Date().toISOString().split('T')[0],
+            'Modality': 'CT',
+            'Series Description': 'Local File',
+            'Instance Number': '1',
+            'Image Type': 'ORIGINAL\\PRIMARY\\AXIAL'
+        },
+        arrayBuffer: arrayBuffer
+    };
+    
+    if (isDicom) {
+        try {
+            // Try to extract real DICOM tags (simplified)
+            parseDicomTags(dataView, dicomInfo);
+        } catch (error) {
+            console.warn('Could not parse DICOM tags:', error);
+        }
+    }
+    
+    // Generate pixel data for display (simplified)
+    dicomInfo.file = file; // Store the file reference for server processing
+    
+    return dicomInfo;
+}
+
+function parseDicomTags(dataView, dicomInfo) {
+    // This is a very simplified DICOM tag parser
+    // In production, you'd use a proper DICOM library like dicom-parser or cornerstone
+    
+    let offset = 132; // Start after preamble and DICM
+    
+    // Look for specific tags (this is simplified - real DICOM parsing is much more complex)
+    while (offset < dataView.byteLength - 8) {
+        try {
+            const group = dataView.getUint16(offset, true);
+            const element = dataView.getUint16(offset + 2, true);
+            const vr = String.fromCharCode(dataView.getUint8(offset + 4), dataView.getUint8(offset + 5));
+            
+            let length = 0;
+            let valueOffset = offset + 8;
+            
+            if (['OB', 'OW', 'OF', 'SQ', 'UT', 'UN'].includes(vr)) {
+                length = dataView.getUint32(valueOffset, true);
+                valueOffset += 4;
+            } else {
+                length = dataView.getUint16(offset + 6, true);
+            }
+            
+            // Extract some common tags
+            const tag = `${group.toString(16).padStart(4, '0')},${element.toString(16).padStart(4, '0')}`;
+            
+            switch (tag) {
+                case '0010,0010': // Patient Name
+                    if (length > 0 && length < 100) {
+                        dicomInfo.tags['Patient Name'] = extractStringValue(dataView, valueOffset, length);
+                    }
+                    break;
+                case '0008,0020': // Study Date
+                    if (length > 0 && length < 20) {
+                        dicomInfo.tags['Study Date'] = extractStringValue(dataView, valueOffset, length);
+                    }
+                    break;
+                case '0008,0060': // Modality
+                    if (length > 0 && length < 20) {
+                        dicomInfo.tags['Modality'] = extractStringValue(dataView, valueOffset, length);
+                    }
+                    break;
+                case '0028,0010': // Rows
+                    if (length === 2) {
+                        dicomInfo.height = dataView.getUint16(valueOffset, true);
+                    }
+                    break;
+                case '0028,0011': // Columns
+                    if (length === 2) {
+                        dicomInfo.width = dataView.getUint16(valueOffset, true);
+                    }
+                    break;
+                case '0028,0100': // Bits Allocated
+                    if (length === 2) {
+                        dicomInfo.bitsAllocated = dataView.getUint16(valueOffset, true);
+                    }
+                    break;
+            }
+            
+            offset = valueOffset + length;
+            if (length % 2 === 1) offset++; // DICOM uses even byte boundaries
+            
+        } catch (error) {
+            break;
+        }
+    }
+}
+
+function extractStringValue(dataView, offset, length) {
+    let value = '';
+    for (let i = 0; i < length; i++) {
+        const char = dataView.getUint8(offset + i);
+        if (char === 0) break; // Null terminator
+        value += String.fromCharCode(char);
+    }
+    return value.trim();
+}
+
+async function generatePixelData(dicomInfo, windowWidth, windowLevel, inverted = false) {
+    // If we have an uploaded DICOM file, upload it to server for processing
+    if (dicomInfo.file && dicomInfo.file instanceof File) {
+        try {
+            const processedImageData = await uploadAndProcessDicomFile(dicomInfo.file, windowWidth, windowLevel, inverted);
+            if (processedImageData) {
+                return processedImageData;
+            }
+        } catch (error) {
+            console.error('Error processing DICOM file:', error);
+        }
+    }
+    
+    // Fallback: Generate a simple pattern for display
+    const { width, height } = dicomInfo;
+    const imageData = new ImageData(width, height);
+    const data = imageData.data;
+    
+    // Create a simple test pattern
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const i = (y * width + x) * 4;
+            const value = Math.sin(x * 0.01) * Math.sin(y * 0.01) * 127 + 128;
+            
+            data[i] = value;     // R
+            data[i + 1] = value; // G
+            data[i + 2] = value; // B
+            data[i + 3] = 255;   // A
+        }
+    }
+    
+    return imageData;
+}
+
+async function uploadAndProcessDicomFile(file, windowWidth, windowLevel, inverted = false) {
+    try {
+        // Create FormData for file upload
+        const formData = new FormData();
+        formData.append('dicom_file', file);
+        
+        // Upload the file temporarily for processing
+        const uploadResponse = await fetch('{% url "dicom_viewer:upload_dicom" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': getCsrfToken()
+            }
+        });
+        
+        if (!uploadResponse.ok) {
+            throw new Error('Failed to upload DICOM file');
+        }
+        
+        const uploadData = await uploadResponse.json();
+        
+        if (uploadData.images && uploadData.images.length > 0) {
+            const imageId = uploadData.images[0].id;
+            
+            // Get processed image with windowing
+            const displayUrl = `{% url 'dicom_viewer:api_dicom_image_display' 0 %}`.replace('0', imageId) + `?window_width=${windowWidth}&window_level=${windowLevel}&inverted=${inverted}`;
+            const displayResponse = await fetch(displayUrl);
+            
+            if (!displayResponse.ok) {
+                throw new Error('Failed to get processed image');
+            }
+            
+            const displayData = await displayResponse.json();
+            
+            if (displayData.image_data) {
+                // Convert base64 image to ImageData
+                return await base64ToImageData(displayData.image_data);
+            }
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('Error in uploadAndProcessDicomFile:', error);
+        return null;
+    }
+}
+
+async function base64ToImageData(base64DataUrl) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            const imageData = ctx.getImageData(0, 0, img.width, img.height);
+            resolve(imageData);
+        };
+        img.onerror = reject;
+        img.src = base64DataUrl;
+    });
+}
+
+async function loadImageToViewport(fileIndex, viewportNum) {
+    if (!dicomData[fileIndex]) return;
+    
+    const canvas = document.getElementById('dicomCanvas');
+    const ctx = canvas.getContext('2d');
+    const dicom = dicomData[fileIndex];
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Check if we need to regenerate pixel data with current window/level settings
+    const currentInverted = document.getElementById('invertCheck') ? document.getElementById('invertCheck').checked : false;
+    const needsRegeneration = !dicom.pixelData || 
+                             dicom.lastWindowWidth !== windowLevel.width || 
+                             dicom.lastWindowLevel !== windowLevel.center ||
+                             dicom.lastInverted !== currentInverted;
+    
+    if (needsRegeneration) {
+        try {
+            // Show loading indicator
+            ctx.fillStyle = '#666';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Processing DICOM image...', canvas.width / 2, canvas.height / 2);
+            
+            // Generate pixel data with current windowing
+            const pixelData = await generatePixelData(dicom, windowLevel.width, windowLevel.center, currentInverted);
+            if (pixelData) {
+                dicom.pixelData = pixelData;
+                dicom.width = pixelData.width;
+                dicom.height = pixelData.height;
+                dicom.lastWindowWidth = windowLevel.width;
+                dicom.lastWindowLevel = windowLevel.center;
+                dicom.lastInverted = currentInverted;
+            }
+        } catch (error) {
+            console.error('Error generating pixel data:', error);
+            ctx.fillStyle = 'red';
+            ctx.fillText('Error loading DICOM image', canvas.width / 2, canvas.height / 2);
+            return;
+        }
+    }
+    
+    if (dicom.pixelData) {
+        // Clear canvas again
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Create a temporary canvas for the image
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = dicom.width;
+        tempCanvas.height = dicom.height;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        tempCtx.putImageData(dicom.pixelData, 0, 0);
+        
+        // Apply transformations and draw to main canvas
+        ctx.save();
+        ctx.translate(canvas.width / 2 + panOffset.x, canvas.height / 2 + panOffset.y);
+        ctx.scale(zoomLevel, zoomLevel);
+        ctx.translate(-dicom.width / 2, -dicom.height / 2);
+        ctx.drawImage(tempCanvas, 0, 0);
+        ctx.restore();
+    }
+    
+    // Update viewport info
+    const patientInfo = document.getElementById('patientInfo');
+    patientInfo.textContent = `Patient: ${dicom.tags['Patient Name'] || 'N/A'} | Study Date: ${dicom.tags['Study Date'] || 'N/A'} | Modality: ${dicom.tags['Modality'] || 'N/A'}`;
+
+    const seriesInfo = document.getElementById('seriesInfo');
+    seriesInfo.textContent = `Series: ${dicom.tags['Series Description'] || 'N/A'} | Images: ${dicom.tags['Instance Number'] || 'N/A'}`;
+
+    const imageInfo = document.getElementById('imageInfo');
+    imageInfo.innerHTML = `${dicom.width} x ${dicom.height}<br>${dicom.bitsAllocated} bit`;
+
+    const windowLevelInfo = document.getElementById('windowLevelInfo');
+    windowLevelInfo.innerHTML = `WW: ${windowLevel.width}<br>WL: ${windowLevel.center}<br>Slice: ${currentFileIndex + 1}/${dicomData.length}`;
+
+    const toolInfo = document.getElementById('toolInfo');
+    toolInfo.textContent = `Tool: ${currentTool.charAt(0).toUpperCase() + currentTool.slice(1)}`;
+
+    const zoomInfo = document.getElementById('zoomInfo');
+    zoomInfo.textContent = `Zoom: ${Math.round(zoomLevel * 100)}%`;
+
+    const imageIndex = document.getElementById('imageIndex');
+    imageIndex.textContent = `${currentFileIndex + 1} / ${dicomData.length}`;
+
+    currentFileIndex = fileIndex;
+    updateDicomInfo();
+}
+
+function updateFileList() {
+    const fileListSection = document.getElementById('fileListSection');
+    const fileList = document.getElementById('fileList');
+    
+    if (loadedFiles.length === 0) {
+        fileListSection.style.display = 'none';
+        return;
+    }
+    
+    fileListSection.style.display = 'block';
+    fileList.innerHTML = loadedFiles.map((file, index) => `
+        <div class="file-item" onclick="loadImageToViewport(${index}, 1)">
+            <span class="file-number">${index + 1}</span>
+            <span>${file.name}</span>
+        </div>
+    `).join('');
+}
+
+function updateDicomInfo() {
+    const dicomInfoSection = document.getElementById('dicomInfoSection');
+    const dicomInfo = document.getElementById('dicomInfo');
+    
+    if (!dicomData[currentFileIndex]) {
+        dicomInfoSection.style.display = 'none';
+        return;
+    }
+    
+    dicomInfoSection.style.display = 'block';
+    const dicom = dicomData[currentFileIndex];
+    
+    let tagsHtml = '';
+    for (const [tag, value] of Object.entries(dicom.tags)) {
+        tagsHtml += `
+            <div class="dicom-tag">
+                <span class="tag-name">${tag}</span>
+                <span class="tag-value">${value}</span>
+            </div>
+        `;
+    }
+    
+    tagsHtml += `
+        <div class="dicom-tag">
+            <span class="tag-name">File Size</span>
+            <span class="tag-value">${formatFileSize(dicom.fileSize)}</span>
+        </div>
+        <div class="dicom-tag">
+            <span class="tag-name">Dimensions</span>
+            <span class="tag-value">${dicom.width}x${dicom.height}</span>
+        </div>
+        <div class="dicom-tag">
+            <span class="tag-name">Bits Allocated</span>
+            <span class="tag-value">${dicom.bitsAllocated}</span>
+        </div>
+    `;
+    
+    dicomInfo.innerHTML = tagsHtml;
+}
+
+function showNoFileMessage(show) {
+    const noFileMessage = document.getElementById('noFileMessage');
+    const mainViewport = document.getElementById('mainViewport');
+    
+    if (show) {
+        noFileMessage.style.display = 'flex';
+        mainViewport.style.display = 'none';
+    } else {
+        noFileMessage.style.display = 'none';
+        mainViewport.style.display = 'block';
+    }
+}
+
+function setActiveViewport(viewportNum) {
+    // Remove active class from all tool buttons
+    document.querySelectorAll('.tool-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`[data-tool="${currentTool}"]`).classList.add('active');
+
+    // Update cursor
+    updateCursor();
+}
+
+function setTool(tool) {
+    currentTool = tool;
+    
+    // Update tool button states
+    document.querySelectorAll('.tool-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`[data-tool="${tool}"]`).classList.add('active');
+    
+    // Update cursor
+    updateCursor();
+}
+
+function updateCursor() {
+    const cursors = {
+        pan: 'grab',
+        zoom: 'zoom-in',
+        windowing: 'crosshair',
+        measure: 'crosshair',
+        annotate: 'crosshair',
+        crosshair: 'crosshair',
+        invert: 'crosshair'
+    };
+    
+    document.querySelectorAll('.viewport').forEach(viewport => {
+        viewport.style.cursor = cursors[currentTool] || 'default';
+    });
+}
+
+function zoom(factor) {
+    zoomLevel *= factor;
+    zoomLevel = Math.max(0.1, Math.min(10, zoomLevel));
+    
+    updateViewport(currentViewport);
+    updateZoomInfo();
+}
+
+function updateViewport(viewportNum) {
+    if (dicomData.length > 0) {
+        loadImageToViewport(currentFileIndex, 1);
+    }
+}
+
+function updateZoomInfo() {
+    document.getElementById('zoomInfo').textContent = `Zoom: ${Math.round(zoomLevel * 100)}%`;
+}
+
+function changeImage(delta) {
+    if (dicomData.length === 0) return;
+    
+    currentFileIndex = (currentFileIndex + delta + dicomData.length) % dicomData.length;
+    loadImageToViewport(currentFileIndex, 1);
+}
+
+function previousImage() {
+    changeImage(-1);
+}
+
+function nextImage() {
+    changeImage(1);
+}
+
+function togglePlay() {
+    if (dicomData.length < 2) return;
+    
+    const playBtn = document.getElementById('playBtn');
+    
+    if (isPlaying) {
+        clearInterval(playInterval);
+        isPlaying = false;
+        playBtn.innerHTML = '<i class="fas fa-play"></i> Play';
+    } else {
+        playInterval = setInterval(() => {
+            nextImage();
+        }, 500);
+        isPlaying = true;
+        playBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
+    }
+}
+
+function resetViewport(viewportNum) {
+    zoomLevel = 1;
+    panOffset = { x: 0, y: 0 };
+    updateViewport(viewportNum);
+    updateZoomInfo();
+}
+
+function fitToWindow(viewportNum) {
+    if (!dicomData[currentFileIndex]) return;
+    
+    const canvas = document.getElementById('dicomCanvas');
+    const dicom = dicomData[currentFileIndex];
+    
+    const scaleX = canvas.width / dicom.width;
+    const scaleY = canvas.height / dicom.height;
+    zoomLevel = Math.min(scaleX, scaleY) * 0.9;
+    panOffset = { x: 0, y: 0 };
+    
+    updateViewport(viewportNum);
+    updateZoomInfo();
+}
+
+function toggleFullscreen() {
+    const container = document.querySelector('.viewer-container');
+    const icon = document.getElementById('fullscreenIcon');
+    
+    if (!document.fullscreenElement) {
+        container.requestFullscreen();
+        icon.className = 'fas fa-compress';
+    } else {
+        document.exitFullscreen();
+        icon.className = 'fas fa-expand';
+    }
+}
+
+function launchDesktopViewer() {
+    // Launch the standalone desktop DICOM viewer
+    showNotification('Launching desktop DICOM viewer...', 'info');
+    
+    fetch('{% url "dicom_viewer:launch_standalone_viewer" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCsrfToken(),
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification(data.message, 'success');
+        } else {
+            showNotification(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error launching desktop viewer:', error);
+        showNotification('Error launching desktop viewer. Please check if PyQt5 is installed.', 'error');
+    });
+}
+
+function resizeCanvas(canvas) {
+    if (canvas && canvas.parentElement) {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        canvas.width = rect.width - 4;
+        canvas.height = rect.height - 4;
+    }
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function showNotification(message, type = 'info') {
+    const alertClass = type === 'error' ? 'danger' : type;
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${alertClass} alert-dismissible fade show`;
+    alert.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alert);
+    
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.remove();
+        }
+    }, 5000);
+}
+
+// Window/Level Presets
+function setWindowPreset(preset) {
+    let newWidth = 400;
+    let newCenter = 40;
+
+    switch (preset) {
+        case 'lung':
+            newWidth = 1500;
+            newCenter = -600;
+            break;
+        case 'bone':
+            newWidth = 2000;
+            newCenter = 300;
+            break;
+        case 'soft':
+            newWidth = 400;
+            newCenter = 40;
+            break;
+        case 'brain':
+            newWidth = 100;
+            newCenter = 50;
+            break;
+        case 'abdomen':
+            newWidth = 350;
+            newCenter = 50;
+            break;
+        case 'mediastinum':
+            newWidth = 350;
+            newCenter = 50;
+            break;
+        default:
+            newWidth = 400;
+            newCenter = 40;
+    }
+
+    updateWindowWidth(newWidth);
+    updateWindowLevel(newCenter);
+}
+
+function updateWindowWidth(value) {
+    windowLevel.width = parseInt(value);
+    document.getElementById('windowWidthValue').textContent = value;
+    document.getElementById('windowWidthSlider').value = value;
+    // Reload image with new windowing
+    if (dicomData.length > 0) {
+        loadImageToViewport(currentFileIndex, 1);
+    }
+    updateAllOverlays();
+}
+
+function updateWindowLevel(value) {
+    windowLevel.center = parseInt(value);
+    document.getElementById('windowLevelValue').textContent = value;
+    document.getElementById('windowLevelSlider').value = value;
+    // Reload image with new windowing
+    if (dicomData.length > 0) {
+        loadImageToViewport(currentFileIndex, 1);
+    }
+    updateAllOverlays();
+}
+
+function toggleInvert() {
+    // Reload image with new inversion setting
+    if (dicomData.length > 0) {
+        loadImageToViewport(currentFileIndex, 1);
+    }
+    updateAllOverlays();
+}
+
+// Transform Controls
+function updateZoom(value) {
+    zoomLevel = parseFloat(value) / 100;
+    document.getElementById('zoomValue').textContent = `${value}%`;
+    document.getElementById('zoomSlider').value = value;
+    updateViewport(1);
+    updateAllOverlays();
+}
+
+function fitToWindow() {
+    if (!dicomData[currentFileIndex]) return;
+    
+    const canvas = document.getElementById('dicomCanvas');
+    const dicom = dicomData[currentFileIndex];
+    
+    const scaleX = canvas.width / dicom.width;
+    const scaleY = canvas.height / dicom.height;
+    zoomLevel = Math.min(scaleX, scaleY) * 0.9;
+    panOffset = { x: 0, y: 0 };
+    
+    updateViewport(1);
+    updateZoomInfo();
+    document.getElementById('zoomSlider').value = Math.round(zoomLevel * 100);
+    document.getElementById('zoomValue').textContent = `${Math.round(zoomLevel * 100)}%`;
+}
+
+function actualSize() {
+    if (!dicomData[currentFileIndex]) return;
+    
+    zoomLevel = 1;
+    panOffset = { x: 0, y: 0 };
+    
+    updateViewport(1);
+    updateZoomInfo();
+    document.getElementById('zoomSlider').value = 100;
+    document.getElementById('zoomValue').textContent = '100%';
+}
+
+function resetView() {
+    zoomLevel = 1;
+    panOffset = { x: 0, y: 0 };
+    updateViewport(1);
+    updateZoomInfo();
+    document.getElementById('zoomSlider').value = 100;
+    document.getElementById('zoomValue').textContent = '100%';
+}
+
+function toggleCrosshair() {
+    crosshairEnabled = !crosshairEnabled;
+    updateCursor();
+    document.getElementById('toolInfo').textContent = `Tool: ${currentTool.charAt(0).toUpperCase() + currentTool.slice(1)}`;
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    switch(e.key) {
+        case 'ArrowLeft':
+            e.preventDefault();
+            previousImage();
+            break;
+        case 'ArrowRight':
+            e.preventDefault();
+            nextImage();
+            break;
+        case ' ':
+            e.preventDefault();
+            togglePlay();
+            break;
+        case 'r':
+        case 'R':
+            e.preventDefault();
+            resetView();
+            break;
+        case 'i':
+        case 'I':
+            e.preventDefault();
+            toggleInvert();
+            break;
+        case 'f':
+        case 'F':
+            e.preventDefault();
+            fitToWindow();
+            break;
+        case '1':
+            e.preventDefault();
+            setTool('windowing');
+            break;
+        case '2':
+            e.preventDefault();
+            setTool('zoom');
+            break;
+        case '3':
+            e.preventDefault();
+            setTool('pan');
+            break;
+        case '4':
+            e.preventDefault();
+            setTool('measure');
+            break;
+        case '5':
+            e.preventDefault();
+            setTool('annotate');
+            break;
+    }
+});
+
+// Window resize handler
+window.addEventListener('resize', function() {
+    const canvas = document.getElementById('dicomCanvas');
+    if (canvas) {
+        resizeCanvas(canvas);
+        updateViewport(1);
+    }
+});
+
+// Improved error handling
+window.addEventListener('error', function(e) {
+    console.error('DICOM Viewer Error:', e.error);
+    showNotification('An error occurred while processing the image', 'error');
+});
+
+// Initialize cursor and setup
+updateCursor();
+
+// Additional utility functions
+function showLoading(show) {
+    const loadBtn = document.querySelector('.header-btn');
+    if (show) {
+        loadBtn.innerHTML = '<div class="loading"></div> Loading...';
+        loadBtn.disabled = true;
+    } else {
+        loadBtn.innerHTML = '<i class="fas fa-folder-open"></i> Load DICOM Files';
+        loadBtn.disabled = false;
+    }
+}
+
+function updateAllOverlays() {
+    if (dicomData.length > 0 && dicomData[currentFileIndex]) {
+        const dicom = dicomData[currentFileIndex];
+        
+        // Update all overlay information
+        document.getElementById('windowLevelInfo').innerHTML = 
+            `WW: ${windowLevel.width}<br>WL: ${windowLevel.center}<br>Slice: ${currentFileIndex + 1}/${dicomData.length}`;
+        
+        document.getElementById('toolInfo').textContent = 
+            `Tool: ${currentTool.charAt(0).toUpperCase() + currentTool.slice(1)}`;
+        
+        document.getElementById('zoomInfo').textContent = 
+            `Zoom: ${Math.round(zoomLevel * 100)}%`;
+        
+        document.getElementById('imageInfo').innerHTML = 
+            `${dicom.width} x ${dicom.height}<br>${dicom.bitsAllocated} bit`;
+        
+        // Update sliders
+        document.getElementById('windowWidthSlider').value = windowLevel.width;
+        document.getElementById('windowLevelSlider').value = windowLevel.center;
+        document.getElementById('zoomSlider').value = Math.round(zoomLevel * 100);
+        
+        // Update values
+        document.getElementById('windowWidthValue').textContent = windowLevel.width;
+        document.getElementById('windowLevelValue').textContent = windowLevel.center;
+        document.getElementById('zoomValue').textContent = `${Math.round(zoomLevel * 100)}%`;
+    }
+}
+
+console.log('Advanced DICOM Viewer initialized successfully');
+</script>
+{% endblock %}
