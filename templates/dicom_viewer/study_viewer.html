@@ -1069,6 +1069,10 @@ let isFullscreen = false;
 let cineInterval = null;
 let cineFrame = 0;
 let isPlaying = false;
+// Added: window/level and inversion state
+let windowCenter = 40;
+let windowWidth = 400;
+let inverted = false;
 
 document.addEventListener('DOMContentLoaded', function() {
     initializeViewer();
@@ -1290,24 +1294,22 @@ function loadSeries(seriesId) {
     currentSeries = studyData.find(s => s.id === seriesId);
     
     if (currentSeries) {
-        // Load images into viewports
-        loadSeriesImages();
+        // Reset cine
+        cineFrame = 0;
+        // Draw initial image into active viewport
+        loadImageAtFrame(cineFrame);
+        // Update slice counters
+        updateSliceDisplays();
         showNotification(`Loaded ${currentSeries.description}`, 'success');
     }
 }
 
 function loadSeriesImages() {
-    // This would load actual DICOM images
-    // For now, we'll simulate loading
-    setTimeout(() => {
-        // Update slice counters
-        const imageCount = currentSeries.images.length;
-        document.querySelectorAll('[id^="slice-"]').forEach(elem => {
-            elem.textContent = `1/${imageCount}`;
-        });
-        
-        showNotification('Images loaded successfully', 'success');
-    }, 500);
+    // Draw first image for current series into active viewport
+    if (!currentSeries || !currentSeries.images.length) return;
+    cineFrame = 0;
+    updateSliceDisplays();
+    loadImageAtFrame(cineFrame);
 }
 
 function updateHounsfieldUnits(x, y) {
@@ -1349,56 +1351,63 @@ function showWindowLevel() {
 }
 
 function applyWindowLevel(preset) {
-    fetch('/viewer/api/window-level/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCsrfToken()
-        },
-        body: JSON.stringify({ preset: preset })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Update window/level display
-            const wlText = `${data.window_center}/${data.window_width}`;
-            document.querySelectorAll('[id^="wl-"]').forEach(elem => {
-                elem.textContent = wlText;
-            });
-            
-            showNotification(`Applied ${preset} window/level`, 'success');
-        }
-    })
-    .catch(error => console.error('Error:', error));
+    // Apply WL presets locally and refresh
+    const presets = {
+        lung: { center: -600, width: 1600 },
+        bone: { center: 300, width: 1500 },
+        soft: { center: 40, width: 400 },
+        brain: { center: 50, width: 100 },
+        abdomen: { center: 50, width: 350 },
+        mediastinum: { center: 50, width: 350 }
+    };
+    const p = presets[preset];
+    if (!p) return;
+    windowCenter = p.center;
+    windowWidth = p.width;
+    updateWindowLevelDisplays();
+    // Refresh current viewport image
+    loadImageAtFrame(cineFrame);
+    showNotification(`Applied ${preset} window/level`, 'success');
 }
 
 function applyCustomWindowLevel() {
-    const center = document.getElementById('customCenter').value;
-    const width = document.getElementById('customWidth').value;
-    
-    fetch('/viewer/api/window-level/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCsrfToken()
-        },
-        body: JSON.stringify({
-            window_center: parseInt(center),
-            window_width: parseInt(width)
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            const wlText = `${center}/${width}`;
-            document.querySelectorAll('[id^="wl-"]').forEach(elem => {
-                elem.textContent = wlText;
-            });
-            
-            showNotification('Applied custom window/level', 'success');
-        }
-    })
-    .catch(error => console.error('Error:', error));
+    const center = parseInt(document.getElementById('customCenter').value);
+    const width = parseInt(document.getElementById('customWidth').value);
+    if (Number.isFinite(center)) windowCenter = center;
+    if (Number.isFinite(width)) windowWidth = width;
+    updateWindowLevelDisplays();
+    loadImageAtFrame(cineFrame);
+    showNotification('Applied custom window/level', 'success');
+}
+
+function updateWindowLevelDisplays() {
+    const wlText = `${windowCenter}/${windowWidth}`;
+    document.querySelectorAll('[id^="wl-"]').forEach(elem => {
+        elem.textContent = wlText;
+    });
+}
+
+function invertImage() {
+    inverted = !inverted;
+    loadImageAtFrame(cineFrame);
+    showNotification(`Image ${inverted ? 'inverted' : 'normal'}`, 'success');
+}
+
+function resetImage() {
+    // Reset view parameters
+    inverted = false;
+    windowCenter = 40;
+    windowWidth = 400;
+    // Reset zoom transform on active viewport
+    const viewport = document.getElementById(`viewport${currentViewport}`);
+    const canvas = viewport.querySelector('canvas');
+    if (canvas) {
+        canvas.style.transform = 'scale(1)';
+        canvas.style.transformOrigin = 'center';
+    }
+    updateWindowLevelDisplays();
+    loadImageAtFrame(cineFrame);
+    showNotification('Image reset', 'success');
 }
 
 function showReconstructionPanel() {
@@ -1430,37 +1439,59 @@ function processReconstruction() {
         showNotification('Please select a reconstruction type', 'error');
         return;
     }
-    
+    if (!currentSeries) {
+        showNotification('Load a series first', 'error');
+        return;
+    }
     const type = selectedOption.dataset.recon;
     hideReconstructionPanel();
     showProgressOverlay();
-    
-    // Start reconstruction
-    fetch(`/viewer/api/study/{{ study.id }}/reconstruction/`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCsrfToken()
-        },
-        body: JSON.stringify({
-            type: type,
-            parameters: {}
+
+    let endpoint = null;
+    if (type === 'mpr') {
+        endpoint = `/viewer/api/series/${currentSeries.id}/mpr/?window_width=${encodeURIComponent(windowWidth)}&window_level=${encodeURIComponent(windowCenter)}&inverted=${inverted}`;
+    } else if (type === 'mip') {
+        endpoint = `/viewer/api/series/${currentSeries.id}/mip/?window_width=${encodeURIComponent(windowWidth)}&window_level=${encodeURIComponent(windowCenter)}&inverted=${inverted}`;
+    } else if (type === 'bone') {
+        endpoint = `/viewer/api/series/${currentSeries.id}/bone/?window_width=${encodeURIComponent(windowWidth)}&window_level=${encodeURIComponent(windowCenter)}&inverted=${inverted}`;
+    }
+
+    if (!endpoint) {
+        // Keep simulated progress for unsupported types
+        simulateProgress(type);
+        return;
+    }
+
+    fetch(endpoint)
+        .then(resp => resp.json())
+        .then(data => {
+            hideProgressOverlay();
+            if (type === 'mpr' && data.mpr_views) {
+                drawBase64ToCanvas('canvas1', data.mpr_views.axial);
+                drawBase64ToCanvas('canvas2', data.mpr_views.sagittal);
+                drawBase64ToCanvas('canvas3', data.mpr_views.coronal);
+                showNotification('MPR reconstruction completed', 'success');
+            } else if (type === 'mip' && data.mip_views) {
+                drawBase64ToCanvas('canvas1', data.mip_views.axial);
+                drawBase64ToCanvas('canvas2', data.mip_views.sagittal);
+                drawBase64ToCanvas('canvas3', data.mip_views.coronal);
+                showNotification('MIP reconstruction completed', 'success');
+            } else if (type === 'bone' && data.bone_views) {
+                // Show axial bone view in 3D canvas and others in 1-3
+                drawBase64ToCanvas('canvas1', data.bone_views.axial);
+                drawBase64ToCanvas('canvas2', data.bone_views.sagittal);
+                drawBase64ToCanvas('canvas3', data.bone_views.coronal);
+                drawBase64ToCanvas('canvas4', data.bone_views.mip_axial || data.bone_views.axial);
+                showNotification('Bone reconstruction completed', 'success');
+            } else {
+                showNotification('Reconstruction returned no views', 'warning');
+            }
         })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            simulateProgress(type);
-        } else {
+        .catch(err => {
+            console.error('Reconstruction error', err);
             hideProgressOverlay();
             showNotification('Reconstruction failed', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        hideProgressOverlay();
-        showNotification('Reconstruction failed', 'error');
-    });
+        });
 }
 
 function showProgressOverlay() {
@@ -1547,11 +1578,9 @@ function playCine() {
     cineInterval = setInterval(() => {
         cineFrame = (cineFrame + 1) % currentSeries.images.length;
         document.getElementById('cineSlider').value = (cineFrame / currentSeries.images.length) * 100;
-        
-        // Update slice displays
-        document.querySelectorAll('[id^="slice-"]').forEach(elem => {
-            elem.textContent = `${cineFrame + 1}/${currentSeries.images.length}`;
-        });
+        updateSliceDisplays();
+        // Draw next frame
+        loadImageAtFrame(cineFrame);
     }, interval);
 }
 
@@ -1565,26 +1594,6 @@ function stopCine() {
     pauseCine();
     cineFrame = 0;
     document.getElementById('cineSlider').value = 0;
-}
-
-function invertImage() {
-    // Implement image inversion
-    showNotification('Image inverted', 'success');
-}
-
-function resetImage() {
-    // Reset image to original state
-    showNotification('Image reset', 'success');
-}
-
-function flipHorizontal() {
-    // Implement horizontal flip
-    showNotification('Image flipped horizontally', 'success');
-}
-
-function flipVertical() {
-    // Implement vertical flip
-    showNotification('Image flipped vertically', 'success');
 }
 
 function exportImage(format) {
@@ -1742,12 +1751,7 @@ function scrollSlice(delta) {
     if (!currentSeries || !currentSeries.images.length) return;
     
     cineFrame = Math.max(0, Math.min(currentSeries.images.length - 1, cineFrame + delta));
-    
-    // Update slice displays
-    document.querySelectorAll('[id^="slice-"]').forEach(elem => {
-        elem.textContent = `${cineFrame + 1}/${currentSeries.images.length}`;
-    });
-    
+    updateSliceDisplays();
     // Update image display
     loadImageAtFrame(cineFrame);
 }
@@ -1774,12 +1778,7 @@ function nextImage() {
     if (!currentSeries || !currentSeries.images.length) return;
     
     cineFrame = (cineFrame + 1) % currentSeries.images.length;
-    
-    // Update slice displays
-    document.querySelectorAll('[id^="slice-"]').forEach(elem => {
-        elem.textContent = `${cineFrame + 1}/${currentSeries.images.length}`;
-    });
-    
+    updateSliceDisplays();
     loadImageAtFrame(cineFrame);
 }
 
@@ -1788,12 +1787,7 @@ function previousImage() {
     if (!currentSeries || !currentSeries.images.length) return;
     
     cineFrame = cineFrame > 0 ? cineFrame - 1 : currentSeries.images.length - 1;
-    
-    // Update slice displays
-    document.querySelectorAll('[id^="slice-"]').forEach(elem => {
-        elem.textContent = `${cineFrame + 1}/${currentSeries.images.length}`;
-    });
-    
+    updateSliceDisplays();
     loadImageAtFrame(cineFrame);
 }
 
@@ -1808,15 +1802,9 @@ function loadImageAtFrame(frameIndex) {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Draw placeholder with frame info
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    ctx.fillStyle = '#0ea5e9';
-    ctx.font = '16px Inter';
-    ctx.textAlign = 'center';
-    ctx.fillText(`Image ${frameIndex + 1}/${currentSeries.images.length}`, canvas.width / 2, canvas.height / 2);
-    ctx.fillText(`Instance: ${image.instance_number}`, canvas.width / 2, canvas.height / 2 + 25);
+    // Fetch processed PNG from backend with current WL and inversion
+    const url = `/viewer/api/image/${image.id}/display/?window_width=${encodeURIComponent(windowWidth)}&window_level=${encodeURIComponent(windowCenter)}&inverted=${inverted}`;
+    drawImageFromUrlOnCanvas(url, canvas);
 }
 
 function showMeasurementReport() {
@@ -2248,6 +2236,37 @@ function getCookie(name) {
         }
     }
     return cookieValue;
+}
+
+function drawImageFromUrlOnCanvas(imageUrl, canvas) {
+    const img = new Image();
+    img.onload = function() {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Fit image into canvas preserving aspect ratio
+        const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+        const drawWidth = img.width * scale;
+        const drawHeight = img.height * scale;
+        const offsetX = (canvas.width - drawWidth) / 2;
+        const offsetY = (canvas.height - drawHeight) / 2;
+        ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+    };
+    img.onerror = function() {
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#ff4d4f';
+        ctx.font = '14px Inter';
+        ctx.textAlign = 'center';
+        ctx.fillText('Failed to load image', canvas.width / 2, canvas.height / 2);
+    };
+    img.src = imageUrl;
+}
+
+function drawBase64ToCanvas(canvasId, dataUrl) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !dataUrl) return;
+    drawImageFromUrlOnCanvas(dataUrl, canvas);
 }
 
 </script>
