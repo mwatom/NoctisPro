@@ -46,6 +46,17 @@ def standalone_viewer(request):
     return render(request, 'dicom_viewer/standalone_viewer.html', context)
 
 @login_required
+def advanced_standalone_viewer(request):
+    """Advanced Standalone DICOM viewer with enhanced features"""
+    context = {
+        'user': request.user,
+        'standalone': True,
+        'advanced': True,
+    }
+    
+    return render(request, 'dicom_viewer/advanced_standalone_viewer.html', context)
+
+@login_required
 def view_study(request, study_id):
     """View specific study in DICOM viewer"""
     study = get_object_or_404(Study, id=study_id)
