@@ -19,21 +19,8 @@ import uuid
 
 @login_required
 def viewer(request):
-    """Main DICOM viewer interface"""
-    user = request.user
-    
-    # Get recent studies for quick access
-    if user.is_facility_user():
-        recent_studies = Study.objects.filter(facility=user.facility).order_by('-study_date')[:10]
-    else:
-        recent_studies = Study.objects.all().order_by('-study_date')[:10]
-    
-    context = {
-        'user': user,
-        'recent_studies': recent_studies,
-    }
-    
-    return render(request, 'dicom_viewer/viewer.html', context)
+    """Main DICOM viewer interface (redirects to refined standalone viewer)"""
+    return redirect('dicom_viewer:standalone_viewer')
 
 @login_required
 def standalone_viewer(request):

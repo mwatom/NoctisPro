@@ -624,10 +624,6 @@
                 <i class="fas fa-folder-open"></i>
                 Load DICOM Files
             </button>
-            <button class="header-btn secondary" onclick="launchDesktopViewer()" title="Launch Desktop Viewer">
-                <i class="fas fa-desktop"></i>
-                Desktop Viewer
-            </button>
             <button class="header-btn secondary" onclick="toggleFullscreen()">
                 <i class="fas fa-expand" id="fullscreenIcon"></i>
             </button>
@@ -1626,30 +1622,6 @@ function toggleFullscreen() {
     }
 }
 
-function launchDesktopViewer() {
-    // Launch the standalone desktop DICOM viewer
-    showNotification('Launching desktop DICOM viewer...', 'info');
-    
-    fetch('{% url "dicom_viewer:launch_standalone_viewer" %}', {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken'),
-            'Content-Type': 'application/json',
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification(data.message, 'success');
-        } else {
-            showNotification(data.message, 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error launching desktop viewer:', error);
-        showNotification('Error launching desktop viewer. Please check if PyQt5 is installed.', 'error');
-    });
-}
 
 function resizeCanvas(canvas) {
     if (canvas && canvas.parentElement) {

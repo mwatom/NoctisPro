@@ -695,9 +695,6 @@
             </div>
         </div>
         <div class="d-flex align-items-center gap-3">
-            <button class="btn btn-success btn-sm" onclick="launchDesktopViewer({{ study.id }})" title="Launch study in desktop viewer">
-                <i class="fas fa-desktop me-1"></i>Desktop Viewer
-            </button>
             <button class="btn btn-link text-light" onclick="toggleFullscreen()">
                 <i class="fas fa-expand" id="fullscreenIcon"></i>
             </button>
@@ -1079,31 +1076,6 @@ document.addEventListener('DOMContentLoaded', function() {
     loadDefaultSeries();
     setupEventListeners();
 });
-
-function launchDesktopViewer(studyId) {
-    // Launch the study in the desktop viewer
-    showNotification('Launching desktop viewer...', 'info');
-    
-    fetch(`{% url 'dicom_viewer:launch_study_in_desktop_viewer' 0 %}`.replace('0', studyId), {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken'),
-            'Content-Type': 'application/json',
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification(data.message, 'success');
-        } else {
-            showNotification(data.message, 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error launching desktop viewer:', error);
-        showNotification('Error launching desktop viewer. Please check if the tools are properly installed.', 'error');
-    });
-}
 
 function initializeViewer() {
     // Initialize canvases
