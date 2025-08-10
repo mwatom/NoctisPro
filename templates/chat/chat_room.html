@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block title %}Chat Room - Noctis Pro PACS{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card bg-dark border-secondary">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="text-light mb-0">
+                        <i class="fas fa-comments me-2"></i>Chat Room: {{ room_id|title }}
+                    </h5>
+                    <a href="{% url 'chat:chat_rooms' %}" class="btn btn-medical btn-sm">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Rooms
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-comments fa-3x mb-3"></i>
+                        <h4>Chat Room Feature</h4>
+                        <p>Real-time chat functionality coming soon!</p>
+                        <p>This will include:</p>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success me-2"></i>Real-time messaging</li>
+                            <li><i class="fas fa-check text-success me-2"></i>File sharing</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Medical image annotations</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Voice/Video calls</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
