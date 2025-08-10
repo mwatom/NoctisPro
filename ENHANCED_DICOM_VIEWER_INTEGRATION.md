@@ -68,7 +68,7 @@ This document describes the successful integration of PyQt5-like DICOM viewer fu
 ### Frontend Implementation (JavaScript/CSS)
 
 #### Complete Template Rewrite
-The `advanced_standalone_viewer.html` template was completely rewritten to provide:
+Note: The previous web-based advanced viewer has been removed in favor of the C++ desktop viewer.
 
 1. **Modern UI Design**
    - Dark theme optimized for medical imaging

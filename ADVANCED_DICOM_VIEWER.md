@@ -31,8 +31,7 @@ The Advanced DICOM Viewer is a comprehensive medical imaging interface that prov
 ## File Structure
 
 ```
-templates/dicom_viewer/
-├── advanced_standalone_viewer.html    # Main template file
+[Deprecated] The previous web-based advanced viewer was removed in favor of the C++ desktop viewer.
 dicom_viewer/
 ├── urls.py                            # URL routing
 ├── views.py                           # View functions

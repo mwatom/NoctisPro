@@ -361,11 +361,11 @@ def view_attachment(request, attachment_id):
     # Handle DICOM files
     if attachment.is_dicom_file():
         if attachment.attached_study:
-            # Redirect to DICOM viewer for attached study
-            return redirect('dicom_viewer:view_study', study_id=attachment.attached_study.id)
+            # Launch desktop viewer for attached study
+            return redirect('dicom_viewer:launch_study_in_desktop_viewer', study_id=attachment.attached_study.id)
         else:
-            # Handle standalone DICOM file
-            return redirect('dicom_viewer:standalone_viewer')
+            # Launch desktop viewer without study context
+            return redirect('dicom_viewer:launch_standalone_viewer')
     
     # Handle viewable files (PDF, images)
     if attachment.is_viewable_in_browser():
