@@ -651,30 +651,61 @@ def api_dicom_image_display(request, image_id):
 
 @login_required
 @csrf_exempt
-def api_measurements(request, study_id):
+def api_measurements(request, study_id=None):
     """API endpoint for saving/loading measurements"""
-    study = get_object_or_404(Study, id=study_id)
-    user = request.user
-    
-    # Check permissions
-    if user.is_facility_user() and study.facility != user.facility:
-        return JsonResponse({'error': 'Permission denied'}, status=403)
+    if study_id:
+        study = get_object_or_404(Study, id=study_id)
+        user = request.user
+        
+        # Check permissions
+        if user.is_facility_user() and study.facility != user.facility:
+            return JsonResponse({'error': 'Permission denied'}, status=403)
     
     if request.method == 'POST':
         # Save measurements
         try:
             data = json.loads(request.body)
-            # This would save measurements to database
-            # For now, we'll just return success
+            measurements = data.get('measurements', [])
+            annotations = data.get('annotations', [])
+            
+            # Store measurements in session for standalone viewer
+            if not study_id:
+                request.session['measurements'] = measurements
+                request.session['annotations'] = annotations
+            else:
+                # Save to database for study-based viewer
+                # For now, store in session as well
+                request.session[f'measurements_{study_id}'] = measurements
+                request.session[f'annotations_{study_id}'] = annotations
+            
             return JsonResponse({'success': True, 'message': 'Measurements saved'})
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON data'}, status=400)
     
     elif request.method == 'GET':
         # Load measurements
-        # This would load measurements from database
-        measurements = []
-        return JsonResponse({'measurements': measurements})
+        if not study_id:
+            measurements = request.session.get('measurements', [])
+            annotations = request.session.get('annotations', [])
+        else:
+            measurements = request.session.get(f'measurements_{study_id}', [])
+            annotations = request.session.get(f'annotations_{study_id}', [])
+        
+        return JsonResponse({
+            'measurements': measurements,
+            'annotations': annotations
+        })
+    
+    elif request.method == 'DELETE':
+        # Clear measurements
+        if not study_id:
+            request.session.pop('measurements', None)
+            request.session.pop('annotations', None)
+        else:
+            request.session.pop(f'measurements_{study_id}', None)
+            request.session.pop(f'annotations_{study_id}', None)
+        
+        return JsonResponse({'success': True, 'message': 'Measurements cleared'})
 
 @login_required
 @csrf_exempt
@@ -773,6 +804,50 @@ def api_window_level(request):
             }
             
             return JsonResponse(result)
+            
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+    
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@login_required
+@csrf_exempt
+def api_calculate_distance(request):
+    """API endpoint to calculate distance with pixel spacing"""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            start_x = data.get('start_x')
+            start_y = data.get('start_y')
+            end_x = data.get('end_x')
+            end_y = data.get('end_y')
+            pixel_spacing = data.get('pixel_spacing', [1.0, 1.0])
+            
+            # Calculate pixel distance
+            pixel_distance = np.sqrt((end_x - start_x)**2 + (end_y - start_y)**2)
+            
+            # Calculate real-world distance if pixel spacing is available
+            if len(pixel_spacing) >= 2:
+                try:
+                    spacing_x = float(pixel_spacing[0])
+                    spacing_y = float(pixel_spacing[1])
+                    avg_spacing = (spacing_x + spacing_y) / 2
+                    distance_mm = pixel_distance * avg_spacing
+                    distance_cm = distance_mm / 10.0
+                    
+                    return JsonResponse({
+                        'pixel_distance': round(pixel_distance, 2),
+                        'distance_mm': round(distance_mm, 2),
+                        'distance_cm': round(distance_cm, 2),
+                        'formatted_text': f"{distance_mm:.1f} mm / {distance_cm:.2f} cm"
+                    })
+                except (ValueError, TypeError):
+                    pass
+            
+            return JsonResponse({
+                'pixel_distance': round(pixel_distance, 2),
+                'formatted_text': f"{pixel_distance:.1f} px"
+            })
             
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON data'}, status=400)
