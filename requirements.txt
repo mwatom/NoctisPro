@@ -53,4 +53,12 @@ urllib3==2.1.0
 # PyQt5 for standalone desktop applications
 PyQt5==5.15.9
 # PyQt5-tools==5.15.9.3.3  # Has dependency conflicts with pyqt5-plugins
-# For Qt Designer, consider installing qt5-tools system package or using alternatives
+# 
+# SOLUTION: Install system packages instead of pip packages for Qt tools:
+# sudo apt install qttools5-dev-tools pyqt5-dev-tools
+# 
+# This provides:
+# - Qt Designer: /usr/lib/qt5/bin/designer
+# - PyQt5 UI Compiler: /usr/bin/pyuic5  
+# - PyQt5 Resource Compiler: /usr/bin/pyrcc5
+# - PyQt5 Linguist: /usr/bin/pylupdate5
