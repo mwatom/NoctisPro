@@ -31,8 +31,8 @@ from worklist.models import StudyAttachment
 from dicom_viewer.views import view_study
 import pydicom
 from PIL import Image
-import fitz  # PyMuPDF for PDF handling
-import docx  # python-docx for Word documents
+# import fitz  # PyMuPDF for PDF handling - commenting out for now
+# import docx  # python-docx for Word documents - commenting out for now
 from io import BytesIO
 import base64
 
