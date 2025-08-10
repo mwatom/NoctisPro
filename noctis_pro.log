@@ -15,3 +15,8 @@ Watching for file changes with StatReloader
 Watching for file changes with StatReloader
 /workspace/dicom_viewer/views.py changed, reloading.
 Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+"HEAD /viewer/standalone/ HTTP/1.1" 302 0
+"GET /viewer/standalone/ HTTP/1.1" 302 0
+"GET /login/?next=/viewer/standalone/ HTTP/1.1" 200 20078
