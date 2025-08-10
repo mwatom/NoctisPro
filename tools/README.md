@@ -113,7 +113,7 @@ The standalone viewer integrates with the main Noctis Pro system through:
 **PyQt5 Not Found Error**:
 ```bash
 # Install PyQt5
-pip install PyQt5==5.15.10 PyQt5-tools==5.15.9.3.3
+pip install PyQt5==5.15.10 qt5-tools==5.15.2.1.3
 ```
 
 **Display Issues on Linux**:
