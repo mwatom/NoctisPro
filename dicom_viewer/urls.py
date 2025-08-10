@@ -28,6 +28,8 @@ urlpatterns = [
     
     # Measurements and annotations
     path('api/study/<int:study_id>/measurements/', views.api_measurements, name='api_measurements'),
+    path('api/measurements/', views.api_measurements, name='api_measurements_standalone'),
+    path('api/calculate-distance/', views.api_calculate_distance, name='api_calculate_distance'),
     path('api/study/<int:study_id>/annotations/', views.api_annotations, name='api_annotations'),
     
     # DICOM file upload and processing
