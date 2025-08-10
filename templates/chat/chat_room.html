@@ -245,8 +245,8 @@
                         {% elif message.message_type == 'study_link' %}
                             <i class="fas fa-link me-2"></i>
                             {% if message.study_reference %}
-                                <a href="{% url 'dicom_viewer:view_study' message.study_reference.id %}" class="text-accent">
-                                    Study: {{ message.study_reference.patient.full_name }} - {{ message.study_reference.study_date|date:"M d, Y" }}
+                                <a href="{% url 'dicom_viewer:launch_study_in_desktop_viewer' message.study_reference.id %}" class="text-accent" target="_blank">
+                                    Launch Desktop Viewer for: {{ message.study_reference.patient.full_name }} - {{ message.study_reference.study_date|date:"M d, Y" }}
                                 </a>
                             {% endif %}
                             {% if message.content %}

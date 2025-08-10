@@ -7,11 +7,11 @@ app_name = 'dicom_viewer'
 urlpatterns = [
     # Main viewer interface
     path('', views.viewer, name='viewer'),
-    path('standalone/', views.standalone_viewer, name='standalone_viewer'),
-    path('advanced/', views.advanced_standalone_viewer, name='advanced_standalone_viewer'),
+    # path('standalone/', views.standalone_viewer, name='standalone_viewer'),
+    # path('advanced/', views.advanced_standalone_viewer, name='advanced_standalone_viewer'),
     path('launch-desktop/', views.launch_standalone_viewer, name='launch_standalone_viewer'),
     path('launch-desktop/<int:study_id>/', views.launch_study_in_desktop_viewer, name='launch_study_in_desktop_viewer'),
-    path('study/<int:study_id>/', views.view_study, name='view_study'),
+    # path('study/<int:study_id>/', views.view_study, name='view_study'),
     
     # API endpoints
     path('api/study/<int:study_id>/data/', views.api_study_data, name='api_study_data'),

@@ -4,7 +4,7 @@ Noctis Pro - Standalone DICOM Viewer Launcher
 =============================================
 
 This script launches the standalone DICOM viewer application.
-It prefers the C++ Qt desktop viewer when available, falling back to the Python viewer.
+It requires the C++ Qt desktop viewer binary to be built and available.
 
 Usage:
     python tools/launch_dicom_viewer.py [options] [dicom_file_or_directory]
@@ -52,65 +52,26 @@ def main():
 
     args = parser.parse_args()
 
-    # Prefer C++ viewer if present
+    # Prefer C++ viewer; required going forward
     cpp_bin = find_cpp_viewer_binary()
-    if cpp_bin:
-        env = os.environ.copy()
-        # Default Django base URL for the C++ app
-        env.setdefault('DICOM_VIEWER_BASE_URL', 'http://localhost:8000/viewer')
-        argv = [cpp_bin]
-        if args.path:
-            argv += [args.path]
-        if args.debug:
-            print(f"Launching C++ viewer: {' '.join(argv)}")
-            print(f"Using base URL: {env['DICOM_VIEWER_BASE_URL']}")
-        try:
-            subprocess.Popen(argv, env=env)
-            return
-        except Exception as e:
-            print(f"Failed to launch C++ viewer: {e}. Falling back to Python viewer...")
-
-    # Fallback to Python viewer
-    try:
-        from tools.standalone_viewers.dicom_viewer import main as viewer_main
-        if args.debug:
-            print("Python viewer fallback engaged")
-            print(f"Project root: {project_root}")
-            if args.study_id:
-                print(f"Loading study ID: {args.study_id}")
-            if args.path:
-                print(f"Loading DICOM path: {args.path}")
-        if args.study_id and not args.standalone:
-            viewer_main(study_id=args.study_id)
-        elif args.path:
-            viewer_main(dicom_path=args.path)
-        else:
-            viewer_main()
-    except ImportError as e:
-        print(f"Error importing DICOM viewer: {e}")
-        print("Make sure all dependencies are installed:")
-        print("pip install -r requirements.txt")
-        try:
-            import PyQt5
-            print("✓ PyQt5 is available")
-        except ImportError:
-            print("✗ PyQt5 is not installed - install with: pip install PyQt5")
-        try:
-            import pydicom
-            print("✓ pydicom is available")
-        except ImportError:
-            print("✗ pydicom is not installed - install with: pip install pydicom")
-        try:
-            import matplotlib
-            print("✓ matplotlib is available")
-        except ImportError:
-            print("✗ matplotlib is not installed - install with: pip install matplotlib")
+    if not cpp_bin:
+        print("Error: C++ viewer binary not found. Please build it in cpp_viewer/build (see README).")
         sys.exit(1)
+
+    env = os.environ.copy()
+    # Default Django base URL for the C++ app
+    env.setdefault('DICOM_VIEWER_BASE_URL', 'http://localhost:8000/viewer')
+    argv = [cpp_bin]
+    if args.path:
+        argv += [args.path]
+    if args.debug:
+        print(f"Launching C++ viewer: {' '.join(argv)}")
+        print(f"Using base URL: {env['DICOM_VIEWER_BASE_URL']}")
+    try:
+        subprocess.Popen(argv, env=env)
+        return
     except Exception as e:
-        print(f"Error launching DICOM viewer: {e}")
-        if args.debug:
-            import traceback
-            traceback.print_exc()
+        print(f"Failed to launch C++ viewer: {e}")
         sys.exit(1)
 
 

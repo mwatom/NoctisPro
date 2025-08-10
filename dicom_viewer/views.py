@@ -17,81 +17,22 @@ from PIL import Image
 from django.utils import timezone
 import uuid
 
-@login_required
-def viewer(request):
-    """Main DICOM viewer interface (redirects to refined standalone viewer)"""
-    return redirect('dicom_viewer:standalone_viewer')
+# Removed web-based viewer entrypoints (standalone_viewer, advanced_standalone_viewer, view_study)
 
 @login_required
-def standalone_viewer(request):
-    """Standalone DICOM viewer for any DICOM files"""
-    context = {
-        'user': request.user,
-        'standalone': True,
-    }
-    
-    return render(request, 'dicom_viewer/standalone_viewer.html', context)
+def viewer(request):
+    """Deprecated: web viewer removed. Redirect to desktop launcher endpoint."""
+    return redirect('dicom_viewer:launch_standalone_viewer')
 
 @login_required
 def advanced_standalone_viewer(request):
-    """Advanced Standalone DICOM viewer with enhanced features"""
-    context = {
-        'user': request.user,
-        'standalone': True,
-        'advanced': True,
-    }
-    
-    return render(request, 'dicom_viewer/advanced_standalone_viewer.html', context)
+    """Deprecated: web viewer removed. Redirect to desktop launcher endpoint."""
+    return redirect('dicom_viewer:launch_standalone_viewer')
 
 @login_required
 def view_study(request, study_id):
-    """View specific study in DICOM viewer"""
-    study = get_object_or_404(Study, id=study_id)
-    user = request.user
-    
-    # Check permissions
-    if user.is_facility_user() and study.facility != user.facility:
-        messages.error(request, 'You do not have permission to view this study.')
-        return redirect('dicom_viewer:viewer')
-    
-    # Update study status to in_progress if it was scheduled
-    if study.status == 'scheduled':
-        study.status = 'in_progress'
-        study.save()
-    
-    # Get series and images
-    series_list = study.series_set.all().order_by('series_number')
-    
-    # Prepare series data for viewer
-    series_data = []
-    for series in series_list:
-        images = series.images.all().order_by('instance_number')
-        series_data.append({
-            'id': series.id,
-            'series_number': series.series_number,
-            'description': series.series_description,
-            'modality': series.modality,
-            'image_count': images.count(),
-            'slice_thickness': series.slice_thickness,
-            'pixel_spacing': series.pixel_spacing,
-            'images': [
-                {
-                    'id': img.id,
-                    'instance_number': img.instance_number,
-                    'file_path': img.file_path.url if img.file_path else '',
-                    'slice_location': img.slice_location,
-                    'image_position': img.image_position,
-                } for img in images
-            ]
-        })
-    
-    context = {
-        'study': study,
-        'series_data': json.dumps(series_data),
-        'user': user,
-    }
-    
-    return render(request, 'dicom_viewer/study_viewer.html', context)
+    """Deprecated: web viewer removed. Redirect to desktop launcher endpoint for the specific study."""
+    return redirect('dicom_viewer:launch_study_in_desktop_viewer', study_id=study_id)
 
 @login_required
 @csrf_exempt

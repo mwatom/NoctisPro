@@ -847,12 +847,6 @@
                 <a href="{% url 'worklist:upload_study' %}" class="quick-action-btn">
                     <i class="fas fa-upload"></i>Upload Study
                 </a>
-                <a href="{% url 'dicom_viewer:standalone_viewer' %}" class="quick-action-btn">
-                    <i class="fas fa-eye"></i>DICOM Viewer
-                </a>
-                <a href="{% url 'dicom_viewer:standalone_viewer' %}" class="quick-action-btn">
-                    <i class="fas fa-folder-open"></i>Standalone Viewer
-                </a>
                 <a href="{% url 'reports:report_list' %}" class="quick-action-btn">
                     <i class="fas fa-file-medical"></i>Reports
                 </a>
@@ -1016,11 +1010,6 @@
                                         <a href="{% url 'worklist:study_list' %}?patient={{ patient.id }}" class="action-btn" title="View Patient Studies">
                                             <i class="fas fa-clipboard-list"></i>
                                         </a>
-                                        {% if patient.study_count > 0 %}
-                                        <a href="{% url 'dicom_viewer:standalone_viewer' %}?patient={{ patient.id }}" class="action-btn" title="View in DICOM Viewer">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                        {% endif %}
                                     </div>
                                 </td>
                             </tr>
