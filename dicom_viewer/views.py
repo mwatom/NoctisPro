@@ -839,3 +839,38 @@ def api_process_study(request, study_id):
             return JsonResponse({'error': str(e)}, status=500)
     
     return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@login_required
+def launch_standalone_viewer(request):
+    """Launch the standalone DICOM viewer application"""
+    import subprocess
+    import sys
+    import os
+    
+    try:
+        # Path to the standalone viewer
+        viewer_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 
+                                   'tools', 'standalone_viewers', 'dicom_viewer.py')
+        
+        if os.path.exists(viewer_path):
+            # Launch the standalone viewer in the background
+            if sys.platform.startswith('win'):
+                subprocess.Popen([sys.executable, viewer_path], shell=True)
+            else:
+                subprocess.Popen([sys.executable, viewer_path])
+            
+            return JsonResponse({
+                'success': True, 
+                'message': 'Standalone DICOM viewer launched successfully'
+            })
+        else:
+            return JsonResponse({
+                'success': False, 
+                'message': 'Standalone viewer not found'
+            }, status=404)
+            
+    except Exception as e:
+        return JsonResponse({
+            'success': False, 
+            'message': f'Error launching standalone viewer: {str(e)}'
+        }, status=500)
