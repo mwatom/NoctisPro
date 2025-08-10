@@ -1,0 +1,352 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}User Management - Admin Panel{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-medical">
+    <div class="container-fluid">
+        <a class="navbar-brand text-white fw-bold" href="{% url 'admin_panel:dashboard' %}">
+            <i class="fas fa-user-shield me-2"></i>Admin Panel
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'admin_panel:dashboard' %}">
+                        <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link active" href="{% url 'admin_panel:user_management' %}">
+                        <i class="fas fa-users me-1"></i>Users
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'admin_panel:facility_management' %}">
+                        <i class="fas fa-hospital me-1"></i>Facilities
+                    </a>
+                </li>
+            </ul>
+            <ul class="navbar-nav">
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-user-circle me-1"></i>{{ user.get_full_name|default:user.username }}
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="{% url 'worklist:dashboard' %}">
+                            <i class="fas fa-home me-2"></i>Main Dashboard
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{% url 'accounts:logout' %}">
+                            <i class="fas fa-sign-out-alt me-2"></i>Logout
+                        </a></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="text-white mb-0">
+                    <i class="fas fa-users me-3"></i>User Management
+                </h1>
+                <div class="btn-group" role="group">
+                    <a href="{% url 'admin_panel:facility_create' %}" class="btn btn-success me-2">
+                        <i class="fas fa-hospital me-2"></i>Add Facility
+                    </a>
+                    <a href="{% url 'admin_panel:user_create' %}" class="btn btn-medical">
+                        <i class="fas fa-user-plus me-2"></i>Add User
+                    </a>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-light dropdown-toggle" data-bs-toggle="dropdown">
+                            <i class="fas fa-user-md me-2"></i>Add Radiologist
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{% url 'admin_panel:user_create' %}?role=radiologist">
+                                <i class="fas fa-user-md me-2"></i>New Radiologist
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'admin_panel:user_create' %}?role=admin">
+                                <i class="fas fa-user-shield me-2"></i>New Administrator
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'admin_panel:user_create' %}?role=facility">
+                                <i class="fas fa-user me-2"></i>New Facility User
+                            </a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search and Filter Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card-medical p-4">
+                <form method="get" class="row g-3">
+                    <div class="col-md-4">
+                        <label for="search" class="form-label text-white">Search Users</label>
+                        <input type="text" class="form-control form-control-medical" id="search" name="search" 
+                               value="{{ search_query }}" placeholder="Search by name, username, email...">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="role" class="form-label text-white">Role</label>
+                        <select class="form-select form-control-medical" id="role" name="role">
+                            <option value="">All Roles</option>
+                            {% for role_code, role_name in user_roles %}
+                            <option value="{{ role_code }}" {% if role_filter == role_code %}selected{% endif %}>
+                                {{ role_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="facility" class="form-label text-white">Facility</label>
+                        <select class="form-select form-control-medical" id="facility" name="facility">
+                            <option value="">All Facilities</option>
+                            {% for facility in facilities %}
+                            <option value="{{ facility.id }}" {% if facility_filter == facility.id|stringformat:'s' %}selected{% endif %}>
+                                {{ facility.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-medical w-100">
+                            <i class="fas fa-search me-2"></i>Filter
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card-medical p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="text-white mb-0">
+                        <i class="fas fa-list me-2"></i>Users List
+                    </h5>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'admin_panel:user_create' %}?role=radiologist" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-user-md me-1"></i>Add Radiologist
+                        </a>
+                        <a href="{% url 'admin_panel:facility_create' %}" class="btn btn-outline-success btn-sm">
+                            <i class="fas fa-hospital me-1"></i>Add Facility
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Facility</th>
+                                <th>Status</th>
+                                <th>Last Login</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user_item in users %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="rounded-circle bg-primary bg-opacity-20 d-flex align-items-center justify-content-center me-3" 
+                                             style="width: 40px; height: 40px;">
+                                            {% if user_item.role == 'admin' %}
+                                                <i class="fas fa-user-shield text-danger"></i>
+                                            {% elif user_item.role == 'radiologist' %}
+                                                <i class="fas fa-user-md text-primary"></i>
+                                            {% else %}
+                                                <i class="fas fa-user text-secondary"></i>
+                                            {% endif %}
+                                        </div>
+                                        <div>
+                                            <strong class="text-white">{{ user_item.get_full_name|default:user_item.username }}</strong>
+                                            <div class="text-secondary small">@{{ user_item.username }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-white">{{ user_item.email }}</td>
+                                <td>
+                                    {% if user_item.role == 'admin' %}
+                                        <span class="badge bg-danger">{{ user_item.get_role_display }}</span>
+                                    {% elif user_item.role == 'radiologist' %}
+                                        <span class="badge bg-primary">{{ user_item.get_role_display }}</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ user_item.get_role_display }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-white">{{ user_item.facility.name|default:"-" }}</td>
+                                <td>
+                                    {% if user_item.is_verified %}
+                                        <span class="badge bg-success">Verified</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">Pending</span>
+                                    {% endif %}
+                                    {% if user_item.is_active %}
+                                        <span class="badge bg-info ms-1">Active</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary ms-1">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-secondary">
+                                    {% if user_item.last_login %}
+                                        {{ user_item.last_login|date:"M d, Y H:i" }}
+                                    {% else %}
+                                        Never
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a href="{% url 'admin_panel:user_edit' user_item.id %}" class="btn btn-outline-light">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        {% if user_item.id != user.id %}
+                                        <a href="{% url 'admin_panel:user_delete' user_item.id %}" class="btn btn-outline-danger">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center text-secondary py-4">
+                                    <i class="fas fa-users fa-3x mb-3 opacity-50"></i>
+                                    <div>No users found matching your criteria</div>
+                                    <div class="mt-2">
+                                        <a href="{% url 'admin_panel:user_create' %}" class="btn btn-medical btn-sm">
+                                            <i class="fas fa-user-plus me-2"></i>Add First User
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                {% if users.has_other_pages %}
+                <nav aria-label="Users pagination" class="mt-4">
+                    <ul class="pagination pagination-dark justify-content-center">
+                        {% if users.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if role_filter %}&role={{ role_filter }}{% endif %}{% if facility_filter %}&facility={{ facility_filter }}{% endif %}">
+                                    <i class="fas fa-angle-double-left"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ users.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if role_filter %}&role={{ role_filter }}{% endif %}{% if facility_filter %}&facility={{ facility_filter }}{% endif %}">
+                                    <i class="fas fa-angle-left"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+
+                        {% for num in users.paginator.page_range %}
+                            {% if users.number == num %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                            {% elif num > users.number|add:'-3' and num < users.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if role_filter %}&role={{ role_filter }}{% endif %}{% if facility_filter %}&facility={{ facility_filter }}{% endif %}">{{ num }}</a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if users.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ users.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if role_filter %}&role={{ role_filter }}{% endif %}{% if facility_filter %}&facility={{ facility_filter }}{% endif %}">
+                                    <i class="fas fa-angle-right"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ users.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if role_filter %}&role={{ role_filter }}{% endif %}{% if facility_filter %}&facility={{ facility_filter }}{% endif %}">
+                                    <i class="fas fa-angle-double-right"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .navbar-medical {
+        background: var(--gradient-primary);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .form-select {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m1 6 7 7 7-7'/%3e%3c/svg%3e");
+    }
+
+    .table-dark {
+        --bs-table-bg: transparent;
+        --bs-table-border-color: var(--border-color);
+    }
+
+    .table-dark th {
+        border-bottom: 2px solid var(--border-color);
+        color: var(--text-secondary);
+        font-weight: 600;
+    }
+
+    .table-dark td {
+        border-top: 1px solid var(--border-color);
+    }
+
+    .table-hover tbody tr:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .pagination-dark .page-link {
+        background: var(--card-bg);
+        border-color: var(--border-color);
+        color: var(--text-primary);
+    }
+
+    .pagination-dark .page-link:hover {
+        background: var(--accent-color);
+        border-color: var(--accent-color);
+        color: white;
+    }
+
+    .pagination-dark .page-item.active .page-link {
+        background: var(--accent-color);
+        border-color: var(--accent-color);
+    }
+
+    .badge {
+        font-size: 0.75rem;
+        padding: 0.35em 0.65em;
+    }
+
+    .btn-group-sm .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}

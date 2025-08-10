@@ -148,9 +148,16 @@ def user_create(request):
             messages.error(request, f'Error creating user: {str(e)}')
     
     facilities = Facility.objects.filter(is_active=True)
+    
+    # Get pre-fill values from URL parameters
+    preset_role = request.GET.get('role', '')
+    preset_facility = request.GET.get('facility', '')
+    
     context = {
         'facilities': facilities,
         'user_roles': User.USER_ROLES,
+        'preset_role': preset_role,
+        'preset_facility': preset_facility,
     }
     
     return render(request, 'admin_panel/user_form.html', context)
