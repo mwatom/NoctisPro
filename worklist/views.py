@@ -24,25 +24,47 @@ from accounts.models import User
 
 @login_required
 def dashboard(request):
-    """Main dashboard view for the worklist"""
+    """Main dashboard view for the worklist - now shows patients"""
     user = request.user
+    from datetime import date
+    from django.db.models import Max, Count
     
-    # Get basic statistics
+    # Get patients with study counts and additional data
     if user.is_facility_user():
-        studies = Study.objects.filter(facility=user.facility)
+        patients_queryset = Patient.objects.filter(study__facility=user.facility).distinct()
     else:
-        studies = Study.objects.all()
+        patients_queryset = Patient.objects.all()
     
-    stats = {
-        'total_studies': studies.count(),
-        'pending_studies': studies.filter(status='scheduled').count(),
-        'in_progress_studies': studies.filter(status='in_progress').count(),
-        'completed_studies': studies.filter(status='completed').count(),
-        'urgent_studies': studies.filter(priority='urgent').count(),
-    }
+    # Apply filters from request
+    search = request.GET.get('search', '')
+    gender = request.GET.get('gender', '')
     
-    # Recent studies for the dashboard
-    recent_studies = studies.order_by('-upload_date')[:10]
+    if search:
+        patients_queryset = patients_queryset.filter(
+            Q(first_name__icontains=search) |
+            Q(last_name__icontains=search) |
+            Q(patient_id__icontains=search) |
+            Q(medical_record_number__icontains=search)
+        )
+    
+    if gender:
+        patients_queryset = patients_queryset.filter(gender=gender)
+    
+    # Annotate with study count and last study date
+    patients = patients_queryset.annotate(
+        study_count=Count('study'),
+        last_study_date=Max('study__study_date')
+    ).order_by('-last_study_date', 'last_name', 'first_name')
+    
+    # Add age calculation for each patient
+    for patient in patients:
+        if patient.date_of_birth:
+            today = date.today()
+            patient.age = today.year - patient.date_of_birth.year - (
+                (today.month, today.day) < (patient.date_of_birth.month, patient.date_of_birth.day)
+            )
+        else:
+            patient.age = 'Unknown'
     
     # Get unread notifications count
     try:
@@ -53,8 +75,7 @@ def dashboard(request):
     
     context = {
         'user': user,
-        'stats': stats,
-        'recent_studies': recent_studies,
+        'patients': patients,
         'unread_notifications_count': unread_notifications_count,
     }
     
