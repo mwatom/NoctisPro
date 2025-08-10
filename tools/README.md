@@ -13,6 +13,7 @@ The Standalone DICOM Viewer is an advanced PyQt5-based desktop application that 
 - **Enhanced Display Options**: Multiple window presets (lung, bone, soft tissue, brain, etc.)
 - **Annotation Support**: Drawing and text annotations
 - **Multi-series Support**: Navigate through multiple DICOM series
+- **Database Integration**: Direct access to Noctis Pro studies
 - **Export Capabilities**: Save processed images and measurements
 
 ### Installation
@@ -29,31 +30,52 @@ The Standalone DICOM Viewer is an advanced PyQt5-based desktop application that 
 
 ### Usage
 
-#### Method 1: Direct Launch (Command Line)
-```bash
-# From project root directory
-python tools/launch_dicom_viewer.py
+#### Method 1: Web Interface Integration (Recommended)
+1. Navigate to the Noctis Pro web interface
+2. Open any study in the DICOM viewer
+3. Click the **"Desktop Viewer"** button in the top toolbar
+4. The standalone application will launch automatically with the study loaded
 
+#### Method 2: Direct Launch with Study ID
+```bash
+# Launch with specific study from database
+python tools/launch_dicom_viewer.py --study-id 123
+
+# Launch with debug mode
+python tools/launch_dicom_viewer.py --study-id 123 --debug
+```
+
+#### Method 3: Direct Launch with DICOM Files
+```bash
 # Launch with specific DICOM file or directory
 python tools/launch_dicom_viewer.py /path/to/dicom/files/
 python tools/launch_dicom_viewer.py study.dcm
 
 # Launch with debug mode
-python tools/launch_dicom_viewer.py --debug
+python tools/launch_dicom_viewer.py /path/to/dicom/files/ --debug
 ```
 
-#### Method 2: Web Interface Integration
-1. Navigate to the Noctis Pro web interface
-2. Go to **Viewer → Standalone**
-3. Click the **"Desktop Viewer"** button in the top-right corner
-4. The standalone application will launch automatically
+#### Method 4: Standalone Mode (No Database)
+```bash
+# Launch without database integration
+python tools/launch_dicom_viewer.py --standalone
 
-#### Method 3: Direct Python Execution
+# Launch specific files in standalone mode
+python tools/launch_dicom_viewer.py /path/to/dicom/files/ --standalone
+```
+
+#### Method 5: Direct Python Execution
 ```bash
 python tools/standalone_viewers/dicom_viewer.py
 ```
 
 ### Features
+
+#### Database Integration
+- **Study Loading**: Load complete studies directly from the Noctis Pro database
+- **Series Navigation**: Browse through multiple series within a study
+- **Patient Information**: Display comprehensive patient and study metadata
+- **Seamless Integration**: Launch from web interface with one click
 
 #### Image Display and Manipulation
 - **Windowing**: Adjust window width and level for optimal contrast
@@ -72,15 +94,16 @@ python tools/standalone_viewers/dicom_viewer.py
 - **Mediastinum**: WW=350, WL=50
 
 #### Measurement Tools
-- **Distance**: Measure distances between points
+- **Distance**: Measure distances between points with real-world units
 - **Angle**: Measure angles between lines
 - **Area**: Calculate areas of regions
 - **Pixel Value**: Display pixel intensity values
+- **Annotations**: Add text labels and drawings
 
-#### Annotations
-- **Text Annotations**: Add text labels to images
-- **Drawing Tools**: Free-hand drawing on images
-- **Arrow Annotations**: Point to specific features
+#### Multi-Series Support
+- **Series Navigation**: Dropdown selector for multi-series studies
+- **Automatic Loading**: Smart loading of the first available series
+- **Series Information**: Display series description, modality, and image count
 
 ### Technical Requirements
 
@@ -96,15 +119,47 @@ python tools/standalone_viewers/dicom_viewer.py
 - numpy >= 1.24.3
 - matplotlib >= 3.8.2
 - Pillow >= 10.1.0
+- Django >= 4.0 (for database integration)
 
 ### Integration with Noctis Pro
 
-The standalone viewer integrates with the main Noctis Pro system through:
+The standalone viewer integrates seamlessly with the main Noctis Pro system through:
 
-1. **Web Interface**: Launch button in the web-based viewer
-2. **Shared DICOM Processing**: Uses the same DICOM processing libraries
-3. **Database Integration**: Can access studies from the Noctis Pro database
-4. **User Authentication**: Respects user permissions and facility access
+1. **Web Interface**: One-click launch button in study viewer
+2. **Database Access**: Direct loading of studies from the database
+3. **User Authentication**: Respects user permissions and facility access
+4. **Shared Processing**: Uses the same DICOM processing libraries
+5. **Real-time Updates**: Synchronized with web-based viewer changes
+
+### Advanced Features
+
+#### Command Line Options
+```bash
+python tools/launch_dicom_viewer.py [OPTIONS] [PATH]
+
+Options:
+  --study-id ID         Load study with specific database ID
+  --debug              Enable debug mode with verbose output
+  --standalone         Force standalone mode (no database)
+  -h, --help           Show help message
+```
+
+#### Programming Interface
+```python
+from tools.standalone_viewers import DicomViewer
+
+# Create viewer instance
+viewer = DicomViewer()
+
+# Load study from database (requires Django setup)
+viewer = DicomViewer(study_id=123)
+
+# Load DICOM files from path
+viewer = DicomViewer(dicom_path="/path/to/dicom/files")
+
+# Show the viewer
+viewer.show()
+```
 
 ### Troubleshooting
 
@@ -122,6 +177,11 @@ pip install PyQt5==5.15.10 PyQt5-tools==5.15.9.3.3
 sudo apt-get install python3-pyqt5 python3-pyqt5.qtcore python3-pyqt5.qtgui
 ```
 
+**Database Connection Issues**:
+- Ensure Django is properly configured
+- Check database connectivity
+- Verify user permissions for study access
+
 **Permission Issues**:
 - Ensure the user has read access to DICOM files
 - On macOS, may need to grant Python access to files in System Preferences
@@ -138,10 +198,10 @@ python tools/launch_dicom_viewer.py --debug
 ```
 tools/
 ├── standalone_viewers/
-│   ├── __init__.py
-│   └── dicom_viewer.py          # Main viewer application
-├── launch_dicom_viewer.py       # Launcher script
-└── README.md                    # This documentation
+│   ├── __init__.py                 # Module exports
+│   └── dicom_viewer.py            # Main viewer application
+├── launch_dicom_viewer.py         # Launcher script
+└── README.md                      # This documentation
 ```
 
 #### Extending the Viewer
@@ -152,27 +212,41 @@ The viewer is designed to be extensible. Common customizations:
 3. **Export Formats**: Add new export options in the file menu
 4. **Integration Points**: Add callbacks for web interface communication
 
+#### API Integration
+The viewer can be integrated into other applications:
+```python
+# Launch with specific study
+from tools.standalone_viewers import main
+main(study_id=123)
+
+# Launch with DICOM files
+main(dicom_path="/path/to/files")
+```
+
 ### Security Considerations
 
 - The desktop viewer runs with local user permissions
 - DICOM files are processed locally on the user's machine
-- No network communication except for optional web interface integration
+- Database access respects user authentication and facility permissions
 - PHI (Protected Health Information) remains on the local system
+- No network communication except for optional database integration
 
 ### Performance Optimization
 
-- **Large Datasets**: Use progressive loading for multi-series studies
+- **Large Datasets**: Uses progressive loading for multi-series studies
 - **Memory Management**: Images are cached intelligently to balance performance and memory usage
-- **GPU Acceleration**: Future versions may include GPU-accelerated processing
+- **Database Queries**: Optimized queries for fast study loading
+- **Rendering**: Hardware-accelerated rendering where available
 
 ### Support
 
 For technical support:
 1. Check the troubleshooting section above
-2. Review the Noctis Pro main documentation
-3. Contact your system administrator
-4. Submit issues through the project repository
+2. Use debug mode to identify issues
+3. Review the Noctis Pro main documentation
+4. Contact your system administrator
+5. Submit issues through the project repository
 
 ---
 
-**Note**: This standalone viewer is part of the Noctis Pro ecosystem and is designed to complement, not replace, the web-based interface. It provides advanced features for users who need enhanced desktop DICOM viewing capabilities.
+**Note**: This standalone viewer is part of the Noctis Pro ecosystem and is designed to complement, not replace, the web-based interface. It provides advanced features for users who need enhanced desktop DICOM viewing capabilities with seamless integration to the main system.

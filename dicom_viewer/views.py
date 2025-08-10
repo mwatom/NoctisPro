@@ -848,29 +848,95 @@ def launch_standalone_viewer(request):
     import os
     
     try:
-        # Path to the standalone viewer
-        viewer_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 
-                                   'tools', 'standalone_viewers', 'dicom_viewer.py')
+        # Get study ID if provided in POST data
+        study_id = None
+        if request.method == 'POST':
+            data = json.loads(request.body) if request.body else {}
+            study_id = data.get('study_id')
         
-        if os.path.exists(viewer_path):
+        # Path to the launcher script
+        launcher_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 
+                                   'tools', 'launch_dicom_viewer.py')
+        
+        if os.path.exists(launcher_path):
+            # Build command with appropriate arguments
+            cmd = [sys.executable, launcher_path]
+            
+            # Add study ID if provided
+            if study_id:
+                cmd.extend(['--study-id', str(study_id)])
+            
             # Launch the standalone viewer in the background
             if sys.platform.startswith('win'):
-                subprocess.Popen([sys.executable, viewer_path], shell=True)
+                subprocess.Popen(cmd, shell=True)
             else:
-                subprocess.Popen([sys.executable, viewer_path])
+                subprocess.Popen(cmd)
             
+            message = 'Standalone DICOM viewer launched successfully'
+            if study_id:
+                message += f' with study ID {study_id}'
+                
             return JsonResponse({
                 'success': True, 
-                'message': 'Standalone DICOM viewer launched successfully'
+                'message': message
             })
         else:
             return JsonResponse({
                 'success': False, 
-                'message': 'Standalone viewer not found'
+                'message': 'Standalone viewer launcher not found'
             }, status=404)
             
     except Exception as e:
         return JsonResponse({
             'success': False, 
             'message': f'Error launching standalone viewer: {str(e)}'
+        }, status=500)
+
+@login_required
+def launch_study_in_desktop_viewer(request, study_id):
+    """Launch a specific study in the desktop viewer"""
+    import subprocess
+    import sys
+    import os
+    
+    try:
+        # Verify study exists and user has access
+        study = get_object_or_404(Study, id=study_id)
+        user = request.user
+        
+        # Check permissions
+        if user.is_facility_user() and study.facility != user.facility:
+            return JsonResponse({
+                'success': False,
+                'message': 'You do not have permission to view this study.'
+            }, status=403)
+        
+        # Path to the launcher script
+        launcher_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 
+                                   'tools', 'launch_dicom_viewer.py')
+        
+        if os.path.exists(launcher_path):
+            # Build command with study ID
+            cmd = [sys.executable, launcher_path, '--study-id', str(study_id)]
+            
+            # Launch the standalone viewer in the background
+            if sys.platform.startswith('win'):
+                subprocess.Popen(cmd, shell=True)
+            else:
+                subprocess.Popen(cmd)
+            
+            return JsonResponse({
+                'success': True, 
+                'message': f'Desktop viewer launched for study: {study.patient_name} ({study.study_date})'
+            })
+        else:
+            return JsonResponse({
+                'success': False, 
+                'message': 'Desktop viewer launcher not found'
+            }, status=404)
+            
+    except Exception as e:
+        return JsonResponse({
+            'success': False, 
+            'message': f'Error launching desktop viewer: {str(e)}'
         }, status=500)
