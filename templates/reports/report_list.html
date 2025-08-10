@@ -1,0 +1,330 @@
+{% extends 'base.html' %}
+
+{% block title %}Reports - Noctis Pro PACS{% endblock %}
+
+{% block extra_css %}
+<style>
+    .reports-container {
+        background: var(--dark-bg);
+        min-height: 100vh;
+        padding: 2rem 0;
+    }
+
+    .reports-header {
+        background: var(--gradient-primary);
+        border-radius: 16px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        border: 1px solid var(--border-color);
+    }
+
+    .reports-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+        transition: transform 0.3s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--accent-color);
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .reports-table-container {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        overflow: hidden;
+    }
+
+    .table-header {
+        background: var(--gradient-primary);
+        padding: 1.5rem;
+        display: flex;
+        justify-content: between;
+        align-items: center;
+    }
+
+    .reports-table {
+        width: 100%;
+        margin: 0;
+    }
+
+    .reports-table th {
+        background: var(--secondary-color);
+        color: var(--text-primary);
+        font-weight: 600;
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 0.5px;
+    }
+
+    .reports-table td {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-primary);
+    }
+
+    .reports-table tr:hover {
+        background: rgba(14, 165, 233, 0.05);
+    }
+
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .status-draft {
+        background: rgba(156, 163, 175, 0.2);
+        color: #9ca3af;
+    }
+
+    .status-preliminary {
+        background: rgba(245, 158, 11, 0.2);
+        color: #f59e0b;
+    }
+
+    .status-final {
+        background: rgba(16, 185, 129, 0.2);
+        color: #10b981;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .action-btn {
+        background: rgba(14, 165, 233, 0.1);
+        border: 1px solid var(--accent-color);
+        border-radius: 6px;
+        color: var(--accent-color);
+        padding: 0.5rem;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+    }
+
+    .action-btn:hover {
+        background: var(--accent-color);
+        color: white;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: var(--text-secondary);
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.3;
+    }
+
+    .filter-controls {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .filter-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr auto;
+        gap: 1rem;
+        align-items: end;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="reports-container">
+    <div class="container-fluid">
+        <!-- Header -->
+        <div class="reports-header">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h1 class="text-white mb-0">
+                        <i class="fas fa-file-medical me-3"></i>Reports Management
+                    </h1>
+                    <p class="text-light opacity-75 mb-0">View and manage radiology reports</p>
+                </div>
+                <div class="col-md-6 text-end">
+                    <a href="{% url 'worklist:dashboard' %}" class="btn btn-medical">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="reports-stats">
+            <div class="stat-card">
+                <div class="stat-number">{{ total_reports|default:0 }}</div>
+                <div class="stat-label">Total Reports</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ draft_reports|default:0 }}</div>
+                <div class="stat-label">Draft Reports</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ pending_reports|default:0 }}</div>
+                <div class="stat-label">Pending Review</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ final_reports|default:0 }}</div>
+                <div class="stat-label">Final Reports</div>
+            </div>
+        </div>
+
+        <!-- Filter Controls -->
+        <div class="filter-controls">
+            <div class="filter-grid">
+                <div class="search-input">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="searchInput" placeholder="Search by patient name, accession number, or radiologist..." class="form-control">
+                </div>
+                <select id="statusFilter" class="form-select">
+                    <option value="">All Status</option>
+                    <option value="draft">Draft</option>
+                    <option value="preliminary">Preliminary</option>
+                    <option value="final">Final</option>
+                    <option value="amended">Amended</option>
+                </select>
+                <select id="modalityFilter" class="form-select">
+                    <option value="">All Modalities</option>
+                    <option value="CT">CT</option>
+                    <option value="MR">MR</option>
+                    <option value="XR">X-Ray</option>
+                    <option value="US">Ultrasound</option>
+                </select>
+                <button class="btn btn-medical" onclick="applyFilters()">
+                    <i class="fas fa-filter me-2"></i>Filter
+                </button>
+            </div>
+        </div>
+
+        <!-- Reports Table -->
+        <div class="reports-table-container">
+            <div class="table-header">
+                <h4 class="text-white mb-0">
+                    <i class="fas fa-list me-2"></i>Reports List
+                </h4>
+            </div>
+            
+            {% if reports %}
+            <div class="table-responsive">
+                <table class="reports-table table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Patient</th>
+                            <th>Study Date</th>
+                            <th>Modality</th>
+                            <th>Body Part</th>
+                            <th>Radiologist</th>
+                            <th>Status</th>
+                            <th>Report Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for report in reports %}
+                        <tr>
+                            <td>
+                                <div class="fw-bold">{{ report.study.patient.full_name }}</div>
+                                <small class="text-muted">{{ report.study.patient.patient_id }}</small>
+                            </td>
+                            <td>{{ report.study.study_date|date:"M d, Y" }}</td>
+                            <td>
+                                <span class="badge bg-secondary">{{ report.study.modality.code }}</span>
+                            </td>
+                            <td>{{ report.study.body_part_examined|default:"-" }}</td>
+                            <td>{{ report.radiologist.get_full_name }}</td>
+                            <td>
+                                <span class="status-badge status-{{ report.status }}">
+                                    {{ report.get_status_display }}
+                                </span>
+                            </td>
+                            <td>{{ report.report_date|date:"M d, Y H:i" }}</td>
+                            <td>
+                                <div class="action-buttons">
+                                    <a href="{% url 'reports:write_report' report.study.id %}" class="action-btn" title="View/Edit Report">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="#" class="action-btn" title="Print Report">
+                                        <i class="fas fa-print"></i>
+                                    </a>
+                                    <a href="#" class="action-btn" title="Download PDF">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-file-medical"></i>
+                <h4>No Reports Found</h4>
+                <p>Reports will appear here when radiologists create them for studies.</p>
+                <a href="{% url 'worklist:dashboard' %}" class="btn btn-medical">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Worklist
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function applyFilters() {
+    // Implement filtering logic here
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const statusFilter = document.getElementById('statusFilter').value;
+    const modalityFilter = document.getElementById('modalityFilter').value;
+    
+    // This would typically make an AJAX call to filter results
+    console.log('Applying filters:', { searchTerm, statusFilter, modalityFilter });
+}
+
+// Real-time search
+document.getElementById('searchInput').addEventListener('input', function() {
+    // Implement real-time search here
+});
+</script>
+{% endblock %}

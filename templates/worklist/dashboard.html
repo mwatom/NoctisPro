@@ -824,6 +824,11 @@
                 <a href="{% url 'chat:chat_rooms' %}" class="quick-action-btn">
                     <i class="fas fa-comments"></i>Chat
                 </a>
+                {% if user.is_admin %}
+                <a href="{% url 'admin_panel:dashboard' %}" class="quick-action-btn">
+                    <i class="fas fa-user-shield"></i>Admin Panel
+                </a>
+                {% endif %}
             </div>
         </div>
     </div>
