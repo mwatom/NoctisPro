@@ -1,0 +1,377 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if user_item %}Edit User{% else %}Create User{% endif %} - Admin Panel{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-medical">
+    <div class="container-fluid">
+        <a class="navbar-brand text-white fw-bold" href="{% url 'admin_panel:dashboard' %}">
+            <i class="fas fa-user-shield me-2"></i>Admin Panel
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'admin_panel:dashboard' %}">
+                        <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link active" href="{% url 'admin_panel:user_management' %}">
+                        <i class="fas fa-users me-1"></i>Users
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'admin_panel:facility_management' %}">
+                        <i class="fas fa-hospital me-1"></i>Facilities
+                    </a>
+                </li>
+            </ul>
+            <ul class="navbar-nav">
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-user-circle me-1"></i>{{ user.get_full_name|default:user.username }}
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="{% url 'worklist:dashboard' %}">
+                            <i class="fas fa-home me-2"></i>Main Dashboard
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{% url 'accounts:logout' %}">
+                            <i class="fas fa-sign-out-alt me-2"></i>Logout
+                        </a></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="text-white mb-0">
+                    <i class="fas fa-user-{% if user_item %}edit{% else %}plus{% endif %} me-3"></i>
+                    {% if user_item %}Edit User{% else %}Create User{% endif %}
+                </h1>
+                <div class="btn-group" role="group">
+                    <a href="{% url 'admin_panel:user_management' %}" class="btn btn-outline-light">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Users
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Form -->
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card-medical p-4">
+                <form method="post" class="row g-4">
+                    {% csrf_token %}
+                    
+                    <!-- Personal Information -->
+                    <div class="col-12">
+                        <h5 class="text-white mb-3">
+                            <i class="fas fa-user me-2"></i>Personal Information
+                        </h5>
+                        <hr class="border-secondary mb-4">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="first_name" class="form-label text-white">
+                            First Name <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control form-control-medical" id="first_name" name="first_name" 
+                               value="{{ user_item.first_name|default:'' }}" required>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="last_name" class="form-label text-white">
+                            Last Name <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control form-control-medical" id="last_name" name="last_name" 
+                               value="{{ user_item.last_name|default:'' }}" required>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="username" class="form-label text-white">
+                            Username <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control form-control-medical" id="username" name="username" 
+                               value="{{ user_item.username|default:'' }}" required 
+                               {% if user_item %}readonly{% endif %}>
+                        <div class="form-text text-secondary">
+                            {% if user_item %}Username cannot be changed after creation{% else %}Choose a unique username{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="email" class="form-label text-white">
+                            Email Address <span class="text-danger">*</span>
+                        </label>
+                        <input type="email" class="form-control form-control-medical" id="email" name="email" 
+                               value="{{ user_item.email|default:'' }}" required>
+                    </div>
+
+                    <!-- Role and Access -->
+                    <div class="col-12 mt-5">
+                        <h5 class="text-white mb-3">
+                            <i class="fas fa-shield-alt me-2"></i>Role and Access
+                        </h5>
+                        <hr class="border-secondary mb-4">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="role" class="form-label text-white">
+                            Role <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select form-control-medical" id="role" name="role" required>
+                            <option value="">Select Role</option>
+                            {% for role_code, role_name in user_roles %}
+                            <option value="{{ role_code }}" 
+                                {% if user_item and user_item.role == role_code %}selected
+                                {% elif not user_item and preset_role == role_code %}selected
+                                {% endif %}>
+                                {{ role_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text text-secondary">
+                            <small>
+                                <strong>Admin:</strong> Full system access<br>
+                                <strong>Radiologist:</strong> Can read studies and create reports<br>
+                                <strong>Facility User:</strong> Can view studies from their facility
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="facility" class="form-label text-white">
+                            Facility
+                        </label>
+                        <select class="form-select form-control-medical" id="facility" name="facility">
+                            <option value="">No Facility (Admin/Independent)</option>
+                            {% for facility in facilities %}
+                            <option value="{{ facility.id }}" 
+                                {% if user_item and user_item.facility_id == facility.id %}selected
+                                {% elif not user_item and preset_facility == facility.id|stringformat:'s' %}selected
+                                {% endif %}>
+                                {{ facility.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text text-secondary">
+                            <small>Assign user to a specific facility (required for facility users)</small>
+                        </div>
+                    </div>
+
+                    <!-- Additional Information -->
+                    <div class="col-12 mt-5">
+                        <h5 class="text-white mb-3">
+                            <i class="fas fa-info-circle me-2"></i>Additional Information
+                        </h5>
+                        <hr class="border-secondary mb-4">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="phone" class="form-label text-white">
+                            Phone Number
+                        </label>
+                        <input type="tel" class="form-control form-control-medical" id="phone" name="phone" 
+                               value="{{ user_item.phone|default:'' }}">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="license_number" class="form-label text-white">
+                            License Number
+                        </label>
+                        <input type="text" class="form-control form-control-medical" id="license_number" name="license_number" 
+                               value="{{ user_item.license_number|default:'' }}">
+                    </div>
+
+                    <div class="col-12">
+                        <label for="specialization" class="form-label text-white">
+                            Specialization
+                        </label>
+                        <input type="text" class="form-control form-control-medical" id="specialization" name="specialization" 
+                               value="{{ user_item.specialization|default:'' }}" 
+                               placeholder="e.g., Diagnostic Radiology, Interventional Radiology">
+                    </div>
+
+                    <!-- Password Section -->
+                    {% if not user_item %}
+                    <div class="col-12 mt-5">
+                        <h5 class="text-white mb-3">
+                            <i class="fas fa-lock me-2"></i>Security
+                        </h5>
+                        <hr class="border-secondary mb-4">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="password" class="form-label text-white">
+                            Password <span class="text-danger">*</span>
+                        </label>
+                        <input type="password" class="form-control form-control-medical" id="password" name="password" required>
+                        <div class="form-text text-secondary">
+                            <small>Password should be at least 8 characters long</small>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="password_confirm" class="form-label text-white">
+                            Confirm Password <span class="text-danger">*</span>
+                        </label>
+                        <input type="password" class="form-control form-control-medical" id="password_confirm" name="password_confirm" required>
+                    </div>
+                    {% endif %}
+
+                    <!-- Status for Edit Mode -->
+                    {% if user_item %}
+                    <div class="col-12 mt-5">
+                        <h5 class="text-white mb-3">
+                            <i class="fas fa-toggle-on me-2"></i>Account Status
+                        </h5>
+                        <hr class="border-secondary mb-4">
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="is_verified" name="is_verified" 
+                                   {% if user_item.is_verified %}checked{% endif %}>
+                            <label class="form-check-label text-white" for="is_verified">
+                                Account Verified
+                            </label>
+                        </div>
+                        <div class="form-text text-secondary">
+                            <small>Verified accounts have full access to their assigned features</small>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="is_active" name="is_active" 
+                                   {% if user_item.is_active %}checked{% endif %}>
+                            <label class="form-check-label text-white" for="is_active">
+                                Account Active
+                            </label>
+                        </div>
+                        <div class="form-text text-secondary">
+                            <small>Inactive accounts cannot log in</small>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Submit Buttons -->
+                    <div class="col-12 mt-5">
+                        <hr class="border-secondary mb-4">
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'admin_panel:user_management' %}" class="btn btn-outline-light">
+                                <i class="fas fa-times me-2"></i>Cancel
+                            </a>
+                            <div>
+                                {% if not user_item %}
+                                <button type="button" class="btn btn-outline-secondary me-2" onclick="resetForm()">
+                                    <i class="fas fa-undo me-2"></i>Reset
+                                </button>
+                                {% endif %}
+                                <button type="submit" class="btn btn-medical">
+                                    <i class="fas fa-save me-2"></i>
+                                    {% if user_item %}Update User{% else %}Create User{% endif %}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .navbar-medical {
+        background: var(--gradient-primary);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .form-select {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m1 6 7 7 7-7'/%3e%3c/svg%3e");
+    }
+
+    .form-check-input:checked {
+        background-color: var(--accent-color);
+        border-color: var(--accent-color);
+    }
+
+    .form-check-input:focus {
+        border-color: var(--accent-color);
+        box-shadow: 0 0 0 0.25rem rgba(14, 165, 233, 0.25);
+    }
+
+    .form-text {
+        margin-top: 0.25rem;
+    }
+
+    hr {
+        opacity: 0.3;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function resetForm() {
+        document.querySelector('form').reset();
+    }
+
+    // Password confirmation validation
+    document.addEventListener('DOMContentLoaded', function() {
+        const password = document.getElementById('password');
+        const passwordConfirm = document.getElementById('password_confirm');
+        
+        if (password && passwordConfirm) {
+            function validatePassword() {
+                if (password.value !== passwordConfirm.value) {
+                    passwordConfirm.setCustomValidity("Passwords don't match");
+                } else {
+                    passwordConfirm.setCustomValidity('');
+                }
+            }
+            
+            password.addEventListener('change', validatePassword);
+            passwordConfirm.addEventListener('keyup', validatePassword);
+        }
+
+        // Role-based facility requirement
+        const roleSelect = document.getElementById('role');
+        const facilitySelect = document.getElementById('facility');
+        
+        if (roleSelect && facilitySelect) {
+            function updateFacilityRequirement() {
+                const selectedRole = roleSelect.value;
+                if (selectedRole === 'facility') {
+                    facilitySelect.required = true;
+                    facilitySelect.closest('.col-md-6').querySelector('.form-text').innerHTML = 
+                        '<small class="text-warning">Facility is required for facility users</small>';
+                } else {
+                    facilitySelect.required = false;
+                    facilitySelect.closest('.col-md-6').querySelector('.form-text').innerHTML = 
+                        '<small>Assign user to a specific facility (required for facility users)</small>';
+                }
+            }
+            
+            roleSelect.addEventListener('change', updateFacilityRequirement);
+            updateFacilityRequirement(); // Initial check
+        }
+    });
+</script>
+{% endblock %}
