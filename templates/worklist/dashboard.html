@@ -661,7 +661,41 @@
         color: var(--accent-color);
     }
 
+    /* Role badges */
+    .role-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-right: 0.5rem;
+    }
 
+    .role-admin {
+        background: linear-gradient(135deg, #dc2626, #ef4444);
+        color: white;
+    }
+
+    .role-radiologist {
+        background: linear-gradient(135deg, #2563eb, #3b82f6);
+        color: white;
+    }
+
+    .role-facility {
+        background: linear-gradient(135deg, #059669, #10b981);
+        color: white;
+    }
+
+    /* Access info panel */
+    .access-info-panel {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 1rem 1.5rem;
+        border-left: 4px solid var(--accent-color);
+    }
 
     .badge-medical {
         background: var(--danger-color);
@@ -781,8 +815,9 @@
                             <div class="fw-bold">
                                 {% if user.first_name %}{{ user.first_name }} {{ user.last_name }}{% else %}{{ user.username }}{% endif %}
                             </div>
-                            <div class="small text-secondary">
-                                {{ user.get_role_display }}{% if user.facility %} - {{ user.facility.name }}{% endif %}
+                            <div class="small text-secondary d-flex align-items-center">
+                                <span class="role-badge role-{{ user.role }}">{{ user.get_role_display }}</span>
+                                {% if user.facility %} - {{ user.facility.name }}{% endif %}
                             </div>
                         </div>
                         <div class="dropdown ms-3">
@@ -828,6 +863,14 @@
                 <a href="{% url 'admin_panel:dashboard' %}" class="quick-action-btn">
                     <i class="fas fa-user-shield"></i>Admin Panel
                 </a>
+                {% elif user.is_radiologist %}
+                <a href="{% url 'admin_panel:dashboard' %}" class="quick-action-btn" title="Limited admin access for radiologists">
+                    <i class="fas fa-user-md"></i>Radiologist Panel
+                </a>
+                {% else %}
+                <button class="quick-action-btn" onclick="requestAdminAccess()" title="Request administrator access">
+                    <i class="fas fa-user-cog"></i>Request Admin Access
+                </button>
                 {% endif %}
             </div>
         </div>
@@ -836,6 +879,37 @@
     <div class="main-content">
         <!-- Main Content Area -->
         <main class="content-area">
+            <!-- User Access Info Panel -->
+            <div class="access-info-panel mb-3">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-info-circle text-primary me-2"></i>
+                            <span class="fw-bold">Current Access Level:</span>
+                            <span class="role-badge role-{{ user.role }} ms-2">{{ user.get_role_display }}</span>
+                            {% if not user.is_admin %}
+                            <span class="text-muted ms-2">
+                                - Limited admin panel access. 
+                                {% if user.is_radiologist %}
+                                    You have radiologist-level access to some admin features.
+                                {% else %}
+                                    Contact your administrator for elevated privileges.
+                                {% endif %}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        {% if not user.is_admin %}
+                        <small class="text-muted">
+                            <i class="fas fa-lightbulb me-1"></i>
+                            Need admin access? Use the "Request Admin Access" button above.
+                        </small>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
             <!-- Patient Search and Filter Controls -->
             <div class="filter-controls">
                 <div class="filter-row">
@@ -1097,6 +1171,21 @@ function checkNotifications() {
     //         }
     //     })
     //     .catch(error => console.error('Error checking messages:', error));
+}
+
+// Function to request admin access
+function requestAdminAccess() {
+    showNotification(
+        'Admin access request feature would be implemented here. ' +
+        'For now, please contact your system administrator to upgrade your account to admin role.', 
+        'info'
+    );
+    
+    // In a real implementation, this could:
+    // 1. Send a request to administrators
+    // 2. Create a notification for admins
+    // 3. Log the request for audit purposes
+    console.log('Admin access requested for user: {{ user.username }}');
 }
 </script>
 {% endblock %}
