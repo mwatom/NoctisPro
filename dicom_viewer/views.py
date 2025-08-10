@@ -12,7 +12,7 @@ import time
 import numpy as np
 import pydicom
 from io import BytesIO
-import cv2
+# import cv2  # Optional for advanced image processing
 from PIL import Image
 from django.utils import timezone
 import uuid
@@ -195,11 +195,29 @@ def api_mpr_reconstruction(request, series_id):
         
         # Read DICOM data
         volume_data = []
+        default_window_width = 400
+        default_window_level = 40
+        
         for img in images:
             try:
                 dicom_path = os.path.join('/workspace/media', str(img.file_path))
                 ds = pydicom.dcmread(dicom_path)
-                volume_data.append(ds.pixel_array)
+                
+                # Get pixel array and apply rescale slope/intercept
+                pixel_array = ds.pixel_array.astype(np.float32)
+                if hasattr(ds, 'RescaleSlope') and hasattr(ds, 'RescaleIntercept'):
+                    pixel_array = pixel_array * float(ds.RescaleSlope) + float(ds.RescaleIntercept)
+                
+                # Get default window/level from first image
+                if len(volume_data) == 0:
+                    default_window_width = getattr(ds, 'WindowWidth', 400)
+                    default_window_level = getattr(ds, 'WindowCenter', 40)
+                    if hasattr(default_window_width, '__iter__') and not isinstance(default_window_width, str):
+                        default_window_width = default_window_width[0]
+                    if hasattr(default_window_level, '__iter__') and not isinstance(default_window_level, str):
+                        default_window_level = default_window_level[0]
+                
+                volume_data.append(pixel_array)
             except Exception as e:
                 continue
         
@@ -209,20 +227,25 @@ def api_mpr_reconstruction(request, series_id):
         # Stack into 3D volume
         volume = np.stack(volume_data, axis=0)
         
+        # Get windowing parameters from request
+        window_width = float(request.GET.get('window_width', default_window_width))
+        window_level = float(request.GET.get('window_level', default_window_level))
+        inverted = request.GET.get('inverted', 'false').lower() == 'true'
+        
         # Generate MPR views
         mpr_views = {}
         
         # Axial (original orientation)
         axial_slice = volume[volume.shape[0] // 2]
-        mpr_views['axial'] = _array_to_base64_image(axial_slice)
+        mpr_views['axial'] = _array_to_base64_image(axial_slice, window_width, window_level, inverted)
         
         # Sagittal (YZ plane)
         sagittal_slice = volume[:, :, volume.shape[2] // 2]
-        mpr_views['sagittal'] = _array_to_base64_image(sagittal_slice)
+        mpr_views['sagittal'] = _array_to_base64_image(sagittal_slice, window_width, window_level, inverted)
         
         # Coronal (XZ plane)
         coronal_slice = volume[:, volume.shape[1] // 2, :]
-        mpr_views['coronal'] = _array_to_base64_image(coronal_slice)
+        mpr_views['coronal'] = _array_to_base64_image(coronal_slice, window_width, window_level, inverted)
         
         return JsonResponse({
             'mpr_views': mpr_views,
@@ -257,11 +280,29 @@ def api_mip_reconstruction(request, series_id):
         
         # Read DICOM data
         volume_data = []
+        default_window_width = 400
+        default_window_level = 40
+        
         for img in images:
             try:
                 dicom_path = os.path.join('/workspace/media', str(img.file_path))
                 ds = pydicom.dcmread(dicom_path)
-                volume_data.append(ds.pixel_array)
+                
+                # Get pixel array and apply rescale slope/intercept
+                pixel_array = ds.pixel_array.astype(np.float32)
+                if hasattr(ds, 'RescaleSlope') and hasattr(ds, 'RescaleIntercept'):
+                    pixel_array = pixel_array * float(ds.RescaleSlope) + float(ds.RescaleIntercept)
+                
+                # Get default window/level from first image
+                if len(volume_data) == 0:
+                    default_window_width = getattr(ds, 'WindowWidth', 400)
+                    default_window_level = getattr(ds, 'WindowCenter', 40)
+                    if hasattr(default_window_width, '__iter__') and not isinstance(default_window_width, str):
+                        default_window_width = default_window_width[0]
+                    if hasattr(default_window_level, '__iter__') and not isinstance(default_window_level, str):
+                        default_window_level = default_window_level[0]
+                
+                volume_data.append(pixel_array)
             except Exception as e:
                 continue
         
@@ -271,20 +312,25 @@ def api_mip_reconstruction(request, series_id):
         # Stack into 3D volume
         volume = np.stack(volume_data, axis=0)
         
+        # Get windowing parameters from request
+        window_width = float(request.GET.get('window_width', default_window_width))
+        window_level = float(request.GET.get('window_level', default_window_level))
+        inverted = request.GET.get('inverted', 'false').lower() == 'true'
+        
         # Generate MIP projections
         mip_views = {}
         
         # Axial MIP (maximum along Z-axis)
         mip_axial = np.max(volume, axis=0)
-        mip_views['axial'] = _array_to_base64_image(mip_axial)
+        mip_views['axial'] = _array_to_base64_image(mip_axial, window_width, window_level, inverted)
         
         # Sagittal MIP (maximum along Y-axis)
         mip_sagittal = np.max(volume, axis=1)
-        mip_views['sagittal'] = _array_to_base64_image(mip_sagittal)
+        mip_views['sagittal'] = _array_to_base64_image(mip_sagittal, window_width, window_level, inverted)
         
         # Coronal MIP (maximum along X-axis)
         mip_coronal = np.max(volume, axis=2)
-        mip_views['coronal'] = _array_to_base64_image(mip_coronal)
+        mip_views['coronal'] = _array_to_base64_image(mip_coronal, window_width, window_level, inverted)
         
         return JsonResponse({
             'mip_views': mip_views,
@@ -348,30 +394,35 @@ def api_bone_reconstruction(request, series_id):
         bone_mask = volume >= threshold
         bone_volume = volume * bone_mask
         
+        # Get windowing parameters optimized for bone
+        window_width = float(request.GET.get('window_width', 2000))  # Bone window
+        window_level = float(request.GET.get('window_level', 300))   # Bone level
+        inverted = request.GET.get('inverted', 'false').lower() == 'true'
+        
         # Generate bone reconstruction views
         bone_views = {}
         
         # Axial bone view
         axial_bone = bone_volume[bone_volume.shape[0] // 2]
-        bone_views['axial'] = _array_to_base64_image(axial_bone)
+        bone_views['axial'] = _array_to_base64_image(axial_bone, window_width, window_level, inverted)
         
         # Sagittal bone view
         sagittal_bone = bone_volume[:, :, bone_volume.shape[2] // 2]
-        bone_views['sagittal'] = _array_to_base64_image(sagittal_bone)
+        bone_views['sagittal'] = _array_to_base64_image(sagittal_bone, window_width, window_level, inverted)
         
         # Coronal bone view
         coronal_bone = bone_volume[:, bone_volume.shape[1] // 2, :]
-        bone_views['coronal'] = _array_to_base64_image(coronal_bone)
+        bone_views['coronal'] = _array_to_base64_image(coronal_bone, window_width, window_level, inverted)
         
         # MIP of bone structures
         bone_mip_axial = np.max(bone_volume, axis=0)
-        bone_views['mip_axial'] = _array_to_base64_image(bone_mip_axial)
+        bone_views['mip_axial'] = _array_to_base64_image(bone_mip_axial, window_width, window_level, inverted)
         
         bone_mip_sagittal = np.max(bone_volume, axis=1)
-        bone_views['mip_sagittal'] = _array_to_base64_image(bone_mip_sagittal)
+        bone_views['mip_sagittal'] = _array_to_base64_image(bone_mip_sagittal, window_width, window_level, inverted)
         
         bone_mip_coronal = np.max(bone_volume, axis=2)
-        bone_views['mip_coronal'] = _array_to_base64_image(bone_mip_coronal)
+        bone_views['mip_coronal'] = _array_to_base64_image(bone_mip_coronal, window_width, window_level, inverted)
         
         return JsonResponse({
             'bone_views': bone_views,
@@ -470,14 +521,37 @@ def api_study_progress(request, study_id):
         'last_updated': study.last_updated.isoformat()
     })
 
-def _array_to_base64_image(array):
-    """Convert numpy array to base64 encoded image"""
+def _array_to_base64_image(array, window_width=None, window_level=None, inverted=False):
+    """Convert numpy array to base64 encoded image with proper windowing"""
     try:
-        # Normalize to 0-255
-        if array.max() > array.min():
-            normalized = ((array - array.min()) / (array.max() - array.min()) * 255).astype(np.uint8)
+        # Convert to float for calculations
+        image_data = array.astype(np.float32)
+        
+        # Apply windowing if parameters provided
+        if window_width is not None and window_level is not None:
+            # Apply window/level
+            min_val = window_level - window_width / 2
+            max_val = window_level + window_width / 2
+            
+            # Clip and normalize
+            image_data = np.clip(image_data, min_val, max_val)
+            if max_val > min_val:
+                image_data = (image_data - min_val) / (max_val - min_val) * 255
+            else:
+                image_data = np.zeros_like(image_data)
         else:
-            normalized = np.zeros_like(array, dtype=np.uint8)
+            # Default normalization
+            if image_data.max() > image_data.min():
+                image_data = ((image_data - image_data.min()) / (image_data.max() - image_data.min()) * 255)
+            else:
+                image_data = np.zeros_like(image_data)
+        
+        # Apply inversion if requested
+        if inverted:
+            image_data = 255 - image_data
+        
+        # Convert to uint8
+        normalized = image_data.astype(np.uint8)
         
         # Convert to PIL Image
         img = Image.fromarray(normalized, mode='L')
@@ -490,6 +564,79 @@ def _array_to_base64_image(array):
         return f"data:image/png;base64,{img_str}"
     except Exception as e:
         return None
+
+@login_required
+@csrf_exempt 
+def api_dicom_image_display(request, image_id):
+    """API endpoint to get processed DICOM image with windowing"""
+    image = get_object_or_404(DicomImage, id=image_id)
+    user = request.user
+    
+    # Check permissions
+    if user.is_facility_user() and image.series.study.facility != user.facility:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    
+    try:
+        # Get windowing parameters from request
+        window_width = float(request.GET.get('window_width', 400))
+        window_level = float(request.GET.get('window_level', 40))
+        inverted = request.GET.get('inverted', 'false').lower() == 'true'
+        
+        # Read DICOM file
+        dicom_path = os.path.join('/workspace/media', str(image.file_path))
+        ds = pydicom.dcmread(dicom_path)
+        
+        # Get pixel array
+        pixel_array = ds.pixel_array.astype(np.float32)
+        
+        # Apply rescale slope and intercept if available (convert to Hounsfield Units)
+        if hasattr(ds, 'RescaleSlope') and hasattr(ds, 'RescaleIntercept'):
+            pixel_array = pixel_array * float(ds.RescaleSlope) + float(ds.RescaleIntercept)
+        
+        # Generate image with proper windowing
+        image_data_url = _array_to_base64_image(pixel_array, window_width, window_level, inverted)
+        
+        if not image_data_url:
+            return JsonResponse({'error': 'Failed to process image'}, status=500)
+        
+        # Get default window/level values from DICOM if available
+        default_window_width = getattr(ds, 'WindowWidth', window_width)
+        default_window_level = getattr(ds, 'WindowCenter', window_level)
+        
+        # Handle multiple window values (take first if array)
+        if hasattr(default_window_width, '__iter__') and not isinstance(default_window_width, str):
+            default_window_width = default_window_width[0]
+        if hasattr(default_window_level, '__iter__') and not isinstance(default_window_level, str):
+            default_window_level = default_window_level[0]
+        
+        return JsonResponse({
+            'image_data': image_data_url,
+            'image_info': {
+                'id': image.id,
+                'instance_number': image.instance_number,
+                'slice_location': image.slice_location,
+                'dimensions': [int(ds.Rows), int(ds.Columns)],
+                'pixel_spacing': getattr(ds, 'PixelSpacing', [1.0, 1.0]),
+                'slice_thickness': getattr(ds, 'SliceThickness', 1.0),
+                'default_window_width': float(default_window_width),
+                'default_window_level': float(default_window_level),
+                'modality': getattr(ds, 'Modality', ''),
+                'series_description': getattr(ds, 'SeriesDescription', ''),
+                'patient_name': str(getattr(ds, 'PatientName', '')),
+                'study_date': str(getattr(ds, 'StudyDate', '')),
+                'bits_allocated': getattr(ds, 'BitsAllocated', 16),
+                'bits_stored': getattr(ds, 'BitsStored', 16),
+                'photometric_interpretation': getattr(ds, 'PhotometricInterpretation', ''),
+            },
+            'windowing': {
+                'window_width': window_width,
+                'window_level': window_level,
+                'inverted': inverted
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': f'Error processing DICOM image: {str(e)}'}, status=500)
 
 @login_required
 @csrf_exempt
@@ -741,12 +888,18 @@ def api_export_measurements(request, study_id):
     
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-@login_required
+@csrf_exempt
 def upload_dicom(request):
     """Upload DICOM files for processing"""
     if request.method == 'POST':
         try:
+            # Handle both multiple files and single file
             uploaded_files = request.FILES.getlist('dicom_files')
+            if not uploaded_files:
+                # Try single file upload for standalone viewer
+                dicom_file = request.FILES.get('dicom_file')
+                if dicom_file:
+                    uploaded_files = [dicom_file]
             
             if not uploaded_files:
                 return JsonResponse({'success': False, 'error': 'No files uploaded'})
@@ -754,20 +907,87 @@ def upload_dicom(request):
             # Generate upload ID for tracking
             upload_id = str(uuid.uuid4())
             
-            # This would process DICOM files and create Study/Series/Image records
-            # For now, we'll simulate processing
+            # Process DICOM files and create temporary Study/Series/Image records
             total_files = len(uploaded_files)
             processed_files = 0
+            processed_images = []
+            
+            # Create a temporary study for standalone uploads
+            temp_study = Study.objects.create(
+                patient_name=f'Temp Upload {upload_id[:8]}',
+                patient_id=f'TEMP_{upload_id[:8]}',
+                study_date=timezone.now().date(),
+                study_description='Temporary upload for standalone viewer',
+                accession_number=f'TEMP_{upload_id[:8]}',
+                modality='CT',  # Default, will be updated from DICOM
+                status='completed'
+            )
+            
+            # Create a temporary series
+            temp_series = Series.objects.create(
+                study=temp_study,
+                series_number=1,
+                series_description='Temporary series',
+                modality='CT',  # Default, will be updated from DICOM
+                series_uid=f'temp.{upload_id}',
+                image_count=0
+            )
             
             for file in uploaded_files:
                 # Validate file type
                 if not (file.name.lower().endswith('.dcm') or file.name.lower().endswith('.dicom')):
                     continue
                 
-                # This would save the file and create Study/Series/Image records
-                processed_files += 1
+                try:
+                    # Save file temporarily
+                    file_path = f'temp_uploads/{upload_id}_{file.name}'
+                    full_path = os.path.join('/workspace/media', file_path)
+                    os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                    
+                    with open(full_path, 'wb+') as destination:
+                        for chunk in file.chunks():
+                            destination.write(chunk)
+                    
+                    # Read DICOM metadata
+                    ds = pydicom.dcmread(full_path)
+                    
+                    # Update series metadata from first file
+                    if processed_files == 0:
+                        temp_series.modality = getattr(ds, 'Modality', 'CT')
+                        temp_series.series_description = getattr(ds, 'SeriesDescription', 'Uploaded DICOM')
+                        temp_study.patient_name = str(getattr(ds, 'PatientName', f'Temp Upload {upload_id[:8]}'))
+                        temp_study.modality = getattr(ds, 'Modality', 'CT')
+                        temp_study.save()
+                        temp_series.save()
+                    
+                    # Create image record
+                    image = DicomImage.objects.create(
+                        series=temp_series,
+                        instance_number=getattr(ds, 'InstanceNumber', processed_files + 1),
+                        slice_location=getattr(ds, 'SliceLocation', 0),
+                        image_position=str(getattr(ds, 'ImagePositionPatient', '')),
+                        file_path=file_path,
+                        file_size=file.size
+                    )
+                    
+                    processed_images.append({
+                        'id': image.id,
+                        'instance_number': image.instance_number,
+                        'slice_location': image.slice_location
+                    })
+                    
+                    processed_files += 1
+                    
+                except Exception as e:
+                    print(f"Error processing file {file.name}: {str(e)}")
+                    continue
+            
+            # Update series image count
+            temp_series.image_count = processed_files
+            temp_series.save()
             
             if processed_files == 0:
+                temp_study.delete()  # Clean up
                 return JsonResponse({'success': False, 'error': 'No valid DICOM files found'})
             
             return JsonResponse({
@@ -775,7 +995,10 @@ def upload_dicom(request):
                 'message': f'Successfully uploaded {processed_files} DICOM files',
                 'upload_id': upload_id,
                 'processed_files': processed_files,
-                'total_files': total_files
+                'total_files': total_files,
+                'study_id': temp_study.id,
+                'series_id': temp_series.id,
+                'images': processed_images
             })
             
         except Exception as e:

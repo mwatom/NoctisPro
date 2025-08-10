@@ -762,6 +762,15 @@
                     <button class="preset-btn" onclick="setWindowPreset('abdomen')">Abdomen</button>
                     <button class="preset-btn" onclick="setWindowPreset('mediastinum')">Mediastinum</button>
                 </div>
+                
+                <div class="control-group">
+                    <div class="control-label">
+                        <label>
+                            <input type="checkbox" id="invertCheck" onchange="toggleInvert()">
+                            Invert Image
+                        </label>
+                    </div>
+                </div>
             </div>
 
             <!-- Navigation Controls -->
@@ -1124,7 +1133,7 @@ function extractDicomInfo(arrayBuffer, file) {
     }
     
     // Generate pixel data for display (simplified)
-    dicomInfo.pixelData = generatePixelData(dicomInfo);
+            dicomInfo.file = file; // Store the file reference for server processing
     
     return dicomInfo;
 }
@@ -1207,8 +1216,20 @@ function extractStringValue(dataView, offset, length) {
     return value.trim();
 }
 
-function generatePixelData(dicomInfo) {
-    // Generate a simple pattern for display (in real implementation, extract actual pixel data)
+async function generatePixelData(dicomInfo, windowWidth, windowLevel, inverted = false) {
+    // If we have an uploaded DICOM file, upload it to server for processing
+    if (dicomInfo.file && dicomInfo.file instanceof File) {
+        try {
+            const processedImageData = await uploadAndProcessDicomFile(dicomInfo.file, windowWidth, windowLevel, inverted);
+            if (processedImageData) {
+                return processedImageData;
+            }
+        } catch (error) {
+            console.error('Error processing DICOM file:', error);
+        }
+    }
+    
+    // Fallback: Generate a simple pattern for display
     const { width, height } = dicomInfo;
     const imageData = new ImageData(width, height);
     const data = imageData.data;
@@ -1229,7 +1250,86 @@ function generatePixelData(dicomInfo) {
     return imageData;
 }
 
-function loadImageToViewport(fileIndex, viewportNum) {
+async function uploadAndProcessDicomFile(file, windowWidth, windowLevel, inverted = false) {
+    try {
+        // Create FormData for file upload
+        const formData = new FormData();
+        formData.append('dicom_file', file);
+        
+        // Upload the file temporarily for processing
+        const uploadResponse = await fetch('/viewer/upload/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        });
+        
+        if (!uploadResponse.ok) {
+            throw new Error('Failed to upload DICOM file');
+        }
+        
+        const uploadData = await uploadResponse.json();
+        
+        if (uploadData.images && uploadData.images.length > 0) {
+            const imageId = uploadData.images[0].id;
+            
+            // Get processed image with windowing
+            const displayUrl = `/viewer/api/image/${imageId}/display/?window_width=${windowWidth}&window_level=${windowLevel}&inverted=${inverted}`;
+            const displayResponse = await fetch(displayUrl);
+            
+            if (!displayResponse.ok) {
+                throw new Error('Failed to get processed image');
+            }
+            
+            const displayData = await displayResponse.json();
+            
+            if (displayData.image_data) {
+                // Convert base64 image to ImageData
+                return await base64ToImageData(displayData.image_data);
+            }
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('Error in uploadAndProcessDicomFile:', error);
+        return null;
+    }
+}
+
+async function base64ToImageData(base64DataUrl) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            const imageData = ctx.getImageData(0, 0, img.width, img.height);
+            resolve(imageData);
+        };
+        img.onerror = reject;
+        img.src = base64DataUrl;
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+async function loadImageToViewport(fileIndex, viewportNum) {
     if (!dicomData[fileIndex]) return;
     
     const canvas = document.getElementById('dicomCanvas');
@@ -1239,7 +1339,45 @@ function loadImageToViewport(fileIndex, viewportNum) {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    // Check if we need to regenerate pixel data with current window/level settings
+    const currentInverted = document.getElementById('invertCheck') ? document.getElementById('invertCheck').checked : false;
+    const needsRegeneration = !dicom.pixelData || 
+                             dicom.lastWindowWidth !== windowLevel.width || 
+                             dicom.lastWindowLevel !== windowLevel.center ||
+                             dicom.lastInverted !== currentInverted;
+    
+    if (needsRegeneration) {
+        try {
+            // Show loading indicator
+            ctx.fillStyle = '#666';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Processing DICOM image...', canvas.width / 2, canvas.height / 2);
+            
+            // Generate pixel data with current windowing
+            const pixelData = await generatePixelData(dicom, windowLevel.width, windowLevel.center, currentInverted);
+            if (pixelData) {
+                dicom.pixelData = pixelData;
+                dicom.width = pixelData.width;
+                dicom.height = pixelData.height;
+                dicom.lastWindowWidth = windowLevel.width;
+                dicom.lastWindowLevel = windowLevel.center;
+                dicom.lastInverted = currentInverted;
+            }
+        } catch (error) {
+            console.error('Error generating pixel data:', error);
+            ctx.fillStyle = 'red';
+            ctx.fillText('Error loading DICOM image', canvas.width / 2, canvas.height / 2);
+            return;
+        }
+    }
+    
     if (dicom.pixelData) {
+        // Clear canvas again
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
         // Create a temporary canvas for the image
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = dicom.width;
@@ -1590,14 +1728,22 @@ function setWindowPreset(preset) {
 function updateWindowWidth(value) {
     windowLevel.width = parseInt(value);
     document.getElementById('windowWidthValue').textContent = value;
-    updateViewport(1);
+    // Reload image with new windowing
+    loadImageToViewport(currentFileIndex, 1);
     updateAllOverlays();
 }
 
 function updateWindowLevel(value) {
     windowLevel.center = parseInt(value);
     document.getElementById('windowLevelValue').textContent = value;
-    updateViewport(1);
+    // Reload image with new windowing
+    loadImageToViewport(currentFileIndex, 1);
+    updateAllOverlays();
+}
+
+function toggleInvert() {
+    // Reload image with new inversion setting
+    loadImageToViewport(currentFileIndex, 1);
     updateAllOverlays();
 }
 
