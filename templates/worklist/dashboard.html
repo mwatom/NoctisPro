@@ -72,6 +72,135 @@
         font-size: 0.85rem;
     }
 
+    /* Patient Table Styles */
+    .patients-table {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        overflow: hidden;
+        margin-bottom: 2rem;
+    }
+
+    .table-header {
+        background: var(--gradient-primary);
+        padding: 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .table-title {
+        color: white;
+        font-weight: 600;
+        font-size: 1.25rem;
+    }
+
+    .patient-table-container {
+        overflow-x: auto;
+    }
+
+    .patient-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+
+    .patient-table th {
+        background: var(--dark-bg);
+        color: var(--text-primary);
+        padding: 1rem;
+        text-align: left;
+        font-weight: 600;
+        border-bottom: 2px solid var(--border-color);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    .patient-table td {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-secondary);
+        vertical-align: middle;
+    }
+
+    .patient-table tbody tr {
+        transition: all 0.3s ease;
+    }
+
+    .patient-table tbody tr:hover {
+        background: rgba(14, 165, 233, 0.05);
+        transform: scale(1.002);
+    }
+
+    .patient-id {
+        font-family: 'Courier New', monospace;
+        font-weight: 600;
+        color: var(--accent-color);
+    }
+
+    .patient-name {
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .patient-age {
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+    }
+
+    .patient-contact {
+        font-size: 0.85rem;
+    }
+
+    .patient-studies-count {
+        background: var(--gradient-accent);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        display: inline-block;
+    }
+
+    .gender-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .gender-m {
+        background: rgba(59, 130, 246, 0.2);
+        color: #3b82f6;
+    }
+
+    .gender-f {
+        background: rgba(236, 72, 153, 0.2);
+        color: #ec4899;
+    }
+
+    .gender-o {
+        background: rgba(168, 85, 247, 0.2);
+        color: #a855f7;
+    }
+
+    .last-study {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
+
+    .no-patients {
+        text-align: center;
+        padding: 3rem 2rem;
+        color: var(--text-secondary);
+    }
+
+    .no-patients i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
     .main-content {
         min-height: calc(100vh - 160px);
     }
@@ -532,34 +661,7 @@
         color: var(--accent-color);
     }
 
-    /* Navigation styles for sidebar */
-    .nav-link {
-        display: block;
-        padding: 0.75rem 1rem;
-        margin-bottom: 0.5rem;
-        color: var(--text-secondary);
-        text-decoration: none;
-        border-radius: 8px;
-        transition: all 0.3s ease;
-        font-size: 0.9rem;
-    }
 
-    .nav-link:hover {
-        background: rgba(14, 165, 233, 0.1);
-        color: var(--accent-color);
-        transform: translateX(4px);
-    }
-
-    .nav-link.active {
-        background: var(--gradient-accent);
-        color: white;
-    }
-
-    .nav-link i {
-        margin-right: 0.75rem;
-        width: 16px;
-        text-align: center;
-    }
 
     .badge-medical {
         background: var(--danger-color);
@@ -604,17 +706,33 @@
         .content-area {
             padding: 1rem;
         }
-        
-        .stats-grid {
-            grid-template-columns: 1fr;
-        }
 
         .quick-actions-bar {
             padding: 0.75rem 0;
         }
 
-        .sidebar {
-            display: none;
+        .patient-table-container {
+            overflow-x: auto;
+        }
+
+        .patient-table {
+            min-width: 800px;
+        }
+
+        .patient-table th,
+        .patient-table td {
+            padding: 0.75rem 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        .filter-controls .filter-row {
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .search-input,
+        .select-input {
+            width: 100%;
         }
     }
 </style>
@@ -713,165 +831,133 @@
     <div class="main-content">
         <!-- Main Content Area -->
         <main class="content-area">
-            <!-- Statistics Dashboard -->
-            <div class="section-header">
-                <h2 class="section-title">
-                    <i class="fas fa-chart-bar me-2 text-accent"></i>
-                    Dashboard Overview
-                </h2>
-                <div class="text-secondary">
-                    <i class="fas fa-clock me-1"></i>
-                    Last updated: <span id="lastUpdate">{{ "now"|date:"H:i:s" }}</span>
-                </div>
-            </div>
-
-            <div class="stats-grid">
-                <div class="stat-card hover-scale">
-                    <div class="stat-header">
-                        <div class="stat-icon">
-                            <i class="fas fa-clipboard-list"></i>
-                        </div>
-                    </div>
-                    <div class="stat-value">{{ stats.total_studies }}</div>
-                    <div class="stat-label">Total Studies</div>
-                    <div class="stat-change positive">
-                        <i class="fas fa-arrow-up me-1"></i>+12% this week
-                    </div>
-                </div>
-
-                <div class="stat-card hover-scale">
-                    <div class="stat-header">
-                        <div class="stat-icon">
-                            <i class="fas fa-clock"></i>
-                        </div>
-                    </div>
-                    <div class="stat-value">{{ stats.pending_studies }}</div>
-                    <div class="stat-label">Pending Studies</div>
-                    <div class="stat-change negative">
-                        <i class="fas fa-arrow-down me-1"></i>-3% from yesterday
-                    </div>
-                </div>
-
-                <div class="stat-card hover-scale">
-                    <div class="stat-header">
-                        <div class="stat-icon">
-                            <i class="fas fa-play-circle"></i>
-                        </div>
-                    </div>
-                    <div class="stat-value">{{ stats.in_progress_studies }}</div>
-                    <div class="stat-label">In Progress</div>
-                    <div class="stat-change positive">
-                        <i class="fas fa-arrow-up me-1"></i>+5% from yesterday
-                    </div>
-                </div>
-
-                <div class="stat-card hover-scale">
-                    <div class="stat-header">
-                        <div class="stat-icon">
-                            <i class="fas fa-check-circle"></i>
-                        </div>
-                    </div>
-                    <div class="stat-value">{{ stats.completed_studies }}</div>
-                    <div class="stat-label">Completed</div>
-                    <div class="stat-change positive">
-                        <i class="fas fa-arrow-up me-1"></i>+8% this week
-                    </div>
-                </div>
-
-                <div class="stat-card hover-scale">
-                    <div class="stat-header">
-                        <div class="stat-icon">
-                            <i class="fas fa-exclamation-triangle"></i>
-                        </div>
-                    </div>
-                    <div class="stat-value">{{ stats.urgent_studies }}</div>
-                    <div class="stat-label">Urgent Studies</div>
-                    <div class="stat-change {% if stats.urgent_studies > 0 %}negative{% else %}positive{% endif %}">
-                        <i class="fas fa-{% if stats.urgent_studies > 0 %}exclamation-triangle{% else %}check{% endif %} me-1"></i>
-                        {% if stats.urgent_studies > 0 %}Needs attention{% else %}All clear{% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Enhanced Filter Controls -->
+            <!-- Patient Search and Filter Controls -->
             <div class="filter-controls">
                 <div class="filter-row">
                     <div class="search-input">
                         <i class="fas fa-search search-icon"></i>
-                        <input type="text" placeholder="Search by patient name, ID, or accession number..." id="searchInput">
+                        <input type="text" placeholder="Search by patient name, ID, or medical record number..." id="patientSearchInput">
                     </div>
-                    <select class="select-input" id="statusFilter">
-                        <option value="">All Statuses</option>
-                        <option value="scheduled">Scheduled</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                        <option value="suspended">Suspended</option>
+                    <select class="select-input" id="genderFilter">
+                        <option value="">All Genders</option>
+                        <option value="M">Male</option>
+                        <option value="F">Female</option>
+                        <option value="O">Other</option>
                     </select>
-                    <select class="select-input" id="modalityFilter">
-                        <option value="">All Modalities</option>
-                        <option value="CT">CT</option>
-                        <option value="MR">MRI</option>
-                        <option value="XR">X-Ray</option>
-                        <option value="US">Ultrasound</option>
-                    </select>
-                    <select class="select-input" id="priorityFilter">
-                        <option value="">All Priorities</option>
-                        <option value="urgent">Urgent</option>
-                        <option value="high">High</option>
-                        <option value="normal">Normal</option>
-                        <option value="low">Low</option>
-                    </select>
-                    <button class="btn btn-medical" onclick="applyFilters()">
+                    <button class="btn btn-medical" onclick="applyPatientFilters()">
                         <i class="fas fa-filter me-2"></i>Filter
+                    </button>
+                    <button class="btn btn-link text-accent" onclick="refreshPatients()">
+                        <i class="fas fa-sync-alt me-1"></i>Refresh
                     </button>
                 </div>
             </div>
 
-            <!-- Recent Studies -->
-            <div class="studies-table">
+            <!-- Patients Table -->
+            <div class="patients-table">
                 <div class="table-header">
                     <div class="d-flex justify-content-between align-items-center">
-                        <h3 class="table-title mb-0">Recent Studies</h3>
-                        <button class="btn btn-link text-accent" onclick="refreshStudies()">
-                            <i class="fas fa-sync-alt me-1"></i>Refresh
-                        </button>
+                        <h3 class="table-title mb-0">
+                            <i class="fas fa-users me-2"></i>
+                            Patients Overview
+                        </h3>
+                        <div class="text-white opacity-75">
+                            <i class="fas fa-clock me-1"></i>
+                            Last updated: <span id="lastUpdate">{{ "now"|date:"H:i:s" }}</span>
+                        </div>
                     </div>
                 </div>
 
-                <div class="studies-list" id="studiesList">
-                    {% for study in recent_studies %}
-                    <div class="study-row" onclick="viewStudy({{ study.id }})">
-                        <div class="study-accession">{{ study.accession_number }}</div>
-                        <div class="patient-name">{{ study.patient.full_name }}</div>
-                        <div class="study-modality">{{ study.modality.code }}</div>
-                        <div class="study-status status-{{ study.status }}">{{ study.get_status_display }}</div>
-                        <div class="priority-badge priority-{{ study.priority }}">{{ study.priority }}</div>
-                        <div class="text-secondary">{{ study.study_date|date:"M d, Y" }}</div>
-                        <div class="text-secondary">{{ study.facility.name }}</div>
-                        <div class="action-buttons">
-                            <a href="{% url 'dicom_viewer:view_study' study.id %}" class="action-btn" title="View in DICOM Viewer">
-                                <i class="fas fa-eye"></i>
-                            </a>
-                            {% if study.status == 'scheduled' or study.status == 'in_progress' %}
-                            <a href="{% url 'reports:write_report' study.id %}" class="action-btn" title="Write Report">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            {% endif %}
-                            <a href="{% url 'worklist:study_detail' study.id %}" class="action-btn" title="Study Details">
-                                <i class="fas fa-info-circle"></i>
-                            </a>
-                        </div>
-                    </div>
-                    {% empty %}
-                    <div class="text-center py-5">
-                        <i class="fas fa-clipboard-list text-secondary" style="font-size: 3rem;"></i>
-                        <h4 class="text-secondary mt-3">No studies found</h4>
-                        <p class="text-secondary">Upload your first study to get started</p>
+                <div class="patient-table-container" id="patientsTableContainer">
+                    {% if patients %}
+                    <table class="patient-table">
+                        <thead>
+                            <tr>
+                                <th>Patient ID</th>
+                                <th>Name</th>
+                                <th>Age</th>
+                                <th>Gender</th>
+                                <th>Contact</th>
+                                <th>Medical Record #</th>
+                                <th>Studies</th>
+                                <th>Last Study</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for patient in patients %}
+                            <tr>
+                                <td>
+                                    <span class="patient-id">{{ patient.patient_id }}</span>
+                                </td>
+                                <td>
+                                    <div class="patient-name">{{ patient.full_name }}</div>
+                                    <div class="patient-age">Born: {{ patient.date_of_birth|date:"M d, Y" }}</div>
+                                </td>
+                                <td>
+                                    <span class="patient-age">{{ patient.age }} years</span>
+                                </td>
+                                <td>
+                                    <span class="gender-badge gender-{{ patient.gender|lower }}">
+                                        {{ patient.get_gender_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="patient-contact">
+                                        {% if patient.phone %}
+                                            <div><i class="fas fa-phone me-1"></i>{{ patient.phone }}</div>
+                                        {% endif %}
+                                        {% if patient.email %}
+                                            <div><i class="fas fa-envelope me-1"></i>{{ patient.email }}</div>
+                                        {% endif %}
+                                        {% if not patient.phone and not patient.email %}
+                                            <span class="text-muted">No contact info</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if patient.medical_record_number %}
+                                        <span class="patient-id">{{ patient.medical_record_number }}</span>
+                                    {% else %}
+                                        <span class="text-muted">Not set</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="patient-studies-count">{{ patient.study_count }}</span>
+                                </td>
+                                <td>
+                                    {% if patient.last_study_date %}
+                                        <div class="last-study">{{ patient.last_study_date|date:"M d, Y" }}</div>
+                                    {% else %}
+                                        <span class="text-muted">No studies</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <a href="{% url 'worklist:study_list' %}?patient={{ patient.id }}" class="action-btn" title="View Patient Studies">
+                                            <i class="fas fa-clipboard-list"></i>
+                                        </a>
+                                        {% if patient.study_count > 0 %}
+                                        <a href="{% url 'dicom_viewer:viewer' %}?patient={{ patient.id }}" class="action-btn" title="View in DICOM Viewer">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div class="no-patients">
+                        <i class="fas fa-user-friends"></i>
+                        <h4>No patients found</h4>
+                        <p>Patients will appear here when studies are uploaded to the system.</p>
                         <a href="{% url 'worklist:upload_study' %}" class="btn btn-medical">
-                            <i class="fas fa-upload me-2"></i>Upload Study
+                            <i class="fas fa-upload me-2"></i>Upload First Study
                         </a>
                     </div>
-                    {% endfor %}
+                    {% endif %}
                 </div>
             </div>
         </main>
@@ -882,128 +968,61 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Auto-refresh functionality
+    // Auto-refresh functionality for patients
     let refreshInterval;
     
     function startAutoRefresh() {
         refreshInterval = setInterval(() => {
-            refreshStudies();
-        }, 30000); // Refresh every 30 seconds
+            refreshPatients();
+        }, 60000); // Refresh every 60 seconds for patients
     }
     
-    function refreshStudies() {
+    function refreshPatients() {
         const indicator = document.getElementById('refreshIndicator');
-        indicator.classList.add('show');
-        
-        fetch('{% url "worklist:api_studies" %}')
-            .then(response => response.json())
-            .then(data => {
-                updateStudiesList(data.studies);
-                updateLastUpdate();
-                setTimeout(() => {
-                    indicator.classList.remove('show');
-                }, 1000);
-            })
-            .catch(error => {
-                console.error('Error refreshing studies:', error);
-                indicator.classList.remove('show');
-            });
-    }
-    
-    function updateStudiesList(studies) {
-        const studiesList = document.getElementById('studiesList');
-        if (!studies.length) {
-            studiesList.innerHTML = `
-                <div class="text-center py-5">
-                    <i class="fas fa-clipboard-list text-secondary" style="font-size: 3rem;"></i>
-                    <h4 class="text-secondary mt-3">No studies found</h4>
-                    <p class="text-secondary">Upload your first study to get started</p>
-                    <a href="{% url 'worklist:upload_study' %}" class="btn btn-medical">
-                        <i class="fas fa-upload me-2"></i>Upload Study
-                    </a>
-                </div>
-            `;
-            return;
+        if (indicator) {
+            indicator.classList.add('show');
         }
         
-        studiesList.innerHTML = studies.map(study => `
-            <div class="study-row" onclick="viewStudy(${study.id})">
-                <div class="study-accession">${study.accession_number}</div>
-                <div class="patient-name">${study.patient_name}</div>
-                <div class="study-modality">${study.modality}</div>
-                <div class="study-status status-${study.status}">${study.status}</div>
-                <div class="priority-badge priority-${study.priority}">${study.priority}</div>
-                <div class="text-secondary">${new Date(study.study_date).toLocaleDateString()}</div>
-                <div class="text-secondary">${study.facility}</div>
-                <div class="action-buttons">
-                    <a href="/viewer/study/${study.id}/" class="action-btn" title="View in DICOM Viewer">
-                        <i class="fas fa-eye"></i>
-                    </a>
-                    <a href="/reports/write/${study.id}/" class="action-btn" title="Write Report">
-                        <i class="fas fa-edit"></i>
-                    </a>
-                    <a href="/worklist/study/${study.id}/" class="action-btn" title="Study Details">
-                        <i class="fas fa-info-circle"></i>
-                    </a>
-                </div>
-            </div>
-        `).join('');
+        // Refresh the page to get updated patient data
+        window.location.reload();
     }
     
     function updateLastUpdate() {
         const now = new Date();
-        document.getElementById('lastUpdate').textContent = 
-            now.toLocaleTimeString('en-US', { hour12: false });
+        const lastUpdateElement = document.getElementById('lastUpdate');
+        if (lastUpdateElement) {
+            lastUpdateElement.textContent = 
+                now.toLocaleTimeString('en-US', { hour12: false });
+        }
     }
     
-    // Filter functionality
-    window.applyFilters = function() {
-        const search = document.getElementById('searchInput').value;
-        const status = document.getElementById('statusFilter').value;
-        const modality = document.getElementById('modalityFilter').value;
-        const priority = document.getElementById('priorityFilter').value;
+    // Patient filter functionality
+    window.applyPatientFilters = function() {
+        const search = document.getElementById('patientSearchInput').value;
+        const gender = document.getElementById('genderFilter').value;
         
         const params = new URLSearchParams();
         if (search) params.append('search', search);
-        if (status) params.append('status', status);
-        if (modality) params.append('modality', modality);
-        if (priority) params.append('priority', priority);
+        if (gender) params.append('gender', gender);
         
-        window.location.href = `{% url 'worklist:study_list' %}?${params.toString()}`;
+        // For now, we'll reload the page with filters - can be enhanced with AJAX later
+        window.location.href = `{% url 'worklist:dashboard' %}?${params.toString()}`;
     };
     
-    // Study navigation
-    window.viewStudy = function(studyId) {
-        window.location.href = `/worklist/study/${studyId}/`;
-    };
-    
-    // Refresh studies function
-    window.refreshStudies = function() {
-        const refreshBtn = document.querySelector('[onclick="refreshStudies()"]');
-        const icon = refreshBtn.querySelector('i');
-        
-        // Show loading state
-        icon.classList.add('fa-spin');
-        
-        fetch('{% url "worklist:api_studies" %}')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    updateStudiesList(data.studies);
-                    updateLastUpdate();
-                    showNotification('Studies refreshed successfully', 'success');
-                } else {
-                    showNotification('Failed to refresh studies', 'error');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showNotification('Error refreshing studies', 'error');
-            })
-            .finally(() => {
-                // Remove loading state
-                icon.classList.remove('fa-spin');
-            });
+    // Refresh patients function
+    window.refreshPatients = function() {
+        const refreshBtn = document.querySelector('[onclick="refreshPatients()"]');
+        if (refreshBtn) {
+            const icon = refreshBtn.querySelector('i');
+            
+            // Show loading state
+            icon.classList.add('fa-spin');
+            
+            // Refresh the page
+            setTimeout(() => {
+                window.location.reload();
+            }, 500);
+        }
     };
     
     // Notification system
@@ -1027,15 +1046,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 5000);
     }
     
-    // Search on enter key
-    document.getElementById('searchInput').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            applyFilters();
-        }
-    });
-    
-    // Start auto-refresh
-    startAutoRefresh();
+    // Search on enter key for patient search
+    const patientSearchInput = document.getElementById('patientSearchInput');
+    if (patientSearchInput) {
+        patientSearchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                applyPatientFilters();
+            }
+        });
+    }
     
     // Update last update time
     updateLastUpdate();
