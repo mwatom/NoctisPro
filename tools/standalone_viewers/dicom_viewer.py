@@ -14,168 +14,98 @@ from matplotlib.figure import Figure
 import requests
 import json
 
+# Add Django project path for database access
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, project_root)
+
+# Try to import Django models (optional, for study viewing)
+try:
+    import django
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'noctis_pro.settings')
+    django.setup()
+    from worklist.models import Study, Series, DicomImage
+    DJANGO_AVAILABLE = True
+except ImportError:
+    DJANGO_AVAILABLE = False
+    print("Django not available - running in standalone mode only")
+
 
 class DicomCanvas(FigureCanvas):
-    """Enhanced matplotlib canvas for DICOM image display with improved interaction"""
+    """Custom matplotlib canvas for DICOM image display"""
     mouse_pressed = pyqtSignal(int, int)
     mouse_moved = pyqtSignal(int, int)
     mouse_released = pyqtSignal(int, int)
     
     def __init__(self, parent=None):
-        self.fig = Figure(figsize=(10, 10), facecolor='black')
+        self.fig = Figure(figsize=(8, 8), facecolor='black')
         super().__init__(self.fig)
         self.setParent(parent)
         
-        # Create subplot with proper configuration
         self.ax = self.fig.add_subplot(111)
         self.ax.set_facecolor('black')
         self.ax.axis('off')
         
-        # Remove all margins and padding for full image display
+        # Remove margins
         self.fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
-        self.fig.patch.set_facecolor('black')
         
-        # Enhanced mouse tracking
+        # Mouse tracking
         self.mouse_pressed_flag = False
         self.last_mouse_pos = None
-        self.drag_start_pos = None
         
-        # Enable mouse tracking for continuous position updates
-        self.setMouseTracking(True)
-        
-        # Image display properties
-        self.image_object = None
-        self.current_extent = None
-        
-    def clear_canvas(self):
-        """Clear the canvas completely"""
-        self.ax.clear()
-        self.ax.set_facecolor('black')
-        self.ax.axis('off')
-        self.current_extent = None
-        self.image_object = None
-        
-    def display_image(self, image_data, extent=None):
-        """Display image with proper extent handling"""
-        if extent is None:
-            h, w = image_data.shape
-            extent = (0, w, h, 0)
-            
-        self.current_extent = extent
-        
-        # Clear previous content
-        self.ax.clear()
-        self.ax.set_facecolor('black')
-        self.ax.axis('off')
-        
-        # Display the image
-        self.image_object = self.ax.imshow(
-            image_data, 
-            cmap='gray', 
-            origin='upper', 
-            extent=extent,
-            interpolation='nearest',  # Better for medical images
-            aspect='equal'
-        )
-        
-        # Set initial view
-        self.ax.set_xlim(extent[0], extent[1])
-        self.ax.set_ylim(extent[2], extent[3])
-        
-    def get_image_coordinates(self, widget_x, widget_y):
-        """Convert widget coordinates to image coordinates"""
-        if self.current_extent is None:
-            return None, None
-            
-        try:
-            # Transform from widget coordinates to data coordinates
-            inv_trans = self.ax.transData.inverted()
-            data_coords = inv_trans.transform((widget_x, widget_y))
-            
-            # Check if coordinates are within image bounds
-            x, y = data_coords
-            if (self.current_extent[0] <= x <= self.current_extent[1] and 
-                self.current_extent[3] <= y <= self.current_extent[2]):
-                return x, y
-            else:
-                return None, None
-        except:
-            return None, None
-    
     def mousePressEvent(self, event):
-        """Enhanced mouse press handling"""
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.LeftButton:  # type: ignore
             self.mouse_pressed_flag = True
             self.last_mouse_pos = (event.x(), event.y())
-            self.drag_start_pos = (event.x(), event.y())
             self.mouse_pressed.emit(event.x(), event.y())
         super().mousePressEvent(event)
     
     def mouseMoveEvent(self, event):
-        """Enhanced mouse move handling with continuous updates"""
-        current_pos = (event.x(), event.y())
-        
-        # Always emit mouse position for cursor tracking
-        if hasattr(self.parent(), 'update_cursor_info'):
-            img_x, img_y = self.get_image_coordinates(event.x(), event.y())
-            if img_x is not None and img_y is not None:
-                self.parent().update_cursor_info(img_x, img_y)
-        
-        # Handle dragging operations
         if self.mouse_pressed_flag:
             self.mouse_moved.emit(event.x(), event.y())
-            
-        self.last_mouse_pos = current_pos
         super().mouseMoveEvent(event)
     
     def mouseReleaseEvent(self, event):
-        """Enhanced mouse release handling"""
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.LeftButton:  # type: ignore
             self.mouse_pressed_flag = False
             self.mouse_released.emit(event.x(), event.y())
-            self.drag_start_pos = None
         super().mouseReleaseEvent(event)
     
     def wheelEvent(self, event):
-        """Enhanced wheel event handling for zoom and slice navigation"""
-        if not hasattr(self.parent(), 'handle_zoom') or not hasattr(self.parent(), 'handle_slice_change'):
-            super().wheelEvent(event)
-            return
-            
-        # Get mouse position for zoom center
-        mouse_x, mouse_y = event.x(), event.y()
-        
-        if event.modifiers() & Qt.ControlModifier:
-            # Zoom with mouse position as center
+        # Handle zoom and slice navigation
+        if event.modifiers() & Qt.ControlModifier:  # type: ignore
+            # Zoom
             delta = event.angleDelta().y()
-            zoom_factor = 1.15 if delta > 0 else 1/1.15
-            self.parent().handle_zoom(zoom_factor, mouse_x, mouse_y)
+            zoom_factor = 1.1 if delta > 0 else 0.9
+            self.parent().handle_zoom(zoom_factor)
         else:
             # Slice navigation
             delta = event.angleDelta().y()
             direction = 1 if delta > 0 else -1
             self.parent().handle_slice_change(direction)
         super().wheelEvent(event)
-        
-    def leaveEvent(self, event):
-        """Handle mouse leaving the canvas"""
-        if hasattr(self.parent(), 'update_cursor_info'):
-            self.parent().update_cursor_info(None, None)
-        super().leaveEvent(event)
 
 
 class DicomViewer(QMainWindow):
-    def __init__(self):
+    def __init__(self, study_id=None, dicom_path=None):
         super().__init__()
-        self.setWindowTitle("Advanced DICOM Viewer")
-        self.setGeometry(100, 100, 1600, 1000)
+        self.setWindowTitle("Noctis Pro - Advanced DICOM Viewer")
+        self.setGeometry(100, 100, 1400, 900)
         self.setStyleSheet("background-color: #2a2a2a; color: white;")
+        
+        # Initialize with study or path
+        self.study_id = study_id
+        self.initial_dicom_path = dicom_path
         
         # DICOM data
         self.dicom_files = []
         self.current_image_index = 0
         self.current_image_data = None
         self.current_dicom = None
+        
+        # Study data (for database integration)
+        self.current_study = None
+        self.current_series_list = []
+        self.current_series_index = 0
         
         # Display parameters
         self.window_width = 400
@@ -203,19 +133,19 @@ class DicomViewer(QMainWindow):
             'mediastinum': {'ww': 350, 'wl': 50}
         }
         
-        # View state
         self.view_xlim = None
         self.view_ylim = None
         
-        # Image caching
         self._cached_image_data = None
-        self._cached_image_params = (None, None, None, None)
-        
-        # Cursor information
-        self.cursor_x = None
-        self.cursor_y = None
+        self._cached_image_params = (None, None, None, None)  # (index, window_width, window_level, inverted)
         
         self.init_ui()
+        
+        # Load initial data if provided
+        if self.study_id and DJANGO_AVAILABLE:
+            self.load_study_from_database(self.study_id)
+        elif self.initial_dicom_path:
+            self.load_dicom_path(self.initial_dicom_path)
         
     def init_ui(self):
         main_widget = QWidget()
@@ -234,7 +164,7 @@ class DicomViewer(QMainWindow):
         center_layout = QVBoxLayout(center_widget)
         center_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Top bar (removed system selector)
+        # Top bar
         self.create_top_bar(center_layout)
         
         # Viewport
@@ -270,7 +200,7 @@ class DicomViewer(QMainWindow):
         self.tool_buttons = {}
         for tool_key, tool_label, tool_icon in tools:
             btn = QPushButton(f"{tool_icon}\n{tool_label}")
-            btn.setFixedSize(70, 55)
+            btn.setFixedSize(70, 50)
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: #444;
@@ -278,7 +208,6 @@ class DicomViewer(QMainWindow):
                     border: none;
                     border-radius: 5px;
                     font-size: 10px;
-                    font-weight: bold;
                 }
                 QPushButton:hover {
                     background-color: #555;
@@ -296,7 +225,7 @@ class DicomViewer(QMainWindow):
         
     def create_top_bar(self, center_layout):
         top_bar = QWidget()
-        top_bar.setFixedHeight(60)
+        top_bar.setFixedHeight(50)
         top_bar.setStyleSheet("background-color: #333; border-bottom: 1px solid #555;")
         
         top_layout = QHBoxLayout(top_bar)
@@ -309,10 +238,9 @@ class DicomViewer(QMainWindow):
                 background-color: #0078d4;
                 color: white;
                 border: none;
-                padding: 12px 20px;
-                border-radius: 6px;
+                padding: 8px 16px;
+                border-radius: 4px;
                 font-size: 14px;
-                font-weight: bold;
             }
             QPushButton:hover {
                 background-color: #106ebe;
@@ -321,30 +249,38 @@ class DicomViewer(QMainWindow):
         load_btn.clicked.connect(self.load_dicom_files)
         top_layout.addWidget(load_btn)
         
-        top_layout.addSpacing(20)
+        # Backend studies dropdown (only if Django is available)
+        if DJANGO_AVAILABLE:
+            self.backend_combo = QComboBox()
+            self.backend_combo.addItem("Select Study from Database")
+            self.backend_combo.setStyleSheet("padding: 6px; border-radius: 4px; font-size: 14px;")
+            self.backend_combo.currentTextChanged.connect(self.handle_backend_study_select)
+            self.load_studies_to_dropdown()
+            top_layout.addWidget(self.backend_combo)
+        
+        # Series selector (for multi-series studies)
+        self.series_combo = QComboBox()
+        self.series_combo.addItem("No Series")
+        self.series_combo.setStyleSheet("padding: 6px; border-radius: 4px; font-size: 14px;")
+        self.series_combo.currentTextChanged.connect(self.handle_series_select)
+        top_layout.addWidget(self.series_combo)
         
         # Patient info
-        self.patient_info_label = QLabel("No DICOM files loaded")
-        self.patient_info_label.setStyleSheet("font-size: 14px; color: #ccc; font-weight: bold;")
+        self.patient_info_label = QLabel("Patient: - | Study Date: - | Modality: -")
+        self.patient_info_label.setStyleSheet("font-size: 14px; color: #ccc;")
         top_layout.addWidget(self.patient_info_label)
         
         top_layout.addStretch()
-        
-        # Cursor info
-        self.cursor_info_label = QLabel("Position: -")
-        self.cursor_info_label.setStyleSheet("font-size: 12px; color: #aaa;")
-        top_layout.addWidget(self.cursor_info_label)
-        
         center_layout.addWidget(top_bar)
         
     def create_viewport(self, center_layout):
         viewport_widget = QWidget()
-        viewport_widget.setStyleSheet("background-color: black; border: 2px solid #555;")
+        viewport_widget.setStyleSheet("background-color: black;")
         
         viewport_layout = QVBoxLayout(viewport_widget)
-        viewport_layout.setContentsMargins(2, 2, 2, 2)
+        viewport_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Enhanced DICOM canvas
+        # DICOM canvas
         self.canvas = DicomCanvas(self)
         self.canvas.mouse_pressed.connect(self.on_mouse_press)
         self.canvas.mouse_moved.connect(self.on_mouse_move)
@@ -358,7 +294,7 @@ class DicomViewer(QMainWindow):
         center_layout.addWidget(viewport_widget)
         
     def create_overlay_labels(self, viewport_widget):
-        # Window/Level info (top-left)
+        # Window/Level info
         self.wl_label = QLabel("WW: 400\nWL: 40\nSlice: 1/1")
         self.wl_label.setStyleSheet("""
             background-color: rgba(0, 0, 0, 150);
@@ -370,15 +306,15 @@ class DicomViewer(QMainWindow):
             border: 1px solid rgba(255, 255, 255, 50);
         """)
         self.wl_label.setParent(viewport_widget)
-        self.wl_label.move(15, 15)
+        self.wl_label.move(10, 10)
         
-        # Zoom info (bottom-left)
+        # Zoom info
         self.zoom_label = QLabel("Zoom: 100%")
         self.zoom_label.setStyleSheet("""
             background-color: rgba(0, 0, 0, 150);
             color: white;
-            padding: 8px 12px;
-            border-radius: 4px;
+            padding: 5px 10px;
+            border-radius: 3px;
             font-size: 12px;
             font-weight: bold;
             border: 1px solid rgba(255, 255, 255, 50);
@@ -398,7 +334,7 @@ class DicomViewer(QMainWindow):
         """)
         self.tool_label.setParent(viewport_widget)
         
-        # Position labels on timer
+        # Position zoom label at bottom left
         QTimer.singleShot(100, self.position_overlay_labels)
         
     def position_overlay_labels(self):
@@ -406,39 +342,18 @@ class DicomViewer(QMainWindow):
         if hasattr(self, 'zoom_label') and hasattr(self, 'tool_label'):
             parent = self.zoom_label.parent()
             if parent:
-                # Bottom-left for zoom
-                self.zoom_label.move(15, parent.height() - 50)
-                # Top-right for tool
-                self.tool_label.move(parent.width() - self.tool_label.width() - 15, 15)
+                self.zoom_label.move(10, parent.height() - 40)
+                self.tool_label.move(parent.width() - 150, 10)
         
-    def update_cursor_info(self, x, y):
-        """Update cursor position information"""
-        if x is not None and y is not None:
-            self.cursor_x = x
-            self.cursor_y = y
-            
-            # Get pixel value if we have image data
-            pixel_value = "-"
-            if (self.current_image_data is not None and 
-                0 <= int(x) < self.current_image_data.shape[1] and 
-                0 <= int(y) < self.current_image_data.shape[0]):
-                pixel_value = f"{self.current_image_data[int(y), int(x)]}"
-            
-            self.cursor_info_label.setText(f"Position: ({int(x)}, {int(y)}) | Value: {pixel_value}")
-        else:
-            self.cursor_x = None
-            self.cursor_y = None
-            self.cursor_info_label.setText("Position: -")
-
     def create_right_panel(self, main_layout):
         right_panel = QWidget()
-        right_panel.setFixedWidth(280)
+        right_panel.setFixedWidth(250)
         right_panel.setStyleSheet("background-color: #333; border-left: 1px solid #555;")
         
         scroll_area = QScrollArea()
         scroll_area.setWidget(right_panel)
         scroll_area.setWidgetResizable(True)
-        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)  # type: ignore
         
         panel_layout = QVBoxLayout(right_panel)
         panel_layout.setContentsMargins(20, 20, 20, 20)
@@ -461,14 +376,14 @@ class DicomViewer(QMainWindow):
         
         panel_layout.addStretch()
         main_layout.addWidget(scroll_area)
-
+        
     def create_window_level_section(self, panel_layout):
+        # Window/Level section
         wl_frame = QFrame()
-        wl_frame.setStyleSheet("QFrame { border: 1px solid #555; border-radius: 5px; padding: 10px; }")
         wl_layout = QVBoxLayout(wl_frame)
         
-        wl_title = QLabel("🔧 Window/Level")
-        wl_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #0078d4; margin-bottom: 10px;")
+        wl_title = QLabel("Window/Level")
+        wl_title.setStyleSheet("font-size: 14px; font-weight: bold; color: white; margin-bottom: 10px;")
         wl_layout.addWidget(wl_title)
         
         # Window Width slider
@@ -477,69 +392,41 @@ class DicomViewer(QMainWindow):
         wl_layout.addWidget(ww_label)
         
         self.ww_value_label = QLabel(str(self.window_width))
-        self.ww_value_label.setStyleSheet("font-size: 12px; color: #ccc; font-weight: bold;")
-        self.ww_value_label.setAlignment(Qt.AlignRight)
+        self.ww_value_label.setStyleSheet("font-size: 12px; color: #ccc;")
+        self.ww_value_label.setAlignment(Qt.AlignRight)  # type: ignore
         
         ww_header = QHBoxLayout()
         ww_header.addWidget(ww_label)
         ww_header.addWidget(self.ww_value_label)
         wl_layout.addLayout(ww_header)
         
-        self.ww_slider = QSlider(Qt.Horizontal)
+        self.ww_slider = QSlider(Qt.Horizontal)  # type: ignore
         self.ww_slider.setRange(1, 4000)
         self.ww_slider.setValue(self.window_width)
         self.ww_slider.valueChanged.connect(self.handle_window_width_change)
-        self.ww_slider.setStyleSheet("""
-            QSlider::groove:horizontal {
-                border: 1px solid #555;
-                height: 8px;
-                background: #222;
-                border-radius: 4px;
-            }
-            QSlider::handle:horizontal {
-                background: #0078d4;
-                border: 1px solid #555;
-                width: 18px;
-                border-radius: 9px;
-            }
-        """)
         wl_layout.addWidget(self.ww_slider)
         
         # Window Level slider
-        wl_label_text = QLabel("Window Level")
-        wl_label_text.setStyleSheet("font-size: 12px; color: #ccc;")
-        wl_layout.addWidget(wl_label_text)
+        wl_label = QLabel("Window Level")
+        wl_label.setStyleSheet("font-size: 12px; color: #ccc;")
+        wl_layout.addWidget(wl_label)
         
         self.wl_value_label = QLabel(str(self.window_level))
-        self.wl_value_label.setStyleSheet("font-size: 12px; color: #ccc; font-weight: bold;")
-        self.wl_value_label.setAlignment(Qt.AlignRight)
+        self.wl_value_label.setStyleSheet("font-size: 12px; color: #ccc;")
+        self.wl_value_label.setAlignment(Qt.AlignRight)  # type: ignore
         
         wl_header = QHBoxLayout()
-        wl_header.addWidget(wl_label_text)
+        wl_header.addWidget(wl_label)
         wl_header.addWidget(self.wl_value_label)
         wl_layout.addLayout(wl_header)
         
-        self.wl_slider = QSlider(Qt.Horizontal)
+        self.wl_slider = QSlider(Qt.Horizontal)  # type: ignore
         self.wl_slider.setRange(-1000, 1000)
         self.wl_slider.setValue(self.window_level)
         self.wl_slider.valueChanged.connect(self.handle_window_level_change)
-        self.wl_slider.setStyleSheet("""
-            QSlider::groove:horizontal {
-                border: 1px solid #555;
-                height: 8px;
-                background: #222;
-                border-radius: 4px;
-            }
-            QSlider::handle:horizontal {
-                background: #0078d4;
-                border: 1px solid #555;
-                width: 18px;
-                border-radius: 9px;
-            }
-        """)
         wl_layout.addWidget(self.wl_slider)
         
-        # Enhanced preset buttons
+        # Preset buttons
         preset_layout = QGridLayout()
         preset_layout.setSpacing(5)
         
@@ -553,11 +440,10 @@ class DicomViewer(QMainWindow):
                     border: none;
                     padding: 8px 4px;
                     border-radius: 3px;
-                    font-size: 10px;
-                    font-weight: bold;
+                    font-size: 11px;
                 }
                 QPushButton:hover {
-                    background-color: #0078d4;
+                    background-color: #555;
                 }
             """)
             btn.clicked.connect(lambda checked, p=preset: self.handle_preset(p))
@@ -568,11 +454,10 @@ class DicomViewer(QMainWindow):
         
     def create_navigation_section(self, panel_layout):
         nav_frame = QFrame()
-        nav_frame.setStyleSheet("QFrame { border: 1px solid #555; border-radius: 5px; padding: 10px; }")
         nav_layout = QVBoxLayout(nav_frame)
         
-        nav_title = QLabel("🧭 Navigation")
-        nav_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #0078d4; margin-bottom: 10px;")
+        nav_title = QLabel("Image Navigation")
+        nav_title.setStyleSheet("font-size: 14px; font-weight: bold; color: white; margin-bottom: 10px;")
         nav_layout.addWidget(nav_title)
         
         # Slice slider
@@ -581,43 +466,28 @@ class DicomViewer(QMainWindow):
         nav_layout.addWidget(slice_label)
         
         self.slice_value_label = QLabel("1")
-        self.slice_value_label.setStyleSheet("font-size: 12px; color: #ccc; font-weight: bold;")
-        self.slice_value_label.setAlignment(Qt.AlignRight)
+        self.slice_value_label.setStyleSheet("font-size: 12px; color: #ccc;")
+        self.slice_value_label.setAlignment(Qt.AlignRight)  # type: ignore
 
         slice_header = QHBoxLayout()
         slice_header.addWidget(slice_label)
         slice_header.addWidget(self.slice_value_label)
         nav_layout.addLayout(slice_header)
         
-        self.slice_slider = QSlider(Qt.Horizontal)
+        self.slice_slider = QSlider(Qt.Horizontal)  # type: ignore
         self.slice_slider.setRange(0, 0)
         self.slice_slider.setValue(0)
         self.slice_slider.valueChanged.connect(self.handle_slice_change_slider)
-        self.slice_slider.setStyleSheet("""
-            QSlider::groove:horizontal {
-                border: 1px solid #555;
-                height: 8px;
-                background: #222;
-                border-radius: 4px;
-            }
-            QSlider::handle:horizontal {
-                background: #0078d4;
-                border: 1px solid #555;
-                width: 18px;
-                border-radius: 9px;
-            }
-        """)
         nav_layout.addWidget(self.slice_slider)
         
         panel_layout.addWidget(nav_frame)
         
     def create_transform_section(self, panel_layout):
         transform_frame = QFrame()
-        transform_frame.setStyleSheet("QFrame { border: 1px solid #555; border-radius: 5px; padding: 10px; }")
         transform_layout = QVBoxLayout(transform_frame)
         
-        transform_title = QLabel("🔄 Transform")
-        transform_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #0078d4; margin-bottom: 10px;")
+        transform_title = QLabel("Transform")
+        transform_title.setStyleSheet("font-size: 14px; font-weight: bold; color: white; margin-bottom: 10px;")
         transform_layout.addWidget(transform_title)
         
         # Zoom slider
@@ -626,43 +496,28 @@ class DicomViewer(QMainWindow):
         transform_layout.addWidget(zoom_label)
         
         self.zoom_value_label = QLabel("100%")
-        self.zoom_value_label.setStyleSheet("font-size: 12px; color: #ccc; font-weight: bold;")
-        self.zoom_value_label.setAlignment(Qt.AlignRight)
+        self.zoom_value_label.setStyleSheet("font-size: 12px; color: #ccc;")
+        self.zoom_value_label.setAlignment(Qt.AlignRight)  # type: ignore
         
         zoom_header = QHBoxLayout()
         zoom_header.addWidget(zoom_label)
         zoom_header.addWidget(self.zoom_value_label)
         transform_layout.addLayout(zoom_header)
         
-        self.zoom_slider = QSlider(Qt.Horizontal)
+        self.zoom_slider = QSlider(Qt.Horizontal)  # type: ignore
         self.zoom_slider.setRange(25, 500)
         self.zoom_slider.setValue(100)
         self.zoom_slider.valueChanged.connect(self.handle_zoom_slider)
-        self.zoom_slider.setStyleSheet("""
-            QSlider::groove:horizontal {
-                border: 1px solid #555;
-                height: 8px;
-                background: #222;
-                border-radius: 4px;
-            }
-            QSlider::handle:horizontal {
-                background: #0078d4;
-                border: 1px solid #555;
-                width: 18px;
-                border-radius: 9px;
-            }
-        """)
         transform_layout.addWidget(self.zoom_slider)
         
         panel_layout.addWidget(transform_frame)
         
     def create_image_info_section(self, panel_layout):
         info_frame = QFrame()
-        info_frame.setStyleSheet("QFrame { border: 1px solid #555; border-radius: 5px; padding: 10px; }")
         info_layout = QVBoxLayout(info_frame)
         
-        info_title = QLabel("ℹ️ Image Info")
-        info_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #0078d4; margin-bottom: 10px;")
+        info_title = QLabel("Image Info")
+        info_title.setStyleSheet("font-size: 14px; font-weight: bold; color: white; margin-bottom: 10px;")
         info_layout.addWidget(info_title)
         
         self.info_labels = {}
@@ -670,8 +525,7 @@ class DicomViewer(QMainWindow):
         
         for item in info_items:
             label = QLabel(f"{item.replace('_', ' ').title()}: -")
-            label.setStyleSheet("font-size: 11px; color: #ccc; margin-bottom: 3px;")
-            label.setWordWrap(True)
+            label.setStyleSheet("font-size: 12px; color: #ccc; margin-bottom: 5px;")
             info_layout.addWidget(label)
             self.info_labels[item] = label
         
@@ -679,26 +533,24 @@ class DicomViewer(QMainWindow):
         
     def create_measurements_section(self, panel_layout):
         measurements_frame = QFrame()
-        measurements_frame.setStyleSheet("QFrame { border: 1px solid #555; border-radius: 5px; padding: 10px; }")
         measurements_layout = QVBoxLayout(measurements_frame)
         
-        measurements_title = QLabel("📏 Measurements")
-        measurements_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #0078d4; margin-bottom: 10px;")
+        measurements_title = QLabel("Measurements")
+        measurements_title.setStyleSheet("font-size: 14px; font-weight: bold; color: white; margin-bottom: 10px;")
         measurements_layout.addWidget(measurements_title)
         
-        clear_btn = QPushButton("🗑️ Clear All")
+        clear_btn = QPushButton("Clear All")
         clear_btn.setStyleSheet("""
             QPushButton {
-                background-color: #d32f2f;
+                background-color: #444;
                 color: white;
                 border: none;
                 padding: 8px 4px;
                 border-radius: 3px;
                 font-size: 11px;
-                font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #f44336;
+                background-color: #555;
             }
         """)
         clear_btn.clicked.connect(self.clear_measurements)
@@ -710,23 +562,147 @@ class DicomViewer(QMainWindow):
                 background-color: #444;
                 color: white;
                 border: 1px solid #555;
-                font-size: 11px;
-                border-radius: 3px;
-            }
-            QListWidget::item {
-                padding: 5px;
-                border-bottom: 1px solid #555;
-            }
-            QListWidget::item:selected {
-                background-color: #0078d4;
+                font-size: 12px;
             }
         """)
         measurements_layout.addWidget(self.measurements_list)
         
         panel_layout.addWidget(measurements_frame)
 
+    # Database integration methods
+    def load_studies_to_dropdown(self):
+        """Load studies from database to dropdown"""
+        if not DJANGO_AVAILABLE:
+            return
+            
+        try:
+            studies = Study.objects.all().order_by('-study_date')[:50]  # Get recent 50 studies
+            for study in studies:
+                study_text = f"{study.patient_name} - {study.study_date} ({study.modality})"
+                self.backend_combo.addItem(study_text, study.id)
+        except Exception as e:
+            print(f"Error loading studies: {e}")
+    
+    def load_study_from_database(self, study_id):
+        """Load a study from the database"""
+        if not DJANGO_AVAILABLE:
+            QMessageBox.warning(self, "Error", "Database not available")
+            return
+            
+        try:
+            self.current_study = Study.objects.get(id=study_id)
+            self.current_series_list = list(self.current_study.series_set.all().order_by('series_number'))
+            
+            # Update series dropdown
+            self.series_combo.clear()
+            for series in self.current_series_list:
+                series_text = f"Series {series.series_number}: {series.series_description} ({series.modality})"
+                self.series_combo.addItem(series_text)
+            
+            # Load first series if available
+            if self.current_series_list:
+                self.load_series(0)
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to load study: {str(e)}")
+    
+    def load_series(self, series_index):
+        """Load a specific series from the current study"""
+        if not self.current_series_list or series_index >= len(self.current_series_list):
+            return
+            
+        series = self.current_series_list[series_index]
+        self.current_series_index = series_index
+        
+        # Get images for this series
+        images = series.images.all().order_by('instance_number')
+        
+        # Load DICOM files
+        self.dicom_files = []
+        for image in images:
+            try:
+                # Construct full path to DICOM file
+                file_path = image.file_path.path if hasattr(image.file_path, 'path') else str(image.file_path)
+                if os.path.exists(file_path):
+                    dicom_data = pydicom.dcmread(file_path)
+                    self.dicom_files.append(dicom_data)
+                else:
+                    print(f"Warning: DICOM file not found: {file_path}")
+            except Exception as e:
+                print(f"Error loading DICOM file {image.file_path}: {e}")
+        
+        if self.dicom_files:
+            self.current_image_index = 0
+            self.slice_slider.setRange(0, len(self.dicom_files) - 1)
+            self.slice_slider.setValue(0)
+            
+            # Set initial window/level from first image
+            first_dicom = self.dicom_files[0]
+            if hasattr(first_dicom, 'WindowWidth') and hasattr(first_dicom, 'WindowCenter'):
+                self.window_width = first_dicom.WindowWidth
+                self.window_level = first_dicom.WindowCenter
+                self.ww_slider.setValue(int(self.window_width))
+                self.wl_slider.setValue(int(self.window_level))
+            
+            self.update_patient_info()
+            self.update_display()
+        else:
+            QMessageBox.warning(self, "Warning", f"No DICOM files found for series {series.series_number}")
+    
+    def load_dicom_path(self, path):
+        """Load DICOM files from a given path"""
+        if os.path.isfile(path):
+            # Single file
+            try:
+                dicom_data = pydicom.dcmread(path)
+                self.dicom_files = [dicom_data]
+                self.process_loaded_dicom_files()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to load DICOM file: {str(e)}")
+        elif os.path.isdir(path):
+            # Directory - scan for DICOM files
+            self.dicom_files = []
+            for root, dirs, files in os.walk(path):
+                for file in files:
+                    if file.lower().endswith(('.dcm', '.dicom', '.ima')):
+                        file_path = os.path.join(root, file)
+                        try:
+                            dicom_data = pydicom.dcmread(file_path)
+                            self.dicom_files.append(dicom_data)
+                        except Exception as e:
+                            print(f"Skipping file {file_path}: {e}")
+            
+            if self.dicom_files:
+                self.process_loaded_dicom_files()
+            else:
+                QMessageBox.warning(self, "Warning", f"No DICOM files found in {path}")
+    
+    def process_loaded_dicom_files(self):
+        """Process and display loaded DICOM files"""
+        if not self.dicom_files:
+            return
+            
+        # Sort by instance number if available
+        self.dicom_files.sort(key=lambda x: getattr(x, 'InstanceNumber', 0))
+        
+        self.current_image_index = 0
+        self.slice_slider.setRange(0, len(self.dicom_files) - 1)
+        self.slice_slider.setValue(0)
+        
+        # Set initial window/level from first image
+        first_dicom = self.dicom_files[0]
+        if hasattr(first_dicom, 'WindowWidth') and hasattr(first_dicom, 'WindowCenter'):
+            self.window_width = first_dicom.WindowWidth
+            self.window_level = first_dicom.WindowCenter
+            self.ww_slider.setValue(int(self.window_width))
+            self.wl_slider.setValue(int(self.window_level))
+        
+        self.update_patient_info()
+        self.update_display()
+        
     # Event handlers
     def handle_tool_click(self, tool):
+        print(f"Tool activated: {tool}")  # Debug print
         if tool == 'reset':
             self.reset_view()
         elif tool == 'invert':
@@ -736,14 +712,12 @@ class DicomViewer(QMainWindow):
             self.crosshair = not self.crosshair
             self.update_display()
         elif tool == 'ai':
-            QMessageBox.information(self, "AI Analysis", "🤖 AI analysis feature coming soon!\n\nThis will provide automated analysis of DICOM images.")
+            QMessageBox.information(self, "AI Analysis", "AI analysis result: (stub) No backend connected.")
         elif tool == 'recon':
-            QMessageBox.information(self, "3D Reconstruction", "🧊 3D reconstruction feature coming soon!\n\nThis will create 3D models from DICOM slices.")
+            QMessageBox.information(self, "3D Reconstruction", "3D reconstruction feature is not implemented yet.")
         else:
             self.active_tool = tool
-        
-        # Update tool label
-        self.tool_label.setText(f"Tool: {tool.capitalize()}")
+            self.tool_label.setText(f"Tool: {tool.capitalize()}")
         
         # Update button styles
         for btn_key, btn in self.tool_buttons.items():
@@ -751,7 +725,7 @@ class DicomViewer(QMainWindow):
                 btn.setStyleSheet(btn.styleSheet().replace('#444', '#0078d4'))
             else:
                 btn.setStyleSheet(btn.styleSheet().replace('#0078d4', '#444'))
-
+                
     def handle_window_width_change(self, value):
         self.window_width = value
         self.ww_value_label.setText(str(value))
@@ -763,15 +737,14 @@ class DicomViewer(QMainWindow):
         self.update_display()
         
     def handle_preset(self, preset):
-        if preset in self.window_presets:
-            preset_values = self.window_presets[preset]
-            self.window_width = preset_values['ww']
-            self.window_level = preset_values['wl']
-            
-            self.ww_slider.setValue(self.window_width)
-            self.wl_slider.setValue(self.window_level)
-            
-            self.update_display()
+        preset_values = self.window_presets[preset]
+        self.window_width = preset_values['ww']
+        self.window_level = preset_values['wl']
+        
+        self.ww_slider.setValue(self.window_width)
+        self.wl_slider.setValue(self.window_level)
+        
+        self.update_display()
         
     def handle_slice_change_slider(self, value):
         self.current_image_index = value
@@ -790,80 +763,76 @@ class DicomViewer(QMainWindow):
         self.zoom_value_label.setText(f"{value}%")
         self.update_display()
         
-    def handle_zoom(self, factor, mouse_x=None, mouse_y=None):
-        """Enhanced zoom with mouse position as center"""
-        if self.current_image_data is None:
-            return
-            
-        # Get current view limits
+    def handle_zoom(self, factor):
         xlim = self.canvas.ax.get_xlim()
         ylim = self.canvas.ax.get_ylim()
-        
-        if mouse_x is not None and mouse_y is not None:
-            # Zoom centered on mouse position
-            img_x, img_y = self.canvas.get_image_coordinates(mouse_x, mouse_y)
-            if img_x is not None and img_y is not None:
-                xcenter, ycenter = img_x, img_y
-            else:
-                xcenter = (xlim[0] + xlim[1]) / 2
-                ycenter = (ylim[0] + ylim[1]) / 2
-        else:
-            # Zoom centered on current view
-            xcenter = (xlim[0] + xlim[1]) / 2
-            ycenter = (ylim[0] + ylim[1]) / 2
-        
-        # Calculate new view limits
+        xcenter = (xlim[0] + xlim[1]) / 2
+        ycenter = (ylim[0] + ylim[1]) / 2
         xwidth = (xlim[1] - xlim[0]) / factor
         yheight = (ylim[0] - ylim[1]) / factor
-        
         new_xlim = (xcenter - xwidth/2, xcenter + xwidth/2)
         new_ylim = (ycenter + yheight/2, ycenter - yheight/2)
-        
-        # Apply new limits
         self.canvas.ax.set_xlim(new_xlim)
         self.canvas.ax.set_ylim(new_ylim)
         self.view_xlim = new_xlim
         self.view_ylim = new_ylim
-        
-        # Update zoom factor
         self.zoom_factor *= factor
-        self.zoom_factor = max(0.1, min(10.0, self.zoom_factor))
+        self.zoom_factor = max(0.1, min(5.0, self.zoom_factor))
         zoom_percent = int(self.zoom_factor * 100)
         self.zoom_slider.setValue(zoom_percent)
+        self.update_display()
         
-        self.canvas.draw_idle()
-
+    def handle_backend_study_select(self, study_text):
+        if study_text == "Select Study from Database" or not study_text:
+            return
+            
+        # Get study ID from combo box
+        study_id = self.backend_combo.currentData()
+        if study_id:
+            self.load_study_from_database(study_id)
+        
+    def handle_series_select(self, series_text):
+        if not series_text or not self.current_series_list:
+            return
+            
+        series_index = self.series_combo.currentIndex()
+        if 0 <= series_index < len(self.current_series_list):
+            self.load_series(series_index)
+        
     def widget_to_data_coords(self, x, y):
-        """Convert widget coordinates to data coordinates"""
-        return self.canvas.get_image_coordinates(x, y)
+        inv = self.canvas.ax.transData.inverted()
+        return inv.transform((x, y))
 
     def on_mouse_press(self, x, y):
         if self.current_image_data is None:
             return
         data_x, data_y = self.widget_to_data_coords(x, y)
-        if data_x is None or data_y is None:
-            return
-            
         self.drag_start = (data_x, data_y)
-        
         if self.active_tool == 'measure':
             self.current_measurement = {'start': (data_x, data_y), 'end': (data_x, data_y)}
         elif self.active_tool == 'annotate':
             text, ok = QInputDialog.getText(self, 'Annotation', 'Enter annotation text:')
             if ok and text:
                 self.annotations.append({'pos': (data_x, data_y), 'text': text})
-                self.update_overlays()
+                self.update_display()
+                
+    def update_overlays(self):
+        # Remove all lines and texts except the image
+        self.canvas.ax.lines.clear()
+        self.canvas.ax.texts.clear()
+        self.draw_measurements()
+        self.draw_annotations()
+        if self.crosshair:
+            self.draw_crosshair()
+        self.update_overlay_labels()
+        self.canvas.draw_idle()
 
     def on_mouse_move(self, x, y):
         if not self.drag_start or self.current_image_data is None:
             return
         data_x, data_y = self.widget_to_data_coords(x, y)
-        if data_x is None or data_y is None:
-            return
-            
         dx = data_x - self.drag_start[0]
         dy = data_y - self.drag_start[1]
-        
         if self.active_tool == 'pan':
             xlim = self.canvas.ax.get_xlim()
             ylim = self.canvas.ax.get_ylim()
@@ -874,11 +843,27 @@ class DicomViewer(QMainWindow):
             self.view_xlim = new_xlim
             self.view_ylim = new_ylim
             self.drag_start = (data_x, data_y)
-            self.canvas.draw_idle()
+            self.canvas.draw_idle()  # Only redraw view, not image
         elif self.active_tool == 'zoom':
             zoom_delta = 1 + dy * 0.01
-            self.handle_zoom(zoom_delta)
+            xlim = self.canvas.ax.get_xlim()
+            ylim = self.canvas.ax.get_ylim()
+            xcenter = (xlim[0] + xlim[1]) / 2
+            ycenter = (ylim[0] + ylim[1]) / 2
+            xwidth = (xlim[1] - xlim[0]) / zoom_delta
+            yheight = (ylim[0] - ylim[1]) / zoom_delta
+            new_xlim = (xcenter - xwidth/2, xcenter + xwidth/2)
+            new_ylim = (ycenter + yheight/2, ycenter - yheight/2)
+            self.canvas.ax.set_xlim(new_xlim)
+            self.canvas.ax.set_ylim(new_ylim)
+            self.view_xlim = new_xlim
+            self.view_ylim = new_ylim
+            self.zoom_factor *= zoom_delta
+            self.zoom_factor = max(0.1, min(5.0, self.zoom_factor))
+            zoom_percent = int(self.zoom_factor * 100)
+            self.zoom_slider.setValue(zoom_percent)
             self.drag_start = (data_x, data_y)
+            self.canvas.draw_idle()
         elif self.active_tool == 'windowing':
             self.window_width = max(1, self.window_width + dx * 2)
             self.window_level = max(-1000, min(1000, self.window_level + dy * 2))
@@ -889,77 +874,38 @@ class DicomViewer(QMainWindow):
         elif self.active_tool == 'measure' and self.current_measurement:
             self.current_measurement['end'] = (data_x, data_y)
             self.update_overlays()
-
+            
     def on_mouse_release(self, x, y):
         if self.active_tool == 'measure' and self.current_measurement:
             data_x, data_y = self.widget_to_data_coords(x, y)
-            if data_x is not None and data_y is not None:
-                self.current_measurement['end'] = (data_x, data_y)
-                self.measurements.append(self.current_measurement)
-                self.current_measurement = None
-                self.update_measurements_list()
-                self.update_overlays()
+            self.current_measurement['end'] = (data_x, data_y)
+            self.measurements.append(self.current_measurement)
+            self.current_measurement = None
+            self.update_measurements_list()
+            self.update_overlays()
         
         self.drag_start = None
-
+        
     def load_dicom_files(self):
         file_dialog = QFileDialog()
-        file_dialog.setFileMode(QFileDialog.ExistingFiles)
         file_paths, _ = file_dialog.getOpenFileNames(
-            self, "Select DICOM Files", "", 
-            "DICOM Files (*.dcm *.dicom *.DCM *.DICOM);;All Files (*)"
+            self, "Select DICOM Files", "", "DICOM Files (*.dcm *.dicom);;All Files (*)"
         )
         
         if file_paths:
             self.dicom_files = []
-            successfully_loaded = 0
-            
             for file_path in file_paths:
                 try:
                     dicom_data = pydicom.dcmread(file_path)
-                    # Verify it has pixel data
-                    if hasattr(dicom_data, 'pixel_array'):
-                        self.dicom_files.append(dicom_data)
-                        successfully_loaded += 1
+                    self.dicom_files.append(dicom_data)
                 except Exception as e:
-                    print(f"Could not load {file_path}: {str(e)}")
+                    QMessageBox.warning(self, "Error", f"Could not load {file_path}: {str(e)}")
             
-            if successfully_loaded > 0:
-                # Sort by instance number if available
-                self.dicom_files.sort(key=lambda x: getattr(x, 'InstanceNumber', 0))
+            if self.dicom_files:
+                self.process_loaded_dicom_files()
                 
-                self.current_image_index = 0
-                self.slice_slider.setRange(0, len(self.dicom_files) - 1)
-                self.slice_slider.setValue(0)
-                
-                # Set initial window/level from first image
-                first_dicom = self.dicom_files[0]
-                if hasattr(first_dicom, 'WindowWidth') and hasattr(first_dicom, 'WindowCenter'):
-                    if isinstance(first_dicom.WindowWidth, (list, tuple)):
-                        self.window_width = first_dicom.WindowWidth[0]
-                    else:
-                        self.window_width = first_dicom.WindowWidth
-                        
-                    if isinstance(first_dicom.WindowCenter, (list, tuple)):
-                        self.window_level = first_dicom.WindowCenter[0]
-                    else:
-                        self.window_level = first_dicom.WindowCenter
-                        
-                    self.ww_slider.setValue(int(self.window_width))
-                    self.wl_slider.setValue(int(self.window_level))
-                
-                self.update_patient_info()
-                self.update_display()
-                
-                QMessageBox.information(self, "Success", 
-                    f"Successfully loaded {successfully_loaded} DICOM file(s)")
-            else:
-                QMessageBox.warning(self, "Error", 
-                    "No valid DICOM files could be loaded")
-
     def update_patient_info(self):
         if not self.dicom_files:
-            self.patient_info_label.setText("No DICOM files loaded")
             return
             
         dicom_data = self.dicom_files[self.current_image_index]
@@ -969,40 +915,33 @@ class DicomViewer(QMainWindow):
         study_date = getattr(dicom_data, 'StudyDate', 'Unknown')
         modality = getattr(dicom_data, 'Modality', 'Unknown')
         
-        # Format study date
-        if study_date != 'Unknown' and len(str(study_date)) == 8:
-            formatted_date = f"{study_date[:4]}-{study_date[4:6]}-{study_date[6:8]}"
-        else:
-            formatted_date = study_date
-        
-        self.patient_info_label.setText(
-            f"Patient: {patient_name} | Study: {formatted_date} | Modality: {modality} | "
-            f"Images: {len(self.dicom_files)}"
-        )
+        # Update patient info label
+        self.patient_info_label.setText(f"Patient: {patient_name} | Study Date: {study_date} | Modality: {modality}")
         
         # Update image info
         rows = getattr(dicom_data, 'Rows', 'Unknown')
         cols = getattr(dicom_data, 'Columns', 'Unknown')
-        pixel_spacing = getattr(dicom_data, 'PixelSpacing', 'Unknown')
+        pixel_spacing = getattr(dicom_data, 'PixelSpacing', ['Unknown', 'Unknown'])
         series_description = getattr(dicom_data, 'SeriesDescription', 'Unknown')
         institution = getattr(dicom_data, 'InstitutionName', 'Unknown')
         
-        self.info_labels['dimensions'].setText(f"Dimensions: {cols}×{rows}")
+        self.info_labels['dimensions'].setText(f"Dimensions: {cols}x{rows}")
         
-        if pixel_spacing != 'Unknown' and hasattr(pixel_spacing, '__len__') and len(pixel_spacing) >= 2:
-            self.info_labels['pixel_spacing'].setText(f"Pixel Spacing: {pixel_spacing[0]:.2f}×{pixel_spacing[1]:.2f} mm")
+        if isinstance(pixel_spacing, list) and len(pixel_spacing) >= 2:
+            self.info_labels['pixel_spacing'].setText(f"Pixel Spacing: {pixel_spacing[0]}\\{pixel_spacing[1]}")
         else:
             self.info_labels['pixel_spacing'].setText(f"Pixel Spacing: {pixel_spacing}")
             
         self.info_labels['series'].setText(f"Series: {series_description}")
         self.info_labels['institution'].setText(f"Institution: {institution}")
-
+        
     def update_display(self):
         if not self.dicom_files:
             return
-            
+        self.canvas.ax.clear()
+        self.canvas.ax.set_facecolor('black')
+        self.canvas.ax.axis('off')
         self.current_dicom = self.dicom_files[self.current_image_index]
-        
         # Caching logic
         cache_params = (self.current_image_index, self.window_width, self.window_level, self.inverted)
         if self._cached_image_params == cache_params and self._cached_image_data is not None:
@@ -1012,142 +951,99 @@ class DicomViewer(QMainWindow):
                 self.current_image_data = self.current_dicom.pixel_array.copy()
             else:
                 return
-            
             image_data = self.apply_windowing(self.current_image_data)
             if self.inverted:
                 image_data = 255 - image_data
-            
             self._cached_image_data = image_data
             self._cached_image_params = cache_params
-        
-        # Display image using enhanced canvas
         h, w = image_data.shape
-        extent = (0, w, h, 0)
-        self.canvas.display_image(image_data, extent)
-        
-        # Restore view limits if they exist
+        self.canvas.ax.imshow(image_data, cmap='gray', origin='upper', extent=(0, w, h, 0))
+        # Always restore the current view limits
         if self.view_xlim and self.view_ylim:
             self.canvas.ax.set_xlim(self.view_xlim)
             self.canvas.ax.set_ylim(self.view_ylim)
         else:
+            self.canvas.ax.set_xlim(0, w)
+            self.canvas.ax.set_ylim(h, 0)
             self.view_xlim = (0, w)
             self.view_ylim = (h, 0)
-        
-        # Update overlays
-        self.update_overlays()
-        self.canvas.draw()
-
-    def apply_windowing(self, image_data):
-        """Apply window/level to image data with enhanced contrast"""
-        image_data = image_data.astype(np.float32)
-        
-        min_val = self.window_level - self.window_width / 2
-        max_val = self.window_level + self.window_width / 2
-        
-        # Apply window/level with smooth clipping
-        image_data = np.clip(image_data, min_val, max_val)
-        
-        # Normalize to 0-255 range
-        if max_val != min_val:
-            image_data = (image_data - min_val) / (max_val - min_val) * 255
-        else:
-            image_data = np.zeros_like(image_data)
-        
-        return image_data.astype(np.uint8)
-
-    def update_overlays(self):
-        """Update all overlays on the image"""
-        # Clear existing overlays
-        for line in self.canvas.ax.lines[:]:
-            line.remove()
-        for text in self.canvas.ax.texts[:]:
-            text.remove()
-        
-        # Redraw overlays
         self.draw_measurements()
         self.draw_annotations()
         if self.crosshair:
             self.draw_crosshair()
-        
         self.update_overlay_labels()
-        self.canvas.draw_idle()
-
+        self.canvas.draw()
+        
+    def apply_windowing(self, image_data):
+        """Apply window/level to image data"""
+        # Convert to float for calculations
+        image_data = image_data.astype(np.float32)
+        
+        # Apply window/level
+        min_val = self.window_level - self.window_width / 2
+        max_val = self.window_level + self.window_width / 2
+        
+        # Clip and normalize
+        image_data = np.clip(image_data, min_val, max_val)
+        image_data = (image_data - min_val) / (max_val - min_val) * 255
+        
+        return image_data.astype(np.uint8)
+        
     def draw_measurements(self):
-        """Draw measurement lines and labels"""
         for measurement in self.measurements:
             start = measurement['start']
             end = measurement['end']
             x_data = [start[0], end[0]]
             y_data = [start[1], end[1]]
-            
-            # Draw line
-            self.canvas.ax.plot(x_data, y_data, 'r-', linewidth=2, alpha=0.8)
-            
-            # Draw endpoints
-            self.canvas.ax.plot(x_data[0], y_data[0], 'ro', markersize=6)
-            self.canvas.ax.plot(x_data[1], y_data[1], 'ro', markersize=6)
-            
-            # Calculate distance
+            self.canvas.ax.plot(x_data, y_data, 'r-', linewidth=2)
             distance = np.sqrt((x_data[1] - x_data[0])**2 + (y_data[1] - y_data[0])**2)
             distance_text = f"{distance:.1f} px"
-            
-            # Convert to real world units if possible
-            if self.current_dicom and hasattr(self.current_dicom, 'PixelSpacing'):
+            if self.current_dicom is not None and hasattr(self.current_dicom, 'PixelSpacing'):
                 pixel_spacing = self.current_dicom.PixelSpacing
-                if pixel_spacing and len(pixel_spacing) >= 2:
+                if pixel_spacing is not None and len(pixel_spacing) >= 2:
                     try:
                         spacing_x = float(pixel_spacing[0])
                         spacing_y = float(pixel_spacing[1])
                         avg_spacing = (spacing_x + spacing_y) / 2
                         distance_mm = distance * avg_spacing
-                        distance_text = f"{distance_mm:.1f} mm"
-                    except:
+                        distance_cm = distance_mm / 10.0
+                        distance_text = f"{distance_mm:.1f} mm / {distance_cm:.2f} cm"
+                    except Exception:
                         pass
-            
-            # Draw label
             mid_x = (x_data[0] + x_data[1]) / 2
             mid_y = (y_data[0] + y_data[1]) / 2
             self.canvas.ax.text(mid_x, mid_y, distance_text, color='red', 
-                              fontsize=10, ha='center', va='center', weight='bold',
-                              bbox=dict(boxstyle="round,pad=0.3", facecolor='black', 
-                                       edgecolor='red', alpha=0.8))
-        
-        # Draw current measurement being created
+                              fontsize=10, ha='center', va='center',
+                              bbox=dict(boxstyle="round,pad=0.3", facecolor='black', alpha=0.7))
         if self.current_measurement:
             start = self.current_measurement['start']
             end = self.current_measurement['end']
             x_data = [start[0], end[0]]
             y_data = [start[1], end[1]]
             self.canvas.ax.plot(x_data, y_data, 'y--', linewidth=2, alpha=0.7)
-            self.canvas.ax.plot(x_data[0], y_data[0], 'yo', markersize=6)
-
+            
     def draw_annotations(self):
-        """Draw text annotations"""
         for annotation in self.annotations:
             pos = annotation['pos']
             text = annotation['text']
             self.canvas.ax.text(pos[0], pos[1], text, color='yellow', 
-                              fontsize=12, ha='left', va='bottom', weight='bold',
-                              bbox=dict(boxstyle="round,pad=0.5", facecolor='black', 
-                                       edgecolor='yellow', alpha=0.9))
-
+                              fontsize=12, ha='left', va='bottom',
+                              bbox=dict(boxstyle="round,pad=0.5", facecolor='black', alpha=0.8))
+                              
     def draw_crosshair(self):
-        """Draw crosshair at image center"""
         if self.current_image_data is not None:
             height, width = self.current_image_data.shape
             center_x = width // 2
             center_y = height // 2
+            self.canvas.ax.axvline(x=center_x, color='cyan', linewidth=1, alpha=0.7)
+            self.canvas.ax.axhline(y=center_y, color='cyan', linewidth=1, alpha=0.7)
             
-            # Draw crosshair lines
-            self.canvas.ax.axvline(x=center_x, color='cyan', linewidth=1, alpha=0.7, linestyle='--')
-            self.canvas.ax.axhline(y=center_y, color='cyan', linewidth=1, alpha=0.7, linestyle='--')
-
     def update_overlay_labels(self):
         """Update overlay labels with current values"""
-        total_files = len(self.dicom_files) if self.dicom_files else 1
-        self.wl_label.setText(f"WW: {int(self.window_width)}\nWL: {int(self.window_level)}\nSlice: {self.current_image_index + 1}/{total_files}")
+        total_slices = len(self.dicom_files) if self.dicom_files else 1
+        self.wl_label.setText(f"WW: {int(self.window_width)}\nWL: {int(self.window_level)}\nSlice: {self.current_image_index + 1}/{total_slices}")
         self.zoom_label.setText(f"Zoom: {int(self.zoom_factor * 100)}%")
-
+        
     def update_measurements_list(self):
         """Update the measurements list widget"""
         self.measurements_list.clear()
@@ -1156,61 +1052,63 @@ class DicomViewer(QMainWindow):
             end = measurement['end']
             distance = np.sqrt((end[0] - start[0])**2 + (end[1] - start[1])**2)
             distance_text = f"{distance:.1f} px"
-            
-            if self.current_dicom and hasattr(self.current_dicom, 'PixelSpacing'):
+            if self.current_dicom is not None and hasattr(self.current_dicom, 'PixelSpacing'):
                 pixel_spacing = self.current_dicom.PixelSpacing
-                if pixel_spacing and len(pixel_spacing) >= 2:
+                if pixel_spacing is not None and len(pixel_spacing) >= 2:
                     try:
                         spacing_x = float(pixel_spacing[0])
                         spacing_y = float(pixel_spacing[1])
                         avg_spacing = (spacing_x + spacing_y) / 2
                         distance_mm = distance * avg_spacing
-                        distance_text = f"{distance_mm:.1f} mm"
-                    except:
+                        distance_cm = distance_mm / 10.0
+                        distance_text = f"{distance_mm:.1f} mm / {distance_cm:.2f} cm"
+                    except Exception:
                         pass
-            
-            item_text = f"#{i+1}: {distance_text}"
+            item_text = f"Measurement {i+1}: {distance_text}"
             self.measurements_list.addItem(item_text)
-
+            
     def clear_measurements(self):
-        """Clear all measurements and annotations"""
+        """Clear all measurements"""
         self.measurements.clear()
         self.annotations.clear()
         self.current_measurement = None
         self.update_measurements_list()
-        self.update_overlays()
-
+        self.update_display()
+        
     def reset_view(self):
-        """Reset view to default state"""
         self.zoom_factor = 1.0
         self.pan_x = 0
         self.pan_y = 0
         self.zoom_slider.setValue(100)
-        
         if self.current_image_data is not None:
             h, w = self.current_image_data.shape
             self.view_xlim = (0, w)
             self.view_ylim = (h, 0)
-            self.canvas.ax.set_xlim(self.view_xlim)
-            self.canvas.ax.set_ylim(self.view_ylim)
-            self.canvas.draw_idle()
-
+        self.update_display()
+        
     def resizeEvent(self, event):
         """Handle window resize events"""
         super().resizeEvent(event)
+        # Reposition overlay labels
         QTimer.singleShot(10, self.position_overlay_labels)
 
 
-def main():
+def main(study_id=None, dicom_path=None):
+    """Main function to launch the DICOM viewer
+    
+    Args:
+        study_id: Database study ID to load
+        dicom_path: Path to DICOM file or directory to load
+    """
     app = QApplication(sys.argv)
     
-    # Set application style and properties
+    # Set application style
     app.setStyle('Fusion')
-    app.setApplicationName("Advanced DICOM Viewer")
-    app.setApplicationVersion("2.0")
+    app.setApplicationName("Noctis Pro - Advanced DICOM Viewer")
+    app.setApplicationVersion("3.0")
     
     # Create and show the main window
-    viewer = DicomViewer()
+    viewer = DicomViewer(study_id=study_id, dicom_path=dicom_path)
     viewer.show()
     
     # Start the application event loop
@@ -1218,4 +1116,18 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # Parse command line arguments
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Noctis Pro Advanced DICOM Viewer')
+    parser.add_argument('--study-id', type=int, help='Database study ID to load')
+    parser.add_argument('--path', type=str, help='Path to DICOM file or directory')
+    parser.add_argument('path_positional', nargs='?', help='Path to DICOM file or directory (positional)')
+    
+    args = parser.parse_args()
+    
+    # Determine what to load
+    study_id = args.study_id
+    dicom_path = args.path or args.path_positional
+    
+    main(study_id=study_id, dicom_path=dicom_path)
