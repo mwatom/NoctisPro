@@ -49,3 +49,7 @@ PyJWT==2.8.0
 python-magic==0.4.27
 requests==2.31.0
 urllib3==2.1.0
+
+# PyQt5 for standalone desktop applications
+PyQt5==5.15.10
+PyQt5-tools==5.15.9.3.3
