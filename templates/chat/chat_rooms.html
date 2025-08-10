@@ -118,6 +118,24 @@
         margin-bottom: 1rem;
         opacity: 0.3;
     }
+
+    .room-type-direct .room-icon { background: var(--success-color); }
+    .room-type-facility .room-icon { background: var(--warning-color); }
+    .room-type-study .room-icon { background: var(--info-color); }
+    .room-type-general .room-icon { background: var(--gradient-accent); }
+    .room-type-support .room-icon { background: var(--secondary-color); }
+
+    .available-rooms-section {
+        margin-top: 3rem;
+    }
+
+    .section-header {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 1rem 1.5rem;
+        margin-bottom: 1.5rem;
+    }
 </style>
 {% endblock %}
 
@@ -141,7 +159,23 @@
             </div>
         </div>
 
-        <!-- Chat Rooms Grid -->
+        <!-- Pending Invitations -->
+        {% if pending_invitations %}
+        <div class="alert alert-info">
+            <h6><i class="fas fa-envelope me-2"></i>Pending Invitations</h6>
+            {% for invitation in pending_invitations %}
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span>{{ invitation.invited_by.get_full_name }} invited you to join "{{ invitation.room.name }}"</span>
+                <div>
+                    <a href="{% url 'chat:join_room' invitation.room.id %}" class="btn btn-sm btn-success me-2">Accept</a>
+                    <button class="btn btn-sm btn-secondary">Decline</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Your Chat Rooms -->
         <div class="chat-rooms-grid">
             <!-- Create New Room Card -->
             <div class="create-room-card" onclick="createNewRoom()">
@@ -150,119 +184,115 @@
                 <p class="text-muted">Start a new conversation</p>
             </div>
 
-            <!-- General Discussion Room -->
-            <div class="chat-room-card" onclick="joinRoom('general')">
+            <!-- User's Chat Rooms -->
+            {% for room in user_rooms %}
+            <div class="chat-room-card room-type-{{ room.room_type }}" onclick="joinRoom('{{ room.id }}')">
                 <div class="room-header">
                     <div class="room-icon">
-                        <i class="fas fa-users"></i>
+                        {% if room.room_type == 'direct' %}
+                            <i class="fas fa-user"></i>
+                        {% elif room.room_type == 'facility' %}
+                            <i class="fas fa-hospital"></i>
+                        {% elif room.room_type == 'study' %}
+                            <i class="fas fa-x-ray"></i>
+                        {% elif room.room_type == 'general' %}
+                            <i class="fas fa-users"></i>
+                        {% elif room.room_type == 'support' %}
+                            <i class="fas fa-tools"></i>
+                        {% else %}
+                            <i class="fas fa-comments"></i>
+                        {% endif %}
                     </div>
                     <div class="room-info">
-                        <h5>General Discussion</h5>
-                        <p>General medical team chat</p>
+                        <h5>{{ room.name }}</h5>
+                        <p>{{ room.get_room_type_display }}{% if room.description %} • {{ room.description|truncatechars:50 }}{% endif %}</p>
                     </div>
                 </div>
+                {% if room.latest_message %}
                 <div class="last-message">
-                    <strong>Dr. Smith:</strong> Good morning team! Ready for rounds?
+                    <strong>{{ room.latest_message.sender.get_full_name|default:room.latest_message.sender.username }}:</strong> 
+                    {% if room.latest_message.message_type == 'text' %}
+                        {{ room.latest_message.content|truncatechars:60 }}
+                    {% elif room.latest_message.message_type == 'image' %}
+                        <i class="fas fa-image me-1"></i>Image
+                    {% elif room.latest_message.message_type == 'file' %}
+                        <i class="fas fa-file me-1"></i>{{ room.latest_message.attachment_name|default:"File" }}
+                    {% elif room.latest_message.message_type == 'study_link' %}
+                        <i class="fas fa-link me-1"></i>Study Link
+                    {% else %}
+                        {{ room.latest_message.content|truncatechars:60 }}
+                    {% endif %}
                 </div>
+                {% else %}
+                <div class="last-message">
+                    <em>No messages yet</em>
+                </div>
+                {% endif %}
                 <div class="room-stats">
                     <span class="text-muted">
-                        <i class="fas fa-user me-1"></i>12 members
+                        <i class="fas fa-user me-1"></i>{{ room.participant_count }} member{{ room.participant_count|pluralize }}
                     </span>
-                    <span class="unread-badge">3</span>
+                    {% if room.unread_count > 0 %}
+                        <span class="unread-badge">{{ room.unread_count }}</span>
+                    {% else %}
+                        <span class="text-muted">
+                            {% if room.latest_message %}
+                                {{ room.latest_message.created_at|timesince }} ago
+                            {% else %}
+                                Created {{ room.created_at|timesince }} ago
+                            {% endif %}
+                        </span>
+                    {% endif %}
                 </div>
             </div>
-
-            <!-- Radiology Department -->
-            <div class="chat-room-card" onclick="joinRoom('radiology')">
-                <div class="room-header">
-                    <div class="room-icon">
-                        <i class="fas fa-x-ray"></i>
-                    </div>
-                    <div class="room-info">
-                        <h5>Radiology Department</h5>
-                        <p>Radiologists and technicians</p>
-                    </div>
-                </div>
-                <div class="last-message">
-                    <strong>Dr. Johnson:</strong> CT scan results for patient 12345 are ready for review
-                </div>
-                <div class="room-stats">
-                    <span class="text-muted">
-                        <i class="fas fa-user me-1"></i>8 members
-                    </span>
-                    <span class="unread-badge">1</span>
-                </div>
-            </div>
-
-            <!-- Emergency Cases -->
-            <div class="chat-room-card" onclick="joinRoom('emergency')">
-                <div class="room-header">
-                    <div class="room-icon" style="background: var(--danger-color);">
-                        <i class="fas fa-exclamation-triangle"></i>
-                    </div>
-                    <div class="room-info">
-                        <h5>Emergency Cases</h5>
-                        <p>Urgent medical discussions</p>
-                    </div>
-                </div>
-                <div class="last-message">
-                    <strong>Dr. Williams:</strong> Need immediate consultation on trauma case
-                </div>
-                <div class="room-stats">
-                    <span class="text-muted">
-                        <i class="fas fa-user me-1"></i>15 members
-                    </span>
-                    <span class="unread-badge">2</span>
-                </div>
-            </div>
-
-            <!-- Case Reviews -->
-            <div class="chat-room-card" onclick="joinRoom('case-reviews')">
-                <div class="room-header">
-                    <div class="room-icon" style="background: var(--warning-color);">
-                        <i class="fas fa-clipboard-check"></i>
-                    </div>
-                    <div class="room-info">
-                        <h5>Case Reviews</h5>
-                        <p>Weekly case discussions</p>
-                    </div>
-                </div>
-                <div class="last-message">
-                    <strong>Dr. Davis:</strong> Scheduling tumor board for Thursday
-                </div>
-                <div class="room-stats">
-                    <span class="text-muted">
-                        <i class="fas fa-user me-1"></i>6 members
-                    </span>
-                    <span class="text-muted">No new messages</span>
-                </div>
-            </div>
-
-            <!-- Technical Support -->
-            <div class="chat-room-card" onclick="joinRoom('tech-support')">
-                <div class="room-header">
-                    <div class="room-icon" style="background: var(--success-color);">
-                        <i class="fas fa-tools"></i>
-                    </div>
-                    <div class="room-info">
-                        <h5>Technical Support</h5>
-                        <p>IT and system issues</p>
-                    </div>
-                </div>
-                <div class="last-message">
-                    <strong>IT Support:</strong> System maintenance scheduled for tonight
-                </div>
-                <div class="room-stats">
-                    <span class="text-muted">
-                        <i class="fas fa-user me-1"></i>4 members
-                    </span>
-                    <span class="text-muted">No new messages</span>
-                </div>
-            </div>
+            {% endfor %}
         </div>
 
-        <!-- Empty State (hidden by default) -->
-        <div class="empty-state" style="display: none;" id="emptyState">
+        <!-- Available Rooms to Join -->
+        {% if available_rooms %}
+        <div class="available-rooms-section">
+            <div class="section-header">
+                <h5 class="text-light mb-0">
+                    <i class="fas fa-plus-circle me-2"></i>Available Rooms to Join
+                </h5>
+            </div>
+            <div class="chat-rooms-grid">
+                {% for room in available_rooms %}
+                <div class="chat-room-card room-type-{{ room.room_type }}" onclick="joinAvailableRoom('{{ room.id }}')">
+                    <div class="room-header">
+                        <div class="room-icon">
+                            {% if room.room_type == 'facility' %}
+                                <i class="fas fa-hospital"></i>
+                            {% elif room.room_type == 'general' %}
+                                <i class="fas fa-users"></i>
+                            {% elif room.room_type == 'support' %}
+                                <i class="fas fa-tools"></i>
+                            {% else %}
+                                <i class="fas fa-comments"></i>
+                            {% endif %}
+                        </div>
+                        <div class="room-info">
+                            <h5>{{ room.name }}</h5>
+                            <p>{{ room.get_room_type_display }}{% if room.description %} • {{ room.description|truncatechars:50 }}{% endif %}</p>
+                        </div>
+                    </div>
+                    <div class="room-stats">
+                        <span class="text-muted">
+                            <i class="fas fa-user me-1"></i>{{ room.participant_count }} member{{ room.participant_count|pluralize }}
+                        </span>
+                        <span class="text-accent">
+                            <i class="fas fa-plus me-1"></i>Join
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Empty State -->
+        {% if not user_rooms and not available_rooms %}
+        <div class="empty-state">
             <i class="fas fa-comments"></i>
             <h4>No Chat Rooms Available</h4>
             <p>Create your first chat room to start communicating with your team.</p>
@@ -270,6 +300,7 @@
                 <i class="fas fa-plus me-2"></i>Create Room
             </button>
         </div>
+        {% endif %}
     </div>
 </div>
 
@@ -281,31 +312,38 @@
                 <h5 class="modal-title text-light">Create New Chat Room</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <form id="createRoomForm">
+            <form action="{% url 'chat:create_room' %}" method="post">
+                {% csrf_token %}
+                <div class="modal-body">
                     <div class="mb-3">
                         <label for="roomName" class="form-label text-light">Room Name</label>
-                        <input type="text" class="form-control form-control-medical" id="roomName" required>
+                        <input type="text" class="form-control form-control-medical" id="roomName" name="name" required>
                     </div>
                     <div class="mb-3">
                         <label for="roomDescription" class="form-label text-light">Description</label>
-                        <textarea class="form-control form-control-medical" id="roomDescription" rows="3"></textarea>
+                        <textarea class="form-control form-control-medical" id="roomDescription" name="description" rows="3"></textarea>
                     </div>
                     <div class="mb-3">
                         <label for="roomType" class="form-label text-light">Room Type</label>
-                        <select class="form-select form-control-medical" id="roomType">
+                        <select class="form-select form-control-medical" id="roomType" name="room_type">
                             <option value="general">General Discussion</option>
-                            <option value="department">Department Specific</option>
-                            <option value="case">Case Discussion</option>
-                            <option value="emergency">Emergency</option>
+                            <option value="facility">Facility Specific</option>
+                            <option value="study">Study Discussion</option>
+                            <option value="support">Technical Support</option>
                         </select>
                     </div>
-                </form>
-            </div>
-            <div class="modal-footer border-secondary">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-medical" onclick="submitCreateRoom()">Create Room</button>
-            </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="isPrivate" name="is_private">
+                        <label class="form-check-label text-light" for="isPrivate">
+                            Private Room (invitation only)
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-medical">Create Room</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -316,39 +354,20 @@ function joinRoom(roomId) {
     window.location.href = `/chat/room/${roomId}/`;
 }
 
+function joinAvailableRoom(roomId) {
+    // Join an available room
+    window.location.href = `/chat/join/${roomId}/`;
+}
+
 function createNewRoom() {
     const modal = new bootstrap.Modal(document.getElementById('createRoomModal'));
     modal.show();
 }
 
-function submitCreateRoom() {
-    const roomName = document.getElementById('roomName').value;
-    const roomDescription = document.getElementById('roomDescription').value;
-    const roomType = document.getElementById('roomType').value;
-    
-    if (!roomName.trim()) {
-        alert('Please enter a room name');
-        return;
-    }
-    
-    // Here you would typically make an API call to create the room
-    alert('Room creation feature coming soon!');
-    
-    // Close modal
-    const modal = bootstrap.Modal.getInstance(document.getElementById('createRoomModal'));
-    modal.hide();
-    
-    // Reset form
-    document.getElementById('createRoomForm').reset();
-}
-
-// Simulate real-time updates
-function updateUnreadCounts() {
-    // This would typically connect to a WebSocket for real-time updates
-    console.log('Checking for new messages...');
-}
-
-// Check for updates every 30 seconds
-setInterval(updateUnreadCounts, 30000);
+// Auto-refresh room list every 30 seconds for new messages/rooms
+setInterval(function() {
+    // This would typically use AJAX to update room list
+    console.log('Checking for room updates...');
+}, 30000);
 </script>
 {% endblock %}
