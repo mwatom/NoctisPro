@@ -51,5 +51,6 @@ requests==2.31.0
 urllib3==2.1.0
 
 # PyQt5 for standalone desktop applications
-PyQt5==5.15.10
-PyQt5-tools==5.15.9.3.3
+PyQt5==5.15.9
+# PyQt5-tools==5.15.9.3.3  # Has dependency conflicts with pyqt5-plugins
+# For Qt Designer, consider installing qt5-tools system package or using alternatives
