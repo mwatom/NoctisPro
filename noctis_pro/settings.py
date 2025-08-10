@@ -47,7 +47,7 @@ INSTALLED_APPS = [
     'accounts',
     'worklist',
     'dicom_viewer',
-    # 'reports',  # Temporarily disabled
+    'reports',  # Re-enabled to fix model registration
     'admin_panel',
     'chat',  # Re-enabled to fix template URLs
     'notifications',  # Re-enabled to fix User.notifications relationship
@@ -55,7 +55,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
+    # 'corsheaders.middleware.CorsMiddleware',  # Disabled since corsheaders is not in INSTALLED_APPS
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
