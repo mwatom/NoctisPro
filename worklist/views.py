@@ -128,6 +128,8 @@ def upload_study(request):
             # Group incoming files by StudyInstanceUID then SeriesInstanceUID
             studies_map = {}
             invalid_files = 0
+            processed_files = 0
+            total_files = len(uploaded_files)
             for in_file in uploaded_files:
                 try:
                     # Read dataset without saving to disk first
@@ -259,6 +261,7 @@ def upload_study(request):
                                     'processed': False,
                                 }
                             )
+                            processed_files += 1
                         except Exception:
                             continue
                 created_studies.append(study.id)
@@ -289,6 +292,8 @@ def upload_study(request):
                 'message': f'Uploaded {sum(len(v) for s in studies_map.values() for v in s.values()) - invalid_files} DICOM file(s) across {len(created_studies)} study(ies)',
                 'created_study_ids': created_studies,
                 'invalid_files': invalid_files,
+                'processed_files': processed_files,
+                'total_files': total_files,
             })
             
         except Exception as e:
