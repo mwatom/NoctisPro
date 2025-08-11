@@ -276,13 +276,13 @@ def upload_study(request):
 
 @login_required
 def modern_worklist(request):
-    """Modern worklist UI using the new dashboard layout"""
-    return render(request, 'worklist/modern_worklist.html', {'user': request.user})
+    """Legacy route: redirect to main dashboard UI"""
+    return redirect('worklist:dashboard')
 
 @login_required
 def modern_dashboard(request):
-    """Modern dashboard interface with the exact design provided"""
-    return render(request, 'worklist/modern_dashboard.html')
+    """Legacy route: redirect to main dashboard UI"""
+    return redirect('worklist:dashboard')
 
 @login_required
 def api_studies(request):

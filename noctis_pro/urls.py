@@ -20,6 +20,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.http import HttpResponse
+from worklist import views as worklist_views
 
 def home_redirect(request):
     """Redirect home page to login or dashboard based on authentication"""
@@ -39,7 +40,7 @@ urlpatterns = [
     path('', include('accounts.urls')),
     path('worklist/', include('worklist.urls')),
     # Alias endpoints expected by the dashboard UI
-    path('api/studies/', include('worklist.urls')),  # will resolve to worklist:api_studies
+    path('api/studies/', worklist_views.api_studies, name='api_studies_root'),
     path('dicom-viewer/', include('dicom_viewer.urls')),  # align with dashboard links
     path('viewer/', include('dicom_viewer.urls')),
     path('reports/', include('reports.urls')),
