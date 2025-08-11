@@ -1127,23 +1127,47 @@ def launch_standalone_viewer(request):
                 stderr = (result.stderr or '').strip()
                 stdout = (result.stdout or '').strip()
                 details = stderr or stdout or 'Unknown error'
+                
+                # If C++ viewer failed, fallback to web viewer
+                if 'C++ viewer binary not found' in details or 'Failed to launch C++ viewer' in details:
+                    web_url = '/viewer/web/viewer/'
+                    if study_id:
+                        web_url += f'?study_id={study_id}'
+                    return JsonResponse({
+                        'success': True,
+                        'message': 'Opening web-based DICOM viewer instead',
+                        'fallback_url': web_url,
+                        'details': 'C++ viewer not available, using web viewer'
+                    })
+                
                 return JsonResponse({
                     'success': False,
                     'message': 'Failed to launch DICOM viewer',
                     'details': details[:500]
                 }, status=500)
         else:
+            # Fallback to web viewer if launcher not found
+            web_url = '/viewer/web/viewer/'
+            if study_id:
+                web_url += f'?study_id={study_id}'
             return JsonResponse({
-                'success': False, 
-                'message': 'Standalone viewer launcher not found',
-                'details': f'Missing launcher at {launcher_path}'
-            }, status=404)
+                'success': True,
+                'message': 'Opening web-based DICOM viewer',
+                'fallback_url': web_url,
+                'details': 'Standalone launcher not found, using web viewer'
+            })
             
     except Exception as e:
+        # Fallback to web viewer on any error
+        web_url = '/viewer/web/viewer/'
+        if study_id:
+            web_url += f'?study_id={study_id}'
         return JsonResponse({
-            'success': False, 
-            'message': f'Error launching standalone viewer: {str(e)}'
-        }, status=500)
+            'success': True,
+            'message': 'Opening web-based DICOM viewer',
+            'fallback_url': web_url,
+            'details': f'Error: {str(e)}, using web viewer'
+        })
 
 @login_required
 def launch_study_in_desktop_viewer(request, study_id):
@@ -1183,23 +1207,41 @@ def launch_study_in_desktop_viewer(request, study_id):
                 stderr = (result.stderr or '').strip()
                 stdout = (result.stdout or '').strip()
                 details = stderr or stdout or 'Unknown error'
+                
+                # If C++ viewer failed, fallback to web viewer
+                if 'C++ viewer binary not found' in details or 'Failed to launch C++ viewer' in details:
+                    web_url = f'/viewer/web/viewer/?study_id={study_id}'
+                    return JsonResponse({
+                        'success': True,
+                        'message': f'Opening web-based DICOM viewer for study: {study.patient.full_name}',
+                        'fallback_url': web_url,
+                        'details': 'C++ viewer not available, using web viewer'
+                    })
+                
                 return JsonResponse({
                     'success': False,
                     'message': 'Failed to launch DICOM viewer',
                     'details': details[:500]
                 }, status=500)
         else:
+            # Fallback to web viewer if launcher not found
+            web_url = f'/viewer/web/viewer/?study_id={study_id}'
             return JsonResponse({
-                'success': False, 
-                'message': 'Desktop viewer launcher not found',
-                'details': f'Missing launcher at {launcher_path}'
-            }, status=404)
+                'success': True,
+                'message': f'Opening web-based DICOM viewer for study: {study.patient.full_name}',
+                'fallback_url': web_url,
+                'details': 'Standalone launcher not found, using web viewer'
+            })
             
     except Exception as e:
+        # Fallback to web viewer on any error
+        web_url = f'/viewer/web/viewer/?study_id={study_id}'
         return JsonResponse({
-            'success': False, 
-            'message': f'Error launching desktop viewer: {str(e)}'
-        }, status=500)
+            'success': True,
+            'message': 'Opening web-based DICOM viewer',
+            'fallback_url': web_url,
+            'details': f'Error: {str(e)}, using web viewer'
+        })
 
 
 @login_required
