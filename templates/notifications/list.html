@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block title %}Notifications - Noctis Pro PACS{% endblock %}
+{% block extra_css %}
+<style>
+.container-narrow { max-width: 900px; margin: 0 auto; padding: 2rem 1rem; }
+.notification-item { background: var(--card-bg); border: 1px solid var(--border-color); border-left: 4px solid var(--accent-color); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; display: flex; align-items: start; gap: 12px; }
+.notification-item.unread { border-left-color: var(--warning-color); background: rgba(255,255,255,0.03); }
+.notification-meta { color: var(--text-secondary); font-size: 0.85rem; }
+.notification-actions a { font-size: 0.85rem; }
+.badge-priority { font-size: 0.7rem; padding: 0.25rem 0.5rem; border-radius: 6px; }
+.badge-priority.high, .badge-priority.urgent { background: var(--danger-color); color: #fff; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container-narrow">
+  <h3 class="text-light mb-3"><i class="fas fa-bell me-2"></i>Notifications</h3>
+  {% if notifications %}
+    {% for n in notifications %}
+      <div class="notification-item{% if not n.is_read %} unread{% endif %}">
+        <div style="flex:1">
+          <div class="d-flex justify-content-between align-items-start">
+            <div class="text-light fw-semibold">{{ n.title }}</div>
+            <div class="notification-actions">
+              {% if not n.is_read %}
+              <a href="{% url 'notifications:mark_read' n.id %}"><i class="fas fa-check me-1"></i>Mark as read</a>
+              {% endif %}
+            </div>
+          </div>
+          <div class="text-secondary mt-1">{{ n.message }}</div>
+          <div class="d-flex gap-3 mt-2 notification-meta">
+            <div><i class="fas fa-clock me-1"></i>{{ n.created_at|date:'Y-m-d H:i' }}</div>
+            {% if n.facility %}<div><i class="fas fa-hospital me-1"></i>{{ n.facility.name }}</div>{% endif %}
+            {% if n.study_id %}<div><i class="fas fa-file-medical me-1"></i>Study #{{ n.study_id }}</div>{% endif %}
+            <span class="badge-priority {{ n.priority }}">{{ n.get_priority_display }}</span>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="text-center text-secondary py-5">
+      <i class="fas fa-bell fa-3x mb-3" style="opacity:.3"></i>
+      <div>No notifications yet</div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
