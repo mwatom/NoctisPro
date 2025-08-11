@@ -264,6 +264,7 @@ function renderStudiesTable() {
                 <td>
                     <div class="viewer-buttons">
                         <button class="btn-viewer" onclick="openStudyInViewer(${study.id}); event.stopPropagation();"><i class="fas fa-eye"></i> VIEW</button>
+                        <button class="btn-viewer" onclick="openStudyInWebViewer(${study.id}); event.stopPropagation();"><i class="fas fa-globe"></i> WEB</button>
                         <button class="btn-viewer viewer-only" onclick="openReport(${study.id}); event.stopPropagation();"><i class="fas fa-file-alt"></i> REPORT</button>
                     </div>
                 </td>
@@ -351,6 +352,11 @@ async function launchDicomViewer() {
             showToast((data.message || 'Failed to launch viewer') + details, 'error');
         }
     } catch { showToast('Error launching viewer', 'error'); }
+}
+
+function openStudyInWebViewer(studyId) {
+    // Navigate to the integrated web DICOM viewer for this study
+    window.open(`/viewer/web/viewer/?study_id=${studyId}`, '_blank');
 }
 
 function openReport(studyId) {

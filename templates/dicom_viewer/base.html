@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DICOM Viewer</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a1a; color: #fff; }
+    .layout { display: grid; grid-template-columns: 80px 1fr 300px; grid-template-rows: 60px 1fr; height: 100vh; }
+    .toolbar { grid-row: 1 / span 2; grid-column: 1; background: #2a2a2a; border-right: 1px solid #444; padding: 8px 6px; display: flex; flex-direction: column; gap: 6px; }
+    .tool { width: 66px; height: 56px; background: #3a3a3a; border: none; border-radius: 8px; color: #fff; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; }
+    .tool.active { background: #0078d4; }
+    .tool i { font-size: 18px; margin-bottom: 4px; }
+    .topbar { grid-row: 1; grid-column: 2 / span 2; display: flex; align-items: center; gap: 12px; padding: 0 16px; background: #2a2a2a; border-bottom: 1px solid #444; }
+    .btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+    .btn-primary { background: #0078d4; color: #fff; }
+    .select { padding: 8px 10px; background: #3a3a3a; border: 1px solid #555; border-radius: 6px; color: #fff; min-width: 220px; }
+    .viewport { grid-row: 2; grid-column: 2; background: #000; position: relative; display: flex; align-items: center; justify-content: center; }
+    .right { grid-row: 2; grid-column: 3; background: #2a2a2a; border-left: 1px solid #444; padding: 16px; overflow: auto; }
+    .panel { margin-bottom: 18px; }
+    .panel h3 { font-size: 15px; margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid #444; }
+    .control { margin-bottom: 12px; }
+    .control .label { display: flex; justify-content: space-between; font-size: 12px; color: #ccc; margin-bottom: 6px; }
+    input[type=range] { width: 100%; }
+    .overlay { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.6); padding: 8px 10px; border-radius: 6px; font-family: monospace; font-size: 12px; }
+    .zoominfo { position: absolute; bottom: 12px; left: 12px; background: rgba(0,0,0,0.6); padding: 6px 10px; border-radius: 6px; font-family: monospace; font-size: 12px; }
+    canvas { max-width: 100%; max-height: 100%; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <div class="toolbar">
+      <button class="tool active" data-tool="window"><i class="fas fa-adjust"></i><span>Window</span></button>
+      <button class="tool" data-tool="zoom"><i class="fas fa-search-plus"></i><span>Zoom</span></button>
+      <button class="tool" data-tool="invert"><i class="fas fa-adjust"></i><span>Invert</span></button>
+      <button class="tool" data-tool="reset"><i class="fas fa-undo"></i><span>Reset</span></button>
+    </div>
+    <div class="topbar">
+      <a href="/viewer/web/" class="btn btn-primary"><i class="fas fa-folder-open"></i> Load Studies</a>
+      <select id="seriesSelect" class="select"><option value="">Select Series</option></select>
+      <div id="patientInfo" style="margin-left:auto;color:#ccc;font-size:13px;">Patient: - | Study Date: - | Modality: -</div>
+    </div>
+    <div class="viewport" id="viewport">
+      <canvas id="dicomCanvas"></canvas>
+      <div class="overlay" id="overlay">WW: 400<br>WL: 40<br>Slice: 1/1</div>
+      <div class="zoominfo" id="zoominfo">Zoom: 100%</div>
+    </div>
+    <div class="right">
+      <div class="panel">
+        <h3>Window/Level</h3>
+        <div class="control"><div class="label"><span>Window Width</span><span id="wwVal">400</span></div><input id="ww" type="range" min="1" max="4000" value="400"></div>
+        <div class="control"><div class="label"><span>Window Level</span><span id="wlVal">40</span></div><input id="wl" type="range" min="-1000" max="1000" value="40"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <button class="btn" data-preset="lung">Lung</button>
+          <button class="btn" data-preset="bone">Bone</button>
+          <button class="btn" data-preset="soft">Soft</button>
+          <button class="btn" data-preset="brain">Brain</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Navigation</h3>
+        <div class="control"><div class="label"><span>Slice</span><span id="sliceVal">1</span></div><input id="slice" type="range" min="0" max="0" value="0"></div>
+      </div>
+      <div class="panel">
+        <h3>Transform</h3>
+        <div class="control"><div class="label"><span>Zoom</span><span id="zoomVal">100%</span></div><input id="zoom" type="range" min="25" max="500" value="100"></div>
+      </div>
+      <div class="panel">
+        <h3>Image Info</h3>
+        <div id="dimInfo" style="color:#ccc;font-size:12px;">Dimensions: -</div>
+        <div id="spacingInfo" style="color:#ccc;font-size:12px;">Pixel Spacing: -</div>
+        <div id="seriesInfo" style="color:#ccc;font-size:12px;">Series: -</div>
+        <div id="institutionInfo" style="color:#ccc;font-size:12px;">Institution: -</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    const canvas = document.getElementById('dicomCanvas');
+    const ctx = canvas.getContext('2d');
+    const seriesSelect = document.getElementById('seriesSelect');
+    const wwSlider = document.getElementById('ww');
+    const wlSlider = document.getElementById('wl');
+    const sliceSlider = document.getElementById('slice');
+    const zoomSlider = document.getElementById('zoom');
+
+    let currentStudy = null;
+    let currentSeries = null;
+    let images = [];
+    let index = 0;
+    let ww = 400, wl = 40, inverted = false, zoom = 1.0;
+
+    function setCanvasSize(){
+      const vp = document.getElementById('viewport');
+      const rect = vp.getBoundingClientRect();
+      canvas.width = Math.max(100, rect.width - 20);
+      canvas.height = Math.max(100, rect.height - 20);
+    }
+    window.addEventListener('resize', ()=>{ setCanvasSize(); draw(); });
+
+    function q(name){ return new URLSearchParams(window.location.search).get(name); }
+
+    async function loadStudy(studyId){
+      const r = await fetch(`/viewer/study/${studyId}/`);
+      const data = await r.json();
+      currentStudy = data.study;
+      document.getElementById('patientInfo').textContent = `Patient: ${currentStudy.patient_name} | Study Date: ${currentStudy.study_date} | Modality: ${currentStudy.modality}`;
+      seriesSelect.innerHTML = '<option value="">Select Series</option>';
+      (data.series_list || []).forEach(s=>{
+        const opt = document.createElement('option');
+        opt.value = s.id; opt.textContent = `Series ${s.series_number} - ${s.modality} (${s.image_count} images)`;
+        seriesSelect.appendChild(opt);
+      });
+      if ((data.series_list||[]).length){
+        seriesSelect.value = data.series_list[0].id;
+        await loadSeries(data.series_list[0].id);
+      }
+    }
+
+    async function loadSeries(seriesId){
+      const r = await fetch(`/viewer/series/${seriesId}/images/`);
+      const data = await r.json();
+      currentSeries = data.series; images = data.images || []; index = 0;
+      sliceSlider.max = Math.max(0, images.length - 1); sliceSlider.value = 0; document.getElementById('sliceVal').textContent = '1';
+      if (images.length){
+        ww = data.images[0].window_width || ww; wl = data.images[0].window_center || wl;
+        wwSlider.value = ww; wlSlider.value = wl; document.getElementById('wwVal').textContent = ww; document.getElementById('wlVal').textContent = wl;
+      }
+      setCanvasSize();
+      await draw();
+    }
+
+    async function draw(){
+      if (!images.length) { ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height); return; }
+      const img = images[index];
+      const url = `/viewer/image/${img.id}/?ww=${ww}&wl=${wl}&invert=${inverted}`;
+      const htmlImg = new Image(); htmlImg.crossOrigin = 'anonymous';
+      await new Promise((resolve,reject)=>{ htmlImg.onload=resolve; htmlImg.onerror=reject; htmlImg.src=url; });
+      // Fit
+      const scale = Math.min(canvas.width / htmlImg.width, canvas.height / htmlImg.height) * zoom;
+      const w = htmlImg.width * scale, h = htmlImg.height * scale;
+      ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(htmlImg, (canvas.width - w)/2, (canvas.height - h)/2, w, h);
+      document.getElementById('overlay').innerHTML = `WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}<br>Slice: ${index+1}/${images.length}`;
+      document.getElementById('zoominfo').textContent = `Zoom: ${Math.round(zoom*100)}%`;
+    }
+
+    // UI wiring
+    seriesSelect.addEventListener('change', e=>{ if(e.target.value) loadSeries(e.target.value); });
+    wwSlider.addEventListener('input', e=>{ ww = +e.target.value; document.getElementById('wwVal').textContent = ww; draw(); });
+    wlSlider.addEventListener('input', e=>{ wl = +e.target.value; document.getElementById('wlVal').textContent = wl; draw(); });
+    sliceSlider.addEventListener('input', e=>{ index = +e.target.value; document.getElementById('sliceVal').textContent = index+1; draw(); });
+    zoomSlider.addEventListener('input', e=>{ zoom = (+e.target.value)/100; document.getElementById('zoomVal').textContent = `${e.target.value}%`; draw(); });
+    document.querySelectorAll('[data-preset]').forEach(btn=>btn.addEventListener('click', ()=>{
+      const p = btn.getAttribute('data-preset');
+      const map = { lung:{ww:1500,wl:-600}, bone:{ww:2000,wl:300}, soft:{ww:400,wl:40}, brain:{ww:100,wl:50} };
+      if (map[p]){ ww = map[p].ww; wl = map[p].wl; wwSlider.value = ww; wlSlider.value = wl; document.getElementById('wwVal').textContent = ww; document.getElementById('wlVal').textContent = wl; draw(); }
+    }));
+    document.querySelectorAll('.tool').forEach(t=>t.addEventListener('click', ()=>{
+      const tool = t.getAttribute('data-tool');
+      document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active')); t.classList.add('active');
+      if (tool === 'invert'){ inverted = !inverted; draw(); }
+      if (tool === 'reset'){ zoom = 1.0; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; draw(); }
+    }));
+
+    // Mouse wheel slice/zoom
+    document.getElementById('viewport').addEventListener('wheel', (e)=>{
+      e.preventDefault();
+      if (e.ctrlKey){ const delta = e.deltaY>0?0.9:1.1; zoom = Math.max(0.1, Math.min(5.0, zoom*delta)); zoomSlider.value = Math.round(zoom*100); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; draw(); }
+      else { const d = e.deltaY>0?1:-1; const ni = Math.max(0, Math.min(images.length-1, index+d)); if (ni !== index){ index = ni; sliceSlider.value = index; document.getElementById('sliceVal').textContent = index+1; draw(); } }
+    }, { passive:false });
+
+    // Init
+    setCanvasSize();
+    const studyId = q('study_id');
+    if (studyId) loadStudy(studyId);
+  })();
+  </script>
+</body>
+</html>
