@@ -42,6 +42,7 @@
     </div>
     <div class="topbar">
       <button id="btnLoadLocal" class="btn btn-primary"><i class="fas fa-folder-open"></i> Load Local DICOM</button>
+      <a href="{% url 'dicom_viewer:index' %}" class="btn"><i class="fas fa-list"></i> Study List</a>
       <input id="localDicom" type="file" multiple webkitdirectory directory accept=".dcm,.dicom,application/dicom" style="display:none" />
       <select id="seriesSelect" class="select"><option value="">Select Series</option></select>
       <div id="patientInfo" style="margin-left:auto;color:#ccc;font-size:13px;">Patient: - | Study Date: - | Modality: -</div>
