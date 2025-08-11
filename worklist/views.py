@@ -24,62 +24,8 @@ from accounts.models import User, Facility
 
 @login_required
 def dashboard(request):
-    """Main dashboard view for the worklist - now shows patients"""
-    user = request.user
-    from datetime import date
-    from django.db.models import Max, Count
-    
-    # Get patients with study counts and additional data
-    if user.is_facility_user():
-        patients_queryset = Patient.objects.filter(study__facility=user.facility).distinct()
-    else:
-        patients_queryset = Patient.objects.all()
-    
-    # Apply filters from request
-    search = request.GET.get('search', '')
-    gender = request.GET.get('gender', '')
-    
-    if search:
-        patients_queryset = patients_queryset.filter(
-            Q(first_name__icontains=search) |
-            Q(last_name__icontains=search) |
-            Q(patient_id__icontains=search) |
-            Q(medical_record_number__icontains=search)
-        )
-    
-    if gender:
-        patients_queryset = patients_queryset.filter(gender=gender)
-    
-    # Annotate with study count and last study date
-    patients = patients_queryset.annotate(
-        study_count=Count('study'),
-        last_study_date=Max('study__study_date')
-    ).order_by('-last_study_date', 'last_name', 'first_name')
-    
-    # Add age calculation for each patient
-    for patient in patients:
-        if patient.date_of_birth:
-            today = date.today()
-            patient.age = today.year - patient.date_of_birth.year - (
-                (today.month, today.day) < (patient.date_of_birth.month, patient.date_of_birth.day)
-            )
-        else:
-            patient.age = 'Unknown'
-    
-    # Get unread notifications count
-    try:
-        unread_notifications_count = user.notifications.filter(is_read=False).count()
-    except AttributeError:
-        # Handle case where notifications app is not enabled or relationship doesn't exist
-        unread_notifications_count = 0
-    
-    context = {
-        'user': user,
-        'patients': patients,
-        'unread_notifications_count': unread_notifications_count,
-    }
-    
-    return render(request, 'worklist/dashboard.html', context)
+    """Main dashboard view for the worklist now redirects to modern UI"""
+    return redirect('worklist:modern_worklist')
 
 @login_required
 def study_list(request):
