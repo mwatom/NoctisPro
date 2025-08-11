@@ -25,7 +25,7 @@
         --suspended-color: #ff5a5f;
     }
 
-    body { background: var(--primary-bg); color: var(--text-primary); font-size: 12px; overflow: hidden; }
+    body { background: var(--primary-bg); color: var(--text-primary); font-size: 12px; overflow: auto; }
     .dashboard-container { height: 100vh; display: flex; flex-direction: column; }
 
     /* Top Navigation */
@@ -123,27 +123,6 @@
 
 {% block content %}
 <div class="dashboard-container">
-    <nav class="top-navbar">
-        <div class="nav-left">
-            <div class="logo"><i class="fas fa-hospital-symbol"></i> Noctis Pro PACS</div>
-            <div class="nav-tabs">
-                <div class="nav-tab active">WORKLIST</div>
-                <div class="nav-tab" onclick="window.location.href='{% url 'worklist:study_list' %}'">STUDIES</div>
-                <div class="nav-tab" onclick="window.location.href='{% url 'worklist:dashboard' %}'">PATIENTS</div>
-                <div class="nav-tab" onclick="window.location.href='{% url 'reports:report_list' %}'">REPORTS</div>
-            </div>
-        </div>
-        <div class="nav-right">
-            <div class="status-indicator"><div class="status-dot"></div><span>ONLINE</span></div>
-            <div class="user-info">
-                <div class="user-avatar">{% if user.first_name %}{{ user.first_name|first|upper }}{{ user.last_name|first|upper }}{% else %}U{% endif %}</div>
-                <div>
-                    <div>{{ user.get_full_name|default:user.username }}</div>
-                    <div style="color: var(--text-muted); font-size: 10px;">{% if user.is_radiologist %}Radiologist{% else %}User{% endif %}</div>
-                </div>
-            </div>
-        </div>
-    </nav>
 
     <div class="controls-bar">
         <div class="control-group">
