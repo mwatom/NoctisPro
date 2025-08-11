@@ -1104,6 +1104,10 @@ def launch_standalone_viewer(request):
     import sys
     import os
 
+    # If this looks like a normal browser navigation (expects HTML), redirect to web UI
+    accept_header = request.headers.get('Accept', '')
+    wants_html = 'text/html' in accept_header or 'application/xhtml+xml' in accept_header
+
     try:
         study_id = None
         if request.method == 'POST':
@@ -1118,6 +1122,13 @@ def launch_standalone_viewer(request):
                 cmd.extend(['--study-id', str(study_id)])
 
             result = subprocess.run(cmd, capture_output=True, text=True)
+            if wants_html:
+                # For direct navigations, always show the web viewer UI
+                web_url = '/viewer/web/viewer/'
+                if study_id:
+                    web_url += f'?study_id={study_id}'
+                return redirect(web_url)
+
             if result.returncode == 0:
                 message = 'Python DICOM viewer launched successfully'
                 if study_id:
@@ -1136,6 +1147,8 @@ def launch_standalone_viewer(request):
             web_url = '/viewer/web/viewer/'
             if study_id:
                 web_url += f'?study_id={study_id}'
+            if wants_html:
+                return redirect(web_url)
             return JsonResponse({
                 'success': True,
                 'message': 'Opening web-based DICOM viewer',
@@ -1147,6 +1160,8 @@ def launch_standalone_viewer(request):
         web_url = '/viewer/web/viewer/'
         if study_id:
             web_url += f'?study_id={study_id}'
+        if wants_html:
+            return redirect(web_url)
         return JsonResponse({
             'success': True,
             'message': 'Opening web-based DICOM viewer',
@@ -1162,10 +1177,16 @@ def launch_study_in_desktop_viewer(request, study_id):
     import sys
     import os
 
+    # If this looks like a normal browser navigation (expects HTML), redirect to web UI
+    accept_header = request.headers.get('Accept', '')
+    wants_html = 'text/html' in accept_header or 'application/xhtml+xml' in accept_header
+
     try:
         study = get_object_or_404(Study, id=study_id)
         user = request.user
         if user.is_facility_user() and study.facility != user.facility:
+            if wants_html:
+                return redirect('/viewer/web/viewer/')
             return JsonResponse({'success': False, 'message': 'You do not have permission to view this study.'}, status=403)
 
         launcher_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'tools', 'launch_dicom_viewer.py')
@@ -1173,6 +1194,11 @@ def launch_study_in_desktop_viewer(request, study_id):
         if os.path.exists(launcher_path):
             cmd = [sys.executable, launcher_path, '--debug', '--study-id', str(study_id)]
             result = subprocess.run(cmd, capture_output=True, text=True)
+
+            if wants_html:
+                # For direct navigations, always show the web viewer UI
+                return redirect(f'/viewer/web/viewer/?study_id={study_id}')
+
             if result.returncode == 0:
                 return JsonResponse({'success': True, 'message': f'Viewer launched for study: {study.patient.full_name} ({study.study_date})'})
             else:
@@ -1186,6 +1212,8 @@ def launch_study_in_desktop_viewer(request, study_id):
                 }, status=500)
         else:
             web_url = f'/viewer/web/viewer/?study_id={study_id}'
+            if wants_html:
+                return redirect(web_url)
             return JsonResponse({
                 'success': True,
                 'message': f'Opening web-based DICOM viewer for study: {study.patient.full_name}',
@@ -1195,6 +1223,8 @@ def launch_study_in_desktop_viewer(request, study_id):
 
     except Exception as e:
         web_url = f'/viewer/web/viewer/?study_id={study_id}'
+        if wants_html:
+            return redirect(web_url)
         return JsonResponse({
             'success': True,
             'message': 'Opening web-based DICOM viewer',
