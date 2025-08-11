@@ -46,3 +46,29 @@ urlpatterns = [
     path('api/dicom-info/<str:instance_uid>/', api_cpp.api_cpp_dicom_info, name='api_cpp_dicom_info'),
     path('api/viewer-sessions/', api_cpp.api_cpp_viewer_sessions, name='api_cpp_viewer_sessions'),
 ]
+
+urlpatterns += [
+    # Web viewer pages
+    path('web/', views.web_index, name='index'),
+    path('web/viewer/', views.web_viewer, name='web_viewer'),
+
+    # Web viewer JSON APIs
+    path('study/<int:study_id>/', views.web_study_detail, name='web_study_detail'),
+    path('series/<int:series_id>/images/', views.web_series_images, name='web_series_images'),
+    path('image/<int:image_id>/', views.web_dicom_image, name='web_dicom_image'),
+
+    # Measurements and annotations
+    path('measurements/save/', views.web_save_measurement, name='web_save_measurement'),
+    path('annotations/save/', views.web_save_annotation, name='web_save_annotation'),
+    path('measurements/<int:image_id>/', views.web_get_measurements, name='web_get_measurements'),
+    path('annotations/<int:image_id>/', views.web_get_annotations, name='web_get_annotations'),
+
+    # Viewer session
+    path('session/save/', views.web_save_viewer_session, name='web_save_viewer_session'),
+    path('session/<int:study_id>/', views.web_load_viewer_session, name='web_load_viewer_session'),
+
+    # Reconstructions
+    path('reconstruction/start/', views.web_start_reconstruction, name='web_start_reconstruction'),
+    path('reconstruction/status/<int:job_id>/', views.web_reconstruction_status, name='web_reconstruction_status'),
+    path('reconstruction/result/<int:job_id>/', views.web_reconstruction_result, name='web_reconstruction_result'),
+]

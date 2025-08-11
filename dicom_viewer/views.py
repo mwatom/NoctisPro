@@ -17,6 +17,19 @@ from PIL import Image
 from django.utils import timezone
 import uuid
 
+from django.views.decorators.http import require_http_methods
+from django.core.paginator import Paginator
+from django.db.models import Q, Count
+from django.conf import settings
+from io import BytesIO
+from PIL import Image
+import base64
+
+from .models import ViewerSession, Measurement, Annotation, ReconstructionJob
+from .dicom_utils import DicomProcessor
+from .reconstruction import MPRProcessor, MIPProcessor, Bone3DProcessor, MRI3DProcessor
+
+
 # Removed web-based viewer entrypoints (standalone_viewer, advanced_standalone_viewer, view_study)
 
 @login_required
@@ -1187,3 +1200,368 @@ def launch_study_in_desktop_viewer(request, study_id):
             'success': False, 
             'message': f'Error launching desktop viewer: {str(e)}'
         }, status=500)
+
+
+@login_required
+def web_index(request):
+    """Main web viewer index page listing recent studies"""
+    # Keep permissions consistent with existing APIs
+    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user():
+        studies = Study.objects.filter(facility=request.user.facility).order_by('-study_date')[:50]
+    else:
+        studies = Study.objects.order_by('-study_date')[:50]
+    return render(request, 'dicom_viewer/index.html', {'studies': studies})
+
+
+@login_required
+def web_viewer(request):
+    """Render the web viewer page. Expects ?study_id in query."""
+    return render(request, 'dicom_viewer/viewer.html')
+
+
+@login_required
+def web_study_detail(request, study_id):
+    """Return study detail JSON for web viewer"""
+    study = get_object_or_404(Study, id=study_id)
+    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and study.facility != request.user.facility:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    series_qs = study.series_set.all().annotate(image_count=Count('images')).order_by('series_number')
+    data = {
+        'study': {
+            'id': study.id,
+            'patient_name': study.patient.full_name,
+            'patient_id': study.patient.patient_id,
+            'study_date': study.study_date.isoformat(),
+            'modality': study.modality.code,
+        },
+        'series_list': [{
+            'id': s.id,
+            'series_uid': getattr(s, 'series_instance_uid', ''),
+            'series_number': s.series_number,
+            'series_description': s.series_description,
+            'modality': s.modality,
+            'slice_thickness': s.slice_thickness,
+            'pixel_spacing': s.pixel_spacing,
+            'image_orientation': s.image_orientation,
+            'image_count': s.image_count,
+        } for s in series_qs],
+    }
+    return JsonResponse(data)
+
+
+@login_required
+def web_series_images(request, series_id):
+    series = get_object_or_404(Series, id=series_id)
+    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and series.study.facility != request.user.facility:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    images = series.images.all().order_by('instance_number')
+    data = {
+        'series': {
+            'id': series.id,
+            'series_uid': getattr(series, 'series_instance_uid', ''),
+            'series_number': series.series_number,
+            'series_description': series.series_description,
+            'modality': series.modality,
+            'slice_thickness': series.slice_thickness,
+            'pixel_spacing': series.pixel_spacing,
+            'image_orientation': series.image_orientation,
+        },
+        'images': [{
+            'id': img.id,
+            'sop_instance_uid': img.sop_instance_uid,
+            'instance_number': img.instance_number,
+            'image_position': img.image_position,
+            'rows': None,
+            'columns': None,
+            'window_center': None,
+            'window_width': None,
+        } for img in images],
+    }
+    return JsonResponse(data)
+
+
+@login_required
+def web_dicom_image(request, image_id):
+    image = get_object_or_404(DicomImage, id=image_id)
+    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and image.series.study.facility != request.user.facility:
+        return HttpResponse(status=403)
+    window_width = float(request.GET.get('ww', 400))
+    window_level = float(request.GET.get('wl', 40))
+    invert = request.GET.get('invert', 'false').lower() == 'true'
+    try:
+        file_path = os.path.join(settings.MEDIA_ROOT, image.file_path.name)
+        ds = pydicom.dcmread(file_path)
+        pixel_array = ds.pixel_array
+        # apply slope/intercept
+        slope = getattr(ds, 'RescaleSlope', 1.0)
+        intercept = getattr(ds, 'RescaleIntercept', 0.0)
+        pixel_array = pixel_array.astype(np.float32) * float(slope) + float(intercept)
+        processor = DicomProcessor()
+        windowed = processor.apply_windowing(pixel_array, window_width, window_level, invert)
+        pil_image = Image.fromarray(windowed)
+        buffer = BytesIO()
+        pil_image.save(buffer, format='PNG')
+        buffer.seek(0)
+        response = HttpResponse(buffer.getvalue(), content_type='image/png')
+        response['Cache-Control'] = 'max-age=3600'
+        return response
+    except Exception as e:
+        return HttpResponse(status=404)
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def web_save_measurement(request):
+    try:
+        data = json.loads(request.body)
+        image_id = data.get('image_id')
+        measurement_type = data.get('type')
+        points = data.get('points')
+        value = data.get('value')
+        unit = data.get('unit', 'mm')
+        notes = data.get('notes', '')
+        image = get_object_or_404(DicomImage, id=image_id)
+        if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and image.series.study.facility != request.user.facility:
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+        measurement = Measurement.objects.create(
+            user=request.user,
+            image=image,
+            measurement_type=measurement_type,
+            value=value,
+            unit=unit,
+            notes=notes,
+        )
+        measurement.set_points(points or [])
+        measurement.save()
+        return JsonResponse({'success': True, 'id': measurement.id})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def web_save_annotation(request):
+    try:
+        data = json.loads(request.body)
+        image_id = data.get('image_id')
+        position_x = data.get('position_x')
+        position_y = data.get('position_y')
+        text = data.get('text')
+        color = data.get('color', '#FFFF00')
+        image = get_object_or_404(DicomImage, id=image_id)
+        if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and image.series.study.facility != request.user.facility:
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+        annotation = Annotation.objects.create(
+            user=request.user,
+            image=image,
+            position_x=position_x,
+            position_y=position_y,
+            text=text,
+            color=color,
+        )
+        return JsonResponse({'success': True, 'id': annotation.id})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+def web_get_measurements(request, image_id):
+    image = get_object_or_404(DicomImage, id=image_id)
+    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and image.series.study.facility != request.user.facility:
+        return JsonResponse({'measurements': []})
+    measurements = Measurement.objects.filter(image=image, user=request.user)
+    data = [{
+        'id': m.id,
+        'type': m.measurement_type,
+        'points': m.get_points(),
+        'value': m.value,
+        'unit': m.unit,
+        'notes': m.notes,
+        'created_at': m.created_at.isoformat(),
+    } for m in measurements]
+    return JsonResponse({'measurements': data})
+
+
+@login_required
+def web_get_annotations(request, image_id):
+    image = get_object_or_404(DicomImage, id=image_id)
+    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and image.series.study.facility != request.user.facility:
+        return JsonResponse({'annotations': []})
+    annotations = Annotation.objects.filter(image=image, user=request.user)
+    data = [{
+        'id': a.id,
+        'position_x': a.position_x,
+        'position_y': a.position_y,
+        'text': a.text,
+        'color': a.color,
+        'created_at': a.created_at.isoformat(),
+    } for a in annotations]
+    return JsonResponse({'annotations': data})
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def web_save_viewer_session(request):
+    try:
+        payload = json.loads(request.body)
+        study_id = payload.get('study_id')
+        session_data = payload.get('session_data')
+        study = get_object_or_404(Study, id=study_id)
+        if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and study.facility != request.user.facility:
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+        session, created = ViewerSession.objects.get_or_create(
+            user=request.user, study=study, defaults={'session_data': json.dumps(session_data or {})}
+        )
+        if not created:
+            session.set_session_data(session_data or {})
+            session.save()
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+def web_load_viewer_session(request, study_id):
+    study = get_object_or_404(Study, id=study_id)
+    try:
+        session = ViewerSession.objects.get(user=request.user, study=study)
+        return JsonResponse({'success': True, 'session_data': session.get_session_data()})
+    except ViewerSession.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'No session found'})
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def web_start_reconstruction(request):
+    try:
+        data = json.loads(request.body)
+        series_id = data.get('series_id')
+        job_type = data.get('job_type')
+        parameters = data.get('parameters', {})
+        series = get_object_or_404(Series, id=series_id)
+        job = ReconstructionJob.objects.create(user=request.user, series=series, job_type=job_type, status='pending')
+        job.set_parameters(parameters)
+        job.save()
+        if job_type == 'mpr':
+            process_mpr_reconstruction.delay(job.id)
+        elif job_type == 'mip':
+            process_mip_reconstruction.delay(job.id)
+        elif job_type == 'bone_3d':
+            process_bone_reconstruction.delay(job.id)
+        elif job_type == 'mri_3d':
+            process_mri_reconstruction.delay(job.id)
+        return JsonResponse({'success': True, 'job_id': job.id})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+def web_reconstruction_status(request, job_id):
+    job = get_object_or_404(ReconstructionJob, id=job_id, user=request.user)
+    data = {
+        'id': job.id,
+        'job_type': job.job_type,
+        'status': job.status,
+        'result_path': job.result_path,
+        'error_message': job.error_message,
+        'created_at': job.created_at.isoformat(),
+        'completed_at': job.completed_at.isoformat() if job.completed_at else None,
+    }
+    return JsonResponse(data)
+
+
+@login_required
+def web_reconstruction_result(request, job_id):
+    job = get_object_or_404(ReconstructionJob, id=job_id, user=request.user)
+    if job.status != 'completed' or not job.result_path:
+        return HttpResponse(status=404)
+    try:
+        with open(job.result_path, 'rb') as f:
+            response = HttpResponse(f.read(), content_type='application/octet-stream')
+            response['Content-Disposition'] = f'attachment; filename="reconstruction_{job_id}.zip"'
+            return response
+    except FileNotFoundError:
+        return HttpResponse(status=404)
+
+
+# Celery tasks
+from celery import shared_task
+
+@shared_task
+def process_mpr_reconstruction(job_id):
+    try:
+        job = ReconstructionJob.objects.get(id=job_id)
+        job.status = 'processing'
+        job.save()
+        processor = MPRProcessor()
+        result_path = processor.process_series(job.series, job.get_parameters())
+        job.status = 'completed'
+        job.result_path = result_path
+        job.completed_at = timezone.now()
+        job.save()
+    except Exception as e:
+        job = ReconstructionJob.objects.get(id=job_id)
+        job.status = 'failed'
+        job.error_message = str(e)
+        job.save()
+
+
+@shared_task
+def process_mip_reconstruction(job_id):
+    try:
+        job = ReconstructionJob.objects.get(id=job_id)
+        job.status = 'processing'
+        job.save()
+        processor = MIPProcessor()
+        result_path = processor.process_series(job.series, job.get_parameters())
+        job.status = 'completed'
+        job.result_path = result_path
+        job.completed_at = timezone.now()
+        job.save()
+    except Exception as e:
+        job = ReconstructionJob.objects.get(id=job_id)
+        job.status = 'failed'
+        job.error_message = str(e)
+        job.save()
+
+
+@shared_task
+def process_bone_reconstruction(job_id):
+    try:
+        job = ReconstructionJob.objects.get(id=job_id)
+        job.status = 'processing'
+        job.save()
+        processor = Bone3DProcessor()
+        result_path = processor.process_series(job.series, job.get_parameters())
+        job.status = 'completed'
+        job.result_path = result_path
+        job.completed_at = timezone.now()
+        job.save()
+    except Exception as e:
+        job = ReconstructionJob.objects.get(id=job_id)
+        job.status = 'failed'
+        job.error_message = str(e)
+        job.save()
+
+
+@shared_task
+def process_mri_reconstruction(job_id):
+    try:
+        job = ReconstructionJob.objects.get(id=job_id)
+        job.status = 'processing'
+        job.save()
+        processor = MRI3DProcessor()
+        result_path = processor.process_series(job.series, job.get_parameters())
+        job.status = 'completed'
+        job.result_path = result_path
+        job.completed_at = timezone.now()
+        job.save()
+    except Exception as e:
+        job = ReconstructionJob.objects.get(id=job_id)
+        job.status = 'failed'
+        job.error_message = str(e)
+        job.save()
