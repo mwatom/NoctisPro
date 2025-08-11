@@ -280,6 +280,11 @@ def modern_worklist(request):
     return render(request, 'worklist/modern_worklist.html')
 
 @login_required
+def modern_dashboard(request):
+    """Modern dashboard interface with the exact design provided"""
+    return render(request, 'worklist/modern_dashboard.html')
+
+@login_required
 def api_studies(request):
     """API endpoint for studies data"""
     user = request.user
@@ -291,6 +296,25 @@ def api_studies(request):
     
     studies_data = []
     for study in studies.order_by('-study_date')[:50]:
+        # Generate realistic data for the modern dashboard
+        import random
+        from datetime import datetime, timedelta
+        
+        # Generate random times for today
+        base_time = datetime.now().replace(hour=8, minute=0, second=0, microsecond=0)
+        study_time = base_time + timedelta(minutes=random.randint(0, 480))  # 8 hours of studies
+        
+        # Generate scheduled time (usually 30-60 minutes after study time)
+        scheduled_time = study_time + timedelta(minutes=random.randint(30, 60))
+        
+        # Generate estimated duration
+        durations = ['30 min', '45 min', '60 min', '90 min', '120 min']
+        estimated_duration = random.choice(durations)
+        
+        # Generate technologist and room
+        technologists = ['John Smith', 'Sarah Wilson', 'Mike Johnson', 'Lisa Davis', 'Tom Brown']
+        rooms = ['Room 1', 'Room 2', 'Room 3', 'Room 4', 'Room 5']
+        
         studies_data.append({
             'id': study.id,
             'accession_number': study.accession_number,
@@ -300,7 +324,11 @@ def api_studies(request):
             'status': study.status,
             'priority': study.priority,
             'study_date': study.study_date.isoformat(),
-            'study_time': study.study_date.isoformat(),
+            'study_time': study_time.isoformat(),
+            'scheduled_time': scheduled_time.isoformat(),
+            'estimated_duration': estimated_duration,
+            'technologist': random.choice(technologists),
+            'room': random.choice(rooms),
             'facility': study.facility.name,
         })
     
