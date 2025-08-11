@@ -106,9 +106,9 @@
                             DICOM AE Title
                         </label>
                         <input type="text" class="form-control form-control-medical" id="ae_title" name="ae_title"
-                               placeholder="e.g., NOCTIS_FAC_A" value="{{ facility.ae_title|default:'' }}">
+                               placeholder="Auto-generated from Facility Name if left blank" value="{{ facility.ae_title|default:'' }}">
                         <div class="form-text text-secondary">
-                            <small>Studies received with this AE Title will be attributed to this facility.</small>
+                            <small>Auto-generates from Facility Name if left blank. Studies received with this AE Title will be attributed to this facility.</small>
                         </div>
                     </div>
 
@@ -278,6 +278,22 @@
                         fileInput.parentNode.appendChild(preview);
                     };
                     reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        // AE Title auto-gen from Facility Name when empty
+        const nameInput = document.getElementById('name');
+        const aeInput = document.getElementById('ae_title');
+        function toAeTitle(str){
+            const up = (str || '').toUpperCase();
+            const sanitized = up.replace(/[^A-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
+            return sanitized.slice(0, 12) || '';
+        }
+        if (nameInput && aeInput){
+            nameInput.addEventListener('input', ()=>{
+                if (!aeInput.value.trim()){
+                    aeInput.value = toAeTitle(nameInput.value);
                 }
             });
         }
