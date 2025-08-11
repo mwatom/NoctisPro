@@ -24,8 +24,8 @@ from accounts.models import User, Facility
 
 @login_required
 def dashboard(request):
-    """Main dashboard view for the worklist now redirects to modern UI"""
-    return redirect('worklist:modern_worklist')
+    """Render the exact provided dashboard UI template"""
+    return render(request, 'worklist/dashboard.html', {'user': request.user})
 
 @login_required
 def study_list(request):

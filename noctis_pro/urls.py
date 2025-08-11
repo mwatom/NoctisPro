@@ -38,6 +38,9 @@ urlpatterns = [
     path('', home_redirect, name='home'),
     path('', include('accounts.urls')),
     path('worklist/', include('worklist.urls')),
+    # Alias endpoints expected by the dashboard UI
+    path('api/studies/', include('worklist.urls')),  # will resolve to worklist:api_studies
+    path('dicom-viewer/', include('dicom_viewer.urls')),  # align with dashboard links
     path('viewer/', include('dicom_viewer.urls')),
     path('reports/', include('reports.urls')),
     path('admin-panel/', include('admin_panel.urls')),
