@@ -21,6 +21,7 @@ from .models import (
     AttachmentComment, AttachmentVersion
 )
 from accounts.models import User, Facility
+from notifications.models import Notification, NotificationType
 
 @login_required
 def dashboard(request):
@@ -261,6 +262,27 @@ def upload_study(request):
                         except Exception:
                             continue
                 created_studies.append(study.id)
+                
+                # Create notifications for new study upload
+                try:
+                    notif_type, _ = NotificationType.objects.get_or_create(
+                        code='new_study', defaults={'name': 'New Study Uploaded', 'description': 'A new study has been uploaded', 'is_system': True}
+                    )
+                    recipients = User.objects.filter(Q(role='radiologist') | Q(role='admin') | Q(facility=facility))
+                    for recipient in recipients:
+                        Notification.objects.create(
+                            notification_type=notif_type,
+                            recipient=recipient,
+                            sender=request.user,
+                            title=f"New {modality_code} study for {patient.full_name}",
+                            message=f"Study {accession_number} uploaded from {facility.name}",
+                            priority='normal',
+                            study=study,
+                            facility=facility,
+                            data={'study_id': study.id, 'accession_number': accession_number}
+                        )
+                except Exception:
+                    pass
             
             return JsonResponse({
                 'success': True,
@@ -330,6 +352,7 @@ def api_studies(request):
             'technologist': random.choice(technologists),
             'room': random.choice(rooms),
             'facility': study.facility.name,
+            'image_count': study.get_image_count(),
         })
     
     return JsonResponse({'success': True, 'studies': studies_data})
@@ -392,30 +415,39 @@ def upload_attachment(request, study_id):
                     is_public=True
                 )
                 
-                # Link to previous study if specified
-                if attach_previous_study_id:
-                    try:
-                        previous_study = Study.objects.get(id=attach_previous_study_id)
-                        attachment.attached_study = previous_study
-                        attachment.study_date = previous_study.study_date
-                        attachment.modality = previous_study.modality.code
-                        attachment.save()
-                    except Study.DoesNotExist:
-                        pass
-                
-                # Process file for metadata extraction
-                process_attachment_metadata(attachment)
-                
-                # Generate thumbnail if possible
-                generate_attachment_thumbnail(attachment)
+                # Generate thumbnail
+                try:
+                    generate_attachment_thumbnail(attachment)
+                except Exception:
+                    pass
                 
                 uploaded_attachments.append({
                     'id': attachment.id,
                     'name': attachment.name,
-                    'type': attachment.file_type,
                     'size': attachment.file_size,
-                    'url': attachment.file.url
+                    'type': attachment.file_type,
                 })
+            
+            # Create notifications for new attachments
+            try:
+                notif_type, _ = NotificationType.objects.get_or_create(
+                    code='new_attachment', defaults={'name': 'New Attachment Uploaded', 'description': 'A new attachment has been uploaded', 'is_system': True}
+                )
+                recipients = User.objects.filter(Q(role='radiologist') | Q(role='admin') | Q(facility=study.facility))
+                for recipient in recipients:
+                    Notification.objects.create(
+                        notification_type=notif_type,
+                        recipient=recipient,
+                        sender=request.user,
+                        title=f"New attachment for {study.patient.full_name}",
+                        message=f"{len(uploaded_attachments)} file(s) attached to study {study.accession_number}",
+                        priority='normal',
+                        study=study,
+                        facility=study.facility,
+                        data={'study_id': study.id}
+                    )
+            except Exception:
+                pass
             
             return JsonResponse({
                 'success': True,
@@ -435,7 +467,6 @@ def upload_attachment(request, study_id):
     context = {
         'study': study,
         'previous_studies': previous_studies,
-        'attachment_types': StudyAttachment.ATTACHMENT_TYPES,
     }
     
     return render(request, 'worklist/upload_attachment.html', context)

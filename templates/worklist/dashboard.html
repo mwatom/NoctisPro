@@ -640,7 +640,7 @@
                     <option value="low">Low</option>
                 </select>
             </div>
-            <button class="btn-control reset" onclick="resetFilters()">RESET</button>
+            <button class="btn-control reset" onclick="refreshData()">REFRESH</button>
             <button class="btn-control" onclick="launchDicomViewer()">
                 <i class="fas fa-external-link-alt"></i> DICOM VIEWER
             </button>
@@ -663,8 +663,8 @@
                             <th class="sortable">STATUS</th>
                             <th class="sortable">PRIORITY</th>
                             <th class="sortable">SCHEDULED</th>
-                            <th class="sortable">DURATION</th>
-                            <th class="sortable">TECHNOLOGIST</th>
+                            <th class="sortable">IMAGES</th>
+                            <th class="sortable">FACILITY</th>
                             <th class="sortable">ROOM</th>
                             <th>DICOM VIEWER</th>
                         </tr>
@@ -754,8 +754,8 @@
                     </span></td>
                     <td class="priority-${study.priority}">${study.priority.toUpperCase()}</td>
                     <td class="timestamp">${formatTime(study.scheduled_time)}</td>
-                    <td>${study.estimated_duration}</td>
-                    <td>${study.technologist || '-'}</td>
+                    <td>${Number(study.image_count) || 0}</td>
+                    <td>${study.facility || '-'}</td>
                     <td>${study.room || '-'}</td>
                     <td>
                         <div class="viewer-buttons">
@@ -821,47 +821,43 @@
         }
 
         // DICOM Viewer Functions
-        function openStudyInViewer(studyId) {
-            // In a real implementation, this would:
-            // 1. Get the study data and DICOM file paths
-            // 2. Launch the DICOM viewer with the study
-            // 3. Could use OHIF viewer, Cornerstone.js, or other DICOM viewers
-            
-            console.log('Opening study in DICOM viewer:', studyId);
-            
-            // Example: Open in a new window/tab with DICOM viewer
-            const viewerUrl = `/dicom-viewer/?study=${studyId}`;
-            window.open(viewerUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
-            
-            // Show notification
-            showNotification('Opening study in DICOM viewer...', 'info');
+        async function openStudyInViewer(studyId) {
+            try {
+                const resp = await fetch(`/viewer/launch-desktop/${studyId}/`, { method: 'GET', credentials: 'same-origin' });
+                const data = await resp.json();
+                if (data && data.fallback_url) {
+                    window.open(data.fallback_url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+                    showNotification('Opening web DICOM viewer...', 'info');
+                } else if (data.success) {
+                    showNotification('Desktop DICOM viewer launched.', 'success');
+                } else {
+                    const url = `/viewer/web/viewer/?study_id=${studyId}`;
+                    window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+                }
+            } catch (e) {
+                const url = `/viewer/web/viewer/?study_id=${studyId}`;
+                window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+            }
         }
 
-        function launchDicomViewer() {
-            // Launch DICOM viewer without patient data - blank viewer
-            console.log('Launching blank DICOM viewer');
-            
-            const viewerUrl = '/dicom-viewer/';
-            window.open(viewerUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
-            
-            showNotification('Launching DICOM viewer...', 'info');
+        async function launchDicomViewer() {
+            try {
+                const resp = await fetch('/viewer/launch-desktop/', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+                const data = await resp.json();
+                if (data && data.fallback_url) {
+                    window.open(data.fallback_url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+                } else if (data.success) {
+                    showNotification('Desktop DICOM viewer launched.', 'success');
+                } else {
+                    window.open('/viewer/web/viewer/', '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+                }
+            } catch (e) {
+                window.open('/viewer/web/viewer/', '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+            }
         }
 
         function uploadStudies() {
-            // In a real implementation, this would open a file upload dialog
-            // or redirect to an upload page that can handle DICOM folders
-            console.log('Opening DICOM upload interface');
-            
-            // For demonstration, show how this would work
-            showNotification('DICOM upload feature would be implemented here. This would allow uploading entire DICOM study folders.', 'info');
-            
-            // Example implementation could:
-            // 1. Open a file dialog that accepts folders
-            // 2. Process DICOM files and extract metadata
-            // 3. Store files and update the database
-            // 4. Refresh the worklist
-            
-            // window.location.href = '/upload-studies/';
+            window.location.href = '{% url 'worklist:upload_study' %}';
         }
 
         // Notification system
