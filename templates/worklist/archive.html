@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Noctis Pro PACS - Worklist Dashboard</title>
+    <title>Noctis Pro PACS - Archive Management</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -298,7 +298,7 @@
         }
 
         /* Data Styling */
-        .patient-id, .study-id, .accession {
+        .archive-id, .study-id {
             font-family: 'Courier New', monospace;
             font-weight: bold;
             color: var(--accent-color);
@@ -315,16 +315,10 @@
             font-size: 10px;
         }
 
-        .study-count {
-            background: var(--accent-color);
-            color: var(--primary-bg);
-            padding: 2px 6px;
-            border-radius: 10px;
-            font-size: 9px;
-            font-weight: bold;
-            display: inline-block;
-            min-width: 20px;
-            text-align: center;
+        .file-size {
+            font-family: 'Courier New', monospace;
+            color: var(--text-secondary);
+            font-size: 10px;
         }
 
         /* Status Badges */
@@ -340,80 +334,126 @@
             gap: 4px;
         }
 
-        .status-scheduled {
-            background: rgba(74, 144, 226, 0.2);
-            color: var(--scheduled-color);
-            border: 1px solid var(--scheduled-color);
-        }
-
-        .status-urgent {
-            background: rgba(255, 0, 102, 0.2);
-            color: var(--urgent-color);
-            border: 1px solid var(--urgent-color);
-            animation: pulse 2s infinite;
-        }
-
-        .status-in-progress {
-            background: rgba(245, 166, 35, 0.2);
-            color: var(--in-progress-color);
-            border: 1px solid var(--in-progress-color);
-        }
-
-        .status-completed {
+        .status-archived {
             background: rgba(126, 211, 33, 0.2);
             color: var(--completed-color);
             border: 1px solid var(--completed-color);
         }
 
-        .status-cancelled {
-            background: rgba(208, 2, 27, 0.2);
-            color: var(--cancelled-color);
-            border: 1px solid var(--cancelled-color);
+        .status-compressed {
+            background: rgba(0, 212, 255, 0.2);
+            color: var(--accent-color);
+            border: 1px solid var(--accent-color);
         }
 
-        .status-pending {
+        .status-backup {
             background: rgba(255, 170, 0, 0.2);
             color: var(--warning-color);
             border: 1px solid var(--warning-color);
         }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-        }
-
-        /* Priority Indicators */
-        .priority-urgent { 
-            color: var(--urgent-color); 
-            font-weight: bold;
-        }
-        .priority-high { 
-            color: var(--warning-color); 
-            font-weight: bold;
-        }
-        .priority-normal { 
-            color: var(--success-color);
-        }
-        .priority-low { 
+        .status-offline {
+            background: rgba(102, 102, 102, 0.2);
             color: var(--text-muted);
+            border: 1px solid var(--text-muted);
         }
 
-        /* Modality Badges */
-        .modality-badge {
+        /* Storage Type Badges */
+        .storage-badge {
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 9px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .storage-local {
+            background: rgba(126, 211, 33, 0.2);
+            color: var(--completed-color);
+            border: 1px solid var(--completed-color);
+        }
+
+        .storage-cloud {
+            background: rgba(0, 212, 255, 0.2);
+            color: var(--accent-color);
+            border: 1px solid var(--accent-color);
+        }
+
+        .storage-tape {
+            background: rgba(255, 170, 0, 0.2);
+            color: var(--warning-color);
+            border: 1px solid var(--warning-color);
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .btn-action {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
             color: var(--text-primary);
-            padding: 2px 6px;
-            border-radius: 4px;
+            padding: 4px 8px;
+            border-radius: 3px;
             font-size: 9px;
             font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        .modality-ct { border-color: #4a90e2; color: #4a90e2; }
-        .modality-mri { border-color: #7b68ee; color: #7b68ee; }
-        .modality-xr { border-color: #50c878; color: #50c878; }
-        .modality-us { border-color: #ffa500; color: #ffa500; }
-        .modality-nm { border-color: #ff6347; color: #ff6347; }
+        .btn-action:hover {
+            background: var(--text-secondary);
+            color: var(--primary-bg);
+        }
+
+        .btn-action.restore {
+            background: var(--success-color);
+            color: var(--primary-bg);
+            border-color: var(--success-color);
+        }
+
+        .btn-action.restore:hover {
+            background: #00cc6a;
+        }
+
+        .btn-action.download {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+            border-color: var(--accent-color);
+        }
+
+        .btn-action.download:hover {
+            background: #00b8d4;
+        }
+
+        .btn-action.delete {
+            background: var(--danger-color);
+            color: var(--text-primary);
+            border-color: var(--danger-color);
+        }
+
+        .btn-action.delete:hover {
+            background: #cc3333;
+        }
+
+        .btn-action.verify {
+            background: var(--warning-color);
+            color: var(--primary-bg);
+            border-color: var(--warning-color);
+        }
+
+        .btn-action.verify:hover {
+            background: #e69500;
+        }
 
         /* Footer Status Bar */
         .footer-status {
@@ -452,89 +492,6 @@
             background: var(--success-color);
         }
 
-        /* DICOM Viewer Buttons */
-        .viewer-buttons {
-            display: flex;
-            gap: 4px;
-            align-items: center;
-        }
-
-        .btn-viewer {
-            background: var(--accent-color);
-            border: none;
-            color: var(--primary-bg);
-            padding: 4px 8px;
-            border-radius: 3px;
-            font-size: 9px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .btn-viewer:hover {
-            background: #00b8d4;
-            transform: scale(1.05);
-        }
-
-        .btn-viewer.viewer-only {
-            background: var(--card-bg);
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-        }
-
-        .btn-viewer.viewer-only:hover {
-            background: var(--text-secondary);
-            color: var(--primary-bg);
-        }
-
-        .upload-area {
-            text-align: center;
-            padding: 60px 20px;
-            background: var(--secondary-bg);
-            border: 2px dashed var(--border-color);
-            border-radius: 8px;
-            margin: 20px;
-        }
-
-        .upload-area i {
-            font-size: 48px;
-            color: var(--text-muted);
-            margin-bottom: 16px;
-            display: block;
-        }
-
-        .upload-title {
-            color: var(--text-primary);
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 8px;
-        }
-
-        .upload-subtitle {
-            color: var(--text-secondary);
-            font-size: 14px;
-            margin-bottom: 20px;
-        }
-
-        .btn-upload {
-            background: var(--accent-color);
-            color: var(--primary-bg);
-            border: none;
-            padding: 12px 24px;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.2s ease;
-        }
-
-        .btn-upload:hover {
-            background: #00b8d4;
-            transform: translateY(-2px);
-        }
-
         /* Responsive adjustments */
         @media (max-width: 1200px) {
             .data-table th,
@@ -549,12 +506,12 @@
                 min-height: 40px;
             }
 
-            .viewer-buttons {
+            .action-buttons {
                 flex-direction: column;
                 gap: 2px;
             }
 
-            .btn-viewer {
+            .btn-action {
                 font-size: 8px;
                 padding: 3px 6px;
             }
@@ -570,11 +527,11 @@
                     <i class="fas fa-hospital-symbol"></i> Noctis Pro PACS
                 </div>
                 <div class="nav-tabs">
-                    <div class="nav-tab active">WORKLIST</div>
+                    <div class="nav-tab" onclick="window.location.href='{% url 'worklist:dashboard' %}'">WORKLIST</div>
                     <div class="nav-tab" onclick="window.location.href='{% url 'worklist:studies' %}'">STUDIES</div>
                     <div class="nav-tab" onclick="window.location.href='{% url 'worklist:patients' %}'">PATIENTS</div>
                     <div class="nav-tab" onclick="window.location.href='{% url 'worklist:reports' %}'">REPORTS</div>
-                    <div class="nav-tab" onclick="window.location.href='{% url 'worklist:archive' %}'">ARCHIVE</div>
+                    <div class="nav-tab active">ARCHIVE</div>
                 </div>
             </div>
             <div class="nav-right">
@@ -600,19 +557,28 @@
         <!-- Controls Bar -->
         <div class="controls-bar">
             <div class="control-group">
-                <label class="control-label">Date:</label>
-                <input type="date" class="control-input" id="dateFilter" value="2024-01-15">
+                <label class="control-label">Date Range:</label>
+                <input type="date" class="control-input" id="startDate" value="2020-01-01">
+                <span style="color: var(--text-muted);">to</span>
+                <input type="date" class="control-input" id="endDate" value="2023-12-31">
+            </div>
+            <div class="control-group">
+                <label class="control-label">Storage:</label>
+                <select class="control-select" id="storageFilter">
+                    <option value="">All Storage</option>
+                    <option value="local">Local</option>
+                    <option value="cloud">Cloud</option>
+                    <option value="tape">Tape</option>
+                </select>
             </div>
             <div class="control-group">
                 <label class="control-label">Status:</label>
                 <select class="control-select" id="statusFilter">
                     <option value="">All Status</option>
-                    <option value="scheduled">Scheduled</option>
-                    <option value="urgent">Urgent</option>
-                    <option value="in-progress">In Progress</option>
-                    <option value="completed">Completed</option>
-                    <option value="pending">Pending</option>
-                    <option value="cancelled">Cancelled</option>
+                    <option value="archived">Archived</option>
+                    <option value="compressed">Compressed</option>
+                    <option value="backup">Backup</option>
+                    <option value="offline">Offline</option>
                 </select>
             </div>
             <div class="control-group">
@@ -626,22 +592,15 @@
                     <option value="NM">Nuclear Medicine</option>
                 </select>
             </div>
-            <div class="control-group">
-                <label class="control-label">Priority:</label>
-                <select class="control-select" id="priorityFilter">
-                    <option value="">All Priorities</option>
-                    <option value="urgent">Urgent</option>
-                    <option value="high">High</option>
-                    <option value="normal">Normal</option>
-                    <option value="low">Low</option>
-                </select>
-            </div>
             <button class="btn-control reset" onclick="resetFilters()">RESET</button>
-            <button class="btn-control" onclick="launchDicomViewer()">
-                <i class="fas fa-external-link-alt"></i> DICOM VIEWER
+            <button class="btn-control" onclick="refreshData()">
+                <i class="fas fa-sync-alt"></i> REFRESH
             </button>
-            <button class="btn-control" onclick="uploadStudies()">
-                <i class="fas fa-upload"></i> UPLOAD
+            <button class="btn-control" onclick="bulkRestore()">
+                <i class="fas fa-undo"></i> BULK RESTORE
+            </button>
+            <button class="btn-control" onclick="archiveSettings()">
+                <i class="fas fa-cog"></i> SETTINGS
             </button>
         </div>
 
@@ -651,27 +610,26 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th class="sortable">TIME</th>
-                            <th class="sortable">PATIENT ID</th>
-                            <th class="sortable">NAME</th>
-                            <th class="sortable">ACCESSION</th>
+                            <th class="sortable">ARCHIVE ID</th>
+                            <th class="sortable">STUDY ID</th>
+                            <th class="sortable">PATIENT NAME</th>
                             <th class="sortable">MODALITY</th>
                             <th class="sortable">STATUS</th>
-                            <th class="sortable">PRIORITY</th>
-                            <th class="sortable">SCHEDULED</th>
-                            <th class="sortable">DURATION</th>
-                            <th class="sortable">TECHNOLOGIST</th>
-                            <th class="sortable">ROOM</th>
-                            <th>DICOM VIEWER</th>
+                            <th class="sortable">STORAGE</th>
+                            <th class="sortable">ARCHIVE DATE</th>
+                            <th class="sortable">FILE SIZE</th>
+                            <th class="sortable">COMPRESSION</th>
+                            <th class="sortable">RETENTION</th>
+                            <th>ACTIONS</th>
                         </tr>
                     </thead>
-                    <tbody id="studiesTableBody">
-                        <!-- Studies will be dynamically loaded here -->
+                    <tbody id="archiveTableBody">
+                        <!-- Archive items will be dynamically loaded here -->
                         <tr id="noDataRow">
-                            <td colspan="12" style="text-align: center; padding: 40px; color: var(--text-muted);">
-                                <i class="fas fa-folder-open" style="font-size: 48px; opacity: 0.3; margin-bottom: 16px; display: block;"></i>
-                                <div style="font-size: 14px; margin-bottom: 8px;">No studies found</div>
-                                <div style="font-size: 12px;">Upload DICOM studies or check your filter settings</div>
+                            <td colspan="11" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                                <i class="fas fa-archive" style="font-size: 48px; opacity: 0.3; margin-bottom: 16px; display: block;"></i>
+                                <div style="font-size: 14px; margin-bottom: 8px;">No archived items found</div>
+                                <div style="font-size: 12px;">Check your filter settings or archive settings</div>
                             </td>
                         </tr>
                     </tbody>
@@ -682,15 +640,15 @@
         <!-- Footer Status Bar -->
         <div class="footer-status">
             <div class="status-left">
-                <span>Total Studies: <strong>247</strong></span>
-                <span>Urgent: <strong style="color: var(--urgent-color);">12</strong></span>
-                <span>In Progress: <strong style="color: var(--in-progress-color);">8</strong></span>
-                <span>Completed: <strong style="color: var(--completed-color);">189</strong></span>
+                <span>Total Archived: <strong>15,847</strong></span>
+                <span>Local Storage: <strong style="color: var(--completed-color);">8,234</strong></span>
+                <span>Cloud Storage: <strong style="color: var(--accent-color);">5,612</strong></span>
+                <span>Tape Storage: <strong style="color: var(--warning-color);">2,001</strong></span>
             </div>
             <div class="status-right">
                 <div class="connection-status">
                     <div class="connection-dot"></div>
-                    <span>DICOM Server Connected</span>
+                    <span>Archive System Connected</span>
                 </div>
                 <span>Last Update: <strong>14:32:15</strong></span>
                 <span>Auto-refresh: <strong>ON</strong></span>
@@ -700,31 +658,30 @@
 
     <script>
         // Data loading and management
-        let studiesData = [];
+        let archiveData = [];
         let filteredData = [];
 
-        // Load studies from uploaded DICOM data
-        async function loadStudiesData() {
+        // Load archive data
+        async function loadArchiveData() {
             try {
                 // In a real implementation, this would fetch from your backend API
-                // that processes uploaded DICOM folders and extracts study information
-                const response = await fetch('/api/studies/');
+                const response = await fetch('/api/archive/');
                 const data = await response.json();
                 
-                studiesData = data.studies || [];
-                filteredData = [...studiesData];
-                renderStudiesTable();
+                archiveData = data.archive || [];
+                filteredData = [...archiveData];
+                renderArchiveTable();
                 updateStatusCounts();
                 
             } catch (error) {
-                console.error('Error loading studies data:', error);
+                console.error('Error loading archive data:', error);
                 showNoDataMessage();
             }
         }
 
-        // Render studies table
-        function renderStudiesTable() {
-            const tbody = document.getElementById('studiesTableBody');
+        // Render archive table
+        function renderArchiveTable() {
+            const tbody = document.getElementById('archiveTableBody');
             const noDataRow = document.getElementById('noDataRow');
             
             if (filteredData.length === 0) {
@@ -738,25 +695,35 @@
                 noDataRow.remove();
             }
             
-            tbody.innerHTML = filteredData.map(study => `
-                <tr onclick="selectStudy(this)" data-study-id="${study.id}">
-                    <td class="timestamp">${formatTime(study.study_time)}</td>
-                    <td class="patient-id">${study.patient_id}</td>
-                    <td class="patient-name">${study.patient_name}</td>
-                    <td class="accession">${study.accession_number}</td>
-                    <td><span class="modality-badge modality-${study.modality.toLowerCase()}">${study.modality}</span></td>
-                    <td><span class="status-badge status-${study.status}">
-                        ${getStatusIcon(study.status)}${study.status.toUpperCase().replace('_', ' ')}
+            tbody.innerHTML = filteredData.map(item => `
+                <tr onclick="selectArchiveItem(this)" data-archive-id="${item.id}">
+                    <td class="archive-id">${item.archive_id}</td>
+                    <td class="study-id">${item.study_id}</td>
+                    <td class="patient-name">${item.patient_name}</td>
+                    <td>${item.modality}</td>
+                    <td><span class="status-badge status-${item.status}">
+                        ${getStatusIcon(item.status)}${item.status.toUpperCase()}
                     </span></td>
-                    <td class="priority-${study.priority}">${study.priority.toUpperCase()}</td>
-                    <td class="timestamp">${formatTime(study.scheduled_time)}</td>
-                    <td>${study.estimated_duration}</td>
-                    <td>${study.technologist || '-'}</td>
-                    <td>${study.room || '-'}</td>
+                    <td><span class="storage-badge storage-${item.storage_type}">
+                        ${getStorageIcon(item.storage_type)}${item.storage_type.toUpperCase()}
+                    </span></td>
+                    <td class="timestamp">${formatDate(item.archive_date)}</td>
+                    <td class="file-size">${formatFileSize(item.file_size)}</td>
+                    <td>${item.compression_ratio || 'N/A'}</td>
+                    <td class="timestamp">${formatDate(item.retention_date)}</td>
                     <td>
-                        <div class="viewer-buttons">
-                            <button class="btn-viewer" onclick="openStudyInViewer('${study.id}')" title="Open study in DICOM viewer">
-                                <i class="fas fa-eye"></i> VIEW
+                        <div class="action-buttons">
+                            <button class="btn-action restore" onclick="restoreItem('${item.id}')" title="Restore item">
+                                <i class="fas fa-undo"></i> RESTORE
+                            </button>
+                            <button class="btn-action download" onclick="downloadItem('${item.id}')" title="Download item">
+                                <i class="fas fa-download"></i> DL
+                            </button>
+                            <button class="btn-action verify" onclick="verifyItem('${item.id}')" title="Verify integrity">
+                                <i class="fas fa-check-circle"></i> VERIFY
+                            </button>
+                            <button class="btn-action delete" onclick="deleteItem('${item.id}')" title="Delete permanently">
+                                <i class="fas fa-trash"></i> DEL
                             </button>
                         </div>
                     </td>
@@ -765,99 +732,102 @@
         }
 
         // Utility functions
-        function formatTime(timeString) {
-            if (!timeString) return '-';
-            const date = new Date(timeString);
-            return date.toLocaleTimeString('en-US', { hour12: false, timeStyle: 'short' });
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        function formatFileSize(bytes) {
+            if (!bytes) return '0 B';
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
         }
 
         function getStatusIcon(status) {
             const icons = {
-                'urgent': '<i class="fas fa-exclamation-triangle"></i>',
-                'scheduled': '<i class="fas fa-clock"></i>',
-                'in-progress': '<i class="fas fa-play"></i>',
-                'completed': '<i class="fas fa-check"></i>',
-                'cancelled': '<i class="fas fa-times"></i>',
-                'pending': '<i class="fas fa-hourglass-half"></i>'
+                'archived': '<i class="fas fa-archive"></i>',
+                'compressed': '<i class="fas fa-compress"></i>',
+                'backup': '<i class="fas fa-copy"></i>',
+                'offline': '<i class="fas fa-power-off"></i>'
             };
             return icons[status] || '<i class="fas fa-circle"></i>';
         }
 
+        function getStorageIcon(storageType) {
+            const icons = {
+                'local': '<i class="fas fa-hdd"></i>',
+                'cloud': '<i class="fas fa-cloud"></i>',
+                'tape': '<i class="fas fa-cassette-tape"></i>'
+            };
+            return icons[storageType] || '<i class="fas fa-database"></i>';
+        }
+
         function updateStatusCounts() {
-            const counts = studiesData.reduce((acc, study) => {
+            const counts = archiveData.reduce((acc, item) => {
                 acc.total++;
-                acc[study.status] = (acc[study.status] || 0) + 1;
+                acc[item.storage_type] = (acc[item.storage_type] || 0) + 1;
                 return acc;
-            }, { total: 0, urgent: 0, 'in-progress': 0, completed: 0 });
+            }, { total: 0, local: 0, cloud: 0, tape: 0 });
             
             // Update footer status
             const statusElements = document.querySelectorAll('.status-left span strong');
             if (statusElements.length >= 4) {
                 statusElements[0].textContent = counts.total;
-                statusElements[1].textContent = counts.urgent || 0;
-                statusElements[2].textContent = counts['in-progress'] || 0;
-                statusElements[3].textContent = counts.completed || 0;
+                statusElements[1].textContent = counts.local || 0;
+                statusElements[2].textContent = counts.cloud || 0;
+                statusElements[3].textContent = counts.tape || 0;
             }
         }
 
         function showNoDataMessage() {
-            const tbody = document.getElementById('studiesTableBody');
+            const tbody = document.getElementById('archiveTableBody');
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="12" class="upload-area">
-                        <i class="fas fa-folder-open"></i>
-                        <div class="upload-title">No DICOM Studies Found</div>
-                        <div class="upload-subtitle">Upload DICOM folders to populate the worklist</div>
-                        <button class="btn-upload" onclick="uploadStudies()">
-                            <i class="fas fa-upload"></i> Upload DICOM Studies
-                        </button>
+                    <td colspan="11" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                        <i class="fas fa-archive"></i>
+                        <div style="font-size: 14px; margin-bottom: 8px;">No Archived Items Found</div>
+                        <div style="font-size: 12px;">Check your filter settings or archive settings</div>
                     </td>
                 </tr>
             `;
         }
 
-        // DICOM Viewer Functions
-        function openStudyInViewer(studyId) {
-            // In a real implementation, this would:
-            // 1. Get the study data and DICOM file paths
-            // 2. Launch the DICOM viewer with the study
-            // 3. Could use OHIF viewer, Cornerstone.js, or other DICOM viewers
-            
-            console.log('Opening study in DICOM viewer:', studyId);
-            
-            // Example: Open in a new window/tab with DICOM viewer
-            const viewerUrl = `/dicom-viewer/?study=${studyId}`;
-            window.open(viewerUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
-            
-            // Show notification
-            showNotification('Opening study in DICOM viewer...', 'info');
+        // Archive Functions
+        function restoreItem(itemId) {
+            console.log('Restoring item:', itemId);
+            showNotification('Item restoration started...', 'info');
         }
 
-        function launchDicomViewer() {
-            // Launch DICOM viewer without patient data - blank viewer
-            console.log('Launching blank DICOM viewer');
-            
-            const viewerUrl = '/dicom-viewer/';
-            window.open(viewerUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
-            
-            showNotification('Launching DICOM viewer...', 'info');
+        function downloadItem(itemId) {
+            console.log('Downloading item:', itemId);
+            showNotification('Item download started...', 'info');
         }
 
-        function uploadStudies() {
-            // In a real implementation, this would open a file upload dialog
-            // or redirect to an upload page that can handle DICOM folders
-            console.log('Opening DICOM upload interface');
-            
-            // For demonstration, show how this would work
-            showNotification('DICOM upload feature would be implemented here. This would allow uploading entire DICOM study folders.', 'info');
-            
-            // Example implementation could:
-            // 1. Open a file dialog that accepts folders
-            // 2. Process DICOM files and extract metadata
-            // 3. Store files and update the database
-            // 4. Refresh the worklist
-            
-            // window.location.href = '/upload-studies/';
+        function verifyItem(itemId) {
+            console.log('Verifying item:', itemId);
+            showNotification('Item integrity verification started...', 'info');
+        }
+
+        function deleteItem(itemId) {
+            if (confirm('Are you sure you want to permanently delete this archived item? This action cannot be undone.')) {
+                console.log('Deleting item:', itemId);
+                showNotification('Item deleted permanently', 'success');
+                loadArchiveData(); // Refresh data
+            }
+        }
+
+        function bulkRestore() {
+            console.log('Bulk restore functionality...');
+            showNotification('Bulk restore functionality would be implemented here', 'info');
+        }
+
+        function archiveSettings() {
+            console.log('Opening archive settings...');
+            const settingsUrl = `/archive/settings/`;
+            window.open(settingsUrl, '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
+            showNotification('Opening archive settings...', 'info');
         }
 
         // Notification system
@@ -906,7 +876,7 @@
             }, 5000);
         }
         
-        function selectStudy(row) {
+        function selectArchiveItem(row) {
             // Remove previous selection
             document.querySelectorAll('.data-table tbody tr').forEach(r => {
                 r.style.background = '';
@@ -915,20 +885,18 @@
             // Highlight selected row
             row.style.background = 'rgba(0, 212, 255, 0.15)';
             
-            // In a real app, this would open the study viewer
-            console.log('Selected study:', row.children[2].textContent);
+            console.log('Selected archive item:', row.children[2].textContent);
         }
 
         function resetFilters() {
-            document.getElementById('dateFilter').value = '2024-01-15';
+            document.getElementById('startDate').value = '2020-01-01';
+            document.getElementById('endDate').value = '2023-12-31';
+            document.getElementById('storageFilter').value = '';
             document.getElementById('statusFilter').value = '';
             document.getElementById('modalityFilter').value = '';
-            document.getElementById('priorityFilter').value = '';
             
-            // Show all rows
-            document.querySelectorAll('.data-table tbody tr').forEach(row => {
-                row.style.display = '';
-            });
+            filteredData = [...archiveData];
+            renderArchiveTable();
         }
 
         function refreshData() {
@@ -939,8 +907,8 @@
             icon.classList.add('fa-spin');
             btn.disabled = true;
             
-            // Reload studies data
-            loadStudiesData().then(() => {
+            // Reload archive data
+            loadArchiveData().then(() => {
                 icon.classList.remove('fa-spin');
                 btn.disabled = false;
                 
@@ -949,7 +917,7 @@
                 document.querySelector('.footer-status .status-right span:nth-last-child(2) strong').textContent = 
                     now.toLocaleTimeString('en-US', { hour12: false });
                 
-                showNotification('Worklist refreshed successfully', 'success');
+                showNotification('Archive refreshed successfully', 'success');
             }).catch(error => {
                 icon.classList.remove('fa-spin');
                 btn.disabled = false;
@@ -960,11 +928,11 @@
         // Initialize the application
         document.addEventListener('DOMContentLoaded', function() {
             // Load initial data
-            loadStudiesData();
+            loadArchiveData();
             
             // Set up auto-refresh
             setInterval(() => {
-                loadStudiesData();
+                loadArchiveData();
                 const now = new Date();
                 document.querySelector('.footer-status .status-right span:nth-last-child(2) strong').textContent = 
                     now.toLocaleTimeString('en-US', { hour12: false });
@@ -972,33 +940,36 @@
         });
 
         // Filter functionality
+        document.getElementById('storageFilter').addEventListener('change', applyFilters);
         document.getElementById('statusFilter').addEventListener('change', applyFilters);
         document.getElementById('modalityFilter').addEventListener('change', applyFilters);
-        document.getElementById('priorityFilter').addEventListener('change', applyFilters);
-        document.getElementById('dateFilter').addEventListener('change', applyFilters);
+        document.getElementById('startDate').addEventListener('change', applyFilters);
+        document.getElementById('endDate').addEventListener('change', applyFilters);
 
         function applyFilters() {
+            const storageFilter = document.getElementById('storageFilter').value.toLowerCase();
             const statusFilter = document.getElementById('statusFilter').value.toLowerCase();
             const modalityFilter = document.getElementById('modalityFilter').value.toLowerCase();
-            const priorityFilter = document.getElementById('priorityFilter').value.toLowerCase();
-            const dateFilter = document.getElementById('dateFilter').value;
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
             
-            filteredData = studiesData.filter(study => {
-                const matchesStatus = !statusFilter || study.status.toLowerCase().includes(statusFilter);
-                const matchesModality = !modalityFilter || study.modality.toLowerCase().includes(modalityFilter);
-                const matchesPriority = !priorityFilter || study.priority.toLowerCase().includes(priorityFilter);
+            filteredData = archiveData.filter(item => {
+                const matchesStorage = !storageFilter || item.storage_type.toLowerCase().includes(storageFilter);
+                const matchesStatus = !statusFilter || item.status.toLowerCase().includes(statusFilter);
+                const matchesModality = !modalityFilter || item.modality.toLowerCase().includes(modalityFilter);
                 
                 let matchesDate = true;
-                if (dateFilter) {
-                    const studyDate = new Date(study.study_date).toDateString();
-                    const filterDate = new Date(dateFilter).toDateString();
-                    matchesDate = studyDate === filterDate;
+                if (startDate && endDate) {
+                    const archiveDate = new Date(item.archive_date);
+                    const start = new Date(startDate);
+                    const end = new Date(endDate);
+                    matchesDate = archiveDate >= start && archiveDate <= end;
                 }
                 
-                return matchesStatus && matchesModality && matchesPriority && matchesDate;
+                return matchesStorage && matchesStatus && matchesModality && matchesDate;
             });
             
-            renderStudiesTable();
+            renderArchiveTable();
         }
     </script>
 </body>

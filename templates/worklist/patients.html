@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Noctis Pro PACS - Worklist Dashboard</title>
+    <title>Noctis Pro PACS - Patient Management</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -298,7 +298,7 @@
         }
 
         /* Data Styling */
-        .patient-id, .study-id, .accession {
+        .patient-id, .mrn {
             font-family: 'Courier New', monospace;
             font-weight: bold;
             color: var(--accent-color);
@@ -315,6 +315,44 @@
             font-size: 10px;
         }
 
+        .age {
+            font-family: 'Courier New', monospace;
+            color: var(--text-secondary);
+            font-size: 10px;
+        }
+
+        /* Gender Badges */
+        .gender-badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 9px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .gender-m {
+            background: rgba(0, 212, 255, 0.2);
+            color: var(--accent-color);
+            border: 1px solid var(--accent-color);
+        }
+
+        .gender-f {
+            background: rgba(255, 0, 102, 0.2);
+            color: var(--urgent-color);
+            border: 1px solid var(--urgent-color);
+        }
+
+        .gender-o {
+            background: rgba(255, 170, 0, 0.2);
+            color: var(--warning-color);
+            border: 1px solid var(--warning-color);
+        }
+
+        /* Study Count Badge */
         .study-count {
             background: var(--accent-color);
             color: var(--primary-bg);
@@ -327,93 +365,61 @@
             text-align: center;
         }
 
-        /* Status Badges */
-        .status-badge {
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 9px;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            display: inline-flex;
-            align-items: center;
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
             gap: 4px;
+            align-items: center;
         }
 
-        .status-scheduled {
-            background: rgba(74, 144, 226, 0.2);
-            color: var(--scheduled-color);
-            border: 1px solid var(--scheduled-color);
-        }
-
-        .status-urgent {
-            background: rgba(255, 0, 102, 0.2);
-            color: var(--urgent-color);
-            border: 1px solid var(--urgent-color);
-            animation: pulse 2s infinite;
-        }
-
-        .status-in-progress {
-            background: rgba(245, 166, 35, 0.2);
-            color: var(--in-progress-color);
-            border: 1px solid var(--in-progress-color);
-        }
-
-        .status-completed {
-            background: rgba(126, 211, 33, 0.2);
-            color: var(--completed-color);
-            border: 1px solid var(--completed-color);
-        }
-
-        .status-cancelled {
-            background: rgba(208, 2, 27, 0.2);
-            color: var(--cancelled-color);
-            border: 1px solid var(--cancelled-color);
-        }
-
-        .status-pending {
-            background: rgba(255, 170, 0, 0.2);
-            color: var(--warning-color);
-            border: 1px solid var(--warning-color);
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-        }
-
-        /* Priority Indicators */
-        .priority-urgent { 
-            color: var(--urgent-color); 
-            font-weight: bold;
-        }
-        .priority-high { 
-            color: var(--warning-color); 
-            font-weight: bold;
-        }
-        .priority-normal { 
-            color: var(--success-color);
-        }
-        .priority-low { 
-            color: var(--text-muted);
-        }
-
-        /* Modality Badges */
-        .modality-badge {
+        .btn-action {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
             color: var(--text-primary);
-            padding: 2px 6px;
-            border-radius: 4px;
+            padding: 4px 8px;
+            border-radius: 3px;
             font-size: 9px;
             font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        .modality-ct { border-color: #4a90e2; color: #4a90e2; }
-        .modality-mri { border-color: #7b68ee; color: #7b68ee; }
-        .modality-xr { border-color: #50c878; color: #50c878; }
-        .modality-us { border-color: #ffa500; color: #ffa500; }
-        .modality-nm { border-color: #ff6347; color: #ff6347; }
+        .btn-action:hover {
+            background: var(--text-secondary);
+            color: var(--primary-bg);
+        }
+
+        .btn-action.view {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+            border-color: var(--accent-color);
+        }
+
+        .btn-action.view:hover {
+            background: #00b8d4;
+        }
+
+        .btn-action.edit {
+            background: var(--warning-color);
+            color: var(--primary-bg);
+            border-color: var(--warning-color);
+        }
+
+        .btn-action.edit:hover {
+            background: #e69500;
+        }
+
+        .btn-action.studies {
+            background: var(--success-color);
+            color: var(--primary-bg);
+            border-color: var(--success-color);
+        }
+
+        .btn-action.studies:hover {
+            background: #00cc6a;
+        }
 
         /* Footer Status Bar */
         .footer-status {
@@ -452,89 +458,6 @@
             background: var(--success-color);
         }
 
-        /* DICOM Viewer Buttons */
-        .viewer-buttons {
-            display: flex;
-            gap: 4px;
-            align-items: center;
-        }
-
-        .btn-viewer {
-            background: var(--accent-color);
-            border: none;
-            color: var(--primary-bg);
-            padding: 4px 8px;
-            border-radius: 3px;
-            font-size: 9px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .btn-viewer:hover {
-            background: #00b8d4;
-            transform: scale(1.05);
-        }
-
-        .btn-viewer.viewer-only {
-            background: var(--card-bg);
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-        }
-
-        .btn-viewer.viewer-only:hover {
-            background: var(--text-secondary);
-            color: var(--primary-bg);
-        }
-
-        .upload-area {
-            text-align: center;
-            padding: 60px 20px;
-            background: var(--secondary-bg);
-            border: 2px dashed var(--border-color);
-            border-radius: 8px;
-            margin: 20px;
-        }
-
-        .upload-area i {
-            font-size: 48px;
-            color: var(--text-muted);
-            margin-bottom: 16px;
-            display: block;
-        }
-
-        .upload-title {
-            color: var(--text-primary);
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 8px;
-        }
-
-        .upload-subtitle {
-            color: var(--text-secondary);
-            font-size: 14px;
-            margin-bottom: 20px;
-        }
-
-        .btn-upload {
-            background: var(--accent-color);
-            color: var(--primary-bg);
-            border: none;
-            padding: 12px 24px;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.2s ease;
-        }
-
-        .btn-upload:hover {
-            background: #00b8d4;
-            transform: translateY(-2px);
-        }
-
         /* Responsive adjustments */
         @media (max-width: 1200px) {
             .data-table th,
@@ -549,12 +472,12 @@
                 min-height: 40px;
             }
 
-            .viewer-buttons {
+            .action-buttons {
                 flex-direction: column;
                 gap: 2px;
             }
 
-            .btn-viewer {
+            .btn-action {
                 font-size: 8px;
                 padding: 3px 6px;
             }
@@ -570,9 +493,9 @@
                     <i class="fas fa-hospital-symbol"></i> Noctis Pro PACS
                 </div>
                 <div class="nav-tabs">
-                    <div class="nav-tab active">WORKLIST</div>
+                    <div class="nav-tab" onclick="window.location.href='{% url 'worklist:dashboard' %}'">WORKLIST</div>
                     <div class="nav-tab" onclick="window.location.href='{% url 'worklist:studies' %}'">STUDIES</div>
-                    <div class="nav-tab" onclick="window.location.href='{% url 'worklist:patients' %}'">PATIENTS</div>
+                    <div class="nav-tab active">PATIENTS</div>
                     <div class="nav-tab" onclick="window.location.href='{% url 'worklist:reports' %}'">REPORTS</div>
                     <div class="nav-tab" onclick="window.location.href='{% url 'worklist:archive' %}'">ARCHIVE</div>
                 </div>
@@ -600,48 +523,43 @@
         <!-- Controls Bar -->
         <div class="controls-bar">
             <div class="control-group">
-                <label class="control-label">Date:</label>
-                <input type="date" class="control-input" id="dateFilter" value="2024-01-15">
+                <label class="control-label">Search:</label>
+                <input type="text" class="control-input" id="searchInput" placeholder="Patient name, ID, or MRN...">
             </div>
             <div class="control-group">
-                <label class="control-label">Status:</label>
-                <select class="control-select" id="statusFilter">
-                    <option value="">All Status</option>
-                    <option value="scheduled">Scheduled</option>
-                    <option value="urgent">Urgent</option>
-                    <option value="in-progress">In Progress</option>
-                    <option value="completed">Completed</option>
-                    <option value="pending">Pending</option>
-                    <option value="cancelled">Cancelled</option>
+                <label class="control-label">Gender:</label>
+                <select class="control-select" id="genderFilter">
+                    <option value="">All Genders</option>
+                    <option value="M">Male</option>
+                    <option value="F">Female</option>
+                    <option value="O">Other</option>
                 </select>
             </div>
             <div class="control-group">
-                <label class="control-label">Modality:</label>
-                <select class="control-select" id="modalityFilter">
-                    <option value="">All Modalities</option>
-                    <option value="CT">CT</option>
-                    <option value="MRI">MRI</option>
-                    <option value="XR">X-Ray</option>
-                    <option value="US">Ultrasound</option>
-                    <option value="NM">Nuclear Medicine</option>
-                </select>
+                <label class="control-label">Age Range:</label>
+                <input type="number" class="control-input" id="minAge" placeholder="Min" style="width: 60px;">
+                <span style="color: var(--text-muted);">-</span>
+                <input type="number" class="control-input" id="maxAge" placeholder="Max" style="width: 60px;">
             </div>
             <div class="control-group">
-                <label class="control-label">Priority:</label>
-                <select class="control-select" id="priorityFilter">
-                    <option value="">All Priorities</option>
-                    <option value="urgent">Urgent</option>
-                    <option value="high">High</option>
-                    <option value="normal">Normal</option>
-                    <option value="low">Low</option>
+                <label class="control-label">Last Study:</label>
+                <select class="control-select" id="lastStudyFilter">
+                    <option value="">Any Time</option>
+                    <option value="7">Last 7 days</option>
+                    <option value="30">Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                    <option value="365">Last year</option>
                 </select>
             </div>
             <button class="btn-control reset" onclick="resetFilters()">RESET</button>
-            <button class="btn-control" onclick="launchDicomViewer()">
-                <i class="fas fa-external-link-alt"></i> DICOM VIEWER
+            <button class="btn-control" onclick="refreshData()">
+                <i class="fas fa-sync-alt"></i> REFRESH
             </button>
-            <button class="btn-control" onclick="uploadStudies()">
-                <i class="fas fa-upload"></i> UPLOAD
+            <button class="btn-control" onclick="exportPatients()">
+                <i class="fas fa-download"></i> EXPORT
+            </button>
+            <button class="btn-control" onclick="addPatient()">
+                <i class="fas fa-plus"></i> ADD PATIENT
             </button>
         </div>
 
@@ -651,27 +569,26 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th class="sortable">TIME</th>
                             <th class="sortable">PATIENT ID</th>
+                            <th class="sortable">MRN</th>
                             <th class="sortable">NAME</th>
-                            <th class="sortable">ACCESSION</th>
-                            <th class="sortable">MODALITY</th>
-                            <th class="sortable">STATUS</th>
-                            <th class="sortable">PRIORITY</th>
-                            <th class="sortable">SCHEDULED</th>
-                            <th class="sortable">DURATION</th>
-                            <th class="sortable">TECHNOLOGIST</th>
-                            <th class="sortable">ROOM</th>
-                            <th>DICOM VIEWER</th>
+                            <th class="sortable">AGE</th>
+                            <th class="sortable">GENDER</th>
+                            <th class="sortable">DATE OF BIRTH</th>
+                            <th class="sortable">STUDIES</th>
+                            <th class="sortable">LAST STUDY</th>
+                            <th class="sortable">PHONE</th>
+                            <th class="sortable">EMAIL</th>
+                            <th>ACTIONS</th>
                         </tr>
                     </thead>
-                    <tbody id="studiesTableBody">
-                        <!-- Studies will be dynamically loaded here -->
+                    <tbody id="patientsTableBody">
+                        <!-- Patients will be dynamically loaded here -->
                         <tr id="noDataRow">
-                            <td colspan="12" style="text-align: center; padding: 40px; color: var(--text-muted);">
-                                <i class="fas fa-folder-open" style="font-size: 48px; opacity: 0.3; margin-bottom: 16px; display: block;"></i>
-                                <div style="font-size: 14px; margin-bottom: 8px;">No studies found</div>
-                                <div style="font-size: 12px;">Upload DICOM studies or check your filter settings</div>
+                            <td colspan="11" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                                <i class="fas fa-users" style="font-size: 48px; opacity: 0.3; margin-bottom: 16px; display: block;"></i>
+                                <div style="font-size: 14px; margin-bottom: 8px;">No patients found</div>
+                                <div style="font-size: 12px;">Add patients or check your filter settings</div>
                             </td>
                         </tr>
                     </tbody>
@@ -682,15 +599,15 @@
         <!-- Footer Status Bar -->
         <div class="footer-status">
             <div class="status-left">
-                <span>Total Studies: <strong>247</strong></span>
-                <span>Urgent: <strong style="color: var(--urgent-color);">12</strong></span>
-                <span>In Progress: <strong style="color: var(--in-progress-color);">8</strong></span>
-                <span>Completed: <strong style="color: var(--completed-color);">189</strong></span>
+                <span>Total Patients: <strong>847</strong></span>
+                <span>Active Patients: <strong style="color: var(--completed-color);">723</strong></span>
+                <span>New This Month: <strong style="color: var(--accent-color);">45</strong></span>
+                <span>Total Studies: <strong style="color: var(--success-color);">1,247</strong></span>
             </div>
             <div class="status-right">
                 <div class="connection-status">
                     <div class="connection-dot"></div>
-                    <span>DICOM Server Connected</span>
+                    <span>Database Connected</span>
                 </div>
                 <span>Last Update: <strong>14:32:15</strong></span>
                 <span>Auto-refresh: <strong>ON</strong></span>
@@ -700,31 +617,30 @@
 
     <script>
         // Data loading and management
-        let studiesData = [];
+        let patientsData = [];
         let filteredData = [];
 
-        // Load studies from uploaded DICOM data
-        async function loadStudiesData() {
+        // Load patients data
+        async function loadPatientsData() {
             try {
                 // In a real implementation, this would fetch from your backend API
-                // that processes uploaded DICOM folders and extracts study information
-                const response = await fetch('/api/studies/');
+                const response = await fetch('/api/patients/');
                 const data = await response.json();
                 
-                studiesData = data.studies || [];
-                filteredData = [...studiesData];
-                renderStudiesTable();
+                patientsData = data.patients || [];
+                filteredData = [...patientsData];
+                renderPatientsTable();
                 updateStatusCounts();
                 
             } catch (error) {
-                console.error('Error loading studies data:', error);
+                console.error('Error loading patients data:', error);
                 showNoDataMessage();
             }
         }
 
-        // Render studies table
-        function renderStudiesTable() {
-            const tbody = document.getElementById('studiesTableBody');
+        // Render patients table
+        function renderPatientsTable() {
+            const tbody = document.getElementById('patientsTableBody');
             const noDataRow = document.getElementById('noDataRow');
             
             if (filteredData.length === 0) {
@@ -738,25 +654,30 @@
                 noDataRow.remove();
             }
             
-            tbody.innerHTML = filteredData.map(study => `
-                <tr onclick="selectStudy(this)" data-study-id="${study.id}">
-                    <td class="timestamp">${formatTime(study.study_time)}</td>
-                    <td class="patient-id">${study.patient_id}</td>
-                    <td class="patient-name">${study.patient_name}</td>
-                    <td class="accession">${study.accession_number}</td>
-                    <td><span class="modality-badge modality-${study.modality.toLowerCase()}">${study.modality}</span></td>
-                    <td><span class="status-badge status-${study.status}">
-                        ${getStatusIcon(study.status)}${study.status.toUpperCase().replace('_', ' ')}
+            tbody.innerHTML = filteredData.map(patient => `
+                <tr onclick="selectPatient(this)" data-patient-id="${patient.id}">
+                    <td class="patient-id">${patient.patient_id}</td>
+                    <td class="mrn">${patient.mrn || '-'}</td>
+                    <td class="patient-name">${patient.full_name}</td>
+                    <td class="age">${patient.age} years</td>
+                    <td><span class="gender-badge gender-${patient.gender.toLowerCase()}">
+                        ${getGenderIcon(patient.gender)}${patient.gender}
                     </span></td>
-                    <td class="priority-${study.priority}">${study.priority.toUpperCase()}</td>
-                    <td class="timestamp">${formatTime(study.scheduled_time)}</td>
-                    <td>${study.estimated_duration}</td>
-                    <td>${study.technologist || '-'}</td>
-                    <td>${study.room || '-'}</td>
+                    <td class="timestamp">${formatDate(patient.date_of_birth)}</td>
+                    <td><span class="study-count">${patient.study_count || 0}</span></td>
+                    <td class="timestamp">${formatDate(patient.last_study_date) || '-'}</td>
+                    <td>${patient.phone || '-'}</td>
+                    <td>${patient.email || '-'}</td>
                     <td>
-                        <div class="viewer-buttons">
-                            <button class="btn-viewer" onclick="openStudyInViewer('${study.id}')" title="Open study in DICOM viewer">
+                        <div class="action-buttons">
+                            <button class="btn-action view" onclick="viewPatient('${patient.id}')" title="View patient">
                                 <i class="fas fa-eye"></i> VIEW
+                            </button>
+                            <button class="btn-action edit" onclick="editPatient('${patient.id}')" title="Edit patient">
+                                <i class="fas fa-edit"></i> EDIT
+                            </button>
+                            <button class="btn-action studies" onclick="viewPatientStudies('${patient.id}')" title="View studies">
+                                <i class="fas fa-clipboard-list"></i> STUDIES
                             </button>
                         </div>
                     </td>
@@ -765,99 +686,75 @@
         }
 
         // Utility functions
-        function formatTime(timeString) {
-            if (!timeString) return '-';
-            const date = new Date(timeString);
-            return date.toLocaleTimeString('en-US', { hour12: false, timeStyle: 'short' });
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         }
 
-        function getStatusIcon(status) {
+        function getGenderIcon(gender) {
             const icons = {
-                'urgent': '<i class="fas fa-exclamation-triangle"></i>',
-                'scheduled': '<i class="fas fa-clock"></i>',
-                'in-progress': '<i class="fas fa-play"></i>',
-                'completed': '<i class="fas fa-check"></i>',
-                'cancelled': '<i class="fas fa-times"></i>',
-                'pending': '<i class="fas fa-hourglass-half"></i>'
+                'M': '<i class="fas fa-mars"></i>',
+                'F': '<i class="fas fa-venus"></i>',
+                'O': '<i class="fas fa-genderless"></i>'
             };
-            return icons[status] || '<i class="fas fa-circle"></i>';
+            return icons[gender] || '<i class="fas fa-user"></i>';
         }
 
         function updateStatusCounts() {
-            const counts = studiesData.reduce((acc, study) => {
+            const counts = patientsData.reduce((acc, patient) => {
                 acc.total++;
-                acc[study.status] = (acc[study.status] || 0) + 1;
+                if (patient.study_count > 0) acc.active++;
                 return acc;
-            }, { total: 0, urgent: 0, 'in-progress': 0, completed: 0 });
+            }, { total: 0, active: 0 });
             
             // Update footer status
             const statusElements = document.querySelectorAll('.status-left span strong');
-            if (statusElements.length >= 4) {
+            if (statusElements.length >= 2) {
                 statusElements[0].textContent = counts.total;
-                statusElements[1].textContent = counts.urgent || 0;
-                statusElements[2].textContent = counts['in-progress'] || 0;
-                statusElements[3].textContent = counts.completed || 0;
+                statusElements[1].textContent = counts.active;
             }
         }
 
         function showNoDataMessage() {
-            const tbody = document.getElementById('studiesTableBody');
+            const tbody = document.getElementById('patientsTableBody');
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="12" class="upload-area">
-                        <i class="fas fa-folder-open"></i>
-                        <div class="upload-title">No DICOM Studies Found</div>
-                        <div class="upload-subtitle">Upload DICOM folders to populate the worklist</div>
-                        <button class="btn-upload" onclick="uploadStudies()">
-                            <i class="fas fa-upload"></i> Upload DICOM Studies
-                        </button>
+                    <td colspan="11" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                        <i class="fas fa-users"></i>
+                        <div style="font-size: 14px; margin-bottom: 8px;">No Patients Found</div>
+                        <div style="font-size: 12px;">Add patients or check your filter settings</div>
                     </td>
                 </tr>
             `;
         }
 
-        // DICOM Viewer Functions
-        function openStudyInViewer(studyId) {
-            // In a real implementation, this would:
-            // 1. Get the study data and DICOM file paths
-            // 2. Launch the DICOM viewer with the study
-            // 3. Could use OHIF viewer, Cornerstone.js, or other DICOM viewers
-            
-            console.log('Opening study in DICOM viewer:', studyId);
-            
-            // Example: Open in a new window/tab with DICOM viewer
-            const viewerUrl = `/dicom-viewer/?study=${studyId}`;
-            window.open(viewerUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
-            
-            // Show notification
-            showNotification('Opening study in DICOM viewer...', 'info');
+        // Patient Functions
+        function viewPatient(patientId) {
+            console.log('Viewing patient:', patientId);
+            showNotification('Patient view functionality would be implemented here', 'info');
         }
 
-        function launchDicomViewer() {
-            // Launch DICOM viewer without patient data - blank viewer
-            console.log('Launching blank DICOM viewer');
-            
-            const viewerUrl = '/dicom-viewer/';
-            window.open(viewerUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
-            
-            showNotification('Launching DICOM viewer...', 'info');
+        function editPatient(patientId) {
+            console.log('Editing patient:', patientId);
+            showNotification('Patient edit functionality would be implemented here', 'info');
         }
 
-        function uploadStudies() {
-            // In a real implementation, this would open a file upload dialog
-            // or redirect to an upload page that can handle DICOM folders
-            console.log('Opening DICOM upload interface');
-            
-            // For demonstration, show how this would work
-            showNotification('DICOM upload feature would be implemented here. This would allow uploading entire DICOM study folders.', 'info');
-            
-            // Example implementation could:
-            // 1. Open a file dialog that accepts folders
-            // 2. Process DICOM files and extract metadata
-            // 3. Store files and update the database
-            // 4. Refresh the worklist
-            
-            // window.location.href = '/upload-studies/';
+        function viewPatientStudies(patientId) {
+            console.log('Viewing patient studies:', patientId);
+            const studiesUrl = `/studies/?patient=${patientId}`;
+            window.open(studiesUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+            showNotification('Opening patient studies...', 'info');
+        }
+
+        function addPatient() {
+            console.log('Adding new patient...');
+            showNotification('Add patient functionality would be implemented here', 'info');
+        }
+
+        function exportPatients() {
+            console.log('Exporting patients...');
+            showNotification('Patient export functionality would be implemented here', 'info');
         }
 
         // Notification system
@@ -906,7 +803,7 @@
             }, 5000);
         }
         
-        function selectStudy(row) {
+        function selectPatient(row) {
             // Remove previous selection
             document.querySelectorAll('.data-table tbody tr').forEach(r => {
                 r.style.background = '';
@@ -915,20 +812,18 @@
             // Highlight selected row
             row.style.background = 'rgba(0, 212, 255, 0.15)';
             
-            // In a real app, this would open the study viewer
-            console.log('Selected study:', row.children[2].textContent);
+            console.log('Selected patient:', row.children[2].textContent);
         }
 
         function resetFilters() {
-            document.getElementById('dateFilter').value = '2024-01-15';
-            document.getElementById('statusFilter').value = '';
-            document.getElementById('modalityFilter').value = '';
-            document.getElementById('priorityFilter').value = '';
+            document.getElementById('searchInput').value = '';
+            document.getElementById('genderFilter').value = '';
+            document.getElementById('minAge').value = '';
+            document.getElementById('maxAge').value = '';
+            document.getElementById('lastStudyFilter').value = '';
             
-            // Show all rows
-            document.querySelectorAll('.data-table tbody tr').forEach(row => {
-                row.style.display = '';
-            });
+            filteredData = [...patientsData];
+            renderPatientsTable();
         }
 
         function refreshData() {
@@ -939,8 +834,8 @@
             icon.classList.add('fa-spin');
             btn.disabled = true;
             
-            // Reload studies data
-            loadStudiesData().then(() => {
+            // Reload patients data
+            loadPatientsData().then(() => {
                 icon.classList.remove('fa-spin');
                 btn.disabled = false;
                 
@@ -949,7 +844,7 @@
                 document.querySelector('.footer-status .status-right span:nth-last-child(2) strong').textContent = 
                     now.toLocaleTimeString('en-US', { hour12: false });
                 
-                showNotification('Worklist refreshed successfully', 'success');
+                showNotification('Patients refreshed successfully', 'success');
             }).catch(error => {
                 icon.classList.remove('fa-spin');
                 btn.disabled = false;
@@ -960,11 +855,11 @@
         // Initialize the application
         document.addEventListener('DOMContentLoaded', function() {
             // Load initial data
-            loadStudiesData();
+            loadPatientsData();
             
             // Set up auto-refresh
             setInterval(() => {
-                loadStudiesData();
+                loadPatientsData();
                 const now = new Date();
                 document.querySelector('.footer-status .status-right span:nth-last-child(2) strong').textContent = 
                     now.toLocaleTimeString('en-US', { hour12: false });
@@ -972,33 +867,43 @@
         });
 
         // Filter functionality
-        document.getElementById('statusFilter').addEventListener('change', applyFilters);
-        document.getElementById('modalityFilter').addEventListener('change', applyFilters);
-        document.getElementById('priorityFilter').addEventListener('change', applyFilters);
-        document.getElementById('dateFilter').addEventListener('change', applyFilters);
+        document.getElementById('searchInput').addEventListener('input', applyFilters);
+        document.getElementById('genderFilter').addEventListener('change', applyFilters);
+        document.getElementById('minAge').addEventListener('input', applyFilters);
+        document.getElementById('maxAge').addEventListener('input', applyFilters);
+        document.getElementById('lastStudyFilter').addEventListener('change', applyFilters);
 
         function applyFilters() {
-            const statusFilter = document.getElementById('statusFilter').value.toLowerCase();
-            const modalityFilter = document.getElementById('modalityFilter').value.toLowerCase();
-            const priorityFilter = document.getElementById('priorityFilter').value.toLowerCase();
-            const dateFilter = document.getElementById('dateFilter').value;
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const genderFilter = document.getElementById('genderFilter').value;
+            const minAge = document.getElementById('minAge').value;
+            const maxAge = document.getElementById('maxAge').value;
+            const lastStudyFilter = document.getElementById('lastStudyFilter').value;
             
-            filteredData = studiesData.filter(study => {
-                const matchesStatus = !statusFilter || study.status.toLowerCase().includes(statusFilter);
-                const matchesModality = !modalityFilter || study.modality.toLowerCase().includes(modalityFilter);
-                const matchesPriority = !priorityFilter || study.priority.toLowerCase().includes(priorityFilter);
+            filteredData = patientsData.filter(patient => {
+                const matchesSearch = !searchTerm || 
+                    patient.full_name.toLowerCase().includes(searchTerm) ||
+                    patient.patient_id.toLowerCase().includes(searchTerm) ||
+                    (patient.mrn && patient.mrn.toLowerCase().includes(searchTerm));
                 
-                let matchesDate = true;
-                if (dateFilter) {
-                    const studyDate = new Date(study.study_date).toDateString();
-                    const filterDate = new Date(dateFilter).toDateString();
-                    matchesDate = studyDate === filterDate;
+                const matchesGender = !genderFilter || patient.gender === genderFilter;
+                
+                let matchesAge = true;
+                if (minAge && patient.age < parseInt(minAge)) matchesAge = false;
+                if (maxAge && patient.age > parseInt(maxAge)) matchesAge = false;
+                
+                let matchesLastStudy = true;
+                if (lastStudyFilter && patient.last_study_date) {
+                    const lastStudyDate = new Date(patient.last_study_date);
+                    const cutoffDate = new Date();
+                    cutoffDate.setDate(cutoffDate.getDate() - parseInt(lastStudyFilter));
+                    matchesLastStudy = lastStudyDate >= cutoffDate;
                 }
                 
-                return matchesStatus && matchesModality && matchesPriority && matchesDate;
+                return matchesSearch && matchesGender && matchesAge && matchesLastStudy;
             });
             
-            renderStudiesTable();
+            renderPatientsTable();
         }
     </script>
 </body>
