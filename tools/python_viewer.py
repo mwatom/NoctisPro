@@ -11,6 +11,9 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from io import BytesIO
+import requests
+from PIL import Image as PILImage
 
 
 class DicomCanvas(FigureCanvas):
@@ -98,6 +101,16 @@ class DicomViewer(QMainWindow):
         self._cached_image_data = None
         self._cached_image_params = (None, None, None, None)
 
+        # Backend mode (web API parity)
+        self.backend_mode = False
+        self.base_url = os.environ.get('DICOM_VIEWER_BASE_URL', 'http://127.0.0.1:8000/viewer')
+        if self.base_url.endswith('/'):
+            self.base_url = self.base_url[:-1]
+        self.backend_study = None
+        self.backend_series = None
+        self.backend_images = []  # list of dicts with id, etc.
+        self.series_options = []  # list of (label, id)
+
         self.init_ui()
 
     def init_ui(self):
@@ -177,7 +190,7 @@ class DicomViewer(QMainWindow):
         top_layout.addWidget(load_btn)
 
         self.backend_combo = QComboBox()
-        self.backend_combo.addItem("Select DICOM from System")
+        self.backend_combo.addItem("Select Series")
         self.backend_combo.setStyleSheet("padding: 6px; border-radius: 4px; font-size: 14px;")
         self.backend_combo.currentTextChanged.connect(self.handle_backend_study_select)
         top_layout.addWidget(self.backend_combo)
@@ -500,10 +513,81 @@ class DicomViewer(QMainWindow):
         self.zoom_slider.setValue(zoom_percent)
         self.update_display()
 
-    def handle_backend_study_select(self, filename):
-        if filename == "Select DICOM from System" or not filename:
+    def handle_backend_study_select(self, text):
+        if not self.backend_mode:
             return
-        QMessageBox.information(self, "Backend Study", f"Backend study selection: {filename}\n(Feature not implemented)")
+        if not text or text == "Select Series":
+            return
+        # map to id
+        for label, sid in self.series_options:
+            if label == text:
+                try:
+                    self._load_backend_series(sid)
+                except Exception as e:
+                    QMessageBox.warning(self, "Error", f"Failed to load series: {str(e)}")
+                return
+
+    # Backend integration methods
+    def _fetch_json(self, path: str):
+        url = f"{self.base_url}{path}"
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def _fetch_png_as_array(self, url: str):
+        r = requests.get(url, timeout=15)
+        r.raise_for_status()
+        img = PILImage.open(BytesIO(r.content)).convert('L')
+        return np.array(img)
+
+    def load_backend_study(self, study_id: int):
+        try:
+            self.backend_mode = True
+            data = self._fetch_json(f"/study/{study_id}/")
+            self.backend_study = data.get('study')
+            series_list = data.get('series_list') or []
+            # Fill combo with series
+            self.series_options = []
+            self.backend_combo.blockSignals(True)
+            self.backend_combo.clear()
+            self.backend_combo.addItem("Select Series")
+            for s in series_list:
+                label = f"Series {s.get('series_number')} - {s.get('modality')} ({s.get('image_count')} images)"
+                self.series_options.append((label, s.get('id')))
+                self.backend_combo.addItem(label)
+            self.backend_combo.blockSignals(False)
+            # Patient info
+            if self.backend_study:
+                self.patient_info_label.setText(f"Patient: {self.backend_study.get('patient_name','-')} | Study Date: {self.backend_study.get('study_date','-')} | Modality: {self.backend_study.get('modality','-')}")
+            # Auto-load first series
+            if self.series_options:
+                self.backend_combo.setCurrentText(self.series_options[0][0])
+                self._load_backend_series(self.series_options[0][1])
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Failed to load study {study_id}: {str(e)}")
+
+    def _load_backend_series(self, series_id: int):
+        data = self._fetch_json(f"/series/{series_id}/images/")
+        self.backend_series = data.get('series')
+        self.backend_images = data.get('images') or []
+        self.current_image_index = 0
+        if hasattr(self, 'slice_slider'):
+            self.slice_slider.setRange(0, max(0, len(self.backend_images) - 1))
+            self.slice_slider.setValue(0)
+        # Try initial WW/WL
+        if self.backend_images:
+            first = self.backend_images[0]
+            ww = first.get('window_width')
+            wl = first.get('window_center')
+            if ww is not None and wl is not None:
+                try:
+                    self.window_width = float(ww)
+                    self.window_level = float(wl)
+                    self.ww_slider.setValue(int(self.window_width))
+                    self.wl_slider.setValue(int(self.window_level))
+                except Exception:
+                    pass
+        self.update_display()
 
     def widget_to_data_coords(self, x, y):
         inv = self.canvas.ax.transData.inverted()
@@ -645,6 +729,38 @@ class DicomViewer(QMainWindow):
         self.info_labels['institution'].setText(f"Institution: {institution}")
 
     def update_display(self):
+        if self.backend_mode:
+            if not self.backend_images:
+                return
+            try:
+                img_meta = self.backend_images[self.current_image_index]
+                invert_flag = 'true' if self.inverted else 'false'
+                url = f"{self.base_url}/image/{img_meta['id']}/?ww={int(self.window_width)}&wl={int(self.window_level)}&invert={invert_flag}"
+                image_data = self._fetch_png_as_array(url)
+                self.current_image_data = image_data
+                self.canvas.ax.clear()
+                self.canvas.ax.set_facecolor('black')
+                self.canvas.ax.axis('off')
+                h, w = image_data.shape
+                self.canvas.ax.imshow(image_data, cmap='gray', origin='upper', extent=(0, w, h, 0))
+                if self.view_xlim and self.view_ylim:
+                    self.canvas.ax.set_xlim(self.view_xlim)
+                    self.canvas.ax.set_ylim(self.view_ylim)
+                else:
+                    self.canvas.ax.set_xlim(0, w)
+                    self.canvas.ax.set_ylim(h, 0)
+                    self.view_xlim = (0, w)
+                    self.view_ylim = (h, 0)
+                self.draw_measurements()
+                self.draw_annotations()
+                if self.crosshair:
+                    self.draw_crosshair()
+                self.update_overlay_labels()
+                self.canvas.draw()
+                return
+            except Exception as e:
+                QMessageBox.warning(self, "Display Error", f"Failed to render backend image: {str(e)}")
+                return
         if not self.dicom_files:
             return
         self.canvas.ax.clear()
@@ -812,6 +928,8 @@ def main():
 
     if args.path:
         viewer.open_path(args.path)
+    if args.study_id:
+        viewer.load_backend_study(args.study_id)
 
     sys.exit(app.exec_())
 
