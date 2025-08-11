@@ -624,6 +624,13 @@
             <button class="btn-control danger" onclick="systemBackup()">
                 <i class="fas fa-database"></i> BACKUP
             </button>
+            <!-- Added to match Worklist buttons -->
+            <button class="btn-control" onclick="window.open('{% url 'dicom_viewer:launch_standalone_viewer' %}', '_blank')">
+                <i class="fas fa-external-link-alt"></i> DICOM VIEWER
+            </button>
+            <button class="btn-control" onclick="window.location.href='{% url 'worklist:upload_study' %}'">
+                <i class="fas fa-upload"></i> UPLOAD
+            </button>
         </div>
 
         <!-- Main Content -->
