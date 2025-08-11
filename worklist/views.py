@@ -207,6 +207,11 @@ def upload_study(request):
     return render(request, 'worklist/upload.html')
 
 @login_required
+def modern_worklist(request):
+    """Modern worklist UI using the new dashboard layout"""
+    return render(request, 'worklist/modern_worklist.html')
+
+@login_required
 def api_studies(request):
     """API endpoint for studies data"""
     user = request.user
@@ -222,10 +227,12 @@ def api_studies(request):
             'id': study.id,
             'accession_number': study.accession_number,
             'patient_name': study.patient.full_name,
+            'patient_id': study.patient.patient_id,
             'modality': study.modality.code,
             'status': study.status,
             'priority': study.priority,
             'study_date': study.study_date.isoformat(),
+            'study_time': study.study_date.isoformat(),
             'facility': study.facility.name,
         })
     
