@@ -602,6 +602,12 @@
                             <i class="fas fa-sync-alt"></i>
                             Refresh
                         </button>
+                        {% if user.is_staff %}
+                        <a href="{% url 'admin_panel:dashboard' %}" class="btn btn-secondary">
+                            <i class="fas fa-shield-alt"></i>
+                            Admin Panel
+                        </a>
+                        {% endif %}
                     </div>
                 </div>
 
