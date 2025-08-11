@@ -34,7 +34,13 @@ from .reconstruction import MPRProcessor, MIPProcessor, Bone3DProcessor, MRI3DPr
 
 @login_required
 def viewer(request):
-    """Deprecated: web viewer removed. Redirect to desktop launcher endpoint."""
+    """Entry: if ?study=<id> is provided, open that study in desktop viewer; else open launcher."""
+    study_id = request.GET.get('study')
+    if study_id:
+        try:
+            return redirect('dicom_viewer:launch_study_in_desktop_viewer', study_id=int(study_id))
+        except Exception:
+            return redirect('dicom_viewer:launch_standalone_viewer')
     return redirect('dicom_viewer:launch_standalone_viewer')
 
 @login_required
