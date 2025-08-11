@@ -1097,26 +1097,28 @@ def launch_standalone_viewer(request):
         
         if os.path.exists(launcher_path):
             # Build command with appropriate arguments
-            cmd = [sys.executable, launcher_path]
+            cmd = [sys.executable, launcher_path, '--debug']
             
             # Add study ID if provided
             if study_id:
                 cmd.extend(['--study-id', str(study_id)])
             
-            # Launch the standalone viewer in the background
-            if sys.platform.startswith('win'):
-                subprocess.Popen(cmd, shell=True)
+            # Run the launcher synchronously to capture success/failure
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                message = 'Standalone DICOM viewer launched successfully'
+                if study_id:
+                    message += f' with study ID {study_id}'
+                return JsonResponse({'success': True, 'message': message})
             else:
-                subprocess.Popen(cmd)
-            
-            message = 'Standalone DICOM viewer launched successfully'
-            if study_id:
-                message += f' with study ID {study_id}'
-                
-            return JsonResponse({
-                'success': True, 
-                'message': message
-            })
+                stderr = (result.stderr or '').strip()
+                stdout = (result.stdout or '').strip()
+                details = stderr or stdout or 'Unknown error'
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Failed to launch DICOM viewer',
+                    'details': details[:500]
+                }, status=500)
         else:
             return JsonResponse({
                 'success': False, 
@@ -1154,18 +1156,24 @@ def launch_study_in_desktop_viewer(request, study_id):
         
         if os.path.exists(launcher_path):
             # Build command with study ID
-            cmd = [sys.executable, launcher_path, '--study-id', str(study_id)]
+            cmd = [sys.executable, launcher_path, '--debug', '--study-id', str(study_id)]
             
-            # Launch the standalone viewer in the background
-            if sys.platform.startswith('win'):
-                subprocess.Popen(cmd, shell=True)
+            # Run the launcher synchronously to capture success/failure
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                return JsonResponse({
+                    'success': True, 
+                    'message': f'Desktop viewer launched for study: {study.patient.full_name} ({study.study_date})'
+                })
             else:
-                subprocess.Popen(cmd)
-            
-            return JsonResponse({
-                'success': True, 
-                'message': f'Desktop viewer launched for study: {study.patient_name} ({study.study_date})'
-            })
+                stderr = (result.stderr or '').strip()
+                stdout = (result.stdout or '').strip()
+                details = stderr or stdout or 'Unknown error'
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Failed to launch DICOM viewer',
+                    'details': details[:500]
+                }, status=500)
         else:
             return JsonResponse({
                 'success': False, 

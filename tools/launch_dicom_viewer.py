@@ -32,6 +32,12 @@ def find_cpp_viewer_binary():
         os.path.join(project_root, "cpp_viewer", "build", "DicomViewer"),
         os.path.join(project_root, "cpp_viewer", "build", "Release", "DicomViewer"),
         os.path.join(project_root, "cpp_viewer", "build", "Debug", "DicomViewer"),
+        # Windows
+        os.path.join(project_root, "cpp_viewer", "build", "DicomViewer.exe"),
+        os.path.join(project_root, "cpp_viewer", "build", "Release", "DicomViewer.exe"),
+        os.path.join(project_root, "cpp_viewer", "build", "Debug", "DicomViewer.exe"),
+        # macOS app bundle
+        os.path.join(project_root, "cpp_viewer", "build", "DicomViewer.app", "Contents", "MacOS", "DicomViewer"),
     ]
     for path in candidates:
         if os.path.exists(path) and os.access(path, os.X_OK):
@@ -60,15 +66,32 @@ def main():
 
     env = os.environ.copy()
     # Default Django base URL for the C++ app
-    env.setdefault('DICOM_VIEWER_BASE_URL', 'http://localhost:8000/viewer')
+    env.setdefault('DICOM_VIEWER_BASE_URL', 'http://127.0.0.1:8000/viewer')
+    # Help the binary locate shared libraries on Linux
+    bin_dir = os.path.dirname(cpp_bin)
+    ld_paths = [
+        bin_dir,
+        '/usr/lib',
+        '/usr/local/lib',
+        '/usr/lib/x86_64-linux-gnu',
+        '/usr/lib64',
+        '/usr/lib/qt6',
+        '/usr/local/Qt-6/lib',
+    ]
+    existing = env.get('LD_LIBRARY_PATH', '')
+    env['LD_LIBRARY_PATH'] = os.pathsep.join([p for p in (os.pathsep.join(ld_paths) + (os.pathsep + existing if existing else '')).split(os.pathsep) if p])
+    # Also prepend to PATH for plugins/platforms
+    env['PATH'] = os.pathsep.join([bin_dir, env.get('PATH', '')])
     argv = [cpp_bin]
     if args.path:
         argv += [args.path]
     if args.debug:
         print(f"Launching C++ viewer: {' '.join(argv)}")
         print(f"Using base URL: {env['DICOM_VIEWER_BASE_URL']}")
+
+
     try:
-        subprocess.Popen(argv, env=env)
+        subprocess.Popen(argv, env=env, cwd=os.path.dirname(cpp_bin))
         return
     except Exception as e:
         print(f"Failed to launch C++ viewer: {e}")
