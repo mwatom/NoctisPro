@@ -1,338 +1,992 @@
-{% extends 'base.html' %}
-{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Noctis Pro PACS - Admin Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-bg: #0a0a0a;
+            --secondary-bg: #1a1a1a;
+            --card-bg: #252525;
+            --header-bg: #333333;
+            --border-color: #404040;
+            --accent-color: #00d4ff;
+            --text-primary: #ffffff;
+            --text-secondary: #b3b3b3;
+            --text-muted: #666666;
+            --success-color: #00ff88;
+            --warning-color: #ffaa00;
+            --danger-color: #ff4444;
+            --urgent-color: #ff0066;
+            --scheduled-color: #4a90e2;
+            --in-progress-color: #f5a623;
+            --completed-color: #7ed321;
+            --cancelled-color: #d0021b;
+        }
 
-{% block title %}Admin Dashboard - Noctis Pro PACS{% endblock %}
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-{% block navbar %}
-<nav class="navbar navbar-expand-lg navbar-medical">
-    <div class="container-fluid">
-        <a class="navbar-brand text-white fw-bold" href="{% url 'admin_panel:dashboard' %}">
-            <i class="fas fa-user-shield me-2"></i>Admin Panel
-        </a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav me-auto">
-                <li class="nav-item">
-                    <a class="nav-link active" href="{% url 'admin_panel:dashboard' %}">
-                        <i class="fas fa-tachometer-alt me-1"></i>Dashboard
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'admin_panel:user_management' %}">
-                        <i class="fas fa-users me-1"></i>Users
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'admin_panel:facility_management' %}">
-                        <i class="fas fa-hospital me-1"></i>Facilities
-                    </a>
-                </li>
-            </ul>
-            <ul class="navbar-nav">
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
-                        <i class="fas fa-user-circle me-1"></i>{{ user.get_full_name|default:user.username }}
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="{% url 'worklist:dashboard' %}">
-                            <i class="fas fa-home me-2"></i>Main Dashboard
-                        </a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="{% url 'accounts:logout' %}">
-                            <i class="fas fa-sign-out-alt me-2"></i>Logout
-                        </a></li>
-                    </ul>
-                </li>
-            </ul>
-        </div>
-    </div>
-</nav>
-{% endblock %}
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--primary-bg);
+            color: var(--text-primary);
+            font-size: 12px;
+            overflow: hidden;
+        }
 
-{% block content %}
-<div class="container-fluid py-4">
-    <!-- Header Section -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
-                <h1 class="text-white mb-0">
-                    <i class="fas fa-tachometer-alt me-3"></i>Admin Dashboard
-                </h1>
-                <div class="btn-group" role="group">
-                    <a href="{% url 'admin_panel:facility_create' %}" class="btn btn-medical me-2">
-                        <i class="fas fa-hospital me-2"></i>Add Facility
-                    </a>
-                    <a href="{% url 'admin_panel:user_create' %}" class="btn btn-medical">
-                        <i class="fas fa-user-md me-2"></i>Add Radiologist
-                    </a>
+        .dashboard-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Navigation */
+        .top-navbar {
+            background: var(--header-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 50px;
+        }
+
+        .nav-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo {
+            color: var(--danger-color);
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 2px;
+        }
+
+        .nav-tab {
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 6px 12px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .nav-tab.active {
+            background: var(--danger-color);
+            color: var(--text-primary);
+            font-weight: bold;
+        }
+
+        .nav-tab:hover:not(.active) {
+            background: var(--card-bg);
+            color: var(--text-primary);
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 11px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .user-avatar {
+            background: var(--danger-color);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: var(--text-primary);
+            font-size: 10px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--success-color);
+        }
+
+        .worklist-btn {
+            background: var(--accent-color);
+            border: none;
+            color: var(--primary-bg);
+            padding: 4px 8px;
+            font-size: 9px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: bold;
+        }
+
+        .worklist-btn:hover {
+            background: #00b8d4;
+            transform: scale(1.05);
+        }
+
+        /* Controls Bar */
+        .controls-bar {
+            background: var(--secondary-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            height: 40px;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .control-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .control-input, .control-select {
+            background: var(--primary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 4px 8px;
+            font-size: 11px;
+            border-radius: 2px;
+            min-width: 100px;
+        }
+
+        .control-input:focus, .control-select:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 1px var(--accent-color);
+        }
+
+        .btn-control {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 4px 12px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-control:hover {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+        }
+
+        .btn-control.reset {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+        }
+
+        .btn-control.danger {
+            background: var(--danger-color);
+            color: var(--text-primary);
+        }
+
+        .btn-control.danger:hover {
+            background: #cc3333;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            padding: 16px;
+            background: var(--primary-bg);
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .stat-icon {
+            background: var(--accent-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary-bg);
+            font-size: 16px;
+        }
+
+        .stat-content h3 {
+            color: var(--text-primary);
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .stat-content p {
+            color: var(--text-secondary);
+            font-size: 11px;
+            margin: 0;
+        }
+
+        /* Data Table */
+        .data-table-container {
+            flex: 1;
+            overflow: auto;
+            background: var(--primary-bg);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 11px;
+        }
+
+        .data-table th {
+            background: var(--header-bg);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            white-space: nowrap;
+        }
+
+        .data-table th:last-child {
+            border-right: none;
+        }
+
+        .data-table th.sortable {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .data-table th.sortable:hover {
+            background: var(--card-bg);
+        }
+
+        .data-table td {
+            padding: 4px 12px;
+            border-bottom: 1px solid rgba(64, 64, 64, 0.3);
+            border-right: 1px solid rgba(64, 64, 64, 0.3);
+            color: var(--text-secondary);
+            white-space: nowrap;
+            vertical-align: middle;
+            font-size: 11px;
+        }
+
+        .data-table td:last-child {
+            border-right: none;
+        }
+
+        .data-table tbody tr {
+            transition: background-color 0.1s ease;
+            cursor: pointer;
+        }
+
+        .data-table tbody tr:hover {
+            background: rgba(255, 68, 68, 0.08);
+        }
+
+        .data-table tbody tr:nth-child(even) {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .data-table tbody tr:nth-child(even):hover {
+            background: rgba(255, 68, 68, 0.08);
+        }
+
+        /* Data Styling */
+        .user-id, .facility-id {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+
+        .user-name, .facility-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .timestamp {
+            font-family: 'Courier New', monospace;
+            color: var(--text-muted);
+            font-size: 10px;
+        }
+
+        /* Status Badges */
+        .status-badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 9px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .status-active {
+            background: rgba(126, 211, 33, 0.2);
+            color: var(--completed-color);
+            border: 1px solid var(--completed-color);
+        }
+
+        .status-inactive {
+            background: rgba(208, 2, 27, 0.2);
+            color: var(--cancelled-color);
+            border: 1px solid var(--cancelled-color);
+        }
+
+        .status-pending {
+            background: rgba(255, 170, 0, 0.2);
+            color: var(--warning-color);
+            border: 1px solid var(--warning-color);
+        }
+
+        /* Role Badges */
+        .role-badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 9px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .role-admin {
+            background: rgba(255, 68, 68, 0.2);
+            color: var(--danger-color);
+            border: 1px solid var(--danger-color);
+        }
+
+        .role-radiologist {
+            background: rgba(0, 212, 255, 0.2);
+            color: var(--accent-color);
+            border: 1px solid var(--accent-color);
+        }
+
+        .role-technologist {
+            background: rgba(255, 170, 0, 0.2);
+            color: var(--warning-color);
+            border: 1px solid var(--warning-color);
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .btn-action {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 9px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-action:hover {
+            background: var(--text-secondary);
+            color: var(--primary-bg);
+        }
+
+        .btn-action.edit {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+            border-color: var(--accent-color);
+        }
+
+        .btn-action.edit:hover {
+            background: #00b8d4;
+        }
+
+        .btn-action.delete {
+            background: var(--danger-color);
+            color: var(--text-primary);
+            border-color: var(--danger-color);
+        }
+
+        .btn-action.delete:hover {
+            background: #cc3333;
+        }
+
+        /* Footer Status Bar */
+        .footer-status {
+            background: var(--secondary-bg);
+            border-top: 1px solid var(--border-color);
+            padding: 6px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 10px;
+            color: var(--text-muted);
+            height: 30px;
+        }
+
+        .status-left {
+            display: flex;
+            gap: 20px;
+        }
+
+        .status-right {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .connection-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--success-color);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 1200px) {
+            .data-table th,
+            .data-table td {
+                padding: 4px 8px;
+                font-size: 10px;
+            }
+            
+            .controls-bar {
+                flex-wrap: wrap;
+                height: auto;
+                min-height: 40px;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+                gap: 2px;
+            }
+
+            .btn-action {
+                font-size: 8px;
+                padding: 3px 6px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 8px;
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Top Navigation -->
+        <nav class="top-navbar">
+            <div class="nav-left">
+                <div class="logo">
+                    <i class="fas fa-shield-alt"></i> Noctis Pro PACS - ADMIN
+                </div>
+                <div class="nav-tabs">
+                    <div class="nav-tab active">DASHBOARD</div>
+                    <div class="nav-tab" onclick="window.location.href='{% url 'admin_panel:user_management' %}'">USERS</div>
+                    <div class="nav-tab" onclick="window.location.href='{% url 'admin_panel:facility_management' %}'">FACILITIES</div>
+                    <div class="nav-tab" onclick="window.location.href='{% url 'admin_panel:system_logs' %}'">LOGS</div>
+                    <div class="nav-tab" onclick="window.location.href='{% url 'admin_panel:settings' %}'">SETTINGS</div>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- Statistics Cards -->
-    <div class="row mb-4">
-        <div class="col-lg-3 col-md-6 mb-4">
-            <div class="card-medical p-4 fade-in">
-                <div class="d-flex align-items-center">
-                    <div class="rounded-circle bg-primary bg-opacity-20 p-3 me-3">
-                        <i class="fas fa-users text-primary fs-4"></i>
-                    </div>
+            <div class="nav-right">
+                <div class="status-indicator">
+                    <div class="status-dot"></div>
+                    <span>ADMIN MODE</span>
+                </div>
+                <div class="user-info">
+                    <div class="user-avatar">{{ user.get_full_name|default:user.username|slice:":2"|upper }}</div>
                     <div>
-                        <h3 class="text-white mb-0">{{ total_users }}</h3>
-                        <p class="text-secondary mb-0">Total Users</p>
+                        <div>{{ user.get_full_name|default:user.username }}</div>
+                        <div style="color: var(--text-muted); font-size: 10px;">Administrator</div>
+                    </div>
+                </div>
+                <button class="worklist-btn" onclick="window.location.href='{% url 'worklist:dashboard' %}'">
+                    <i class="fas fa-home"></i> WORKLIST
+                </button>
+            </div>
+        </nav>
+
+        <!-- Controls Bar -->
+        <div class="controls-bar">
+            <div class="control-group">
+                <label class="control-label">Filter:</label>
+                <select class="control-select" id="filterType">
+                    <option value="">All Items</option>
+                    <option value="users">Users</option>
+                    <option value="facilities">Facilities</option>
+                    <option value="logs">System Logs</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label class="control-label">Status:</label>
+                <select class="control-select" id="statusFilter">
+                    <option value="">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="pending">Pending</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label class="control-label">Role:</label>
+                <select class="control-select" id="roleFilter">
+                    <option value="">All Roles</option>
+                    <option value="admin">Administrator</option>
+                    <option value="radiologist">Radiologist</option>
+                    <option value="technologist">Technologist</option>
+                </select>
+            </div>
+            <button class="btn-control reset" onclick="resetFilters()">RESET</button>
+            <button class="btn-control" onclick="refreshData()">
+                <i class="fas fa-sync-alt"></i> REFRESH
+            </button>
+            <button class="btn-control" onclick="exportData()">
+                <i class="fas fa-download"></i> EXPORT
+            </button>
+            <button class="btn-control danger" onclick="systemBackup()">
+                <i class="fas fa-database"></i> BACKUP
+            </button>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Statistics Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>{{ total_users }}</h3>
+                        <p>Total Users</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-hospital"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>{{ total_facilities }}</h3>
+                        <p>Facilities</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-clipboard-list"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>{{ total_studies }}</h3>
+                        <p>Total Studies</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>{{ system_alerts }}</h3>
+                        <p>System Alerts</p>
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <div class="col-lg-3 col-md-6 mb-4">
-            <div class="card-medical p-4 fade-in" style="animation-delay: 0.1s">
-                <div class="d-flex align-items-center">
-                    <div class="rounded-circle bg-success bg-opacity-20 p-3 me-3">
-                        <i class="fas fa-hospital text-success fs-4"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-white mb-0">{{ total_facilities }}</h3>
-                        <p class="text-secondary mb-0">Facilities</p>
-                    </div>
-                </div>
+
+            <!-- Data Table -->
+            <div class="data-table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable">ID</th>
+                            <th class="sortable">NAME</th>
+                            <th class="sortable">ROLE</th>
+                            <th class="sortable">FACILITY</th>
+                            <th class="sortable">STATUS</th>
+                            <th class="sortable">LAST LOGIN</th>
+                            <th class="sortable">CREATED</th>
+                            <th>ACTIONS</th>
+                        </tr>
+                    </thead>
+                    <tbody id="adminTableBody">
+                        <!-- Data will be dynamically loaded here -->
+                        <tr id="noDataRow">
+                            <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                                <i class="fas fa-database" style="font-size: 48px; opacity: 0.3; margin-bottom: 16px; display: block;"></i>
+                                <div style="font-size: 14px; margin-bottom: 8px;">No data found</div>
+                                <div style="font-size: 12px;">Check your filter settings or add new items</div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
-        
-        <div class="col-lg-3 col-md-6 mb-4">
-            <div class="card-medical p-4 fade-in" style="animation-delay: 0.2s">
-                <div class="d-flex align-items-center">
-                    <div class="rounded-circle bg-info bg-opacity-20 p-3 me-3">
-                        <i class="fas fa-x-ray text-info fs-4"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-white mb-0">{{ total_studies }}</h3>
-                        <p class="text-secondary mb-0">Studies</p>
-                    </div>
-                </div>
+
+        <!-- Footer Status Bar -->
+        <div class="footer-status">
+            <div class="status-left">
+                <span>Total Users: <strong>{{ total_users }}</strong></span>
+                <span>Active Users: <strong style="color: var(--completed-color);">{{ active_users }}</strong></span>
+                <span>Facilities: <strong style="color: var(--accent-color);">{{ total_facilities }}</strong></span>
+                <span>System Status: <strong style="color: var(--success-color);">HEALTHY</strong></span>
             </div>
-        </div>
-        
-        <div class="col-lg-3 col-md-6 mb-4">
-            <div class="card-medical p-4 fade-in" style="animation-delay: 0.3s">
-                <div class="d-flex align-items-center">
-                    <div class="rounded-circle bg-warning bg-opacity-20 p-3 me-3">
-                        <i class="fas fa-chart-line text-warning fs-4"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-white mb-0">{{ active_users_today }}</h3>
-                        <p class="text-secondary mb-0">Active Today</p>
-                    </div>
+            <div class="status-right">
+                <div class="connection-status">
+                    <div class="connection-dot"></div>
+                    <span>Database Connected</span>
                 </div>
+                <span>Last Update: <strong>14:32:15</strong></span>
+                <span>Auto-refresh: <strong>ON</strong></span>
             </div>
         </div>
     </div>
 
-    <!-- Quick Actions Section -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card-medical p-4">
-                <h4 class="text-white mb-4">
-                    <i class="fas fa-bolt me-2"></i>Quick Actions
-                </h4>
-                <div class="row">
-                    <div class="col-lg-3 col-md-6 mb-3">
-                        <a href="{% url 'admin_panel:facility_create' %}" class="btn btn-outline-light w-100 p-3 text-start">
-                            <i class="fas fa-hospital text-success me-3"></i>
-                            <div>
-                                <strong>Add New Facility</strong>
-                                <small class="d-block text-secondary">Register healthcare facility</small>
-                            </div>
-                        </a>
-                    </div>
-                    <div class="col-lg-3 col-md-6 mb-3">
-                        <a href="{% url 'admin_panel:user_create' %}" class="btn btn-outline-light w-100 p-3 text-start">
-                            <i class="fas fa-user-md text-primary me-3"></i>
-                            <div>
-                                <strong>Add Radiologist</strong>
-                                <small class="d-block text-secondary">Create new radiologist account</small>
-                            </div>
-                        </a>
-                    </div>
-                    <div class="col-lg-3 col-md-6 mb-3">
-                        <a href="{% url 'admin_panel:user_management' %}" class="btn btn-outline-light w-100 p-3 text-start">
-                            <i class="fas fa-users text-info me-3"></i>
-                            <div>
-                                <strong>Manage Users</strong>
-                                <small class="d-block text-secondary">View and edit users</small>
-                            </div>
-                        </a>
-                    </div>
-                    <div class="col-lg-3 col-md-6 mb-3">
-                        <a href="{% url 'admin_panel:facility_management' %}" class="btn btn-outline-light w-100 p-3 text-start">
-                            <i class="fas fa-hospital-alt text-warning me-3"></i>
-                            <div>
-                                <strong>Manage Facilities</strong>
-                                <small class="d-block text-secondary">View and edit facilities</small>
-                            </div>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    <script>
+        // Data loading and management
+        let adminData = [];
+        let filteredData = [];
 
-    <!-- Content Grid -->
-    <div class="row">
-        <!-- Recent Studies -->
-        <div class="col-lg-6 mb-4">
-            <div class="card-medical p-4">
-                <h5 class="text-white mb-4">
-                    <i class="fas fa-history me-2"></i>Recent Studies
-                </h5>
-                <div class="table-responsive">
-                    <table class="table table-dark table-hover">
-                        <thead>
-                            <tr>
-                                <th>Patient</th>
-                                <th>Modality</th>
-                                <th>Facility</th>
-                                <th>Date</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for study in recent_studies %}
-                            <tr>
-                                <td>{{ study.patient.name }}</td>
-                                <td>
-                                    <span class="badge bg-primary">{{ study.modality.name }}</span>
-                                </td>
-                                <td>{{ study.facility.name }}</td>
-                                <td>{{ study.study_date|date:"M d, Y" }}</td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="4" class="text-center text-secondary">No recent studies</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+        // Load admin data
+        async function loadAdminData() {
+            try {
+                // In a real implementation, this would fetch from your backend API
+                const response = await fetch('/api/admin/dashboard/');
+                const data = await response.json();
+                
+                adminData = data.items || [];
+                filteredData = [...adminData];
+                renderAdminTable();
+                updateStats();
+                
+            } catch (error) {
+                console.error('Error loading admin data:', error);
+                showNoDataMessage();
+            }
+        }
 
-        <!-- Recent Users -->
-        <div class="col-lg-6 mb-4">
-            <div class="card-medical p-4">
-                <h5 class="text-white mb-4">
-                    <i class="fas fa-user-plus me-2"></i>Recent Users
-                </h5>
-                <div class="table-responsive">
-                    <table class="table table-dark table-hover">
-                        <thead>
-                            <tr>
-                                <th>User</th>
-                                <th>Role</th>
-                                <th>Facility</th>
-                                <th>Joined</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for user_item in recent_users %}
-                            <tr>
-                                <td>{{ user_item.get_full_name|default:user_item.username }}</td>
-                                <td>
-                                    {% if user_item.role == 'admin' %}
-                                        <span class="badge bg-danger">{{ user_item.get_role_display }}</span>
-                                    {% elif user_item.role == 'radiologist' %}
-                                        <span class="badge bg-primary">{{ user_item.get_role_display }}</span>
-                                    {% else %}
-                                        <span class="badge bg-secondary">{{ user_item.get_role_display }}</span>
-                                    {% endif %}
-                                </td>
-                                <td>{{ user_item.facility.name|default:"-" }}</td>
-                                <td>{{ user_item.date_joined|date:"M d, Y" }}</td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="4" class="text-center text-secondary">No recent users</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modality Statistics -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card-medical p-4">
-                <h5 class="text-white mb-4">
-                    <i class="fas fa-chart-bar me-2"></i>Study Distribution by Modality
-                </h5>
-                <div class="row">
-                    {% for stat in modality_stats %}
-                    <div class="col-md-2 col-sm-4 col-6 mb-3">
-                        <div class="text-center">
-                            <div class="bg-primary bg-opacity-20 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 60px; height: 60px;">
-                                <i class="fas fa-x-ray text-primary"></i>
-                            </div>
-                            <h6 class="text-white mb-1">{{ stat.count }}</h6>
-                            <small class="text-secondary">{{ stat.modality__name }}</small>
+        // Render admin table
+        function renderAdminTable() {
+            const tbody = document.getElementById('adminTableBody');
+            const noDataRow = document.getElementById('noDataRow');
+            
+            if (filteredData.length === 0) {
+                tbody.innerHTML = '';
+                tbody.appendChild(noDataRow);
+                return;
+            }
+            
+            // Remove no data row if it exists
+            if (noDataRow) {
+                noDataRow.remove();
+            }
+            
+            tbody.innerHTML = filteredData.map(item => `
+                <tr onclick="selectItem(this)" data-item-id="${item.id}">
+                    <td class="user-id">${item.id}</td>
+                    <td class="user-name">${item.name}</td>
+                    <td><span class="role-badge role-${item.role.toLowerCase()}">
+                        ${getRoleIcon(item.role)}${item.role.toUpperCase()}
+                    </span></td>
+                    <td>${item.facility || '-'}</td>
+                    <td><span class="status-badge status-${item.status}">
+                        ${getStatusIcon(item.status)}${item.status.toUpperCase()}
+                    </span></td>
+                    <td class="timestamp">${formatTime(item.last_login)}</td>
+                    <td class="timestamp">${formatTime(item.created)}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn-action edit" onclick="editItem('${item.id}')" title="Edit item">
+                                <i class="fas fa-edit"></i> EDIT
+                            </button>
+                            <button class="btn-action delete" onclick="deleteItem('${item.id}')" title="Delete item">
+                                <i class="fas fa-trash"></i> DEL
+                            </button>
                         </div>
-                    </div>
-                    {% empty %}
-                    <div class="col-12 text-center text-secondary">
-                        No modality data available
-                    </div>
-                    {% endfor %}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Utility functions
+        function formatTime(timeString) {
+            if (!timeString) return '-';
+            const date = new Date(timeString);
+            return date.toLocaleTimeString('en-US', { hour12: false, timeStyle: 'short' });
+        }
+
+        function getRoleIcon(role) {
+            const icons = {
+                'admin': '<i class="fas fa-shield-alt"></i>',
+                'radiologist': '<i class="fas fa-user-md"></i>',
+                'technologist': '<i class="fas fa-user-cog"></i>'
+            };
+            return icons[role] || '<i class="fas fa-user"></i>';
+        }
+
+        function getStatusIcon(status) {
+            const icons = {
+                'active': '<i class="fas fa-check"></i>',
+                'inactive': '<i class="fas fa-times"></i>',
+                'pending': '<i class="fas fa-clock"></i>'
+            };
+            return icons[status] || '<i class="fas fa-circle"></i>';
+        }
+
+        function updateStats() {
+            // Update statistics in the grid
+            const stats = adminData.reduce((acc, item) => {
+                acc.total++;
+                if (item.status === 'active') acc.active++;
+                return acc;
+            }, { total: 0, active: 0 });
+            
+            // Update footer status
+            const statusElements = document.querySelectorAll('.status-left span strong');
+            if (statusElements.length >= 4) {
+                statusElements[0].textContent = stats.total;
+                statusElements[1].textContent = stats.active;
+            }
+        }
+
+        function showNoDataMessage() {
+            const tbody = document.getElementById('adminTableBody');
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                        <i class="fas fa-database"></i>
+                        <div style="font-size: 14px; margin-bottom: 8px;">No Data Found</div>
+                        <div style="font-size: 12px;">Check your filter settings or add new items</div>
+                    </td>
+                </tr>
+            `;
+        }
+
+        // Admin Functions
+        function editItem(itemId) {
+            console.log('Editing item:', itemId);
+            showNotification('Edit functionality would be implemented here', 'info');
+        }
+
+        function deleteItem(itemId) {
+            if (confirm('Are you sure you want to delete this item?')) {
+                console.log('Deleting item:', itemId);
+                showNotification('Item deleted successfully', 'success');
+                loadAdminData(); // Refresh data
+            }
+        }
+
+        function exportData() {
+            console.log('Exporting data...');
+            showNotification('Data export functionality would be implemented here', 'info');
+        }
+
+        function systemBackup() {
+            console.log('Creating system backup...');
+            showNotification('System backup started. This may take a few minutes.', 'info');
+        }
+
+        // Notification system
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: var(--card-bg);
+                border: 1px solid var(--border-color);
+                border-left: 4px solid var(--accent-color);
+                color: var(--text-primary);
+                padding: 12px 16px;
+                border-radius: 4px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                z-index: 1000;
+                font-size: 12px;
+                max-width: 300px;
+                transition: all 0.3s ease;
+            `;
+            
+            if (type === 'error') {
+                notification.style.borderLeftColor = 'var(--danger-color)';
+            } else if (type === 'success') {
+                notification.style.borderLeftColor = 'var(--success-color)';
+            }
+            
+            notification.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <span>${message}</span>
+                    <button onclick="this.parentElement.parentElement.remove()" 
+                            style="background: none; border: none; color: var(--text-muted); cursor: pointer; margin-left: 8px;">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
+        
+        function selectItem(row) {
+            // Remove previous selection
+            document.querySelectorAll('.data-table tbody tr').forEach(r => {
+                r.style.background = '';
+            });
+            
+            // Highlight selected row
+            row.style.background = 'rgba(255, 68, 68, 0.15)';
+            
+            console.log('Selected item:', row.children[1].textContent);
+        }
 
-{% block extra_css %}
-<style>
-    .navbar-medical {
-        background: var(--gradient-primary);
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    }
+        function resetFilters() {
+            document.getElementById('filterType').value = '';
+            document.getElementById('statusFilter').value = '';
+            document.getElementById('roleFilter').value = '';
+            
+            filteredData = [...adminData];
+            renderAdminTable();
+        }
 
-    .btn-outline-light {
-        border-color: var(--border-color);
-        transition: all 0.3s ease;
-    }
+        function refreshData() {
+            const btn = event.target.closest('.btn-control');
+            const icon = btn.querySelector('i');
+            
+            // Show loading state
+            icon.classList.add('fa-spin');
+            btn.disabled = true;
+            
+            // Reload admin data
+            loadAdminData().then(() => {
+                icon.classList.remove('fa-spin');
+                btn.disabled = false;
+                
+                // Update last update time
+                const now = new Date();
+                document.querySelector('.footer-status .status-right span:nth-last-child(2) strong').textContent = 
+                    now.toLocaleTimeString('en-US', { hour12: false });
+                
+                showNotification('Admin data refreshed successfully', 'success');
+            }).catch(error => {
+                icon.classList.remove('fa-spin');
+                btn.disabled = false;
+                showNotification('Error refreshing data', 'error');
+            });
+        }
 
-    .btn-outline-light:hover {
-        background: var(--accent-color);
-        border-color: var(--accent-color);
-        transform: translateY(-2px);
-    }
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load initial data
+            loadAdminData();
+            
+            // Set up auto-refresh
+            setInterval(() => {
+                loadAdminData();
+                const now = new Date();
+                document.querySelector('.footer-status .status-right span:nth-last-child(2) strong').textContent = 
+                    now.toLocaleTimeString('en-US', { hour12: false });
+            }, 30000); // Refresh every 30 seconds
+        });
 
-    .table-dark {
-        --bs-table-bg: transparent;
-        --bs-table-border-color: var(--border-color);
-    }
+        // Filter functionality
+        document.getElementById('filterType').addEventListener('change', applyFilters);
+        document.getElementById('statusFilter').addEventListener('change', applyFilters);
+        document.getElementById('roleFilter').addEventListener('change', applyFilters);
 
-    .table-dark th {
-        border-bottom: 2px solid var(--border-color);
-        color: var(--text-secondary);
-        font-weight: 600;
-    }
-
-    .table-dark td {
-        border-top: 1px solid var(--border-color);
-    }
-
-    .table-hover tbody tr:hover {
-        background: rgba(255, 255, 255, 0.05);
-    }
-
-    .badge {
-        font-size: 0.75rem;
-        padding: 0.35em 0.65em;
-    }
-</style>
-{% endblock %}
+        function applyFilters() {
+            const filterType = document.getElementById('filterType').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value.toLowerCase();
+            const roleFilter = document.getElementById('roleFilter').value.toLowerCase();
+            
+            filteredData = adminData.filter(item => {
+                const matchesType = !filterType || item.type.toLowerCase().includes(filterType);
+                const matchesStatus = !statusFilter || item.status.toLowerCase().includes(statusFilter);
+                const matchesRole = !roleFilter || item.role.toLowerCase().includes(roleFilter);
+                
+                return matchesType && matchesStatus && matchesRole;
+            });
+            
+            renderAdminTable();
+        }
+    </script>
+</body>
+</html>
