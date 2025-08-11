@@ -37,8 +37,13 @@
     <div class="toolbar">
       <button class="tool active" data-tool="window"><i class="fas fa-adjust"></i><span>Window</span></button>
       <button class="tool" data-tool="zoom"><i class="fas fa-search-plus"></i><span>Zoom</span></button>
+      <button class="tool" data-tool="pan"><i class="fas fa-arrows-alt"></i><span>Pan</span></button>
+      <button class="tool" data-tool="measure"><i class="fas fa-ruler"></i><span>Measure</span></button>
+      <button class="tool" data-tool="annotate"><i class="fas fa-comment-dots"></i><span>Annotate</span></button>
+      <button class="tool" data-tool="crosshair"><i class="fas fa-crosshairs"></i><span>Crosshair</span></button>
       <button class="tool" data-tool="invert"><i class="fas fa-adjust"></i><span>Invert</span></button>
       <button class="tool" data-tool="reset"><i class="fas fa-undo"></i><span>Reset</span></button>
+      <button class="tool" data-tool="ai"><i class="fas fa-robot"></i><span>AI</span></button>
     </div>
     <div class="topbar">
       <button id="btnLoadLocal" class="btn btn-primary"><i class="fas fa-folder-open"></i> Load Local DICOM</button>
@@ -102,6 +107,13 @@
         <div id="seriesInfo" style="color:#ccc;font-size:12px;">Series: -</div>
         <div id="institutionInfo" style="color:#ccc;font-size:12px;">Institution: -</div>
       </div>
+      <div class="panel">
+        <h3>Measurements</h3>
+        <div class="control">
+          <button id="btnClearMeasurements" class="btn">Clear All</button>
+        </div>
+        <ul id="measurementsList" style="list-style:none;padding-left:0;margin:0;color:#ddd;font-size:12px;"></ul>
+      </div>
     </div>
   </div>
 
@@ -116,6 +128,8 @@
     const zoomSlider = document.getElementById('zoom');
     const btnLoadLocal = document.getElementById('btnLoadLocal');
     const inputLocal = document.getElementById('localDicom');
+    const btnClearMeasurements = document.getElementById('btnClearMeasurements');
+    const measurementsList = document.getElementById('measurementsList');
 
     const reconType = document.getElementById('reconType');
     const boneCtrl = document.getElementById('boneCtrl');
@@ -133,6 +147,48 @@
     let images = [];
     let index = 0;
     let ww = 400, wl = 40, inverted = false, zoom = 1.0;
+    let activeTool = 'window';
+    let isDragging = false;
+    let dragStart = null;
+    let panOffset = { x: 0, y: 0 };
+    let measureDraft = null; // {start:{x,y}, end:{x,y}}
+    let measurements = []; // persisted per image id
+    let annotations = [];
+    let crosshair = false;
+
+    // Map imageId -> arrays to persist while session active
+    const imageIdToMeasurements = new Map();
+    const imageIdToAnnotations = new Map();
+
+    // Helper: parse pixel spacing robustly (string "0.5\\0.5", "0.5,0.5" or array)
+    function parsePixelSpacing(ps){
+      if (!ps) return null;
+      if (Array.isArray(ps)) return ps.map(Number);
+      if (typeof ps === 'string'){
+        const parts = ps.split(/[\\,\s]+/).filter(Boolean);
+        if (parts.length >= 2) return [parseFloat(parts[0]), parseFloat(parts[1])];
+      }
+      return null;
+    }
+
+    async function fallbackToDesktop(){
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const studyId = params.get('study_id') || (currentStudy && currentStudy.id);
+        if (studyId){
+          const resp = await fetch(`/viewer/launch-desktop/${studyId}/`);
+          const j = await resp.json();
+          if (j && j.fallback_url){ window.location.href = j.fallback_url; return; }
+          // Desktop launched; leave page as-is
+        } else {
+          const resp = await fetch('/viewer/launch-desktop/', { method:'POST', headers:{'Content-Type':'application/json'}, body: '{}' });
+          const j = await resp.json();
+          if (j && j.fallback_url){ window.location.href = j.fallback_url; return; }
+        }
+      } catch (e) {
+        // swallow
+      }
+    }
 
     function setCanvasSize(){
       const vp = document.getElementById('viewport');
@@ -145,56 +201,201 @@
     function q(name){ return new URLSearchParams(window.location.search).get(name); }
 
     async function loadStudy(studyId){
-      const r = await fetch(`/viewer/study/${studyId}/`);
-      const data = await r.json();
-      currentStudy = data.study;
-      document.getElementById('patientInfo').textContent = `Patient: ${currentStudy.patient_name} | Study Date: ${currentStudy.study_date} | Modality: ${currentStudy.modality}`;
-      seriesSelect.innerHTML = '<option value="">Select Series</option>';
-      (data.series_list || []).forEach(s=>{
-        const opt = document.createElement('option');
-        opt.value = s.id; opt.textContent = `Series ${s.series_number} - ${s.modality} (${s.image_count} images)`;
-        seriesSelect.appendChild(opt);
-      });
-      if ((data.series_list||[]).length){
-        seriesSelect.value = data.series_list[0].id;
-        await loadSeries(data.series_list[0].id);
+      try {
+        const r = await fetch(`/viewer/study/${studyId}/`);
+        if (!r.ok) throw new Error('study fetch failed');
+        const data = await r.json();
+        currentStudy = data.study;
+        document.getElementById('patientInfo').textContent = `Patient: ${currentStudy.patient_name} | Study Date: ${currentStudy.study_date} | Modality: ${currentStudy.modality}`;
+        seriesSelect.innerHTML = '<option value="">Select Series</option>';
+        (data.series_list || []).forEach(s=>{
+          const opt = document.createElement('option');
+          opt.value = s.id; opt.textContent = `Series ${s.series_number} - ${s.modality} (${s.image_count} images)`;
+          seriesSelect.appendChild(opt);
+        });
+        if ((data.series_list||[]).length){
+          seriesSelect.value = data.series_list[0].id;
+          await loadSeries(data.series_list[0].id);
+        }
+      } catch (e) {
+        await fallbackToDesktop();
       }
     }
 
     async function loadSeries(seriesId){
-      const r = await fetch(`/viewer/series/${seriesId}/images/`);
-      const data = await r.json();
-      currentSeries = data.series; images = data.images || []; index = 0;
-      sliceSlider.max = Math.max(0, images.length - 1); sliceSlider.value = 0; document.getElementById('sliceVal').textContent = '1';
-      if (images.length){
-        ww = data.images[0].window_width || ww; wl = data.images[0].window_center || wl;
-        wwSlider.value = ww; wlSlider.value = wl; document.getElementById('wwVal').textContent = ww; document.getElementById('wlVal').textContent = wl;
+      try {
+        const r = await fetch(`/viewer/series/${seriesId}/images/`);
+        if (!r.ok) throw new Error('series fetch failed');
+        const data = await r.json();
+        currentSeries = data.series; images = data.images || []; index = 0;
+        sliceSlider.max = Math.max(0, images.length - 1); sliceSlider.value = 0; document.getElementById('sliceVal').textContent = '1';
+        if (images.length){
+          ww = data.images[0].window_width || ww; wl = data.images[0].window_center || wl;
+          wwSlider.value = ww; wlSlider.value = wl; document.getElementById('wwVal').textContent = ww; document.getElementById('wlVal').textContent = wl;
+        }
+        // Reset view state
+        zoom = 1.0; panOffset = {x:0,y:0}; activeTool = 'window'; inverted = false; crosshair = false;
+        document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active'));
+        document.querySelector('.tool[data-tool="window"]').classList.add('active');
+        setCanvasSize();
+        await draw();
+        await loadOverlaysForCurrentImage();
+      } catch (e) {
+        await fallbackToDesktop();
       }
-      setCanvasSize();
-      await draw();
+    }
+
+    function getCurrentImageId(){
+      if (!images.length) return null;
+      return images[index].id;
+    }
+
+    function getViewportPlacement(imgW, imgH){
+      const scale = Math.min(canvas.width / imgW, canvas.height / imgH) * zoom;
+      const w = imgW * scale, h = imgH * scale;
+      const x = (canvas.width - w)/2 + panOffset.x;
+      const y = (canvas.height - h)/2 + panOffset.y;
+      return { scale, w, h, x, y };
     }
 
     async function draw(){
       if (!images.length) { ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height); return; }
-      const img = images[index];
-      const url = `/viewer/image/${img.id}/?ww=${ww}&wl=${wl}&invert=${inverted}`;
-      const htmlImg = new Image(); htmlImg.crossOrigin = 'anonymous';
-      await new Promise((resolve,reject)=>{ htmlImg.onload=resolve; htmlImg.onerror=reject; htmlImg.src=url; });
-      // Fit
-      const scale = Math.min(canvas.width / htmlImg.width, canvas.height / htmlImg.height) * zoom;
-      const w = htmlImg.width * scale, h = htmlImg.height * scale;
-      ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(htmlImg, (canvas.width - w)/2, (canvas.height - h)/2, w, h);
-      document.getElementById('overlay').innerHTML = `WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}<br>Slice: ${index+1}/${images.length}`;
-      document.getElementById('zoominfo').textContent = `Zoom: ${Math.round(zoom*100)}%`;
+      try {
+        const img = images[index];
+        const url = `/viewer/image/${img.id}/?ww=${ww}&wl=${wl}&invert=${inverted}`;
+        const htmlImg = new Image(); htmlImg.crossOrigin = 'anonymous';
+        await new Promise((resolve,reject)=>{ htmlImg.onload=resolve; htmlImg.onerror=reject; htmlImg.src=url; });
+        const vp = getViewportPlacement(htmlImg.width, htmlImg.height);
+        ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(htmlImg, vp.x, vp.y, vp.w, vp.h);
+        drawOverlays(vp);
+        document.getElementById('overlay').innerHTML = `WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}<br>Slice: ${index+1}/${images.length}`;
+        document.getElementById('zoominfo').textContent = `Zoom: ${Math.round(zoom*100)}%`;
+      } catch (e) {
+        await fallbackToDesktop();
+      }
+    }
+
+    function drawOverlays(vp){
+      // Measurements (draft first)
+      ctx.save();
+      ctx.strokeStyle = 'yellow';
+      ctx.fillStyle = 'yellow';
+      ctx.lineWidth = 2;
+      const toCanvas = (p)=>({
+        x: vp.x + p.x * vp.scale,
+        y: vp.y + p.y * vp.scale,
+      });
+      const drawLine = (a,b)=>{
+        const A = toCanvas(a), B = toCanvas(b);
+        ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+      };
+      const drawText = (p, text)=>{
+        const P = toCanvas(p);
+        ctx.font = '12px monospace';
+        ctx.fillStyle = 'yellow';
+        ctx.fillText(text, P.x + 6, P.y - 6);
+      };
+      if (measureDraft && measureDraft.start && measureDraft.end){
+        drawLine(measureDraft.start, measureDraft.end);
+      }
+      measurements.forEach(m=>{ drawLine(m.start, m.end); if (m.label) drawText(m.end, m.label); });
+      // Annotations
+      annotations.forEach(a=>{ drawText(a.pos, a.text); });
+      // Crosshair
+      if (crosshair){
+        ctx.strokeStyle = 'rgba(0,255,255,0.8)';
+        ctx.beginPath();
+        ctx.moveTo(canvas.width/2, 0); ctx.lineTo(canvas.width/2, canvas.height);
+        ctx.moveTo(0, canvas.height/2); ctx.lineTo(canvas.width, canvas.height/2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function canvasToImageCoords(vp, cx, cy){
+      const x = (cx - vp.x) / vp.scale;
+      const y = (cy - vp.y) / vp.scale;
+      return { x, y };
+    }
+
+    function imageDistance(a, b){
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const px = Math.sqrt(dx*dx + dy*dy);
+      const spacing = parsePixelSpacing(currentSeries && currentSeries.pixel_spacing);
+      if (spacing && spacing.length >= 2 && isFinite(spacing[0]) && isFinite(spacing[1])){
+        const mm = Math.sqrt((dx*spacing[0])**2 + (dy*spacing[1])**2);
+        return { px, mm };
+      }
+      return { px, mm: null };
+    }
+
+    async function saveMeasurementToServer(m){
+      const imageId = getCurrentImageId();
+      if (!imageId) return;
+      const dist = imageDistance(m.start, m.end);
+      const payload = {
+        image_id: imageId,
+        type: 'distance',
+        points: [m.start, m.end],
+        value: dist.mm || dist.px,
+        unit: dist.mm ? 'mm' : 'px',
+        notes: ''
+      };
+      try {
+        const r = await fetch('/viewer/measurements/save/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+        const j = await r.json();
+        if (j && j.success){
+          m.label = dist.mm ? `${dist.mm.toFixed(2)} mm` : `${dist.px.toFixed(1)} px`;
+        }
+      } catch(e){}
+    }
+
+    async function saveAnnotationToServer(p, text){
+      const imageId = getCurrentImageId();
+      if (!imageId) return;
+      try {
+        await fetch('/viewer/annotations/save/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ image_id: imageId, position_x: p.x, position_y: p.y, text }) });
+      } catch(e){}
+    }
+
+    async function loadOverlaysForCurrentImage(){
+      const imageId = getCurrentImageId();
+      if (!imageId) return;
+      // Load from cache or backend
+      if (imageIdToMeasurements.has(imageId)) measurements = imageIdToMeasurements.get(imageId); else {
+        try {
+          const r = await fetch(`/viewer/measurements/${imageId}/`); const j = await r.json();
+          measurements = (j.measurements||[]).map(m=>({ start: m.points[0], end: m.points[1], label: m.unit==='mm' ? `${(+m.value).toFixed(2)} mm` : `${(+m.value).toFixed(1)} px` }));
+          imageIdToMeasurements.set(imageId, measurements);
+        } catch(e){ measurements = []; }
+      }
+      if (imageIdToAnnotations.has(imageId)) annotations = imageIdToAnnotations.get(imageId); else {
+        try {
+          const r = await fetch(`/viewer/annotations/${imageId}/`); const j = await r.json();
+          annotations = (j.annotations||[]).map(a=>({ pos: {x:a.position_x, y:a.position_y}, text: a.text }));
+          imageIdToAnnotations.set(imageId, annotations);
+        } catch(e){ annotations = []; }
+      }
+      renderMeasurementsList();
+      await draw();
+    }
+
+    function renderMeasurementsList(){
+      measurementsList.innerHTML = '';
+      measurements.forEach((m, i)=>{
+        const li = document.createElement('li');
+        li.textContent = `Measurement ${i+1}: ${m.label||''}`;
+        measurementsList.appendChild(li);
+      });
     }
 
     // UI wiring
     seriesSelect.addEventListener('change', e=>{ if(e.target.value) loadSeries(e.target.value); });
     wwSlider.addEventListener('input', e=>{ ww = +e.target.value; document.getElementById('wwVal').textContent = ww; draw(); });
     wlSlider.addEventListener('input', e=>{ wl = +e.target.value; document.getElementById('wlVal').textContent = wl; draw(); });
-    sliceSlider.addEventListener('input', e=>{ index = +e.target.value; document.getElementById('sliceVal').textContent = index+1; draw(); });
+    sliceSlider.addEventListener('input', async e=>{ index = +e.target.value; document.getElementById('sliceVal').textContent = index+1; await loadOverlaysForCurrentImage(); });
     zoomSlider.addEventListener('input', e=>{ zoom = (+e.target.value)/100; document.getElementById('zoomVal').textContent = `${e.target.value}%`; draw(); });
     document.querySelectorAll('[data-preset]').forEach(btn=>btn.addEventListener('click', ()=>{
       const p = btn.getAttribute('data-preset');
@@ -204,15 +405,59 @@
     document.querySelectorAll('.tool').forEach(t=>t.addEventListener('click', ()=>{
       const tool = t.getAttribute('data-tool');
       document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active')); t.classList.add('active');
-      if (tool === 'invert'){ inverted = !inverted; draw(); }
-      if (tool === 'reset'){ zoom = 1.0; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; draw(); }
+      if (tool === 'invert'){ inverted = !inverted; draw(); return; }
+      if (tool === 'reset'){ zoom = 1.0; panOffset = {x:0,y:0}; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; draw(); return; }
+      if (tool === 'ai'){ alert('AI analysis result: (stub) No backend connected.'); return; }
+      if (tool === 'crosshair'){ crosshair = !crosshair; draw(); return; }
+      activeTool = tool;
     }));
+
+    // Mouse interactions on viewport
+    const viewport = document.getElementById('viewport');
+    viewport.addEventListener('mousedown', (e)=>{
+      isDragging = true; dragStart = { x: e.offsetX, y: e.offsetY };
+      // Start measurement draft
+      if (activeTool === 'measure'){
+        const vp2 = getViewportPlacement(canvas.width, canvas.height);
+        measureDraft = { start: canvasToImageCoords(vp2, e.offsetX, e.offsetY), end: canvasToImageCoords(vp2, e.offsetX, e.offsetY) };
+      }
+    });
+    viewport.addEventListener('mousemove', async (e)=>{
+      if (!isDragging) return;
+      const vp = getViewportPlacement(canvas.width, canvas.height);
+      if (activeTool === 'window'){
+        const dx = e.offsetX - dragStart.x; const dy = e.offsetY - dragStart.y; dragStart = { x: e.offsetX, y: e.offsetY };
+        ww = Math.max(1, ww + dx*4); wl = wl + dy*2; wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); await draw();
+      } else if (activeTool === 'pan'){
+        panOffset.x += (e.offsetX - dragStart.x); panOffset.y += (e.offsetY - dragStart.y); dragStart = { x: e.offsetX, y: e.offsetY }; await draw();
+      } else if (activeTool === 'measure' && measureDraft){
+        measureDraft.end = canvasToImageCoords(vp, e.offsetX, e.offsetY); await draw();
+      } else if (activeTool === 'annotate'){
+        // no-op while dragging
+      } else if (activeTool === 'zoom'){
+        const dy = e.offsetY - dragStart.y; dragStart = { x: e.offsetX, y: e.offsetY }; const factor = dy<0 ? 1.05 : 0.95; zoom = Math.min(5.0, Math.max(0.25, zoom*factor)); zoomSlider.value = Math.round(zoom*100); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; await draw();
+      }
+    });
+    viewport.addEventListener('mouseup', async (e)=>{
+      if (!isDragging) return; isDragging = false;
+      const vp = getViewportPlacement(canvas.width, canvas.height);
+      if (activeTool === 'measure' && measureDraft){
+        measureDraft.end = canvasToImageCoords(vp, e.offsetX, e.offsetY);
+        const m = { start: measureDraft.start, end: measureDraft.end };
+        measureDraft = null; measurements.push(m); imageIdToMeasurements.set(getCurrentImageId(), measurements);
+        await saveMeasurementToServer(m); renderMeasurementsList(); await draw();
+      } else if (activeTool === 'annotate'){
+        const pos = canvasToImageCoords(vp, e.offsetX, e.offsetY);
+        const text = prompt('Enter annotation text:');
+        if (text){ annotations.push({ pos, text }); imageIdToAnnotations.set(getCurrentImageId(), annotations); await saveAnnotationToServer(pos, text); await draw(); }
+      }
+    });
 
     // Mouse wheel slice/zoom
     document.getElementById('viewport').addEventListener('wheel', (e)=>{
       e.preventDefault();
       if (e.ctrlKey){ const delta = e.deltaY>0?0.9:1.1; zoom = Math.max(0.1, Math.min(5.0, zoom*delta)); zoomSlider.value = Math.round(zoom*100); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; draw(); }
-      else { const d = e.deltaY>0?1:-1; const ni = Math.max(0, Math.min(images.length-1, index+d)); if (ni !== index){ index = ni; sliceSlider.value = index; document.getElementById('sliceVal').textContent = index+1; draw(); } }
+      else { const d = e.deltaY>0?1:-1; const ni = Math.max(0, Math.min(images.length-1, index+d)); if (ni !== index){ index = ni; sliceSlider.value = index; document.getElementById('sliceVal').textContent = index+1; loadOverlaysForCurrentImage(); } }
     }, { passive:false });
 
     // Local DICOM upload
@@ -231,6 +476,7 @@
         reconStatus.textContent = '';
       } catch (err){
         reconStatus.textContent = `Error: ${err.message}`;
+        await fallbackToDesktop();
       } finally {
         e.target.value = '';
       }
@@ -269,7 +515,13 @@
         reconStatus.textContent = 'Done'; setTimeout(()=> reconStatus.textContent = '', 1500);
       } catch (err){
         reconStatus.textContent = `Error: ${err.message}`;
+        await fallbackToDesktop();
       }
+    });
+
+    // Clear measurements
+    btnClearMeasurements.addEventListener('click', ()=>{
+      measurements = []; imageIdToMeasurements.set(getCurrentImageId(), measurements); renderMeasurementsList(); draw();
     });
 
     // Init
