@@ -51,6 +51,8 @@
     .btn-control { background: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-primary); padding: 4px 12px; font-size: 11px; cursor: pointer; border-radius: 2px; }
     .btn-control:hover { background: var(--accent-color); color: var(--primary-bg); }
     .btn-control.reset { background: var(--accent-color); color: var(--primary-bg); }
+    .btn-upload { background: var(--success-color); border: 1px solid var(--success-color); color: white; padding: 4px 12px; font-size: 11px; cursor: pointer; border-radius: 2px; font-weight: bold; }
+    .btn-upload:hover { background: #28a745; border-color: #28a745; }
 
     /* Main Content */
     .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
@@ -66,6 +68,17 @@
     .data-table tbody tr:hover { background: rgba(0, 212, 255, 0.08); }
     .data-table tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.02); }
     .data-table tbody tr:nth-child(even):hover { background: rgba(0, 212, 255, 0.08); }
+
+    /* Action Buttons */
+    .action-buttons { display: flex; gap: 4px; flex-wrap: wrap; }
+    .btn-action { background: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-primary); padding: 3px 8px; font-size: 10px; cursor: pointer; border-radius: 2px; display: inline-flex; align-items: center; gap: 3px; }
+    .btn-action:hover { background: var(--accent-color); color: var(--primary-bg); }
+    .btn-view { background: rgba(74, 144, 226, 0.2); border-color: var(--scheduled-color); color: var(--scheduled-color); }
+    .btn-view:hover { background: var(--scheduled-color); color: white; }
+    .btn-delete { background: rgba(208, 2, 27, 0.2); border-color: var(--cancelled-color); color: var(--cancelled-color); }
+    .btn-delete:hover { background: var(--cancelled-color); color: white; }
+    .btn-viewer { background: rgba(126, 211, 33, 0.2); border-color: var(--completed-color); color: var(--completed-color); }
+    .btn-viewer:hover { background: var(--completed-color); color: white; }
 
     /* Data Styling */
     .patient-id, .study-id, .accession { font-family: 'Courier New', monospace; font-weight: bold; color: var(--accent-color); }
@@ -184,7 +197,7 @@
                         <th>DURATION</th>
                         <th>TECHNOLOGIST</th>
                         <th>ROOM</th>
-                        <th>DICOM VIEWER</th>
+                        <th>ACTIONS</th>
                     </tr>
                 </thead>
                 <tbody id="studiesTableBody">
@@ -262,10 +275,24 @@ function renderStudiesTable() {
                 <td>-</td>
                 <td>-</td>
                 <td>
-                    <div class="viewer-buttons">
-                        <button class="btn-viewer" onclick="openStudyInViewer(${study.id}); event.stopPropagation();"><i class="fas fa-eye"></i> VIEW</button>
-                        <button class="btn-viewer" onclick="openStudyInWebViewer(${study.id}); event.stopPropagation();"><i class="fas fa-globe"></i> WEB</button>
-                        <button class="btn-viewer viewer-only" onclick="openReport(${study.id}); event.stopPropagation();"><i class="fas fa-file-alt"></i> REPORT</button>
+                    <div class="action-buttons">
+                        <button class="btn-action btn-view" onclick="viewPatient(${study.id}); event.stopPropagation();" title="View Patient Details">
+                            <i class="fas fa-user"></i> VIEW
+                        </button>
+                        <button class="btn-action btn-viewer" onclick="openStudyInViewer(${study.id}); event.stopPropagation();" title="Open in Desktop Viewer">
+                            <i class="fas fa-eye"></i> DICOM
+                        </button>
+                        <button class="btn-action btn-viewer" onclick="openStudyInWebViewer(${study.id}); event.stopPropagation();" title="Open in Web Viewer">
+                            <i class="fas fa-globe"></i> WEB
+                        </button>
+                        <button class="btn-action btn-viewer" onclick="openReport(${study.id}); event.stopPropagation();" title="Open Report">
+                            <i class="fas fa-file-alt"></i> REPORT
+                        </button>
+                        {% if user.is_admin %}
+                        <button class="btn-action btn-delete" onclick="deleteStudy(${study.id}); event.stopPropagation();" title="Delete Study">
+                            <i class="fas fa-trash"></i> DELETE
+                        </button>
+                        {% endif %}
                     </div>
                 </td>
             </tr>`;
@@ -332,7 +359,13 @@ async function openStudyInViewer(studyId) {
         const res = await fetch(`/viewer/launch-desktop/${studyId}/`);
         const data = await res.json();
         if (data.success) {
-            showToast('Launching desktop DICOM viewer...', 'success');
+            if (data.fallback_url) {
+                // Open web viewer as fallback
+                window.open(data.fallback_url, '_blank');
+                showToast(data.message, 'success');
+            } else {
+                showToast('Launching desktop DICOM viewer...', 'success');
+            }
         } else {
             const details = data.details ? `\nDetails: ${data.details}` : '';
             showToast('Failed to launch viewer.' + details, 'error');
@@ -346,8 +379,15 @@ async function launchDicomViewer() {
     try {
         const res = await fetch('/viewer/launch-desktop/');
         const data = await res.json();
-        if (data.success) showToast('Launching desktop DICOM viewer...', 'success');
-        else {
+        if (data.success) {
+            if (data.fallback_url) {
+                // Open web viewer as fallback
+                window.open(data.fallback_url, '_blank');
+                showToast(data.message, 'success');
+            } else {
+                showToast('Launching desktop DICOM viewer...', 'success');
+            }
+        } else {
             const details = data.details ? `\nDetails: ${data.details}` : '';
             showToast((data.message || 'Failed to launch viewer') + details, 'error');
         }
@@ -368,6 +408,35 @@ function openReport(studyId) {
     }).finally(() => {
         window.location.href = `/reports/write/${studyId}/`;
     });
+}
+
+function viewPatient(studyId) {
+    // Navigate to patient details view
+    window.location.href = `{% url 'worklist:study_detail' 0 %}`.replace('/0/', `/${studyId}/`);
+}
+
+async function deleteStudy(studyId) {
+    if (!confirm('Are you sure you want to delete this study? This action cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/worklist/api/study/${studyId}/delete/`, {
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': getCsrf() }
+        });
+        
+        if (response.ok) {
+            showToast('Study deleted successfully', 'success');
+            loadStudiesData(); // Refresh the list
+        } else {
+            const data = await response.json();
+            showToast('Failed to delete study: ' + (data.error || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting study:', error);
+        showToast('Error deleting study', 'error');
+    }
 }
 
 function uploadStudies() { window.location.href = '{% url 'worklist:upload_study' %}'; }

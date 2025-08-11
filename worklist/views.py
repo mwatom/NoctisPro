@@ -277,7 +277,7 @@ def upload_study(request):
 @login_required
 def modern_worklist(request):
     """Modern worklist UI using the new dashboard layout"""
-    return render(request, 'worklist/modern_worklist.html')
+    return render(request, 'worklist/modern_worklist.html', {'user': request.user})
 
 @login_required
 def modern_dashboard(request):
@@ -683,6 +683,40 @@ def api_update_study_status(request, study_id):
         return JsonResponse({'error': 'Invalid JSON data'}, status=400)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+@csrf_exempt
+def api_delete_study(request, study_id):
+    """API endpoint to delete a study (admin only)"""
+    if request.method != 'DELETE':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    # Check if user is admin
+    if not request.user.is_admin():
+        return JsonResponse({'error': 'Permission denied. Only administrators can delete studies.'}, status=403)
+    
+    study = get_object_or_404(Study, id=study_id)
+    
+    try:
+        # Store study info for logging
+        study_info = {
+            'id': study.id,
+            'accession_number': study.accession_number,
+            'patient_name': study.patient.full_name,
+            'deleted_by': request.user.username
+        }
+        
+        # Delete the study (this will cascade to related objects)
+        study.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Study {study_info["accession_number"]} deleted successfully',
+            'deleted_study': study_info
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': f'Failed to delete study: {str(e)}'}, status=500)
 
 def process_attachment_metadata(attachment):
     """Extract metadata from uploaded attachment"""
