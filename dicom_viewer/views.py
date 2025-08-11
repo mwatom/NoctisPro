@@ -1099,61 +1099,40 @@ def api_process_study(request, study_id):
 
 @login_required
 def launch_standalone_viewer(request):
-    """Launch the standalone DICOM viewer application"""
+    """Launch the standalone DICOM viewer application (Python PyQt)."""
     import subprocess
     import sys
     import os
-    
+
     try:
-        # Get study ID if provided in POST data
         study_id = None
         if request.method == 'POST':
             data = json.loads(request.body) if request.body else {}
             study_id = data.get('study_id')
-        
-        # Path to the launcher script
-        launcher_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 
-                                   'tools', 'launch_dicom_viewer.py')
-        
+
+        launcher_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'tools', 'launch_dicom_viewer.py')
+
         if os.path.exists(launcher_path):
-            # Build command with appropriate arguments
             cmd = [sys.executable, launcher_path, '--debug']
-            
-            # Add study ID if provided
             if study_id:
                 cmd.extend(['--study-id', str(study_id)])
-            
-            # Run the launcher synchronously to capture success/failure
+
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode == 0:
-                message = 'Standalone DICOM viewer launched successfully'
+                message = 'Python DICOM viewer launched successfully'
                 if study_id:
                     message += f' with study ID {study_id}'
                 return JsonResponse({'success': True, 'message': message})
             else:
-                stderr = (result.stderr or '').strip()
                 stdout = (result.stdout or '').strip()
+                stderr = (result.stderr or '').strip()
                 details = stderr or stdout or 'Unknown error'
-                
-                # If C++ viewer failed, fallback to web viewer
-                if 'C++ viewer binary not found' in details or 'Failed to launch C++ viewer' in details:
-                    web_url = '/viewer/web/viewer/'
-                    if study_id:
-                        web_url += f'?study_id={study_id}'
-                    return JsonResponse({
-                        'success': True,
-                        'message': 'Opening web-based DICOM viewer instead',
-                        'fallback_url': web_url,
-                        'details': 'C++ viewer not available, using web viewer'
-                    })
-                
                 return JsonResponse({
                     'success': False,
                     'message': 'Failed to launch DICOM viewer',
                     'details': details[:500]
                 }, status=500)
         else:
-            # Fallback to web viewer if launcher not found
             web_url = '/viewer/web/viewer/'
             if study_id:
                 web_url += f'?study_id={study_id}'
@@ -1161,11 +1140,10 @@ def launch_standalone_viewer(request):
                 'success': True,
                 'message': 'Opening web-based DICOM viewer',
                 'fallback_url': web_url,
-                'details': 'Standalone launcher not found, using web viewer'
+                'details': 'Python launcher not found, using web viewer'
             })
-            
+
     except Exception as e:
-        # Fallback to web viewer on any error
         web_url = '/viewer/web/viewer/'
         if study_id:
             web_url += f'?study_id={study_id}'
@@ -1176,72 +1154,46 @@ def launch_standalone_viewer(request):
             'details': f'Error: {str(e)}, using web viewer'
         })
 
+
 @login_required
 def launch_study_in_desktop_viewer(request, study_id):
-    """Launch a specific study in the desktop viewer"""
+    """Launch a specific study in the desktop viewer (Python PyQt)."""
     import subprocess
     import sys
     import os
-    
+
     try:
-        # Verify study exists and user has access
         study = get_object_or_404(Study, id=study_id)
         user = request.user
-        
-        # Check permissions
         if user.is_facility_user() and study.facility != user.facility:
-            return JsonResponse({
-                'success': False,
-                'message': 'You do not have permission to view this study.'
-            }, status=403)
-        
-        # Path to the launcher script
-        launcher_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 
-                                   'tools', 'launch_dicom_viewer.py')
-        
+            return JsonResponse({'success': False, 'message': 'You do not have permission to view this study.'}, status=403)
+
+        launcher_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'tools', 'launch_dicom_viewer.py')
+
         if os.path.exists(launcher_path):
-            # Build command with study ID
             cmd = [sys.executable, launcher_path, '--debug', '--study-id', str(study_id)]
-            
-            # Run the launcher synchronously to capture success/failure
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode == 0:
-                return JsonResponse({
-                    'success': True, 
-                    'message': f'Desktop viewer launched for study: {study.patient.full_name} ({study.study_date})'
-                })
+                return JsonResponse({'success': True, 'message': f'Viewer launched for study: {study.patient.full_name} ({study.study_date})'})
             else:
-                stderr = (result.stderr or '').strip()
                 stdout = (result.stdout or '').strip()
+                stderr = (result.stderr or '').strip()
                 details = stderr or stdout or 'Unknown error'
-                
-                # If C++ viewer failed, fallback to web viewer
-                if 'C++ viewer binary not found' in details or 'Failed to launch C++ viewer' in details:
-                    web_url = f'/viewer/web/viewer/?study_id={study_id}'
-                    return JsonResponse({
-                        'success': True,
-                        'message': f'Opening web-based DICOM viewer for study: {study.patient.full_name}',
-                        'fallback_url': web_url,
-                        'details': 'C++ viewer not available, using web viewer'
-                    })
-                
                 return JsonResponse({
                     'success': False,
                     'message': 'Failed to launch DICOM viewer',
                     'details': details[:500]
                 }, status=500)
         else:
-            # Fallback to web viewer if launcher not found
             web_url = f'/viewer/web/viewer/?study_id={study_id}'
             return JsonResponse({
                 'success': True,
                 'message': f'Opening web-based DICOM viewer for study: {study.patient.full_name}',
                 'fallback_url': web_url,
-                'details': 'Standalone launcher not found, using web viewer'
+                'details': 'Python launcher not found, using web viewer'
             })
-            
+
     except Exception as e:
-        # Fallback to web viewer on any error
         web_url = f'/viewer/web/viewer/?study_id={study_id}'
         return JsonResponse({
             'success': True,
