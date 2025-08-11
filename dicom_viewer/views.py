@@ -1122,7 +1122,8 @@ def launch_standalone_viewer(request):
         else:
             return JsonResponse({
                 'success': False, 
-                'message': 'Standalone viewer launcher not found'
+                'message': 'Standalone viewer launcher not found',
+                'details': f'Missing launcher at {launcher_path}'
             }, status=404)
             
     except Exception as e:
@@ -1177,7 +1178,8 @@ def launch_study_in_desktop_viewer(request, study_id):
         else:
             return JsonResponse({
                 'success': False, 
-                'message': 'Desktop viewer launcher not found'
+                'message': 'Desktop viewer launcher not found',
+                'details': f'Missing launcher at {launcher_path}'
             }, status=404)
             
     except Exception as e:
