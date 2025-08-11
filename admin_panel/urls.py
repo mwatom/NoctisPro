@@ -17,4 +17,8 @@ urlpatterns = [
     path('facilities/create/', views.facility_create, name='facility_create'),
     path('facilities/edit/<int:facility_id>/', views.facility_edit, name='facility_edit'),
     path('facilities/delete/<int:facility_id>/', views.facility_delete, name='facility_delete'),
+
+    # Placeholder routes referenced by templates
+    path('logs/', views.system_logs, name='system_logs'),
+    path('settings/', views.settings_view, name='settings'),
 ]

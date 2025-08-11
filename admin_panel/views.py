@@ -11,6 +11,7 @@ from worklist.models import Study, Modality
 from .models import SystemConfiguration, AuditLog, SystemUsageStatistics
 import json
 
+
 def is_admin(user):
     """Check if user is admin"""
     return user.is_authenticated and user.is_admin()
@@ -45,6 +46,20 @@ def dashboard(request):
     }
     
     return render(request, 'admin_panel/dashboard.html', context)
+
+@login_required
+@user_passes_test(is_admin)
+def system_logs(request):
+    """Placeholder: system logs view."""
+    messages.info(request, 'System Logs view is under construction.')
+    return dashboard(request)
+
+@login_required
+@user_passes_test(is_admin)
+def settings_view(request):
+    """Placeholder: settings view."""
+    messages.info(request, 'Settings view is under construction.')
+    return dashboard(request)
 
 @login_required
 @user_passes_test(is_admin)
@@ -289,13 +304,19 @@ def facility_create(request):
     """Create new facility"""
     if request.method == 'POST':
         try:
+            name = request.POST.get('name')
+            ae_title = (request.POST.get('ae_title', '') or '').strip().upper()
+            # Auto-generate AE Title if missing
+            if not ae_title and name:
+                base = ''.join(ch for ch in name.upper() if ch.isalnum() or ch == ' ').strip().replace(' ', '_')
+                ae_title = (base[:12] or 'FACILITY')  # limit length, DICOM AE max 16; keep some headroom
             facility = Facility.objects.create(
-                name=request.POST.get('name'),
+                name=name,
                 address=request.POST.get('address'),
                 phone=request.POST.get('phone'),
                 email=request.POST.get('email'),
                 license_number=request.POST.get('license_number'),
-                ae_title=request.POST.get('ae_title', '').strip().upper(),
+                ae_title=ae_title,
                 is_active=request.POST.get('is_active') == 'on'
             )
             
@@ -335,7 +356,11 @@ def facility_edit(request, facility_id):
             facility.phone = request.POST.get('phone')
             facility.email = request.POST.get('email')
             facility.license_number = request.POST.get('license_number')
-            facility.ae_title = (request.POST.get('ae_title', '') or '').strip().upper()
+            ae_title = (request.POST.get('ae_title', '') or '').strip().upper()
+            if not ae_title and facility.name:
+                base = ''.join(ch for ch in facility.name.upper() if ch.isalnum() or ch == ' ').strip().replace(' ', '_')
+                ae_title = (base[:12] or 'FACILITY')
+            facility.ae_title = ae_title
             facility.is_active = request.POST.get('is_active') == 'on'
             
             # Handle letterhead upload

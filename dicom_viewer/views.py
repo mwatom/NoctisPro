@@ -1037,7 +1037,8 @@ def upload_dicom(request):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
     
-    return render(request, 'dicom_viewer/upload.html')
+    # Render a minimal upload helper if needed
+    return JsonResponse({'success': False, 'error': 'Use POST to upload DICOM files'})
 
 @login_required
 @csrf_exempt

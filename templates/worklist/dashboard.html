@@ -584,10 +584,10 @@
                     <div class="user-avatar">{{ user.get_full_name|default:user.username|slice:":2"|upper }}</div>
                     <div>
                         <div>{{ user.get_full_name|default:user.username }}</div>
-                        <div style="color: var(--text-muted); font-size: 10px;">{% if user.is_staff %}Administrator{% else %}Radiologist{% endif %}</div>
+                        <div style="color: var(--text-muted); font-size: 10px;">{% if user.is_admin %}Administrator{% else %}Radiologist{% endif %}</div>
                     </div>
                 </div>
-                {% if user.is_staff %}
+                {% if user.is_admin %}
                 <button class="admin-btn" onclick="window.location.href='{% url 'admin_panel:dashboard' %}'">
                     <i class="fas fa-shield-alt"></i> ADMIN
                 </button>

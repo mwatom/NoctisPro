@@ -579,6 +579,12 @@
                         <div style="color: var(--text-muted); font-size: 10px;">Administrator</div>
                     </div>
                 </div>
+                <button class="worklist-btn" onclick="window.location.href='{% url 'admin_panel:facility_create' %}'" title="Add Facility">
+                    <i class="fas fa-hospital"></i> ADD FACILITY
+                </button>
+                <button class="worklist-btn" onclick="window.location.href='{% url 'admin_panel:user_create' %}?role=radiologist'" title="Add Radiologist">
+                    <i class="fas fa-user-md"></i> ADD RADIOLOGIST
+                </button>
                 <button class="worklist-btn" onclick="window.location.href='{% url 'worklist:dashboard' %}'">
                     <i class="fas fa-home"></i> WORKLIST
                 </button>
