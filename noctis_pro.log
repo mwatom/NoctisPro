@@ -1,1 +1,7 @@
 
+Watching for file changes with StatReloader
+"GET /worklist/ui/ HTTP/1.1" 302 0
+"GET /worklist/ui/ HTTP/1.1" 302 0
+"GET /worklist/ui/ HTTP/1.1" 302 0
+"GET / HTTP/1.1" 302 0
+Watching for file changes with StatReloader

@@ -498,9 +498,7 @@
                 <nav class="nav-tabs">
                     <a href="{% url 'worklist:dashboard' %}" class="nav-tab">Dashboard</a>
                     <a href="{% url 'worklist:modern_worklist' %}" class="nav-tab active">Worklist</a>
-                    <a href="{% url 'worklist:patients' %}" class="nav-tab">Patients</a>
-                    <a href="{% url 'worklist:studies' %}" class="nav-tab">Studies</a>
-                    <a href="{% url 'worklist:reports' %}" class="nav-tab">Reports</a>
+                    <a href="{% url 'worklist:study_list' %}" class="nav-tab">Studies</a>
                 </nav>
             </div>
             <div class="header-right">
@@ -596,7 +594,7 @@
                             <i class="fas fa-search search-icon"></i>
                             <input type="text" class="search-input" placeholder="Search studies, patients..." id="search-input">
                         </div>
-                        <a href="{% url 'worklist:upload' %}" class="btn btn-primary">
+                        <a href="{% url 'worklist:upload_study' %}" class="btn btn-primary">
                             <i class="fas fa-plus"></i>
                             Upload Study
                         </a>
