@@ -3,8 +3,8 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib import messages
-from worklist.models import Study, Series, DicomImage
-from accounts.models import User
+from worklist.models import Study, Series, DicomImage, Patient, Modality
+from accounts.models import User, Facility
 import json
 import base64
 import os
@@ -921,6 +921,7 @@ def api_export_measurements(request, study_id):
     
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
+@login_required
 @csrf_exempt
 def upload_dicom(request):
     """Upload DICOM files for processing"""
@@ -940,36 +941,133 @@ def upload_dicom(request):
             # Generate upload ID for tracking
             upload_id = str(uuid.uuid4())
             
-            # Process DICOM files and create temporary Study/Series/Image records
+            # Process DICOM files and create Study/Series/Image records
             total_files = len(uploaded_files)
             processed_files = 0
             processed_images = []
-            
-            # Create a temporary study for standalone uploads
-            temp_study = Study.objects.create(
-                patient_name=f'Temp Upload {upload_id[:8]}',
-                patient_id=f'TEMP_{upload_id[:8]}',
-                study_date=timezone.now().date(),
-                study_description='Temporary upload for standalone viewer',
-                accession_number=f'TEMP_{upload_id[:8]}',
-                modality='CT',  # Default, will be updated from DICOM
-                status='completed'
+
+            # Save first file to extract study-level metadata
+            first_file = uploaded_files[0]
+            first_file_rel_path = f'temp_uploads/{upload_id}_first_{first_file.name}'
+            first_file_full_path = os.path.join('/workspace/media', first_file_rel_path)
+            os.makedirs(os.path.dirname(first_file_full_path), exist_ok=True)
+            with open(first_file_full_path, 'wb+') as destination:
+                for chunk in first_file.chunks():
+                    destination.write(chunk)
+
+            # Read DICOM metadata from first file
+            rep_ds = pydicom.dcmread(first_file_full_path)
+
+            # Extract and normalize patient info
+            patient_id = str(getattr(rep_ds, 'PatientID', f'TEMP_{upload_id[:8]}'))
+            patient_name = str(getattr(rep_ds, 'PatientName', 'TEMP^UPLOAD'))
+            name_parts = patient_name.replace('^', ' ').split()
+            first_name = name_parts[0] if len(name_parts) > 0 else 'TEMP'
+            last_name = name_parts[1] if len(name_parts) > 1 else upload_id[:8]
+            birth_date = getattr(rep_ds, 'PatientBirthDate', None)
+            from datetime import datetime
+            if birth_date:
+                try:
+                    dob = datetime.strptime(birth_date, '%Y%m%d').date()
+                except Exception:
+                    dob = timezone.now().date()
+            else:
+                dob = timezone.now().date()
+            gender = getattr(rep_ds, 'PatientSex', 'O')
+            if gender not in ['M', 'F', 'O']:
+                gender = 'O'
+
+            # Create or get Patient
+            patient, _ = Patient.objects.get_or_create(
+                patient_id=patient_id,
+                defaults={'first_name': first_name, 'last_name': last_name, 'date_of_birth': dob, 'gender': gender}
+            )
+
+            # Facility attribution
+            facility = getattr(request.user, 'facility', None)
+            if not facility:
+                facility = Facility.objects.filter(is_active=True).first()
+            if not facility:
+                # Create a default facility if none exist
+                facility = Facility.objects.create(
+                    name='Default Facility',
+                    address='N/A',
+                    phone='N/A',
+                    email='default@example.com',
+                    license_number=f'DEFAULT-{upload_id[:8]}',
+                    ae_title='',
+                    is_active=True
+                )
+
+            # Modality
+            modality_code = getattr(rep_ds, 'Modality', 'OT')
+            modality_obj, _ = Modality.objects.get_or_create(code=modality_code, defaults={'name': modality_code})
+
+            # Study fields
+            study_description = getattr(rep_ds, 'StudyDescription', 'Temporary DICOM Upload')
+            referring_physician = str(getattr(rep_ds, 'ReferringPhysicianName', 'UNKNOWN')).replace('^', ' ')
+            accession_number = getattr(rep_ds, 'AccessionNumber', f"TEMP_{upload_id[:8]}")
+            study_instance_uid = getattr(rep_ds, 'StudyInstanceUID', f'temp.{upload_id}')
+            study_date = getattr(rep_ds, 'StudyDate', None)
+            study_time = getattr(rep_ds, 'StudyTime', '000000')
+            if study_date:
+                try:
+                    sdt = datetime.strptime(f"{study_date}{study_time[:6]}", '%Y%m%d%H%M%S')
+                    sdt = timezone.make_aware(sdt)
+                except Exception:
+                    sdt = timezone.now()
+            else:
+                sdt = timezone.now()
+
+            # Create or get Study
+            temp_study, _ = Study.objects.get_or_create(
+                study_instance_uid=study_instance_uid,
+                defaults={
+                    'accession_number': accession_number,
+                    'patient': patient,
+                    'facility': facility,
+                    'modality': modality_obj,
+                    'study_description': study_description,
+                    'study_date': sdt,
+                    'referring_physician': referring_physician,
+                    'status': 'completed',
+                    'priority': 'normal',
+                    'uploaded_by': request.user,
+                }
+            )
+
+            # Create or get a series for this upload (use first file's SeriesInstanceUID if present)
+            first_series_uid = getattr(rep_ds, 'SeriesInstanceUID', f'temp.series.{upload_id}')
+            series_number = getattr(rep_ds, 'SeriesNumber', 1) or 1
+            series_desc = getattr(rep_ds, 'SeriesDescription', 'Temporary series')
+            temp_series, _ = Series.objects.get_or_create(
+                series_instance_uid=first_series_uid,
+                defaults={
+                    'study': temp_study,
+                    'series_number': int(series_number),
+                    'series_description': series_desc,
+                    'modality': modality_code,
+                    'body_part': getattr(rep_ds, 'BodyPartExamined', ''),
+                    'slice_thickness': getattr(rep_ds, 'SliceThickness', None) or None,
+                    'pixel_spacing': str(getattr(rep_ds, 'PixelSpacing', '')),
+                    'image_orientation': str(getattr(rep_ds, 'ImageOrientationPatient', '')),
+                }
             )
             
-            # Create a temporary series
-            temp_series = Series.objects.create(
-                study=temp_study,
-                series_number=1,
-                series_description='Temporary series',
-                modality='CT',  # Default, will be updated from DICOM
-                series_uid=f'temp.{upload_id}',
-                image_count=0
-            )
-            
+            # Now process all files
             for file in uploaded_files:
                 # Validate file type
                 if not (file.name.lower().endswith('.dcm') or file.name.lower().endswith('.dicom')):
-                    continue
+                    # Attempt to read as DICOM anyway; skip if fails
+                    try:
+                        ds_tmp = pydicom.dcmread(file, force=True)
+                    except Exception:
+                        continue
+                    # Reset pointer for saving
+                    try:
+                        file.seek(0)
+                    except Exception:
+                        pass
                 
                 try:
                     # Save file temporarily
@@ -984,24 +1082,21 @@ def upload_dicom(request):
                     # Read DICOM metadata
                     ds = pydicom.dcmread(full_path)
                     
-                    # Update series metadata from first file
-                    if processed_files == 0:
-                        temp_series.modality = getattr(ds, 'Modality', 'CT')
-                        temp_series.series_description = getattr(ds, 'SeriesDescription', 'Uploaded DICOM')
-                        temp_study.patient_name = str(getattr(ds, 'PatientName', f'Temp Upload {upload_id[:8]}'))
-                        temp_study.modality = getattr(ds, 'Modality', 'CT')
-                        temp_study.save()
-                        temp_series.save()
-                    
                     # Create image record
-                    image = DicomImage.objects.create(
-                        series=temp_series,
-                        instance_number=getattr(ds, 'InstanceNumber', processed_files + 1),
-                        slice_location=getattr(ds, 'SliceLocation', 0),
-                        image_position=str(getattr(ds, 'ImagePositionPatient', '')),
-                        file_path=file_path,
-                        file_size=file.size
-                    )
+                    sop_uid = getattr(ds, 'SOPInstanceUID', f'{upload_id}.{processed_files+1}')
+                    instance_number = getattr(ds, 'InstanceNumber', processed_files + 1)
+                    image = DicomImage.objects.get_or_create(
+                        sop_instance_uid=sop_uid,
+                        defaults={
+                            'series': temp_series,
+                            'instance_number': int(instance_number),
+                            'image_position': str(getattr(ds, 'ImagePositionPatient', '')),
+                            'slice_location': getattr(ds, 'SliceLocation', None),
+                            'file_path': file_path,
+                            'file_size': getattr(file, 'size', 0) or 0,
+                            'processed': False,
+                        }
+                    )[0]
                     
                     processed_images.append({
                         'id': image.id,
@@ -1015,12 +1110,7 @@ def upload_dicom(request):
                     print(f"Error processing file {file.name}: {str(e)}")
                     continue
             
-            # Update series image count
-            temp_series.image_count = processed_files
-            temp_series.save()
-            
             if processed_files == 0:
-                temp_study.delete()  # Clean up
                 return JsonResponse({'success': False, 'error': 'No valid DICOM files found'})
             
             return JsonResponse({

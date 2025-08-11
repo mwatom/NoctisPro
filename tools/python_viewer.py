@@ -189,6 +189,15 @@ class DicomViewer(QMainWindow):
         load_btn.clicked.connect(self.load_dicom_files)
         top_layout.addWidget(load_btn)
 
+        folder_btn = QPushButton("Load DICOM Folder")
+        folder_btn.setStyleSheet("""
+            QPushButton { background-color: #0b8457; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; }
+            QPushButton:hover { background-color: #086b46; }
+        """
+        )
+        folder_btn.clicked.connect(self.load_dicom_folder)
+        top_layout.addWidget(folder_btn)
+
         self.backend_combo = QComboBox()
         self.backend_combo.addItem("Select Series")
         self.backend_combo.setStyleSheet("padding: 6px; border-radius: 4px; font-size: 14px;")
@@ -680,6 +689,19 @@ class DicomViewer(QMainWindow):
         if file_paths:
             self._load_dicom_paths(file_paths)
 
+    def load_dicom_folder(self):
+        directory = QFileDialog.getExistingDirectory(self, "Select DICOM Folder", "")
+        if directory:
+            paths = []
+            for root, dirs, files in os.walk(directory):
+                for name in files:
+                    if name.lower().endswith('.dcm') or name.lower().endswith('.dicom'):
+                        paths.append(os.path.join(root, name))
+            if not paths:
+                QMessageBox.information(self, "No DICOM files", "No .dcm or .dicom files found in the selected folder.")
+                return
+            self._load_dicom_paths(paths)
+
     def _load_dicom_paths(self, paths):
         self.dicom_files = []
         for file_path in paths:
@@ -694,18 +716,12 @@ class DicomViewer(QMainWindow):
             self.slice_slider.setRange(0, len(self.dicom_files) - 1)
             self.slice_slider.setValue(0)
             first_dicom = self.dicom_files[0]
-            ww = getattr(first_dicom, 'WindowWidth', None)
-            wl = getattr(first_dicom, 'WindowCenter', None)
-            if ww is not None and wl is not None:
-                try:
-                    self.window_width = float(ww[0]) if hasattr(ww, '__iter__') else float(ww)
-                    self.window_level = float(wl[0]) if hasattr(wl, '__iter__') else float(wl)
-                except Exception:
-                    pass
-                self.ww_slider.setValue(int(self.window_width))
-                self.wl_slider.setValue(int(self.window_level))
-            self.update_patient_info()
-            self.update_display()
+            self.current_dicom = first_dicom
+            self.display_dicom(first_dicom)
+            modality = getattr(first_dicom, 'Modality', 'Unknown')
+            patient_name = getattr(first_dicom, 'PatientName', 'Unknown')
+            study_date = getattr(first_dicom, 'StudyDate', 'Unknown')
+            self.patient_info_label.setText(f"Patient: {patient_name} | Study Date: {study_date} | Modality: {modality}")
 
     def update_patient_info(self):
         if not self.dicom_files:
