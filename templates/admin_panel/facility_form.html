@@ -101,6 +101,17 @@
                                value="{{ facility.license_number|default:'' }}" required>
                     </div>
 
+                    <div class="col-md-6">
+                        <label for="ae_title" class="form-label text-white">
+                            DICOM AE Title
+                        </label>
+                        <input type="text" class="form-control form-control-medical" id="ae_title" name="ae_title"
+                               placeholder="e.g., NOCTIS_FAC_A" value="{{ facility.ae_title|default:'' }}">
+                        <div class="form-text text-secondary">
+                            <small>Studies received with this AE Title will be attributed to this facility.</small>
+                        </div>
+                    </div>
+
                     <div class="col-12">
                         <label for="address" class="form-label text-white">
                             Address <span class="text-danger">*</span>

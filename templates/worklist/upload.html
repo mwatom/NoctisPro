@@ -20,110 +20,26 @@
         box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
     }
 
-    .upload-header {
-        text-align: center;
-        margin-bottom: 2rem;
-    }
+    .upload-header { text-align: center; margin-bottom: 2rem; }
+    .upload-icon { background: var(--gradient-accent); border-radius: 50%; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: white; margin: 0 auto 1rem; }
 
-    .upload-icon {
-        background: var(--gradient-accent);
-        border-radius: 50%;
-        width: 80px;
-        height: 80px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 2rem;
-        color: white;
-        margin: 0 auto 1rem;
-    }
+    .drop-zone { border: 2px dashed var(--border-color); border-radius: 12px; padding: 3rem 2rem; text-align: center; cursor: pointer; transition: all 0.3s ease; background: rgba(255, 255, 255, 0.02); }
+    .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent-color); background: rgba(14, 165, 233, 0.05); }
 
-    .drop-zone {
-        border: 2px dashed var(--border-color);
-        border-radius: 12px;
-        padding: 3rem 2rem;
-        text-align: center;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        background: rgba(255, 255, 255, 0.02);
-    }
+    .file-input { display: none; }
 
-    .drop-zone:hover,
-    .drop-zone.dragover {
-        border-color: var(--accent-color);
-        background: rgba(14, 165, 233, 0.05);
-    }
+    .upload-actions { display: flex; gap: 1rem; margin-top: 2rem; justify-content: center; }
 
-    .file-input {
-        display: none;
-    }
+    .progress-section { margin-top: 2rem; display: none; }
 
-    .upload-actions {
-        display: flex;
-        gap: 1rem;
-        margin-top: 2rem;
-        justify-content: center;
-    }
-
-    .progress-section {
-        margin-top: 2rem;
-        display: none;
-    }
-
-    .file-list {
-        margin-top: 2rem;
-    }
-
-    .file-item {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        padding: 1rem;
-        margin-bottom: 1rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-
-    .file-info {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-    }
-
-    .file-icon {
-        color: var(--accent-color);
-        font-size: 1.5rem;
-    }
-
-    .file-details h6 {
-        margin: 0;
-        color: var(--text-primary);
-    }
-
-    .file-size {
-        color: var(--text-secondary);
-        font-size: 0.9rem;
-    }
-
-    .remove-file {
-        background: var(--danger-color);
-        border: none;
-        border-radius: 50%;
-        width: 32px;
-        height: 32px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
-
-    .remove-file:hover {
-        background: #dc2626;
-        transform: scale(1.1);
-    }
+    .file-list { margin-top: 2rem; }
+    .file-item { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; }
+    .file-info { display: flex; align-items: center; gap: 1rem; }
+    .file-icon { color: var(--accent-color); font-size: 1.5rem; }
+    .file-details h6 { margin: 0; color: var(--text-primary); }
+    .file-size { color: var(--text-secondary); font-size: 0.9rem; }
+    .remove-file { background: var(--danger-color); border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: white; cursor: pointer; transition: all 0.3s ease; }
+    .remove-file:hover { background: #dc2626; transform: scale(1.1); }
 </style>
 {% endblock %}
 
@@ -135,22 +51,22 @@
                 <i class="fas fa-cloud-upload-alt"></i>
             </div>
             <h2 class="text-light">Upload DICOM Studies</h2>
-            <p class="text-secondary">Upload DICOM files or drag and drop them here</p>
+            <p class="text-secondary">Upload individual DICOM files or select a folder containing an entire study</p>
         </div>
 
         <form id="uploadForm" enctype="multipart/form-data">
             {% csrf_token %}
             <div class="drop-zone" id="dropZone">
                 <i class="fas fa-file-medical text-accent" style="font-size: 3rem; margin-bottom: 1rem;"></i>
-                <h4 class="text-light mb-3">Drop DICOM files here</h4>
+                <h4 class="text-light mb-3">Drop DICOM files or folders here</h4>
                 <p class="text-secondary mb-3">or click to browse</p>
                 <button type="button" class="btn btn-medical" onclick="document.getElementById('fileInput').click()">
                     <i class="fas fa-folder-open me-2"></i>
-                    Choose Files
+                    Choose Files / Folder
                 </button>
             </div>
             
-            <input type="file" id="fileInput" class="file-input" multiple accept=".dcm,.dicom">
+            <input type="file" id="fileInput" class="file-input" multiple webkitdirectory directory>
             
             <div class="file-list" id="fileList" style="display: none;">
                 <h5 class="text-light mb-3">Selected Files</h5>
@@ -214,8 +130,23 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         dropZone.classList.remove('dragover');
         
-        const files = Array.from(e.dataTransfer.files);
-        handleFiles(files);
+        const items = e.dataTransfer.items;
+        if (items && items.length) {
+            // Support dropping folders by traversing entries (Chrome/WebKit)
+            const traverse = (entry) => new Promise((resolve) => {
+                if (entry.isFile) { entry.file(f => resolve([f])); }
+                else if (entry.isDirectory) {
+                    const reader = entry.createReader();
+                    reader.readEntries(async entries => {
+                        const results = await Promise.all(entries.map(traverse));
+                        resolve(results.flat());
+                    });
+                } else { resolve([]); }
+            });
+            Promise.all(Array.from(items).map(i => traverse(i.webkitGetAsEntry()))).then(files => handleFiles(files.flat()));
+        } else {
+            handleFiles(Array.from(e.dataTransfer.files));
+        }
     });
 
     // File input change
@@ -273,15 +204,9 @@ document.addEventListener('DOMContentLoaded', function() {
         `).join('');
     }
 
-    function updateUploadButton() {
-        uploadBtn.disabled = selectedFiles.length === 0;
-    }
+    function updateUploadButton() { uploadBtn.disabled = selectedFiles.length === 0; }
 
-    window.removeFile = function(index) {
-        selectedFiles.splice(index, 1);
-        updateFileList();
-        updateUploadButton();
-    };
+    window.removeFile = function(index) { selectedFiles.splice(index, 1); updateFileList(); updateUploadButton(); };
 
     function formatFileSize(bytes) {
         if (bytes === 0) return '0 Bytes';
@@ -293,10 +218,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function uploadFiles() {
         const formData = new FormData();
-        
-        selectedFiles.forEach((file, index) => {
-            formData.append('dicom_files', file);
-        });
+        selectedFiles.forEach((file) => { formData.append('dicom_files', file); });
 
         // Show progress
         progressSection.style.display = 'block';
@@ -308,7 +230,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const progressInterval = setInterval(() => {
             progress += Math.random() * 15;
             if (progress > 90) progress = 90;
-            
             updateProgress(progress);
         }, 200);
 
@@ -316,19 +237,16 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch('{% url "worklist:upload_study" %}', {
             method: 'POST',
             body: formData,
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            }
+            headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
         })
         .then(response => response.json())
         .then(data => {
             clearInterval(progressInterval);
             updateProgress(100);
-            
             setTimeout(() => {
                 if (data.success) {
-                    showNotification('Files uploaded successfully!', 'success');
-                    window.location.href = '{% url "worklist:dashboard" %}';
+                    showNotification('Files uploaded successfully! Updating worklist...', 'success');
+                    window.location.href = '{% url "worklist:modern_worklist" %}';
                 } else {
                     showNotification('Upload failed: ' + (data.error || 'Unknown error'), 'error');
                     resetUploadState();
@@ -343,20 +261,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function updateProgress(percent) {
-        const progressBar = document.getElementById('progressBar');
-        const progressText = document.getElementById('progressText');
-        
-        progressBar.style.width = percent + '%';
-        progressText.textContent = Math.round(percent) + '%';
-    }
-
-    function resetUploadState() {
-        uploadBtn.disabled = false;
-        uploadBtn.innerHTML = '<i class="fas fa-upload me-2"></i>Upload Studies';
-        progressSection.style.display = 'none';
-        updateProgress(0);
-    }
+    function updateProgress(percent) { const bar = document.getElementById('progressBar'); const text = document.getElementById('progressText'); bar.style.width = percent + '%'; text.textContent = Math.round(percent) + '%'; }
+    function resetUploadState() { uploadBtn.disabled = false; uploadBtn.innerHTML = '<i class="fas fa-upload me-2"></i>Upload Studies'; progressSection.style.display = 'none'; updateProgress(0); }
 
     function showNotification(message, type = 'info') {
         const alertClass = type === 'error' ? 'danger' : type;
@@ -367,14 +273,8 @@ document.addEventListener('DOMContentLoaded', function() {
             ${message}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         `;
-        
         document.body.appendChild(alert);
-        
-        setTimeout(() => {
-            if (alert.parentNode) {
-                alert.remove();
-            }
-        }, 5000);
+        setTimeout(() => { if (alert.parentNode) { alert.remove(); } }, 5000);
     }
 });
 </script>

@@ -165,8 +165,15 @@ class DicomReceiver:
                 defaults={'name': modality_code, 'description': f'{modality_code} Modality'}
             )
             
-            # Use default facility for received studies
-            default_facility = Facility.objects.filter(is_active=True).first()
+            # Try to attribute by called AE title (ours) or requestor AE title (sender)
+            called_aet = getattr(event, 'assoc', None) and event.assoc.acceptor.ae_title.decode(errors='ignore') if getattr(event, 'assoc', None) else None
+            requestor_aet = getattr(event, 'assoc', None) and event.assoc.requestor.ae_title.decode(errors='ignore') if getattr(event, 'assoc', None) else None
+            facility_match = None
+            if called_aet:
+                facility_match = Facility.objects.filter(ae_title__iexact=called_aet.strip()).first()
+            if not facility_match and requestor_aet:
+                facility_match = Facility.objects.filter(ae_title__iexact=requestor_aet.strip()).first()
+            default_facility = facility_match or Facility.objects.filter(is_active=True).first()
             if not default_facility:
                 logger.error("No active facility found for storing DICOM study")
                 return False

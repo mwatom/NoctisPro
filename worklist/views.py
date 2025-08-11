@@ -20,7 +20,7 @@ from .models import (
     Study, Patient, Modality, Series, DicomImage, StudyAttachment, 
     AttachmentComment, AttachmentVersion
 )
-from accounts.models import User
+from accounts.models import User, Facility
 
 @login_required
 def dashboard(request):
@@ -178,27 +178,149 @@ def upload_study(request):
             if not uploaded_files:
                 return JsonResponse({'success': False, 'error': 'No files uploaded'})
             
-            # This would process DICOM files
-            # For now, we'll simulate processing
-            total_files = len(uploaded_files)
-            processed_files = 0
-            
-            for file in uploaded_files:
-                # Validate file type
-                if not (file.name.lower().endswith('.dcm') or file.name.lower().endswith('.dicom')):
+            # Group incoming files by StudyInstanceUID then SeriesInstanceUID
+            studies_map = {}
+            invalid_files = 0
+            for in_file in uploaded_files:
+                try:
+                    # Read dataset without saving to disk first
+                    ds = pydicom.dcmread(in_file, force=True)
+                    study_uid = getattr(ds, 'StudyInstanceUID', None)
+                    series_uid = getattr(ds, 'SeriesInstanceUID', None)
+                    sop_uid = getattr(ds, 'SOPInstanceUID', None)
+                    if not (study_uid and series_uid and sop_uid):
+                        invalid_files += 1
+                        continue
+                    studies_map.setdefault(study_uid, {}).setdefault(series_uid, []).append((ds, in_file))
+                except Exception:
+                    invalid_files += 1
                     continue
-                
-                # This would save the file and create Study/Series/Image records
-                processed_files += 1
             
-            if processed_files == 0:
+            if not studies_map:
                 return JsonResponse({'success': False, 'error': 'No valid DICOM files found'})
             
+            created_studies = []
+            for study_uid, series_map in studies_map.items():
+                # Extract representative dataset
+                first_series_key = next(iter(series_map))
+                rep_ds = series_map[first_series_key][0][0]
+                
+                # Patient info
+                patient_id = getattr(rep_ds, 'PatientID', 'UNKNOWN')
+                patient_name = str(getattr(rep_ds, 'PatientName', 'UNKNOWN')).replace('^', ' ')
+                name_parts = patient_name.split(' ', 1)
+                first_name = name_parts[0] if name_parts else 'Unknown'
+                last_name = name_parts[1] if len(name_parts) > 1 else ''
+                birth_date = getattr(rep_ds, 'PatientBirthDate', None)
+                from datetime import datetime
+                if birth_date:
+                    try:
+                        dob = datetime.strptime(birth_date, '%Y%m%d').date()
+                    except Exception:
+                        dob = timezone.now().date()
+                else:
+                    dob = timezone.now().date()
+                gender = getattr(rep_ds, 'PatientSex', 'O')
+                if gender not in ['M','F','O']:
+                    gender = 'O'
+                
+                patient, _ = Patient.objects.get_or_create(
+                    patient_id=patient_id,
+                    defaults={'first_name': first_name, 'last_name': last_name, 'date_of_birth': dob, 'gender': gender}
+                )
+                
+                # Modality and basic study fields
+                modality_code = getattr(rep_ds, 'Modality', 'OT')
+                modality, _ = Modality.objects.get_or_create(code=modality_code, defaults={'name': modality_code})
+                study_description = getattr(rep_ds, 'StudyDescription', 'DICOM Study')
+                referring_physician = str(getattr(rep_ds, 'ReferringPhysicianName', 'UNKNOWN')).replace('^', ' ')
+                accession_number = getattr(rep_ds, 'AccessionNumber', f"ACC_{int(timezone.now().timestamp())}")
+                study_date = getattr(rep_ds, 'StudyDate', None)
+                study_time = getattr(rep_ds, 'StudyTime', '000000')
+                if study_date:
+                    try:
+                        sdt = datetime.strptime(f"{study_date}{study_time[:6]}", '%Y%m%d%H%M%S')
+                        sdt = timezone.make_aware(sdt)
+                    except Exception:
+                        sdt = timezone.now()
+                else:
+                    sdt = timezone.now()
+                
+                # Facility attribution
+                facility = request.user.facility if getattr(request.user, 'facility', None) else Facility.objects.filter(is_active=True).first()
+                if not facility:
+                    return JsonResponse({'success': False, 'error': 'No active facility configured'})
+                
+                study, created = Study.objects.get_or_create(
+                    study_instance_uid=study_uid,
+                    defaults={
+                        'accession_number': accession_number,
+                        'patient': patient,
+                        'facility': facility,
+                        'modality': modality,
+                        'study_description': study_description,
+                        'study_date': sdt,
+                        'referring_physician': referring_physician,
+                        'status': 'scheduled',
+                        'priority': 'normal',
+                        'uploaded_by': request.user,
+                    }
+                )
+                
+                # Create series and images
+                for series_uid, items in series_map.items():
+                    # Rep dataset for series
+                    ds0 = items[0][0]
+                    series_number = getattr(ds0, 'SeriesNumber', 1) or 1
+                    series_desc = getattr(ds0, 'SeriesDescription', f'Series {series_number}')
+                    slice_thickness = getattr(ds0, 'SliceThickness', None)
+                    pixel_spacing = str(getattr(ds0, 'PixelSpacing', ''))
+                    image_orientation = str(getattr(ds0, 'ImageOrientationPatient', ''))
+                    
+                    series, _ = Series.objects.get_or_create(
+                        series_instance_uid=series_uid,
+                        defaults={
+                            'study': study,
+                            'series_number': int(series_number),
+                            'series_description': series_desc,
+                            'modality': modality_code,
+                            'body_part': getattr(ds0, 'BodyPartExamined', ''),
+                            'slice_thickness': slice_thickness if slice_thickness is not None else None,
+                            'pixel_spacing': pixel_spacing,
+                            'image_orientation': image_orientation,
+                        }
+                    )
+                    
+                    # Save each file to storage and register image
+                    for ds, fobj in items:
+                        try:
+                            sop_uid = getattr(ds, 'SOPInstanceUID')
+                            instance_number = getattr(ds, 'InstanceNumber', 1) or 1
+                            rel_path = f"dicom/images/{study_uid}/{series_uid}/{sop_uid}.dcm"
+                            # Ensure we read from start
+                            fobj.seek(0)
+                            saved_path = default_storage.save(rel_path, ContentFile(fobj.read()))
+                            DicomImage.objects.get_or_create(
+                                sop_instance_uid=sop_uid,
+                                defaults={
+                                    'series': series,
+                                    'instance_number': int(instance_number),
+                                    'image_position': str(getattr(ds, 'ImagePositionPatient', '')),
+                                    'slice_location': getattr(ds, 'SliceLocation', None),
+                                    'file_path': saved_path,
+                                    'file_size': getattr(fobj, 'size', 0) or 0,
+                                    'processed': False,
+                                }
+                            )
+                        except Exception:
+                            continue
+                created_studies.append(study.id)
+            
             return JsonResponse({
-                'success': True, 
-                'message': f'Successfully uploaded {processed_files} DICOM files',
-                'processed_files': processed_files,
-                'total_files': total_files
+                'success': True,
+                'message': f'Uploaded {sum(len(v) for s in studies_map.values() for v in s.values()) - invalid_files} DICOM file(s) across {len(created_studies)} study(ies)',
+                'created_study_ids': created_studies,
+                'invalid_files': invalid_files,
             })
             
         except Exception as e:

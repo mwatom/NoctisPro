@@ -295,6 +295,7 @@ def facility_create(request):
                 phone=request.POST.get('phone'),
                 email=request.POST.get('email'),
                 license_number=request.POST.get('license_number'),
+                ae_title=request.POST.get('ae_title', '').strip().upper(),
                 is_active=request.POST.get('is_active') == 'on'
             )
             
@@ -334,6 +335,7 @@ def facility_edit(request, facility_id):
             facility.phone = request.POST.get('phone')
             facility.email = request.POST.get('email')
             facility.license_number = request.POST.get('license_number')
+            facility.ae_title = (request.POST.get('ae_title', '') or '').strip().upper()
             facility.is_active = request.POST.get('is_active') == 'on'
             
             # Handle letterhead upload
@@ -358,12 +360,7 @@ def facility_edit(request, facility_id):
         except Exception as e:
             messages.error(request, f'Error updating facility: {str(e)}')
     
-    context = {
-        'facility': facility,
-        'edit_mode': True,
-    }
-    
-    return render(request, 'admin_panel/facility_form.html', context)
+    return render(request, 'admin_panel/facility_form.html', { 'facility': facility })
 
 @login_required
 @user_passes_test(is_admin)

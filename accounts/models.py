@@ -10,6 +10,8 @@ class Facility(models.Model):
     email = models.EmailField()
     license_number = models.CharField(max_length=100, unique=True)
     letterhead = models.ImageField(upload_to='letterheads/', null=True, blank=True)
+    # DICOM networking identifier so studies can be attributed to facilities
+    ae_title = models.CharField(max_length=32, blank=True, default='')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
