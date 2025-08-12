@@ -196,6 +196,16 @@ def upload_study(request):
                 study_description = getattr(rep_ds, 'StudyDescription', 'DICOM Study')
                 referring_physician = str(getattr(rep_ds, 'ReferringPhysicianName', 'UNKNOWN')).replace('^', ' ')
                 accession_number = getattr(rep_ds, 'AccessionNumber', f"ACC_{int(timezone.now().timestamp())}")
+                # Ensure accession_number not empty
+                if not accession_number:
+                    accession_number = f"ACC_{int(timezone.now().timestamp())}"
+                # Collision-safe: if accession_number already exists, append suffix
+                if Study.objects.filter(accession_number=accession_number).exists():
+                    suffix = 1
+                    base_acc = str(accession_number)
+                    while Study.objects.filter(accession_number=f"{base_acc}-{suffix}").exists():
+                        suffix += 1
+                    accession_number = f"{base_acc}-{suffix}"
                 study_date = getattr(rep_ds, 'StudyDate', None)
                 study_time = getattr(rep_ds, 'StudyTime', '000000')
                 if study_date:
