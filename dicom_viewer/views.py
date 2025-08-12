@@ -416,8 +416,9 @@ def api_mip_reconstruction(request, series_id):
         # Stack into 3D volume
         volume = np.stack(volume_data, axis=0)
         
-        # If very thin stack, interpolate along depth to stabilize MIP
-        if volume.shape[0] < 16:
+        # If very thin stack, interpolate along depth to stabilize MIP unless high quality requested
+        quality = request.GET.get('quality', '').lower()
+        if quality != 'high' and volume.shape[0] < 16:
             factor = max(2, int(np.ceil(16 / max(volume.shape[0], 1))))
             volume = ndimage.zoom(volume, (factor, 1, 1), order=1)
         
@@ -428,7 +429,8 @@ def api_mip_reconstruction(request, series_id):
         
         # Generate MIP projections
         mip_views = {}
-        
+
+        # For high quality, avoid any downsampling and keep precise max-intensity
         # Axial MIP (maximum along Z-axis)
         mip_axial = np.max(volume, axis=0)
         mip_views['axial'] = _array_to_base64_image(mip_axial, window_width, window_level, inverted)
