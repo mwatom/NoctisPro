@@ -156,8 +156,8 @@ def api_mpr_reconstruction(request, series_id):
         # Get all images in the series sorted by slice location
         images = series.images.all().order_by('slice_location', 'instance_number')
         
-        if images.count() < 2:
-            return JsonResponse({'error': 'Need at least 2 images for MPR'}, status=400)
+        if images.count() < 1:
+            return JsonResponse({'error': 'No images in series'}, status=400)
         
         # Read DICOM data
         volume_data = []
@@ -166,7 +166,7 @@ def api_mpr_reconstruction(request, series_id):
         
         for img in images:
             try:
-                dicom_path = os.path.join('/workspace/media', str(img.file_path))
+                dicom_path = os.path.join(settings.MEDIA_ROOT, str(img.file_path))
                 ds = pydicom.dcmread(dicom_path)
                 
                 # Get pixel array and apply rescale slope/intercept
@@ -187,8 +187,12 @@ def api_mpr_reconstruction(request, series_id):
             except Exception:
                 continue
         
-        if len(volume_data) < 2:
-            return JsonResponse({'error': 'Could not read enough images for MPR'}, status=400)
+        if len(volume_data) < 1:
+            return JsonResponse({'error': 'Could not read images for MPR'}, status=400)
+        
+        # If single image, duplicate slice to allow simple orthogonal views
+        if len(volume_data) == 1:
+            volume_data = [volume_data[0], volume_data[0]]
         
         # Stack into 3D volume
         volume = np.stack(volume_data, axis=0)
@@ -239,15 +243,15 @@ def api_mip_reconstruction(request, series_id):
     user = request.user
     
     # Check permissions
-    if user.is_facility_user() and series.study.facility != user.facility:
+    if user.is_facility_user() and getattr(user, 'facility', None) and series.study.facility != user.facility:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
     try:
         # Get all images in the series
         images = series.images.all().order_by('slice_location', 'instance_number')
         
-        if images.count() < 2:
-            return JsonResponse({'error': 'Need at least 2 images for MIP'}, status=400)
+        if images.count() < 1:
+            return JsonResponse({'error': 'No images in series'}, status=400)
         
         # Read DICOM data
         volume_data = []
@@ -256,7 +260,7 @@ def api_mip_reconstruction(request, series_id):
         
         for img in images:
             try:
-                dicom_path = os.path.join('/workspace/media', str(img.file_path))
+                dicom_path = os.path.join(settings.MEDIA_ROOT, str(img.file_path))
                 ds = pydicom.dcmread(dicom_path)
                 
                 # Get pixel array and apply rescale slope/intercept
@@ -277,8 +281,12 @@ def api_mip_reconstruction(request, series_id):
             except Exception:
                 continue
         
-        if len(volume_data) < 2:
-            return JsonResponse({'error': 'Could not read enough images for MIP'}, status=400)
+        if len(volume_data) < 1:
+            return JsonResponse({'error': 'Could not read images for MIP'}, status=400)
+        
+        # If single image, duplicate slice to allow projections
+        if len(volume_data) == 1:
+            volume_data = [volume_data[0], volume_data[0]]
         
         # Stack into 3D volume
         volume = np.stack(volume_data, axis=0)
@@ -329,7 +337,7 @@ def api_bone_reconstruction(request, series_id):
     user = request.user
     
     # Check permissions
-    if user.is_facility_user() and series.study.facility != user.facility:
+    if user.is_facility_user() and getattr(user, 'facility', None) and series.study.facility != user.facility:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
     try:
@@ -339,14 +347,14 @@ def api_bone_reconstruction(request, series_id):
         # Get all images in the series
         images = series.images.all().order_by('slice_location', 'instance_number')
         
-        if images.count() < 2:
-            return JsonResponse({'error': 'Need at least 2 images for bone reconstruction'}, status=400)
+        if images.count() < 1:
+            return JsonResponse({'error': 'No images in series'}, status=400)
         
         # Read DICOM data
         volume_data = []
         for img in images:
             try:
-                dicom_path = os.path.join('/workspace/media', str(img.file_path))
+                dicom_path = os.path.join(settings.MEDIA_ROOT, str(img.file_path))
                 ds = pydicom.dcmread(dicom_path)
                 
                 # Convert to Hounsfield Units if possible
@@ -360,8 +368,12 @@ def api_bone_reconstruction(request, series_id):
             except Exception:
                 continue
         
-        if len(volume_data) < 2:
-            return JsonResponse({'error': 'Could not read enough images for bone reconstruction'}, status=400)
+        if len(volume_data) < 1:
+            return JsonResponse({'error': 'Could not read images for bone reconstruction'}, status=400)
+        
+        # If single image, duplicate slice to stabilize previews
+        if len(volume_data) == 1:
+            volume_data = [volume_data[0], volume_data[0]]
         
         # Stack into 3D volume
         volume = np.stack(volume_data, axis=0)
@@ -553,7 +565,7 @@ def api_dicom_image_display(request, image_id):
         inverted = request.GET.get('inverted', 'false').lower() == 'true'
         
         # Read DICOM file
-        dicom_path = os.path.join('/workspace/media', str(image.file_path))
+        dicom_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
         ds = pydicom.dcmread(dicom_path)
         
         # Get pixel array, apply VOI LUT if present (improves CR/DX contrast), then rescale
