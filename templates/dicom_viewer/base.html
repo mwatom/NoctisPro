@@ -35,6 +35,10 @@
     .tool-dropdown-menu { position: absolute; top: 58px; left: 0; background: #2f2f2f; border: 1px solid #444; border-radius: 8px; width: 180px; display: none; flex-direction: column; overflow: hidden; z-index: 10; }
     .tool-dropdown-menu button { background: transparent; border: none; color: #fff; text-align: left; padding: 10px 12px; cursor: pointer; font-size: 13px; }
     .tool-dropdown-menu button:hover { background: #0078d4; }
+    /* 3D modal */
+    #threeContainer { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: none; z-index: 1000; }
+    #threeMount { position: absolute; inset: 0; }
+    #close3d { position: absolute; top: 12px; right: 12px; z-index: 1001; }
   </style>
 </head>
 <body>
@@ -138,6 +142,14 @@
     </div>
   </div>
 
+  <!-- Three.js for rotatable bone mesh (loaded only if used) -->
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+  <div id="threeContainer">
+    <button id="close3d" class="btn">Close 3D</button>
+    <div id="threeMount"></div>
+  </div>
+
   <script>
   (function(){
     const canvas = document.getElementById('dicomCanvas');
@@ -188,6 +200,10 @@
     let measurements = []; // persisted per image id
     let annotations = [];
     let crosshair = false;
+
+    // Track last viewport mapping for precise coordinate transforms
+    let lastVp = null; // {x,y,scale,imgW,imgH}
+    const mprRegionVps = {}; // key-> {x,y,scale,imgW,imgH,rect}
 
     // Map imageId -> arrays to persist while session active
     const imageIdToMeasurements = new Map();
@@ -333,37 +349,61 @@
             }
           }
           ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
+          const halfW = Math.floor(canvas.width/2), halfH = Math.floor(canvas.height/2);
           const regions = [
-            { x: 0, y: 0, w: Math.floor(canvas.width/3), h: canvas.height, key: 'axial' },
-            { x: Math.floor(canvas.width/3), y: 0, w: Math.floor(canvas.width/3), h: canvas.height, key: 'sagittal' },
-            { x: Math.floor(2*canvas.width/3), y: 0, w: canvas.width - Math.floor(2*canvas.width/3), h: canvas.height, key: 'coronal' },
+            { x: 0, y: 0, w: halfW, h: halfH, key: 'sagittal' },
+            { x: halfW, y: 0, w: canvas.width - halfW, h: halfH, key: 'coronal' },
+            { x: 0, y: halfH, w: halfW, h: canvas.height - halfH, key: 'axial' },
+            { x: halfW, y: halfH, w: canvas.width - halfW, h: canvas.height - halfH, key: 'empty' },
           ];
+          // Crosshair dividing lines
+          ctx.save();
+          ctx.strokeStyle = 'rgba(0,255,255,0.8)';
+          ctx.beginPath();
+          ctx.moveTo(halfW, 0); ctx.lineTo(halfW, canvas.height);
+          ctx.moveTo(0, halfH); ctx.lineTo(canvas.width, halfH);
+          ctx.stroke();
+          ctx.restore();
+          // Draw regions using available images immediately, then refresh asynchronously
           for (const reg of regions){
-            // Fetch specific slice for this plane index
-            const params2 = new URLSearchParams();
-            params2.set('plane', reg.key);
-            params2.set('slice', mprScroll[reg.key] || 0);
-            params2.set('window_width', ww);
-            params2.set('window_level', wl);
-            params2.set('inverted', inverted);
-            const r2 = await fetch(`/viewer/api/series/${currentSeries.id}/mpr/?${params2.toString()}`);
-            const j2 = await r2.json();
-            if (j2 && j2.image){ mprImgs[reg.key] = j2.image; if (j2.counts) mprScroll.counts = j2.counts; }
-            if (!mprImgs[reg.key]) continue;
-            const im = await loadImage(mprImgs[reg.key]);
-            const scale = Math.min(reg.w / im.width, reg.h / im.height);
-            const dw = im.width * scale, dh = im.height * scale;
-            const dx = reg.x + (reg.w - dw)/2, dy = reg.y + (reg.h - dh)/2;
-            ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(im, dx, dy, dw, dh);
-            // Draw plane label and slice index
-            ctx.save();
-            ctx.fillStyle = 'rgba(0,0,0,0.5)';
-            ctx.fillRect(dx + 8, dy + 8, 130, 22);
-            ctx.fillStyle = '#0ff';
-            ctx.font = '12px monospace';
-            ctx.fillText(`${reg.key.toUpperCase()} ${ (mprScroll[reg.key]||0) + 1 }/${ mprScroll.counts[reg.key]||0 }`, dx + 12, dy + 24);
-            ctx.restore();
+            if (reg.key === 'empty') continue;
+            const imgSrc = mprImgs[reg.key];
+            if (imgSrc){
+              const im = await loadImage(imgSrc);
+              const scale = Math.min(reg.w / im.width, reg.h / im.height);
+              const dw = im.width * scale, dh = im.height * scale;
+              const dx = reg.x + (reg.w - dw)/2, dy = reg.y + (reg.h - dh)/2;
+              ctx.imageSmoothingEnabled = false;
+              ctx.drawImage(im, dx, dy, dw, dh);
+              // Save mapping for tools
+              mprRegionVps[reg.key] = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height, rect: reg };
+              // Draw plane label and slice index
+              ctx.save();
+              ctx.fillStyle = 'rgba(0,0,0,0.5)';
+              ctx.fillRect(dx + 8, dy + 8, 150, 22);
+              ctx.fillStyle = '#0ff';
+              ctx.font = '12px monospace';
+              ctx.fillText(`${reg.key.toUpperCase()} ${ (mprScroll[reg.key]||0) + 1 }/${ mprScroll.counts[reg.key]||0 }`, dx + 12, dy + 24);
+              ctx.restore();
+              // Draw HU ellipse overlay if belongs to this plane
+              if (huEllipse && huEllipse.mode==='mpr' && huEllipse.plane===reg.key){
+                drawEllipseOverlay(reg.key);
+              }
+            }
+            // Fetch updated slice without blocking draw
+            (async ()=>{
+              const params2 = new URLSearchParams();
+              params2.set('plane', reg.key);
+              params2.set('slice', mprScroll[reg.key] || 0);
+              params2.set('window_width', ww);
+              params2.set('window_level', wl);
+              params2.set('inverted', inverted);
+              try {
+                const r2 = await fetch(`/viewer/api/series/${currentSeries.id}/mpr/?${params2.toString()}`);
+                const j2 = await r2.json();
+                if (j2 && j2.image){ mprImgs[reg.key] = j2.image; if (j2.counts) mprScroll.counts = j2.counts; requestAnimationFrame(()=>draw()); }
+              } catch(e){}
+            })();
           }
           document.getElementById('overlay').innerHTML = `MPR | WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}`;
           document.getElementById('zoominfo').textContent = `MPR`;
@@ -379,6 +419,7 @@
           const dx = (canvas.width - dw)/2 + panOffset.x; const dy = (canvas.height - dh)/2 + panOffset.y;
           ctx.imageSmoothingEnabled = false;
           ctx.drawImage(im, dx, dy, dw, dh);
+          lastVp = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height };
           document.getElementById('overlay').innerHTML = `${reconMode.toUpperCase()} | View ${reconIndex+1}/${reconImgs.length}`;
           document.getElementById('zoominfo').textContent = `Zoom: ${Math.round(zoom*100)}%`;
           return;
@@ -393,7 +434,9 @@
         ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(htmlImg, vp.x, vp.y, vp.w, vp.h);
+        lastVp = { x: vp.x, y: vp.y, scale: vp.scale, imgW: htmlImg.width, imgH: htmlImg.height };
         drawOverlays(vp);
+        if (huEllipse && huEllipse.mode==='series') drawEllipseOverlay();
         document.getElementById('overlay').innerHTML = `WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}<br>Slice: ${index+1}/${images.length}`;
         document.getElementById('zoominfo').textContent = `Zoom: ${Math.round(zoom*100)}%`;
       } catch (e) {
@@ -438,6 +481,28 @@
       ctx.restore();
     }
 
+    function drawEllipseOverlay(planeKey){
+      ctx.save();
+      ctx.strokeStyle = '#00ff88';
+      ctx.lineWidth = 2;
+      let mapping;
+      if (huEllipse && huEllipse.mode==='mpr'){
+        mapping = mprRegionVps[planeKey||huEllipse.plane];
+      } else {
+        mapping = lastVp;
+      }
+      if (!mapping) { ctx.restore(); return; }
+      const { x, y, scale } = mapping;
+      const cx = x + huEllipse.cx * scale;
+      const cy = y + huEllipse.cy * scale;
+      const rx = huEllipse.rx * scale;
+      const ry = huEllipse.ry * scale;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, Math.abs(rx), Math.abs(ry), 0, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     function canvasToImageCoords(vp, cx, cy){
       const x = (cx - vp.x) / vp.scale;
       const y = (cy - vp.y) / vp.scale;
@@ -470,9 +535,10 @@
       try {
         const r = await fetch('/viewer/measurements/save/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
         const j = await r.json();
-        if (j && j.success){
-          m.label = dist.mm ? `${dist.mm.toFixed(2)} mm` : `${dist.px.toFixed(1)} px`;
-        }
+                  if (j && j.success){
+            if (dist.mm){ const cm = dist.mm/10.0; m.label = `${dist.mm.toFixed(2)} mm / ${cm.toFixed(2)} cm`; }
+            else { m.label = `${dist.px.toFixed(1)} px`; }
+          }
       } catch(e){}
     }
 
@@ -533,7 +599,7 @@
       if (tool === 'reset'){ zoom = 1.0; panOffset = {x:0,y:0}; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; draw(); return; }
       if (tool === 'ai'){ alert('AI analysis result: (stub) No backend connected.'); return; }
       if (tool === 'crosshair'){ crosshair = !crosshair; draw(); return; }
-      if (tool === 'hu'){ showHuProbe = !showHuProbe; draw(); return; }
+      if (tool === 'hu'){ showHuProbe = true; huEllipse = null; draw(); return; }
       if (tool === 'measure') { showHuProbe = false; }
       // remove old inline MPR toggle from tool button; handled by 3D dropdown now
       if (tool === 'mpr'){
@@ -549,13 +615,30 @@
       isDragging = true; dragStart = { x: e.offsetX, y: e.offsetY };
       // Start measurement draft
       if (activeTool === 'measure'){
-        const vp2 = getViewportPlacement(canvas.width, canvas.height);
+        const vp2 = lastVp || { x:0, y:0, scale:1 };
         measureDraft = { start: canvasToImageCoords(vp2, e.offsetX, e.offsetY), end: canvasToImageCoords(vp2, e.offsetX, e.offsetY) };
+      }
+      if (showHuProbe){
+        if (mprMode){
+          // determine plane by quadrant
+          const halfW = Math.floor(canvas.width/2), halfH = Math.floor(canvas.height/2);
+          const mx = e.offsetX, my = e.offsetY;
+          let plane = null; if (mx < halfW && my < halfH) plane='sagittal'; else if (mx>=halfW && my<halfH) plane='coronal'; else if (mx<halfW && my>=halfH) plane='axial';
+          if (plane && mprRegionVps[plane]){
+            const vpR = mprRegionVps[plane];
+            const imgPt = canvasToImageCoords(vpR, e.offsetX, e.offsetY);
+            huEllipse = { mode:'mpr', plane, slice: (mprScroll[plane]||0), cx: imgPt.x, cy: imgPt.y, rx: 1, ry: 1 };
+          }
+        } else if (lastVp){
+          const imgPt = canvasToImageCoords(lastVp, e.offsetX, e.offsetY);
+          huEllipse = { mode:'series', cx: imgPt.x, cy: imgPt.y, rx: 1, ry: 1 };
+        }
+        draw();
       }
     });
     viewport.addEventListener('mousemove', async (e)=>{
       if (!isDragging) return;
-      const vp = getViewportPlacement(canvas.width, canvas.height);
+      const vp = lastVp || { x:0, y:0, scale:1 };
       if (activeTool === 'window'){
         const dx = e.offsetX - dragStart.x; const dy = e.offsetY - dragStart.y; dragStart = { x: e.offsetX, y: e.offsetY };
         ww = Math.max(1, ww + dx*4); wl = wl + dy*2; wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); await draw();
@@ -567,16 +650,30 @@
         // no-op while dragging
       } else if (activeTool === 'zoom'){
         const dy = e.offsetY - dragStart.y; dragStart = { x: e.offsetX, y: e.offsetY }; const factor = dy<0 ? 1.05 : 0.95; zoom = Math.min(5.0, Math.max(0.25, zoom*factor)); zoomSlider.value = Math.round(zoom*100); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; await draw();
+      } else if (showHuProbe && huEllipse){
+        if (huEllipse.mode==='mpr' && mprRegionVps[huEllipse.plane]){
+          const vpR = mprRegionVps[huEllipse.plane];
+          const cur = canvasToImageCoords(vpR, e.offsetX, e.offsetY);
+          huEllipse.rx = Math.abs(cur.x - huEllipse.cx);
+          huEllipse.ry = Math.abs(cur.y - huEllipse.cy);
+          await draw();
+        } else if (lastVp && huEllipse.mode==='series'){
+          const cur = canvasToImageCoords(lastVp, e.offsetX, e.offsetY);
+          huEllipse.rx = Math.abs(cur.x - huEllipse.cx);
+          huEllipse.ry = Math.abs(cur.y - huEllipse.cy);
+          await draw();
+        }
       }
     });
     // HU probe on mousemove in MPR when enabled
     viewport.addEventListener('mousemove', async (e)=>{
-      if (!mprMode || !showHuProbe) return;
+      if (!mprMode || !showHuProbe || (huEllipse && (huEllipse.rx>1 || huEllipse.ry>1))) return;
       // Determine which plane region the mouse is in
+      const halfW = Math.floor(canvas.width/2), halfH = Math.floor(canvas.height/2);
       const regions = [
-        { x: 0, y: 0, w: Math.floor(canvas.width/3), h: canvas.height, key: 'axial' },
-        { x: Math.floor(canvas.width/3), y: 0, w: Math.floor(canvas.width/3), h: canvas.height, key: 'sagittal' },
-        { x: Math.floor(2*canvas.width/3), y: 0, w: canvas.width - Math.floor(2*canvas.width/3), h: canvas.height, key: 'coronal' },
+        { x: 0, y: 0, w: halfW, h: halfH, key: 'sagittal' },
+        { x: halfW, y: 0, w: canvas.width-halfW, h: halfH, key: 'coronal' },
+        { x: 0, y: halfH, w: halfW, h: canvas.height-halfH, key: 'axial' },
       ];
       const mx = e.offsetX, my = e.offsetY;
       const region = regions.find(r=> mx>=r.x && mx<r.x+r.w && my>=r.y && my<r.y+r.h);
@@ -604,7 +701,7 @@
     });
     viewport.addEventListener('mouseup', async (e)=>{
       if (!isDragging) return; isDragging = false;
-      const vp = getViewportPlacement(canvas.width, canvas.height);
+      const vp = lastVp || { x:0, y:0, scale:1 };
       if (activeTool === 'measure' && measureDraft){
         measureDraft.end = canvasToImageCoords(vp, e.offsetX, e.offsetY);
         const m = { start: measureDraft.start, end: measureDraft.end };
@@ -614,6 +711,32 @@
         const pos = canvasToImageCoords(vp, e.offsetX, e.offsetY);
         const text = prompt('Enter annotation text:');
         if (text){ annotations.push({ pos, text }); imageIdToAnnotations.set(getCurrentImageId(), annotations); await saveAnnotationToServer(pos, text); await draw(); }
+      } else if (showHuProbe && huEllipse){
+        // Submit ROI to backend
+        try {
+          const qp = new URLSearchParams();
+          qp.set('shape','ellipse');
+          if (huEllipse.mode==='series'){
+            qp.set('mode','series');
+            qp.set('image_id', String(getCurrentImageId()));
+          } else {
+            qp.set('mode','mpr');
+            qp.set('series_id', String(currentSeries.id));
+            qp.set('plane', huEllipse.plane);
+            qp.set('slice', String(huEllipse.slice||0));
+          }
+          qp.set('cx', Math.round(huEllipse.cx));
+          qp.set('cy', Math.round(huEllipse.cy));
+          qp.set('rx', Math.max(1, Math.round(huEllipse.rx)));
+          qp.set('ry', Math.max(1, Math.round(huEllipse.ry)));
+          const r = await fetch(`/viewer/api/hu/?${qp.toString()}`);
+          const j = await r.json();
+          if (j && j.stats){
+            const s = j.stats; // mean, std, min, max, n
+            document.getElementById('overlay').innerHTML = `HU ROI (ellipse): mean ${s.mean.toFixed(1)}, sd ${s.std.toFixed(1)}, min ${s.min.toFixed(0)}, max ${s.max.toFixed(0)} (n=${s.n})`;
+          }
+        } catch(e){}
+        await draw();
       }
     });
 
@@ -627,12 +750,15 @@
         return;
       }
       if (mprMode){
-        // Determine which third the cursor is in and scroll that plane
-        const mx = e.offsetX, w = canvas.width; const d = e.deltaY>0 ? 1 : -1;
-        let plane = 'axial';
-        if (mx < Math.floor(w/3)) plane = 'axial';
-        else if (mx < Math.floor(2*w/3)) plane = 'sagittal';
-        else plane = 'coronal';
+        // Determine which quadrant and scroll that plane
+        const halfW = Math.floor(canvas.width/2), halfH = Math.floor(canvas.height/2);
+        const mx = e.offsetX, my = e.offsetY; const d = e.deltaY>0 ? 1 : -1;
+        let plane = null;
+        if (mx < halfW && my < halfH) plane = 'sagittal';
+        else if (mx >= halfW && my < halfH) plane = 'coronal';
+        else if (mx < halfW && my >= halfH) plane = 'axial';
+        else plane = null; // bottom-right empty
+        if (!plane) return;
         const count = (mprScroll.counts[plane]||1);
         const cur = (mprScroll[plane]||0);
         const ni = Math.max(0, Math.min(count-1, cur + d));
@@ -685,13 +811,13 @@
         const type = kind || reconType.value;
         if (type === 'mpr') url = `/viewer/api/series/${currentSeries.id}/mpr/?${params.toString()}`;
         else if (type === 'mip') url = `/viewer/api/series/${currentSeries.id}/mip/?${params.toString()}`;
-        else { url = `/viewer/api/series/${currentSeries.id}/bone/?threshold=${boneSlider.value}`; }
+        else { url = `/viewer/api/series/${currentSeries.id}/bone/?threshold=${boneSlider.value}&mesh=true`; }
         const r = await fetch(url);
         const j = await r.json();
         if (j.error) throw new Error(j.error);
         if (j.mpr_views){ reconMode = 'mpr'; reconImgs = [j.mpr_views.axial, j.mpr_views.sagittal, j.mpr_views.coronal]; mprMode = true; if (j.counts){ mprScroll.counts = j.counts; mprScroll.axial = Math.floor((j.counts.axial||0)/2); mprScroll.sagittal = Math.floor((j.counts.sagittal||0)/2); mprScroll.coronal = Math.floor((j.counts.coronal||0)/2); } }
         if (j.mip_views){ reconMode = 'mip'; reconImgs = [j.mip_views.axial, j.mip_views.sagittal, j.mip_views.coronal]; }
-        if (j.bone_views){ reconMode = 'bone'; reconImgs = [j.bone_views.axial || j.bone_views.bone_axial_preview, j.bone_views.sagittal || j.bone_views.bone_sagittal_preview, j.bone_views.coronal || j.bone_views.bone_coronal_preview]; }
+        if (j.bone_views){ reconMode = 'bone'; reconImgs = [j.bone_views.axial || j.bone_views.bone_axial_preview, j.bone_views.sagittal || j.bone_views.bone_sagittal_preview, j.bone_views.coronal || j.bone_views.bone_coronal_preview]; if (j.mesh) showBone3D(j.mesh); }
         reconImgs = reconImgs.filter(Boolean);
         reconIndex = 0;
         await draw();
@@ -730,12 +856,60 @@
      function loadImage(src){
        return new Promise((res, rej)=>{ const im = new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=src; });
      }
+
+     // 3D viewer for bone mesh
+     let three = { renderer:null, scene:null, camera:null, controls:null };
+     function showBone3D(meshData){
+       try {
+         const container = document.getElementById('threeContainer');
+         const mount = document.getElementById('threeMount');
+         container.style.display = 'block';
+         // init three only once
+         if (!three.renderer){
+           three.renderer = new THREE.WebGLRenderer({ antialias: true });
+           three.renderer.setSize(mount.clientWidth, mount.clientHeight);
+           mount.appendChild(three.renderer.domElement);
+           three.scene = new THREE.Scene();
+           three.scene.background = new THREE.Color(0x000000);
+           three.camera = new THREE.PerspectiveCamera(45, mount.clientWidth/mount.clientHeight, 0.1, 10000);
+           three.camera.position.set(0, 0, 400);
+           three.controls = new THREE.OrbitControls(three.camera, three.renderer.domElement);
+           const light1 = new THREE.DirectionalLight(0xffffff, 1.0); light1.position.set(1,1,1); three.scene.add(light1);
+           const light2 = new THREE.AmbientLight(0x444444); three.scene.add(light2);
+           window.addEventListener('resize', ()=>{
+             if (!three.renderer) return;
+             three.renderer.setSize(mount.clientWidth, mount.clientHeight);
+             three.camera.aspect = mount.clientWidth/mount.clientHeight; three.camera.updateProjectionMatrix();
+           });
+         } else {
+           // clear scene children except lights
+           const keep = []; three.scene.children.forEach(obj=>{ if (obj.isLight) keep.push(obj); }); three.scene.children = keep; keep.forEach(obj=> three.scene.add(obj));
+         }
+         // build geometry
+         const vertices = new Float32Array(meshData.vertices.flat());
+         const indices = new Uint32Array(meshData.faces.flat());
+         const geom = new THREE.BufferGeometry();
+         geom.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+         geom.setIndex(new THREE.BufferAttribute(indices, 1));
+         geom.computeVertexNormals();
+         const material = new THREE.MeshPhongMaterial({ color: 0xdddddd, specular: 0x111111, shininess: 30 });
+         const mesh = new THREE.Mesh(geom, material);
+         // center & scale
+         geom.computeBoundingSphere();
+         const bs = geom.boundingSphere; if (bs){ mesh.position.sub(bs.center); const target = 150; const s = bs.radius>0 ? target/bs.radius : 1; mesh.scale.setScalar(s); }
+         three.scene.add(mesh);
+         // animate
+         const animate = ()=>{ if (!three.renderer) return; three.controls.update(); three.renderer.render(three.scene, three.camera); requestAnimationFrame(animate); };
+         animate();
+         document.getElementById('close3d').onclick = ()=>{ container.style.display='none'; };
+       } catch(e){ console.warn('3D setup failed', e); }
+     }
  
-     // Init
-     setCanvasSize();
-     const studyId = q('study_id');
-     if (studyId) loadStudy(studyId);
-   })();
-   </script>
- </body>
- </html>
+      // Init
+      setCanvasSize();
+      const studyId = q('study_id');
+      if (studyId) loadStudy(studyId);
+    })();
+  </script>
+</body>
+</html>
