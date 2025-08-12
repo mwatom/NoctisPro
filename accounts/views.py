@@ -42,11 +42,13 @@ def login_view(request):
                         user_agent=user_agent
                     )
                     
-                    # Redirect based on user role
-                    if user.is_admin():
-                        return redirect('admin_panel:dashboard')
-                    else:
-                        return redirect('worklist:dashboard')
+                    # Honor "next" parameter if present and looks like an internal path
+                    next_url = request.GET.get('next') or request.POST.get('next')
+                    if next_url and isinstance(next_url, str) and next_url.startswith('/'):
+                        return redirect(next_url)
+                    
+                    # Redirect all users to worklist dashboard by default
+                    return redirect('worklist:dashboard')
                 else:
                     messages.error(request, 'Account is disabled. Please contact administrator.')
             else:

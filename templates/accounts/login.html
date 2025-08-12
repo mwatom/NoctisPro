@@ -234,7 +234,7 @@
 {% endblock %}
 
 {% block content %}
-{% with True as hide_navbar %}
+{% with hide_footer=True %}
 <div class="login-container">
     <div class="login-card fade-in">
         <div class="logo-container">
@@ -261,6 +261,9 @@
 
         <form method="post" id="loginForm">
             {% csrf_token %}
+            {% if request.GET.next %}
+            <input type="hidden" name="next" value="{{ request.GET.next }}" />
+            {% endif %}
             <div class="form-floating">
                 <input type="text" class="form-control" id="username" name="username" 
                        placeholder="Username" required autocomplete="username">
