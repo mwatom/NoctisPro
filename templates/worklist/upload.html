@@ -25,6 +25,7 @@
 
     .drop-zone { border: 2px dashed var(--border-color); border-radius: 12px; padding: 3rem 2rem; text-align: center; cursor: pointer; transition: all 0.3s ease; background: rgba(255, 255, 255, 0.02); }
     .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent-color); background: rgba(14, 165, 233, 0.05); }
+    .drop-zone.uploading { cursor: not-allowed; opacity: 0.7; }
 
     .file-input { display: none; }
 
@@ -107,6 +108,22 @@
     .series-item:last-child {
         border-bottom: none;
     }
+
+    .upload-success {
+        background: rgba(0, 255, 136, 0.1);
+        border: 1px solid var(--success-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1rem;
+        display: none;
+        text-align: center;
+    }
+
+    .upload-success i {
+        font-size: 3rem;
+        color: var(--success-color);
+        margin-bottom: 1rem;
+    }
 </style>
 {% endblock %}
 
@@ -127,7 +144,7 @@
                 <i class="fas fa-file-medical text-accent" style="font-size: 3rem; margin-bottom: 1rem;"></i>
                 <h4 class="text-light mb-3">Drop DICOM files or folders here</h4>
                 <p class="text-secondary mb-3">Supports large CT/MRI studies with multiple series in subfolders</p>
-                <button type="button" class="btn btn-medical" onclick="document.getElementById('fileInput').click()">
+                <button type="button" class="btn btn-medical" id="chooseFilesBtn">
                     <i class="fas fa-folder-open me-2"></i>
                     Choose Files / Folder
                 </button>
@@ -186,8 +203,18 @@
                 <div id="progressMeta" class="text-secondary mt-2" style="font-size: 0.9rem;"></div>
                 <div id="uploadDetails" class="text-secondary mt-1" style="font-size: 0.8rem;"></div>
             </div>
+
+            <div class="upload-success" id="uploadSuccess">
+                <i class="fas fa-check-circle"></i>
+                <h4 class="text-light mb-2">Upload Successful!</h4>
+                <p class="text-secondary mb-3">Your DICOM studies have been uploaded successfully.</p>
+                <div id="uploadSummary" class="text-light mb-3"></div>
+                <button type="button" class="btn btn-medical" onclick="redirectToDashboard()">
+                    <i class="fas fa-arrow-left me-2"></i>Return to Worklist
+                </button>
+            </div>
             
-            <div class="upload-actions">
+            <div class="upload-actions" id="uploadActions">
                 <a href="{% url 'worklist:dashboard' %}" class="btn btn-outline-secondary">
                     <i class="fas fa-arrow-left me-2"></i>Cancel
                 </a>
@@ -203,12 +230,14 @@
 {% block extra_js %}
 <script>
 let selectedFiles = [];
+let isUploading = false;
 
 document.addEventListener('DOMContentLoaded', function() {
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
     const uploadForm = document.getElementById('uploadForm');
     const uploadBtn = document.getElementById('uploadBtn');
+    const chooseFilesBtn = document.getElementById('chooseFilesBtn');
     const fileList = document.getElementById('fileList');
     const selectedFilesDiv = document.getElementById('selectedFiles');
     const progressSection = document.getElementById('progressSection');
@@ -218,20 +247,28 @@ document.addEventListener('DOMContentLoaded', function() {
     const seriesPreview = document.getElementById('seriesPreview');
     const seriesList = document.getElementById('seriesList');
     const folderStructure = document.getElementById('folderStructure');
+    const uploadSuccess = document.getElementById('uploadSuccess');
+    const uploadActions = document.getElementById('uploadActions');
     const totalFilesCount = document.getElementById('totalFiles');
     const dicomFilesCount = document.getElementById('dicomFiles');
     const totalSizeCount = document.getElementById('totalSize');
     const estimatedStudiesCount = document.getElementById('estimatedStudies');
 
-    // Click to browse
-    dropZone.addEventListener('click', () => {
-        fileInput.click();
+    // Click to browse - prevent multiple triggers
+    chooseFilesBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isUploading) {
+            fileInput.click();
+        }
     });
 
     // Enhanced drag and drop handlers with better folder support
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
-        dropZone.classList.add('dragover');
+        if (!isUploading) {
+            dropZone.classList.add('dragover');
+        }
     });
 
     dropZone.addEventListener('dragleave', () => {
@@ -241,6 +278,8 @@ document.addEventListener('DOMContentLoaded', function() {
     dropZone.addEventListener('drop', async (e) => {
         e.preventDefault();
         dropZone.classList.remove('dragover');
+        
+        if (isUploading) return;
         
         const items = e.dataTransfer.items;
         if (items && items.length) {
@@ -278,14 +317,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // File input change
     fileInput.addEventListener('change', (e) => {
-        const files = Array.from(e.target.files);
-        handleFiles(files);
+        if (!isUploading) {
+            const files = Array.from(e.target.files);
+            handleFiles(files);
+        }
     });
 
     // Form submission
     uploadForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (selectedFiles.length > 0) {
+        if (selectedFiles.length > 0 && !isUploading) {
             await uploadFilesInChunks();
         }
     });
@@ -402,14 +443,18 @@ document.addEventListener('DOMContentLoaded', function() {
         `).join('');
     }
 
-    function updateUploadButton() { uploadBtn.disabled = selectedFiles.length === 0; }
+    function updateUploadButton() { 
+        uploadBtn.disabled = selectedFiles.length === 0 || isUploading; 
+    }
 
     window.removeFile = function(index) { 
-        selectedFiles.splice(index, 1); 
-        updateUploadStats();
-        updateFileList(); 
-        updateUploadButton(); 
-        analyzeFolderStructure();
+        if (!isUploading) {
+            selectedFiles.splice(index, 1); 
+            updateUploadStats();
+            updateFileList(); 
+            updateUploadButton(); 
+            analyzeFolderStructure();
+        }
     };
 
     function formatFileSize(bytes) {
@@ -432,9 +477,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function resetUploadState() {
+        isUploading = false;
         uploadBtn.disabled = false;
         uploadBtn.innerHTML = '<i class="fas fa-upload me-2"></i>Upload Studies';
         progressSection.style.display = 'none';
+        dropZone.classList.remove('uploading');
         updateProgress(0);
     }
 
@@ -450,6 +497,12 @@ document.addEventListener('DOMContentLoaded', function() {
         let studiesCreated = 0;
         let totalSeries = 0;
 
+        // Set uploading state
+        isUploading = true;
+        dropZone.classList.add('uploading');
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Uploading...';
+
         // Build chunks
         const chunks = [];
         for (let i = 0; i < selectedFiles.length; i += CHUNK_SIZE) {
@@ -458,8 +511,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // UI state
         progressSection.style.display = 'block';
-        uploadBtn.disabled = true;
-        uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Uploading...';
         updateProgress(0, `0 / ${totalFiles} files`, 'Preparing upload...');
 
         // Upload logic with enhanced progress tracking
@@ -503,11 +554,33 @@ document.addEventListener('DOMContentLoaded', function() {
         await Promise.all(workers);
 
         if (errors.length === 0) {
+            // Show success message
+            progressSection.style.display = 'none';
+            uploadActions.style.display = 'none';
+            uploadSuccess.style.display = 'block';
+            
+            const uploadSummary = document.getElementById('uploadSummary');
+            uploadSummary.innerHTML = `
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value">${uploadedCount}</div>
+                        <div class="stat-label">Files Uploaded</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${studiesCreated}</div>
+                        <div class="stat-label">Studies Created</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${totalSeries}</div>
+                        <div class="stat-label">Series Processed</div>
+                    </div>
+                </div>
+            `;
+            
             showNotification(`Successfully uploaded ${uploadedCount} files creating ${studiesCreated} studies with ${totalSeries} series!`, 'success');
-            setTimeout(() => { window.location.href = '{% url "worklist:dashboard" %}'; }, 1000);
         } else if (uploadedCount > 0) {
             showNotification(`Upload completed with some errors. Processed ${uploadedCount} of ${totalFiles} files, created ${studiesCreated} studies.`, 'warning');
-            setTimeout(() => { window.location.href = '{% url "worklist:dashboard" %}'; }, 1500);
+            resetUploadState();
         } else {
             showNotification('Upload failed: ' + errors[0], 'error');
             resetUploadState();
@@ -526,6 +599,10 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.appendChild(alert);
         setTimeout(() => { if (alert.parentNode) { alert.remove(); } }, 5000);
     }
+
+    window.redirectToDashboard = function() {
+        window.location.href = '{% url "worklist:dashboard" %}';
+    };
 });
 </script>
 {% endblock %}
