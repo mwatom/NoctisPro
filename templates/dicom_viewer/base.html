@@ -9,13 +9,13 @@
     body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a1a; color: #fff; }
     .layout { display: grid; grid-template-columns: 80px 1fr 300px; grid-template-rows: 60px 1fr; height: 100vh; }
     .toolbar { grid-row: 1 / span 2; grid-column: 1; background: #2a2a2a; border-right: 1px solid #444; padding: 8px 6px; display: flex; flex-direction: column; gap: 6px; overflow:auto; }
-    .tool { width: 66px; height: 56px; background: #3a3a3a; border: none; border-radius: 8px; color: #fff; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; }
+    .tool { width: 50px; height: 44px; background: #3a3a3a; border: none; border-radius: 8px; color: #fff; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; }
     .tool.active { background: #0078d4; }
-    .tool i { font-size: 18px; margin-bottom: 4px; }
-    .topbar { grid-row: 1; grid-column: 2 / span 2; display: flex; align-items: center; gap: 12px; padding: 0 16px; background: #2a2a2a; border-bottom: 1px solid #444; }
-    .btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+    .tool i { font-size: 16px; margin-bottom: 2px; }
+    .topbar { grid-row: 1; grid-column: 2 / span 2; display: flex; align-items: center; gap: 8px; padding: 0 12px; background: #2a2a2a; border-bottom: 1px solid #444; }
+    .btn { padding: 6px 10px; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; }
     .btn-primary { background: #0078d4; color: #fff; }
-    .select { padding: 8px 10px; background: #3a3a3a; border: 1px solid #555; border-radius: 6px; color: #fff; min-width: 220px; }
+    .select { padding: 6px 8px; background: #3a3a3a; border: 1px solid #555; border-radius: 6px; color: #fff; min-width: 180px; font-size: 12px; }
     .viewport { grid-row: 2; grid-column: 2; background: #000; position: relative; display: flex; align-items: center; justify-content: center; }
     .right { grid-row: 2; grid-column: 3; background: #2a2a2a; border-left: 1px solid #444; padding: 16px; overflow: auto; }
     .panel { margin-bottom: 18px; }
@@ -32,8 +32,8 @@
     .muted { color:#bbb; font-size:12px; }
     /* 3D dropdown in toolbar */
     .tool-dropdown { position: relative; }
-    .tool-dropdown-menu { position: absolute; top: 58px; left: 0; background: #2f2f2f; border: 1px solid #444; border-radius: 8px; width: 180px; display: none; flex-direction: column; overflow: hidden; z-index: 10; }
-    .tool-dropdown-menu button { background: transparent; border: none; color: #fff; text-align: left; padding: 10px 12px; cursor: pointer; font-size: 13px; }
+    .tool-dropdown-menu { position: absolute; top: 48px; left: 0; background: #2f2f2f; border: 1px solid #444; border-radius: 8px; width: 180px; display: none; flex-direction: column; overflow: hidden; z-index: 10; }
+    .tool-dropdown-menu button { background: transparent; border: none; color: #fff; text-align: left; padding: 8px 10px; cursor: pointer; font-size: 12px; }
     .tool-dropdown-menu button:hover { background: #0078d4; }
     /* 3D modal */
     #threeContainer { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: none; z-index: 1000; }
@@ -52,6 +52,13 @@
       "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
     }
   }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+    // Expose for existing viewer code
+    window.THREE = THREE;
+    window.THREE.OrbitControls = OrbitControls;
   </script>
 </head>
 <body>
@@ -169,8 +176,7 @@
   </div>
 
   <!-- Three.js for rotatable bone mesh (loaded only if used) -->
-  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-  <script src="https://unpkg.com/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+  <!-- Removed deprecated UMD scripts; using ES Modules via importmap -->
   <div id="threeContainer">
     <button id="close3d" class="btn">Close 3D</button>
     <div id="threeMount"></div>
@@ -236,6 +242,8 @@
     let reconIndex = 0;
     // MPR plane browsing state
     let mprScroll = { axial: 0, sagittal: 0, coronal: 0, counts: { axial: 0, sagittal: 0, coronal: 0 } };
+    // Crosshair linkage across planes (x: sagittal index, y: coronal index, z: axial index)
+    let mprCross = { x: null, y: null, z: null };
     let showHuProbe = false;
     let huEllipse = null;
     let activeTool = 'window';
@@ -357,6 +365,7 @@
         }
         // Reset view state
         zoom = 1.0; panOffset = {x:0,y:0}; activeTool = 'window'; crosshair = false; mprMode = false; mprImgs = {axial:null,sagittal:null,coronal:null}; reconMode = null; reconImgs = []; reconIndex = 0;
+        mprCross = { x: null, y: null, z: null }; // reset crosshair linkage
         // Safely guard missing elements (fix: avoid null access halting draw)
         const enterMpr = document.getElementById('btnEnterMpr');
         const exitMpr = document.getElementById('btnExitMpr');
@@ -396,6 +405,14 @@
               const params = new URLSearchParams(); params.set('window_width', ww); params.set('window_level', wl); params.set('inverted', inverted);
               const r = await fetch(`/viewer/api/series/${currentSeries.id}/mpr/?${params.toString()}`);
               const j = await r.json(); if (j && j.mpr_views) mprImgs = j.mpr_views; if (j && j.counts) mprScroll.counts = j.counts;
+              // Initialize crosshair linkage mid positions if not set
+              if (j && j.counts && (mprCross.x === null || mprCross.y === null || mprCross.z === null)){
+                mprCross = {
+                  x: Math.floor((j.counts.sagittal||0)/2),
+                  y: Math.floor((j.counts.coronal||0)/2),
+                  z: Math.floor((j.counts.axial||0)/2)
+                };
+              }
             }
             ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
             const imgSrc = mprImgs[mprFullPlane];
@@ -407,6 +424,8 @@
               ctx.imageSmoothingEnabled = false; ctx.drawImage(im, dx, dy, dw, dh);
               mprRegionVps[mprFullPlane] = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height, rect: {x:0,y:0,w:canvas.width,h:canvas.height} };
               if (huEllipse && huEllipse.mode==='mpr' && huEllipse.plane===mprFullPlane){ drawEllipseOverlay(mprFullPlane); }
+              // Draw linked crosshair on enlarged plane
+              drawMprCrosshairOverlay(mprFullPlane, dx, dy, scale, im.width, im.height);
             }
             document.getElementById('overlay').innerHTML = `MPR (${mprFullPlane.toUpperCase()}) | WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}`;
             document.getElementById('zoominfo').textContent = `MPR`;
@@ -423,6 +442,13 @@
               mprScroll.axial = Math.floor((j.counts.axial||0)/2);
               mprScroll.sagittal = Math.floor((j.counts.sagittal||0)/2);
               mprScroll.coronal = Math.floor((j.counts.coronal||0)/2);
+              if (mprCross.x === null || mprCross.y === null || mprCross.z === null){
+                mprCross = {
+                  x: mprScroll.sagittal,
+                  y: mprScroll.coronal,
+                  z: mprScroll.axial
+                };
+              }
             }
           }
           ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -466,6 +492,8 @@
               if (huEllipse && huEllipse.mode==='mpr' && huEllipse.plane===reg.key){
                 drawEllipseOverlay(reg.key);
               }
+              // Draw linked crosshair overlay for this plane
+              drawMprCrosshairOverlay(reg.key, dx, dy, scale, im.width, im.height);
             }
             // Fetch updated slice without blocking draw
             (async ()=>{
@@ -561,6 +589,38 @@
       } catch (e) {
         await fallbackToDesktop();
       }
+    }
+
+    function drawMprCrosshairOverlay(planeKey, dx, dy, scale, imgW, imgH){
+      if (mprCross.x === null || mprCross.y === null || mprCross.z === null) return;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,255,0,0.9)';
+      ctx.lineWidth = 1;
+      if (planeKey === 'axial'){
+        const cx = dx + mprCross.x * scale;
+        const cy = dy + mprCross.y * scale;
+        ctx.beginPath();
+        ctx.moveTo(cx, dy); ctx.lineTo(cx, dy + imgH * scale);
+        ctx.moveTo(dx, cy); ctx.lineTo(dx + imgW * scale, cy);
+        ctx.stroke();
+      } else if (planeKey === 'sagittal'){
+        // sagittal image axes: x=height(y), y=depth(z)
+        const cx = dx + mprCross.y * scale; // height index across width
+        const cy = dy + mprCross.z * scale; // depth index across height
+        ctx.beginPath();
+        ctx.moveTo(cx, dy); ctx.lineTo(cx, dy + imgH * scale);
+        ctx.moveTo(dx, cy); ctx.lineTo(dx + imgW * scale, cy);
+        ctx.stroke();
+      } else if (planeKey === 'coronal'){
+        // coronal image axes: x=width(x), y=depth(z)
+        const cx = dx + mprCross.x * scale;
+        const cy = dy + mprCross.z * scale;
+        ctx.beginPath();
+        ctx.moveTo(cx, dy); ctx.lineTo(cx, dy + imgH * scale);
+        ctx.moveTo(dx, cy); ctx.lineTo(dx + imgW * scale, cy);
+        ctx.stroke();
+      }
+      ctx.restore();
     }
 
     function drawOverlays(vp){
@@ -772,6 +832,42 @@
         const vp2 = lastVp || { x:0, y:0, scale:1 };
         measureDraft = { start: canvasToImageCoords(vp2, e.offsetX, e.offsetY), end: canvasToImageCoords(vp2, e.offsetX, e.offsetY) };
       }
+      if (mprMode && activeTool === 'crosshair'){
+        const halfW = Math.floor(canvas.width/2), halfH = Math.floor(canvas.height/2);
+        const mx = e.offsetX, my = e.offsetY;
+        let plane = null; if (mx < halfW && my < halfH) plane='sagittal'; else if (mx>=halfW && my<halfH) plane='coronal'; else if (mx<halfW && my>=halfH) plane='axial';
+        if (plane && mprRegionVps[plane]){
+          const vpR = mprRegionVps[plane];
+          // Ignore clicks outside the image bounds within region
+          if (mx < vpR.x || mx > vpR.x + vpR.imgW * vpR.scale || my < vpR.y || my > vpR.y + vpR.imgH * vpR.scale) {
+            return;
+          }
+          const imgPt = canvasToImageCoords(vpR, mx, my);
+          // Update crosshair global coordinates and plane slices
+          if (plane === 'axial'){
+            mprCross.x = Math.round(imgPt.x);
+            mprCross.y = Math.round(imgPt.y);
+            // Update orthogonal planes to intersect this point
+            mprScroll.sagittal = Math.max(0, Math.min((mprScroll.counts.sagittal||1)-1, mprCross.x));
+            mprScroll.coronal = Math.max(0, Math.min((mprScroll.counts.coronal||1)-1, mprCross.y));
+          } else if (plane === 'sagittal'){
+            // sagittal image: x->height(y), y->depth(z)
+            mprCross.y = Math.round(imgPt.x);
+            mprCross.z = Math.round(imgPt.y);
+            mprScroll.axial = Math.max(0, Math.min((mprScroll.counts.axial||1)-1, mprCross.z));
+            // coronal slice corresponds to height index
+            mprScroll.coronal = Math.max(0, Math.min((mprScroll.counts.coronal||1)-1, mprCross.y));
+          } else if (plane === 'coronal'){
+            // coronal image: x->width(x), y->depth(z)
+            mprCross.x = Math.round(imgPt.x);
+            mprCross.z = Math.round(imgPt.y);
+            mprScroll.axial = Math.max(0, Math.min((mprScroll.counts.axial||1)-1, mprCross.z));
+            // sagittal slice corresponds to width index
+            mprScroll.sagittal = Math.max(0, Math.min((mprScroll.counts.sagittal||1)-1, mprCross.x));
+          }
+          draw();
+        }
+      }
       if (showHuProbe){
         if (mprMode){
           // determine plane by quadrant
@@ -930,7 +1026,12 @@
         const count = (mprScroll.counts[plane]||1);
         const cur = (mprScroll[plane]||0);
         const ni = Math.max(0, Math.min(count-1, cur + d));
-        if (ni !== cur){ mprScroll[plane] = ni; await draw(); }
+        if (ni !== cur){
+          mprScroll[plane] = ni;
+          // keep crosshair in sync with the scrolled plane axis
+          if (plane === 'axial') mprCross.z = ni; else if (plane === 'sagittal') mprCross.x = ni; else if (plane === 'coronal') mprCross.y = ni;
+          await draw();
+        }
         return;
       }
       if (e.ctrlKey){ const delta = e.deltaY>0?0.9:1.1; zoom = Math.max(0.1, Math.min(5.0, zoom*delta)); zoomSlider.value = Math.round(zoom*100); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; draw(); }
@@ -983,7 +1084,7 @@
         const r = await fetch(url);
         const j = await r.json();
         if (j.error) throw new Error(j.error);
-        if (j.mpr_views){ reconMode = 'mpr'; reconImgs = [j.mpr_views.axial, j.mpr_views.sagittal, j.mpr_views.coronal]; mprMode = true; if (j.counts){ mprScroll.counts = j.counts; mprScroll.axial = Math.floor((j.counts.axial||0)/2); mprScroll.sagittal = Math.floor((j.counts.sagittal||0)/2); mprScroll.coronal = Math.floor((j.counts.coronal||0)/2); } }
+        if (j.mpr_views){ reconMode = 'mpr'; reconImgs = [j.mpr_views.axial, j.mpr_views.sagittal, j.mpr_views.coronal]; mprMode = true; if (j.counts){ mprScroll.counts = j.counts; mprScroll.axial = Math.floor((j.counts.axial||0)/2); mprScroll.sagittal = Math.floor((j.counts.sagittal||0)/2); mprScroll.coronal = Math.floor((j.counts.coronal||0)/2); mprCross = { x: mprScroll.sagittal, y: mprScroll.coronal, z: mprScroll.axial }; } }
         if (j.mip_views){ reconMode = 'mip'; reconImgs = [j.mip_views.axial, j.mip_views.sagittal, j.mip_views.coronal]; }
         if (j.bone_views){ reconMode = 'bone'; reconImgs = [j.bone_views.axial || j.bone_views.bone_axial_preview, j.bone_views.sagittal || j.bone_views.bone_sagittal_preview, j.bone_views.coronal || j.bone_views.bone_coronal_preview]; if (j.mesh) showBone3D(j.mesh); }
         reconImgs = reconImgs.filter(Boolean);
