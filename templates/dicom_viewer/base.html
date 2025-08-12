@@ -56,9 +56,9 @@
   <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
-    // Expose for existing viewer code
+    // Expose for existing viewer code without mutating the import namespace
     window.THREE = THREE;
-    window.THREE.OrbitControls = OrbitControls;
+    window.OrbitControls = OrbitControls;
   </script>
 </head>
 <body>
@@ -424,8 +424,8 @@
               ctx.imageSmoothingEnabled = false; ctx.drawImage(im, dx, dy, dw, dh);
               mprRegionVps[mprFullPlane] = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height, rect: {x:0,y:0,w:canvas.width,h:canvas.height} };
               if (huEllipse && huEllipse.mode==='mpr' && huEllipse.plane===mprFullPlane){ drawEllipseOverlay(mprFullPlane); }
-              // Draw linked crosshair on enlarged plane
-              drawMprCrosshairOverlay(mprFullPlane, dx, dy, scale, im.width, im.height);
+              // Draw linked crosshair on enlarged plane (only if enabled)
+              if (crosshair) { drawMprCrosshairOverlay(mprFullPlane, dx, dy, scale, im.width, im.height); }
             }
             document.getElementById('overlay').innerHTML = `MPR (${mprFullPlane.toUpperCase()}) | WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}`;
             document.getElementById('zoominfo').textContent = `MPR`;
@@ -492,8 +492,8 @@
               if (huEllipse && huEllipse.mode==='mpr' && huEllipse.plane===reg.key){
                 drawEllipseOverlay(reg.key);
               }
-              // Draw linked crosshair overlay for this plane
-              drawMprCrosshairOverlay(reg.key, dx, dy, scale, im.width, im.height);
+              // Draw linked crosshair overlay for this plane (only if enabled)
+              if (crosshair) { drawMprCrosshairOverlay(reg.key, dx, dy, scale, im.width, im.height); }
             }
             // Fetch updated slice without blocking draw
             (async ()=>{
@@ -778,7 +778,7 @@
     seriesSelect.addEventListener('change', e=>{ if(e.target.value) loadSeries(e.target.value); });
     wwSlider.addEventListener('input', e=>{ ww = +e.target.value; document.getElementById('wwVal').textContent = ww; draw(); });
     wlSlider.addEventListener('input', e=>{ wl = +e.target.value; document.getElementById('wlVal').textContent = wl; draw(); });
-    sliceSlider.addEventListener('input', async e=>{ index = +e.target.value; document.getElementById('sliceVal').textContent = index+1; await loadOverlaysForCurrentImage(); });
+    sliceSlider.addEventListener('input', e=>{ index = +e.target.value; document.getElementById('sliceVal').textContent = index+1; loadOverlaysForCurrentImage(); });
     zoomSlider.addEventListener('input', e=>{ zoom = (+e.target.value)/100; document.getElementById('zoomVal').textContent = `${e.target.value}%`; draw(); });
     document.querySelectorAll('[data-preset]').forEach(btn=>btn.addEventListener('click', ()=>{
       const p = btn.getAttribute('data-preset');
@@ -812,7 +812,7 @@
       if (tool === 'align-center'){ panOffset = {x:0,y:0}; draw(); return; }
       if (tool === 'reload'){ ww = defaultWw; wl = defaultWl; inverted = false; panOffset={x:0,y:0}; zoom=1.0; wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); zoomSlider.value=100; document.getElementById('zoomVal').textContent='100%'; draw(); return; }
       if (tool === 'ai'){ alert('AI analysis result: (stub) No backend connected.'); return; }
-      if (tool === 'crosshair'){ crosshair = !crosshair; draw(); return; }
+      if (tool === 'crosshair'){ if (activeTool === 'crosshair'){ crosshair = false; activeTool = 'window'; } else { activeTool = 'crosshair'; crosshair = true; } draw(); return; }
       if (tool === 'hu'){ showHuProbe = true; huEllipse = null; draw(); return; }
       if (tool === 'measure') { showHuProbe = false; }
       // remove old inline MPR toggle from tool button; handled by 3D dropdown now
@@ -901,6 +901,34 @@
         // no-op while dragging
       } else if (activeTool === 'zoom'){
         const dy = e.offsetY - dragStart.y; dragStart = { x: e.offsetX, y: e.offsetY }; const factor = dy<0 ? 1.05 : 0.95; zoom = Math.min(5.0, Math.max(0.25, zoom*factor)); zoomSlider.value = Math.round(zoom*100); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; await draw();
+      } else if (mprMode && activeTool === 'crosshair'){
+        // Drag crosshair across planes
+        const halfW = Math.floor(canvas.width/2), halfH = Math.floor(canvas.height/2);
+        const mx = e.offsetX, my = e.offsetY;
+        let plane = null; if (mx < halfW && my < halfH) plane='sagittal'; else if (mx>=halfW && my<halfH) plane='coronal'; else if (mx<halfW && my>=halfH) plane='axial';
+        if (plane && mprRegionVps[plane]){
+          const vpR = mprRegionVps[plane];
+          if (!(mx < vpR.x || mx > vpR.x + vpR.imgW * vpR.scale || my < vpR.y || my > vpR.y + vpR.imgH * vpR.scale)){
+            const imgPt = canvasToImageCoords(vpR, mx, my);
+            if (plane === 'axial'){
+              mprCross.x = Math.round(imgPt.x);
+              mprCross.y = Math.round(imgPt.y);
+              mprScroll.sagittal = Math.max(0, Math.min((mprScroll.counts.sagittal||1)-1, mprCross.x));
+              mprScroll.coronal = Math.max(0, Math.min((mprScroll.counts.coronal||1)-1, mprCross.y));
+            } else if (plane === 'sagittal'){
+              mprCross.y = Math.round(imgPt.x);
+              mprCross.z = Math.round(imgPt.y);
+              mprScroll.axial = Math.max(0, Math.min((mprScroll.counts.axial||1)-1, mprCross.z));
+              mprScroll.coronal = Math.max(0, Math.min((mprScroll.counts.coronal||1)-1, mprCross.y));
+            } else if (plane === 'coronal'){
+              mprCross.x = Math.round(imgPt.x);
+              mprCross.z = Math.round(imgPt.y);
+              mprScroll.axial = Math.max(0, Math.min((mprScroll.counts.axial||1)-1, mprCross.z));
+              mprScroll.sagittal = Math.max(0, Math.min((mprScroll.counts.sagittal||1)-1, mprCross.x));
+            }
+            await draw();
+          }
+        }
       } else if (showHuProbe && huEllipse){
         if (huEllipse.mode==='mpr' && mprRegionVps[huEllipse.plane]){
           const vpR = mprRegionVps[huEllipse.plane];
@@ -1097,20 +1125,20 @@
        }
      }
  
-     btnGenerateRecon.addEventListener('click', async ()=>{ await generateReconstruction(); });
+     btnGenerateRecon.addEventListener('click', ()=>{ generateReconstruction(); });
  
      // 3D dropdown interactions
      btn3D.addEventListener('click', ()=>{
        menu3D.style.display = (menu3D.style.display === 'flex') ? 'none' : 'flex';
        if (menu3D.style.display === '' || menu3D.style.display === 'none') menu3D.style.display = 'flex';
      });
-     menu3D.addEventListener('click', async (e)=>{
-       const btn = e.target.closest('button[data-recon]');
-       if (!btn) return;
-       const kind = btn.getAttribute('data-recon');
-       menu3D.style.display = 'none';
-       await generateReconstruction(kind);
-     });
+           menu3D.addEventListener('click', (e)=>{
+        const btn = e.target.closest('button[data-recon]');
+        if (!btn) return;
+        const kind = btn.getAttribute('data-recon');
+        menu3D.style.display = 'none';
+        generateReconstruction(kind);
+      });
      // Close dropdown when clicking outside
      document.addEventListener('click', (e)=>{
        if (!menu3D.contains(e.target) && e.target !== btn3D) menu3D.style.display = 'none';
@@ -1177,7 +1205,7 @@
           three.scene.background = new THREE.Color(0x000000);
           three.camera = new THREE.PerspectiveCamera(45, mount.clientWidth/mount.clientHeight, 0.1, 10000);
           three.camera.position.set(0, 0, 400);
-          three.controls = new THREE.OrbitControls(three.camera, three.renderer.domElement);
+          three.controls = new window.OrbitControls(three.camera, three.renderer.domElement);
           const light1 = new THREE.DirectionalLight(0xffffff, 1.0); light1.position.set(1,1,1); three.scene.add(light1);
           const light2 = new THREE.AmbientLight(0x444444); three.scene.add(light2);
           window.addEventListener('resize', ()=>{
