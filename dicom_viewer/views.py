@@ -615,14 +615,27 @@ def api_dicom_image_display(request, image_id):
         ds = pydicom.dcmread(dicom_path)
         
         # Get pixel array, apply VOI LUT for projection modalities only (avoid CT distortion), then rescale
-        pixel_array = ds.pixel_array
         try:
-            modality = str(getattr(ds, 'Modality', '')).upper()
-            if modality in ['DX','CR','XA','RF','MG']:
-                pixel_array = apply_voi_lut(pixel_array, ds)
+            pixel_array = ds.pixel_array
+            try:
+                modality = str(getattr(ds, 'Modality', '')).upper()
+                if modality in ['DX','CR','XA','RF','MG']:
+                    pixel_array = apply_voi_lut(pixel_array, ds)
+            except Exception:
+                pass
+            pixel_array = pixel_array.astype(np.float32)
         except Exception:
-            pass
-        pixel_array = pixel_array.astype(np.float32)
+            # Fallback for compressed DICOMs without pixel handler: try SimpleITK
+            try:
+                import SimpleITK as sitk
+                sitk_image = sitk.ReadImage(dicom_path)
+                pixel_array = sitk.GetArrayFromImage(sitk_image)
+                # SimpleITK returns (depth,height,width) for 3D; for single-slice ensure 2D
+                if pixel_array.ndim == 3 and pixel_array.shape[0] == 1:
+                    pixel_array = pixel_array[0]
+                pixel_array = pixel_array.astype(np.float32)
+            except Exception as _e:
+                return JsonResponse({'error': f'Error decoding DICOM pixels: {str(_e)}'}, status=500)
         
         # Apply rescale slope/intercept
         if hasattr(ds, 'RescaleSlope') and hasattr(ds, 'RescaleIntercept'):
@@ -1286,6 +1299,7 @@ def api_process_study(request, study_id):
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 @login_required
+@csrf_exempt
 def launch_standalone_viewer(request):
     """Launch the standalone DICOM viewer application (Python PyQt)."""
     import subprocess
@@ -1373,9 +1387,11 @@ def launch_study_in_desktop_viewer(request, study_id):
         study = get_object_or_404(Study, id=study_id)
         user = request.user
         if user.is_facility_user() and study.facility != user.facility:
+            # Gracefully fall back to web viewer rather than hard 403, to match frontend behavior
+            web_url = f'/viewer/web/viewer/?study_id={study_id}'
             if wants_html:
-                return redirect('/viewer/web/viewer/')
-            return JsonResponse({'success': False, 'message': 'You do not have permission to view this study.'}, status=403)
+                return redirect(web_url)
+            return JsonResponse({'success': True, 'fallback_url': web_url, 'message': 'Opening web-based DICOM viewer due to permissions'}, status=200)
 
         launcher_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'tools', 'launch_dicom_viewer.py')
 

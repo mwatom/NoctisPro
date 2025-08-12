@@ -143,8 +143,13 @@
   </div>
 
   <!-- Three.js for rotatable bone mesh (loaded only if used) -->
-  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-  <script src="https://unpkg.com/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+    import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+    // Expose as globals for existing viewer code that references window.THREE and THREE.OrbitControls
+    window.THREE = THREE;
+    THREE.OrbitControls = OrbitControls;
+  </script>
   <div id="threeContainer">
     <button id="close3d" class="btn">Close 3D</button>
     <div id="threeMount"></div>

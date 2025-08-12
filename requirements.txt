@@ -17,6 +17,10 @@ daphne==4.0.0
 pydicom==2.4.3
 pynetdicom==2.0.2
 SimpleITK==2.3.1
+pylibjpeg==2.0.1
+pylibjpeg-libjpeg==2.1.0
+pylibjpeg-openjpeg==2.3.0
+gdcm==3.0.22
 
 # Image processing and computer vision
 opencv-python==4.8.1.78
