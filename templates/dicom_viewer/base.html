@@ -1083,7 +1083,7 @@
         return;
       }
       if (e.ctrlKey){ const delta = e.deltaY>0?0.9:1.1; zoom = Math.max(0.1, Math.min(5.0, zoom*delta)); zoomSlider.value = Math.round(zoom*100); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; requestAnimationFrame(()=>{ draw(); }); }
-      else { const d = e.deltaY>0?1:-1; const ni = Math.max(0, Math.min(images.length-1, index+d)); if (ni !== index){ index = ni; sliceSlider.value = index; document.getElementById('sliceVal').textContent = index+1; loadOverlaysForCurrentImage(); } }
+      else { const d = e.deltaY>0?1:-1; const ni = Math.max(0, Math.min(images.length-1, index+d)); if (ni !== index){ index = ni; sliceSlider.value = index; document.getElementById('sliceVal').textContent = index+1; requestAnimationFrame(()=>{ draw(); }); loadOverlaysForCurrentImage(); } }
     }, { passive:false });
 
     // Local DICOM upload
