@@ -51,6 +51,8 @@
       {% if user.is_authenticated and user.can_edit_reports %}
       <button id="btnWriteReport" class="btn btn-primary" style="display:none"><i class="fas fa-file-signature"></i> Write Report</button>
       {% endif %}
+      <button id="btnEnterMpr" class="btn" style="display:none"><i class="fas fa-layer-group"></i> MPR</button>
+      <button id="btnExitMpr" class="btn" style="display:none"><i class="fas fa-times"></i> Exit MPR</button>
       <input id="localDicom" type="file" multiple webkitdirectory directory accept=".dcm,.dicom,application/dicom" style="display:none" />
       <select id="seriesSelect" class="select"><option value="">Select Series</option></select>
       <div id="patientInfo" style="margin-left:auto;color:#ccc;font-size:13px;">Patient: - | Study Date: - | Modality: -</div>
@@ -153,6 +155,8 @@
     let images = [];
     let index = 0;
     let ww = 400, wl = 40, inverted = false, zoom = 1.0;
+    let mprMode = false;
+    let mprImgs = { axial: null, sagittal: null, coronal: null };
     let activeTool = 'window';
     let isDragging = false;
     let dragStart = null;
@@ -245,22 +249,23 @@
         const data = await r.json();
         currentSeries = data.series; images = data.images || []; index = 0;
         sliceSlider.max = Math.max(0, images.length - 1); sliceSlider.value = 0; document.getElementById('sliceVal').textContent = '1';
-                 if (images.length){
-           // Attempt to fetch first image with defaults to derive ww/wl from backend
-           const probe = await fetch(`/viewer/image/${images[0].id}/`);
-           if (probe.ok){
-             const j = await probe.json();
-             if (j && j.image_info){
-               ww = j.image_info.default_window_width || ww;
-               wl = j.image_info.default_window_level || wl;
-               // Apply inversion suggestion only on first load
-               if (j.windowing && typeof j.windowing.inverted === 'boolean') { inverted = j.windowing.inverted; }
-             }
-           }
-           wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl);
-         }
+        if (images.length){
+          // Fetch defaults from JSON API
+          const probe = await fetch(`/viewer/api/image/${images[0].id}/display/`);
+          if (probe.ok){
+            const j = await probe.json();
+            if (j && j.image_info){
+              ww = j.image_info.default_window_width || ww;
+              wl = j.image_info.default_window_level || wl;
+              if (j.windowing && typeof j.windowing.inverted === 'boolean') { inverted = j.windowing.inverted; }
+            }
+          }
+          wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl);
+        }
         // Reset view state
-        zoom = 1.0; panOffset = {x:0,y:0}; activeTool = 'window'; inverted = false; crosshair = false;
+        zoom = 1.0; panOffset = {x:0,y:0}; activeTool = 'window'; crosshair = false; mprMode = false; mprImgs = {axial:null,sagittal:null,coronal:null};
+        document.getElementById('btnEnterMpr').style.display = images.length ? '' : 'none';
+        document.getElementById('btnExitMpr').style.display = 'none';
         document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active'));
         document.querySelector('.tool[data-tool="window"]').classList.add('active');
         setCanvasSize();
@@ -286,6 +291,35 @@
 
     async function draw(){
       if (!images.length) { ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height); return; }
+      if (mprMode){
+        try{
+          // Ensure MPR images
+          if (!mprImgs.axial || !mprImgs.sagittal || !mprImgs.coronal){
+            const params = new URLSearchParams(); params.set('window_width', ww); params.set('window_level', wl); params.set('inverted', inverted);
+            const r = await fetch(`/viewer/api/series/${currentSeries.id}/mpr/?${params.toString()}`);
+            const j = await r.json();
+            if (j && j.mpr_views){ mprImgs = j.mpr_views; }
+          }
+          // Draw three panels
+          ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
+          const regions = [
+            { x: 0, y: 0, w: Math.floor(canvas.width/3), h: canvas.height, key: 'axial' },
+            { x: Math.floor(canvas.width/3), y: 0, w: Math.floor(canvas.width/3), h: canvas.height, key: 'sagittal' },
+            { x: Math.floor(2*canvas.width/3), y: 0, w: canvas.width - Math.floor(2*canvas.width/3), h: canvas.height, key: 'coronal' },
+          ];
+          for (const reg of regions){
+            if (!mprImgs[reg.key]) continue;
+            const im = await loadImage(mprImgs[reg.key]);
+            const scale = Math.min(reg.w / im.width, reg.h / im.height);
+            const dw = im.width * scale, dh = im.height * scale;
+            const dx = reg.x + (reg.w - dw)/2, dy = reg.y + (reg.h - dh)/2;
+            ctx.drawImage(im, dx, dy, dw, dh);
+          }
+          document.getElementById('overlay').innerHTML = `MPR | WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}`;
+          document.getElementById('zoominfo').textContent = `MPR`;
+          return;
+        } catch(e){ /* fallback to normal draw below */ }
+      }
       try {
         const img = images[index];
         const url = `/viewer/image/${img.id}/?ww=${ww}&wl=${wl}&invert=${inverted}`;
@@ -435,6 +469,7 @@
       if (tool === 'reset'){ zoom = 1.0; panOffset = {x:0,y:0}; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; draw(); return; }
       if (tool === 'ai'){ alert('AI analysis result: (stub) No backend connected.'); return; }
       if (tool === 'crosshair'){ crosshair = !crosshair; draw(); return; }
+      if (mprMode){ return; }
       activeTool = tool;
     }));
 
@@ -554,6 +589,15 @@
     setCanvasSize();
     const studyId = q('study_id');
     if (studyId) loadStudy(studyId);
+
+    // MPR buttons
+    document.getElementById('btnEnterMpr').addEventListener('click', async ()=>{
+      if (!currentSeries || !currentSeries.id) return;
+      mprMode = true; document.getElementById('btnEnterMpr').style.display='none'; document.getElementById('btnExitMpr').style.display=''; await draw();
+    });
+    document.getElementById('btnExitMpr').addEventListener('click', async ()=>{
+      mprMode = false; mprImgs = {axial:null,sagittal:null,coronal:null}; document.getElementById('btnExitMpr').style.display='none'; document.getElementById('btnEnterMpr').style.display=''; await draw();
+    });
   })();
   </script>
 </body>

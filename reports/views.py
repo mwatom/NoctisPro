@@ -10,6 +10,9 @@ from accounts.models import User
 
 @login_required
 def report_list(request):
+    # Restrict to admin and radiologist
+    if not getattr(request.user, 'can_edit_reports', None) or not request.user.can_edit_reports():
+        return HttpResponse(status=403)
     """List all reports"""
     # Get filter parameters
     search_query = request.GET.get('search', '')
@@ -59,6 +62,9 @@ def report_list(request):
 
 @login_required
 def write_report(request, study_id):
+    # Restrict to admin and radiologist
+    if not getattr(request.user, 'can_edit_reports', None) or not request.user.can_edit_reports():
+        return HttpResponse(status=403)
     """Write report for study"""
     study = get_object_or_404(Study, id=study_id)
     

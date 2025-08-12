@@ -239,13 +239,13 @@ def api_mip_reconstruction(request, series_id):
     user = request.user
     
     # Check permissions
-    if user.is_facility_user() and series.study.facility != user.facility:
+    if user.is_facility_user() and getattr(user, 'facility', None) and series.study.facility != user.facility:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
     try:
         # Get all images in the series
         images = series.images.all().order_by('slice_location', 'instance_number')
-        
+
         if images.count() < 2:
             return JsonResponse({'error': 'Need at least 2 images for MIP'}, status=400)
         
@@ -329,7 +329,7 @@ def api_bone_reconstruction(request, series_id):
     user = request.user
     
     # Check permissions
-    if user.is_facility_user() and series.study.facility != user.facility:
+    if user.is_facility_user() and getattr(user, 'facility', None) and series.study.facility != user.facility:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
     try:
@@ -1446,15 +1446,53 @@ def web_dicom_image(request, image_id):
         return HttpResponse(status=403)
     window_width = float(request.GET.get('ww', 400))
     window_level = float(request.GET.get('wl', 40))
-    invert = request.GET.get('invert', 'false').lower() == 'true'
+    inv_param = request.GET.get('invert')
+    invert = (inv_param or '').lower() == 'true'
     try:
         file_path = os.path.join(settings.MEDIA_ROOT, image.file_path.name)
         ds = pydicom.dcmread(file_path)
         pixel_array = ds.pixel_array
+        # Apply VOI LUT when present (improves CR/DX contrast)
+        try:
+            from pydicom.pixel_data_handlers.util import apply_voi_lut as _apply_voi_lut
+            pixel_array = _apply_voi_lut(pixel_array, ds)
+        except Exception:
+            pass
         # apply slope/intercept
         slope = getattr(ds, 'RescaleSlope', 1.0)
         intercept = getattr(ds, 'RescaleIntercept', 0.0)
         pixel_array = pixel_array.astype(np.float32) * float(slope) + float(intercept)
+        # Derive defaults if not provided in query
+        modality = str(getattr(ds, 'Modality', '')).upper()
+        photo = str(getattr(ds, 'PhotometricInterpretation', '')).upper()
+        def _derive_window(arr):
+            flat = arr.astype(np.float32).flatten()
+            p1 = float(np.percentile(flat, 1))
+            p99 = float(np.percentile(flat, 99))
+            return max(1.0, p99 - p1), (p99 + p1) / 2.0
+        ww_param = request.GET.get('ww')
+        wl_param = request.GET.get('wl')
+        if ww_param is None or wl_param is None:
+            dw = getattr(ds, 'WindowWidth', None)
+            dl = getattr(ds, 'WindowCenter', None)
+            if hasattr(dw, '__iter__') and not isinstance(dw, str):
+                dw = dw[0]
+            if hasattr(dl, '__iter__') and not isinstance(dl, str):
+                dl = dl[0]
+            if dw is None or dl is None:
+                dww, dwl = _derive_window(pixel_array)
+                dw = dw or dww
+                dl = dl or dwl
+            if modality in ['DX','CR','XA','RF']:
+                dw = float(dw) if dw is not None else 3000.0
+                dl = float(dl) if dl is not None else 1500.0
+            if ww_param is None:
+                window_width = float(dw)
+            if wl_param is None:
+                window_level = float(dl)
+        # Default invert for MONOCHROME1 when not explicitly provided
+        if inv_param is None and photo == 'MONOCHROME1':
+            invert = True
         processor = DicomProcessor()
         windowed = processor.apply_windowing(pixel_array, window_width, window_level, invert)
         pil_image = Image.fromarray(windowed)
