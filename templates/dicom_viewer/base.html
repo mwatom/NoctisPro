@@ -494,6 +494,20 @@
               }
               // Draw linked crosshair overlay for this plane (only if enabled)
               if (crosshair) { drawMprCrosshairOverlay(reg.key, dx, dy, scale, im.width, im.height); }
+              // Prefetch neighbor slices for this plane
+              const countP = (mprScroll.counts[reg.key]||0);
+              const curP = (mprScroll[reg.key]||0);
+              [curP-1, curP+1].forEach(sli=>{
+                if (sli>=0 && sli<countP){
+                  const paramsN = new URLSearchParams();
+                  paramsN.set('plane', reg.key);
+                  paramsN.set('slice', sli);
+                  paramsN.set('window_width', ww);
+                  paramsN.set('window_level', wl);
+                  paramsN.set('inverted', inverted);
+                  fetch(`/viewer/api/series/${currentSeries.id}/mpr/?${paramsN.toString()}`).catch(()=>{});
+                }
+              });
             }
             // Fetch updated slice without blocking draw
             (async ()=>{
@@ -533,8 +547,7 @@
       try {
         const img = images[index];
         const url = `/viewer/image/${img.id}/?ww=${ww}&wl=${wl}&invert=${inverted}`;
-        const htmlImg = new Image(); htmlImg.crossOrigin = 'anonymous';
-        await new Promise((resolve,reject)=>{ htmlImg.onload=resolve; htmlImg.onerror=reject; htmlImg.src=url; });
+                 const htmlImg = await loadImageCached(url);
         const vp = getViewportPlacement(htmlImg.width, htmlImg.height);
         ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
         ctx.imageSmoothingEnabled = false;
@@ -776,10 +789,10 @@
 
     // UI wiring
     seriesSelect.addEventListener('change', e=>{ if(e.target.value) loadSeries(e.target.value); });
-    wwSlider.addEventListener('input', e=>{ ww = +e.target.value; document.getElementById('wwVal').textContent = ww; draw(); });
-    wlSlider.addEventListener('input', e=>{ wl = +e.target.value; document.getElementById('wlVal').textContent = wl; draw(); });
-    sliceSlider.addEventListener('input', e=>{ index = +e.target.value; document.getElementById('sliceVal').textContent = index+1; loadOverlaysForCurrentImage(); });
-    zoomSlider.addEventListener('input', e=>{ zoom = (+e.target.value)/100; document.getElementById('zoomVal').textContent = `${e.target.value}%`; draw(); });
+          wwSlider.addEventListener('input', e=>{ ww = +e.target.value; document.getElementById('wwVal').textContent = ww; scheduleDraw(); });
+          wlSlider.addEventListener('input', e=>{ wl = +e.target.value; document.getElementById('wlVal').textContent = wl; scheduleDraw(); });
+         sliceSlider.addEventListener('input', e=>{ index = +e.target.value; document.getElementById('sliceVal').textContent = index+1; prefetchNeighbors(index); loadOverlaysForCurrentImageDebounced(); scheduleDraw(); });
+          zoomSlider.addEventListener('input', e=>{ zoom = (+e.target.value)/100; document.getElementById('zoomVal').textContent = `${e.target.value}%`; scheduleDraw(); });
     document.querySelectorAll('[data-preset]').forEach(btn=>btn.addEventListener('click', ()=>{
       const p = btn.getAttribute('data-preset');
       const map = { lung:{ww:1500,wl:-600}, bone:{ww:2000,wl:300}, soft:{ww:400,wl:40}, brain:{ww:100,wl:50} };
@@ -788,16 +801,16 @@
     document.querySelectorAll('.tool').forEach(t=>t.addEventListener('click', ()=>{
       const tool = t.getAttribute('data-tool');
       document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active')); t.classList.add('active');
-      if (tool === 'invert'){ inverted = !inverted; draw(); return; }
-      if (tool === 'reset'){ zoom = 1.0; panOffset = {x:0,y:0}; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; draw(); return; }
-      if (tool === 'fit'){ panOffset = {x:0,y:0}; zoom = 1.0; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; draw(); return; }
-      if (tool === 'one'){
-        if (lastVp){
-          const baseFit = Math.min(canvas.width / lastVp.imgW, canvas.height / lastVp.imgH);
-          zoom = 1 / baseFit; zoomSlider.value = Math.min(500, Math.max(25, Math.round(zoom*100))); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; panOffset={x:0,y:0}; draw();
-        }
-        return;
-      }
+             if (tool === 'invert'){ inverted = !inverted; scheduleDraw(); return; }
+             if (tool === 'reset'){ zoom = 1.0; panOffset = {x:0,y:0}; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; scheduleDraw(); return; }
+       if (tool === 'fit'){ panOffset = {x:0,y:0}; zoom = 1.0; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; scheduleDraw(); return; }
+             if (tool === 'one'){
+         if (lastVp){
+           const baseFit = Math.min(canvas.width / lastVp.imgW, canvas.height / lastVp.imgH);
+           zoom = 1 / baseFit; zoomSlider.value = Math.min(500, Math.max(25, Math.round(zoom*100))); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; panOffset={x:0,y:0}; scheduleDraw();
+         }
+         return;
+       }
       if (tool === 'cine'){
         cineActive = !cineActive;
         if (cineActive){
@@ -809,8 +822,8 @@
         return;
       }
       if (tool === 'spyglass'){ spyglass.active = !spyglass.active; draw(); return; }
-      if (tool === 'align-center'){ panOffset = {x:0,y:0}; draw(); return; }
-      if (tool === 'reload'){ ww = defaultWw; wl = defaultWl; inverted = false; panOffset={x:0,y:0}; zoom=1.0; wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); zoomSlider.value=100; document.getElementById('zoomVal').textContent='100%'; draw(); return; }
+             if (tool === 'align-center'){ panOffset = {x:0,y:0}; scheduleDraw(); return; }
+             if (tool === 'reload'){ ww = defaultWw; wl = defaultWl; inverted = false; panOffset={x:0,y:0}; zoom=1.0; wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); zoomSlider.value=100; document.getElementById('zoomVal').textContent='100%'; scheduleDraw(); return; }
       if (tool === 'ai'){ alert('AI analysis result: (stub) No backend connected.'); return; }
       if (tool === 'crosshair'){ if (activeTool === 'crosshair'){ crosshair = false; activeTool = 'window'; } else { activeTool = 'crosshair'; crosshair = true; } draw(); return; }
       if (tool === 'hu'){ showHuProbe = true; huEllipse = null; draw(); return; }
@@ -885,22 +898,22 @@
         }
         draw();
       }
-      if (spyglass.active){ spyglass.isPress = true; spyglass.cx = e.offsetX; spyglass.cy = e.offsetY; draw(); }
+      if (spyglass.active){ spyglass.isPress = true; spyglass.cx = e.offsetX; spyglass.cy = e.offsetY; scheduleDraw(); }
     });
     viewport.addEventListener('mousemove', async (e)=>{
-      if (!isDragging) { if (spyglass.active && spyglass.isPress){ spyglass.cx = e.offsetX; spyglass.cy = e.offsetY; await draw(); } return; }
+      if (!isDragging) { if (spyglass.active && spyglass.isPress){ spyglass.cx = e.offsetX; spyglass.cy = e.offsetY; scheduleDraw(); } return; }
       const vp = lastVp || { x:0, y:0, scale:1 };
       if (activeTool === 'window'){
         const dx = e.offsetX - dragStart.x; const dy = e.offsetY - dragStart.y; dragStart = { x: e.offsetX, y: e.offsetY };
-        ww = Math.max(1, ww + dx*4); wl = wl + dy*2; wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); await draw();
+        ww = Math.max(1, ww + dx*4); wl = wl + dy*2; wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); scheduleDraw();
       } else if (activeTool === 'pan'){
-        panOffset.x += (e.offsetX - dragStart.x); panOffset.y += (e.offsetY - dragStart.y); dragStart = { x: e.offsetX, y: e.offsetY }; await draw();
+        panOffset.x += (e.offsetX - dragStart.x); panOffset.y += (e.offsetY - dragStart.y); dragStart = { x: e.offsetX, y: e.offsetY }; scheduleDraw();
       } else if (activeTool === 'measure' && measureDraft){
         measureDraft.end = canvasToImageCoords(vp, e.offsetX, e.offsetY); await draw();
       } else if (activeTool === 'annotate'){
         // no-op while dragging
       } else if (activeTool === 'zoom'){
-        const dy = e.offsetY - dragStart.y; dragStart = { x: e.offsetX, y: e.offsetY }; const factor = dy<0 ? 1.05 : 0.95; zoom = Math.min(5.0, Math.max(0.25, zoom*factor)); zoomSlider.value = Math.round(zoom*100); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; await draw();
+        const dy = e.offsetY - dragStart.y; dragStart = { x: e.offsetX, y: e.offsetY }; const factor = dy<0 ? 1.05 : 0.95; zoom = Math.min(5.0, Math.max(0.25, zoom*factor)); zoomSlider.value = Math.round(zoom*100); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; scheduleDraw();
       } else if (mprMode && activeTool === 'crosshair'){
         // Drag crosshair across planes
         const halfW = Math.floor(canvas.width/2), halfH = Math.floor(canvas.height/2);
@@ -1062,8 +1075,8 @@
         }
         return;
       }
-      if (e.ctrlKey){ const delta = e.deltaY>0?0.9:1.1; zoom = Math.max(0.1, Math.min(5.0, zoom*delta)); zoomSlider.value = Math.round(zoom*100); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; draw(); }
-      else { const d = e.deltaY>0?1:-1; const ni = Math.max(0, Math.min(images.length-1, index+d)); if (ni !== index){ index = ni; sliceSlider.value = index; document.getElementById('sliceVal').textContent = index+1; loadOverlaysForCurrentImage(); } }
+      if (e.ctrlKey){ const delta = e.deltaY>0?0.9:1.1; zoom = Math.max(0.1, Math.min(5.0, zoom*delta)); zoomSlider.value = Math.round(zoom*100); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; scheduleDraw(); }
+      else { const d = e.deltaY>0?1:-1; const ni = Math.max(0, Math.min(images.length-1, index+d)); if (ni !== index){ index = ni; sliceSlider.value = index; document.getElementById('sliceVal').textContent = index+1; prefetchNeighbors(index); loadOverlaysForCurrentImageDebounced(); scheduleDraw(); } }
     }, { passive:false });
 
     // Local DICOM upload
@@ -1186,8 +1199,41 @@
 
     // Utils
     function loadImage(src){
-      return new Promise((res, rej)=>{ const im = new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=src; });
+      return new Promise((res, rej)=>{ const im = new Image(); im.crossOrigin = 'anonymous'; im.onload=()=>res(im); im.onerror=rej; im.src=src; });
     }
+    // Cached image loader to avoid re-downloading during fast scrubbing
+    const __imagePromiseCache = new Map();
+    function loadImageCached(src){
+      if (__imagePromiseCache.has(src)) return __imagePromiseCache.get(src);
+      const p = new Promise((res, rej)=>{ const im = new Image(); im.crossOrigin = 'anonymous'; im.onload=()=>res(im); im.onerror=rej; im.src=src; });
+      __imagePromiseCache.set(src, p);
+      // Garbage-collect eventually (keep cache bounded)
+      if (__imagePromiseCache.size > 200) {
+        const firstKey = __imagePromiseCache.keys().next().value; __imagePromiseCache.delete(firstKey);
+      }
+      return p;
+    }
+    // Debounce helper
+    function debounce(fn, delay){
+      let t = null; return (...args)=>{ clearTimeout(t); t = setTimeout(()=> fn.apply(null, args), delay); };
+    }
+    // Schedule draw to next animation frame (avoid multiple awaits per event)
+    let __rafPending = false;
+    function scheduleDraw(){
+      if (__rafPending) return; __rafPending = true;
+      requestAnimationFrame(async ()=>{ __rafPending = false; try { await draw(); } catch(e){} });
+    }
+    // Prefetch neighboring slices for instant scrolling
+    function prefetchNeighbors(currentIndex){
+      if (!images || !images.length) return;
+      const neighbors = [currentIndex - 1, currentIndex + 1].filter(i=> i>=0 && i<images.length);
+      neighbors.forEach(i=>{
+        const u = `/viewer/image/${images[i].id}/?ww=${ww}&wl=${wl}&invert=${inverted}`;
+        loadImageCached(u).catch(()=>{});
+      });
+    }
+    // Debounced overlays loader to avoid network on every scroll tick
+    const loadOverlaysForCurrentImageDebounced = debounce(()=>{ loadOverlaysForCurrentImage(); }, 120);
 
     // 3D viewer for bone mesh
     let three = { renderer:null, scene:null, camera:null, controls:null };
@@ -1241,6 +1287,17 @@
      setCanvasSize();
      const studyId = q('study_id');
      if (studyId) loadStudy(studyId);
+
+    // Enable passive listeners for better scroll perf, except where preventDefault is required
+    try {
+      const supportsPassive = (()=>{ let sp=false; const opts={get passive(){ sp=true; return false; }}; window.addEventListener('test', ()=>{}, opts); window.removeEventListener('test', ()=>{}, opts); return sp; })();
+      if (supportsPassive) {
+        // Re-bind wheel with passive:false already set below
+        // Add touch listeners as passive for smoother scrolling where applicable
+        viewport.addEventListener('touchstart', ()=>{}, { passive: true });
+        viewport.addEventListener('touchmove', ()=>{}, { passive: true });
+      }
+    } catch(e) {}
    })();
   </script>
 </body>

@@ -31,6 +31,7 @@
         padding: 1rem;
         overflow-y: auto;
         max-height: calc(100vh - 200px);
+        scroll-behavior: smooth;
     }
 
     .participants-sidebar {
@@ -229,7 +230,7 @@
                         {% elif message.message_type == 'image' %}
                             <i class="fas fa-image me-2"></i>
                             {% if message.attachment %}
-                                <img src="{{ message.attachment.url }}" alt="Image" style="max-width: 300px; border-radius: 8px;">
+                                <img src="{{ message.attachment.url }}" alt="Image" style="max-width: 300px; border-radius: 8px;" loading="lazy" decoding="async">
                             {% else %}
                                 Image attachment
                             {% endif %}

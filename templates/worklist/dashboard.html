@@ -38,6 +38,7 @@
             color: var(--text-primary);
             font-size: 12px;
             overflow: hidden;
+            scroll-behavior: smooth;
         }
 
         .dashboard-container {
@@ -232,6 +233,7 @@
             flex: 1;
             overflow: auto;
             background: var(--primary-bg);
+            will-change: scroll-position;
         }
 
         .data-table {
@@ -288,6 +290,7 @@
         .data-table tbody tr {
             transition: background-color 0.1s ease;
             cursor: pointer;
+            will-change: background-color, transform;
         }
 
         .data-table tbody tr:hover {
@@ -305,6 +308,7 @@
         .data-table tbody tr.recent-upload {
             background: rgba(0, 255, 136, 0.1);
             border-left: 3px solid var(--success-color);
+            will-change: background-color;
         }
 
         .data-table tbody tr.recent-upload:hover {

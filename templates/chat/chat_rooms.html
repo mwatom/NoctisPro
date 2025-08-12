@@ -8,6 +8,7 @@
         background: var(--dark-bg);
         min-height: 100vh;
         padding: 2rem 0;
+        scroll-behavior: smooth;
     }
 
     .chat-header {
@@ -23,6 +24,7 @@
         grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
         gap: 1.5rem;
         margin-bottom: 2rem;
+        will-change: transform;
     }
 
     .chat-room-card {
