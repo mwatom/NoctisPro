@@ -625,6 +625,9 @@
                 <button class="btn-control" onclick="window.location.href='{% url 'admin_panel:facility_create' %}'" title="Create Facility">
                     <i class="fas fa-hospital"></i> ADD FACILITY
                 </button>
+                <button class="btn-control" onclick="window.location.href='{% url 'admin_panel:user_management' %}'" title="Manage Users">
+                    <i class="fas fa-users-cog"></i> USERS
+                </button>
                 {% endif %}
                 <button class="btn-control" onclick="window.location.href='{% url 'notifications:notification_list' %}'" title="Notifications">
                     <i class="fas fa-bell"></i> NOTIFS <span id="notifBadge" class="study-count" style="display:none">0</span>
@@ -871,6 +874,7 @@
                                 </button>
                                 {% if user.role == 'admin' or user.role == 'radiologist' %}<button class="btn-viewer" style="margin-left:6px" onclick="openReport('${study.id}'); event.stopPropagation();" title="Write/Edit report"><i class="fas fa-file-signature"></i> REPORT</button>{% endif %}
                                 {% if user.role == 'facility' %}<button class="btn-viewer" style="margin-left:6px" onclick="printStudy('${study.id}'); event.stopPropagation();" title="Print"><i class="fas fa-print"></i> PRINT</button>{% endif %}
+                                {% if user.role == 'facility' %}<button class="btn-viewer" style="margin-left:6px" onclick="window.location.href='/worklist/study/${study.id}/upload/'; event.stopPropagation();" title="Attach files"><i class="fas fa-paperclip"></i> ATTACH</button>{% endif %}
                                 {% if user.role == 'admin' %}<button class="btn-viewer" style="margin-left:6px;background:var(--danger-color)" onclick="deleteStudy('${study.id}','${study.accession_number}'); event.stopPropagation();" title="Delete study (admin only)"><i class="fas fa-trash"></i> DELETE</button>{% endif %}
                                 ${isRecentUpload ? '<span style="color: var(--success-color); font-size: 10px; margin-left: 4px;">NEW</span>' : ''}
                             </div>
@@ -930,6 +934,24 @@
                 alert(`Delete failed: ${err.message}`);
             }
         }
+        
+        // Right-click context quick delete for admin
+        (function(){
+            const tbody = document.getElementById('studiesTableBody');
+            if (!tbody) return;
+            tbody.addEventListener('contextmenu', function(e){
+                const row = e.target.closest('tr[data-study-id]');
+                if (!row) return;
+                e.preventDefault();
+                {% if user.role == 'admin' %}
+                const id = row.getAttribute('data-study-id');
+                const acc = (row.querySelector('.accession')||{}).textContent || '';
+                if (confirm(`Delete study ${acc}? This cannot be undone.`)){
+                    deleteStudy(id, acc);
+                }
+                {% endif %}
+            });
+        })();
 
         function updateStatusCounts() {
             const counts = studiesData.reduce((acc, study) => {
