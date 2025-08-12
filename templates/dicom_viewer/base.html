@@ -487,17 +487,10 @@
           if (mprFullPlane){
             // Ensure image for that plane is current
             if (!mprImgs[mprFullPlane]){
-              const params = new URLSearchParams(); params.set('window_width', ww); params.set('window_level', wl); params.set('inverted', inverted);
-              const r = await fetch(`/viewer/api/series/${currentSeries.id}/mpr/?${params.toString()}`);
-              const j = await r.json(); if (j && j.mpr_views) mprImgs = j.mpr_views; if (j && j.counts) mprScroll.counts = j.counts;
-              // Initialize crosshair linkage mid positions if not set
-              if (j && j.counts && (mprCross.x === null || mprCross.y === null || mprCross.z === null)){
-                mprCross = {
-                  x: Math.floor((j.counts.sagittal||0)/2),
-                  y: Math.floor((j.counts.coronal||0)/2),
-                  z: Math.floor((j.counts.axial||0)/2)
-                };
-              }
+              try {
+                const img = await getMprImage(currentSeries.id, mprFullPlane, mprScroll[mprFullPlane] || 0);
+                mprImgs[mprFullPlane] = img;
+              } catch(e){}
             }
             ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
             const imgSrc = mprImgs[mprFullPlane];
@@ -534,6 +527,12 @@
                   z: mprScroll.axial
                 };
               }
+              // Immediately request exact mid slices for all planes
+              await Promise.all([
+                getMprImage(currentSeries.id, 'axial', mprScroll.axial).then(img=>{ mprImgs.axial = img; }).catch(()=>{}),
+                getMprImage(currentSeries.id, 'sagittal', mprScroll.sagittal).then(img=>{ mprImgs.sagittal = img; }).catch(()=>{}),
+                getMprImage(currentSeries.id, 'coronal', mprScroll.coronal).then(img=>{ mprImgs.coronal = img; }).catch(()=>{})
+              ]);
               prefetchMprSlices('axial', mprScroll.axial);
               prefetchMprSlices('sagittal', mprScroll.sagittal);
               prefetchMprSlices('coronal', mprScroll.coronal);
@@ -913,19 +912,19 @@
 
     // UI wiring
     seriesSelect.addEventListener('change', e=>{ if(e.target.value) loadSeries(e.target.value); });
-         wwSlider.addEventListener('input', e=>{ ww = +e.target.value; document.getElementById('wwVal').textContent = ww; imageCache.clear(); mprImageCache.clear(); requestDraw(); });
-     wlSlider.addEventListener('input', e=>{ wl = +e.target.value; document.getElementById('wlVal').textContent = wl; imageCache.clear(); mprImageCache.clear(); requestDraw(); });
+    wwSlider.addEventListener('input', e=>{ ww = +e.target.value; document.getElementById('wwVal').textContent = ww; imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw(); });
+    wlSlider.addEventListener('input', e=>{ wl = +e.target.value; document.getElementById('wlVal').textContent = wl; imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw(); });
     sliceSlider.addEventListener('input', e=>{ index = +e.target.value; document.getElementById('sliceVal').textContent = index+1; requestDraw(); debouncedLoadOverlaysForCurrentImage(); prefetchAround(index, 3); });
     zoomSlider.addEventListener('input', e=>{ zoom = (+e.target.value)/100; document.getElementById('zoomVal').textContent = `${e.target.value}%`; requestDraw(); });
     document.querySelectorAll('[data-preset]').forEach(btn=>btn.addEventListener('click', ()=>{
       const p = btn.getAttribute('data-preset');
       const map = { lung:{ww:1500,wl:-600}, bone:{ww:2000,wl:300}, soft:{ww:400,wl:40}, brain:{ww:100,wl:50} };
-      if (map[p]){ ww = map[p].ww; wl = map[p].wl; wwSlider.value = ww; wlSlider.value = wl; document.getElementById('wwVal').textContent = ww; document.getElementById('wlVal').textContent = wl; requestDraw(); }
+      if (map[p]){ ww = map[p].ww; wl = map[p].wl; wwSlider.value = ww; wlSlider.value = wl; document.getElementById('wwVal').textContent = ww; document.getElementById('wlVal').textContent = wl; imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw(); }
     }));
     document.querySelectorAll('.tool').forEach(t=>t.addEventListener('click', ()=>{
       const tool = t.getAttribute('data-tool');
       document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active')); t.classList.add('active');
-             if (tool === 'invert'){ inverted = !inverted; imageCache.clear(); mprImageCache.clear(); requestDraw(); return; }
+      if (tool === 'invert'){ inverted = !inverted; imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw(); return; }
       if (tool === 'reset'){ zoom = 1.0; panOffset = {x:0,y:0}; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; requestDraw(); return; }
       if (tool === 'fit'){ panOffset = {x:0,y:0}; zoom = 1.0; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; requestDraw(); return; }
       if (tool === 'one'){
@@ -947,7 +946,7 @@
       }
       if (tool === 'spyglass'){ spyglass.active = !spyglass.active; requestDraw(); return; }
       if (tool === 'align-center'){ panOffset = {x:0,y:0}; requestDraw(); return; }
-      if (tool === 'reload'){ ww = defaultWw; wl = defaultWl; inverted = false; panOffset={x:0,y:0}; zoom=1.0; wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); zoomSlider.value=100; document.getElementById('zoomVal').textContent='100%'; imageCache.clear(); requestDraw(); return; }
+      if (tool === 'reload'){ ww = defaultWw; wl = defaultWl; inverted = false; panOffset={x:0,y:0}; zoom=1.0; wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); zoomSlider.value=100; document.getElementById('zoomVal').textContent='100%'; imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw(); return; }
       if (tool === 'ai'){ alert('AI analysis result: (stub) No backend connected.'); return; }
       if (tool === 'crosshair'){ if (activeTool === 'crosshair'){ crosshair = false; activeTool = 'window'; } else { activeTool = 'crosshair'; crosshair = true; } requestDraw(); return; }
       if (tool === 'hu'){ showHuProbe = true; huEllipse = null; requestDraw(); return; }
@@ -1370,7 +1369,39 @@
     function loadImage(src){
       return new Promise((res, rej)=>{ const im = new Image(); im.decoding='async'; im.onload=()=>res(im); im.onerror=rej; im.src=src; });
     }
-
+    function mprKey(seriesId, plane, sliceIndex, wwVal, wlVal, inv){
+      return `${seriesId}|${plane}|${sliceIndex}|${Math.round(wwVal)}|${Math.round(wlVal)}|${inv?1:0}`;
+    }
+    async function getMprImage(seriesId, plane, sliceIndex){
+      const key = mprKey(seriesId, plane, sliceIndex, ww, wl, inverted);
+      if (mprImageCache.has(key)){
+        const val = mprImageCache.get(key);
+        return (typeof val?.then === 'function') ? await val : val;
+      }
+      const url = `/viewer/api/series/${seriesId}/mpr/?plane=${encodeURIComponent(plane)}&slice=${sliceIndex}&window_width=${Math.round(ww)}&window_level=${Math.round(wl)}&inverted=${inverted}`;
+      const pending = fetch(url)
+        .then(r=>{ if(!r.ok) throw new Error('mpr fetch failed'); return r.json(); })
+        .then(j=>{ if(!j || !j.image) throw new Error('no mpr image'); return j.image; })
+        .then(img=>{ mprImageCache.set(key, img); return img; })
+        .catch(err=>{ mprImageCache.delete(key); throw err; });
+      mprImageCache.set(key, pending);
+      return await pending;
+    }
+    function prefetchMprSlices(plane, centerSlice, radius=3){
+      if (!currentSeries || !mprScroll || !mprScroll.counts) return;
+      const total = Math.max(0, (mprScroll.counts[plane]||0));
+      if (!total) return;
+      for (let o = -radius; o <= radius; o++){
+        if (o === 0) continue;
+        const s = centerSlice + o;
+        if (s < 0 || s >= total) continue;
+        const key = mprKey(currentSeries.id, plane, s, ww, wl, inverted);
+        if (mprImageCache.has(key)) continue;
+        // Fire-and-forget; cache will store promise/result
+        getMprImage(currentSeries.id, plane, s).catch(()=>{});
+      }
+    }
+    
     // 3D viewer for bone mesh
     let three = { renderer:null, scene:null, camera:null, controls:null };
     function showBone3D(meshData){
