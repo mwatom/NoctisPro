@@ -68,8 +68,8 @@ def write_report(request, study_id):
     """Write report for study"""
     study = get_object_or_404(Study, id=study_id)
     
-    # When opening editor, mark study as in progress
-    if study.status != 'in_progress':
+    # When opening editor, mark study as in progress for editors
+    if study.status in ['scheduled', 'suspended']:
         study.status = 'in_progress'
         study.save(update_fields=['status'])
     
@@ -118,14 +118,14 @@ def write_report(request, study_id):
             report.last_modified = timezone.now()
             
             # If finalizing the report
-            if action == 'submit' and status == 'final':
+            if status == 'final' or (action == 'submit' and status == 'final'):
                 report.signed_date = timezone.now()
             
             report.save()
             messages.success(request, 'Report updated successfully!')
         
         # Update study status when report finalized
-        if action == 'submit' and status == 'final':
+        if status == 'final' or (action == 'submit' and status == 'final'):
             study.status = 'completed'
             study.save(update_fields=['status'])
         

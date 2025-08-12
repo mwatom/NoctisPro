@@ -469,6 +469,7 @@ def api_bone_reconstruction(request, series_id):
         # Get threshold from request
         threshold = int(request.GET.get('threshold', 300))  # Default bone threshold in HU
         want_mesh = (request.GET.get('mesh','false').lower() == 'true')
+        quality = (request.GET.get('quality','').lower())  # 'high' to disable downsampling
         
         # Get all images in the series
         images = series.images.all().order_by('slice_location', 'instance_number')
@@ -531,14 +532,16 @@ def api_bone_reconstruction(request, series_id):
         
         mesh_payload = None
         if want_mesh:
-            # Light mesh via marching cubes at low resolution for web
+            # Mesh via marching cubes; downsample unless high-quality requested
             try:
                 from skimage import measure as _measure
-                # Downsample for speed
-                ds_factor = max(1, int(np.ceil(max(1, bone_volume.shape[0]) / 128)))
-                vol_ds = bone_volume[::ds_factor, ::2, ::2]
-                verts, faces, normals, values = _measure.marching_cubes(vol_ds.astype(np.float32) > 0, level=0.5)
-                # Convert to simple lists
+                if quality == 'high':
+                    vol_for_mesh = (bone_volume > 0).astype(np.float32)
+                else:
+                    # Downsample for speed
+                    ds_factor = max(1, int(np.ceil(max(1, bone_volume.shape[0]) / 128)))
+                    vol_for_mesh = (bone_volume[::ds_factor, ::2, ::2] > 0).astype(np.float32)
+                verts, faces, normals, values = _measure.marching_cubes(vol_for_mesh, level=0.5)
                 mesh_payload = {
                     'vertices': verts.tolist(),
                     'faces': faces.tolist(),
@@ -1548,6 +1551,13 @@ def launch_study_in_desktop_viewer(request, study_id):
     try:
         study = get_object_or_404(Study, id=study_id)
         user = request.user
+        # Mark study in progress for admins/radiologists when they open the viewer
+        try:
+            if hasattr(user, 'can_edit_reports') and user.can_edit_reports() and study.status in ['scheduled', 'suspended']:
+                study.status = 'in_progress'
+                study.save(update_fields=['status'])
+        except Exception:
+            pass
         if user.is_facility_user() and study.facility != user.facility:
             # Gracefully fall back to web viewer rather than hard 403, to match frontend behavior
             web_url = f'/viewer/web/viewer/?study_id={study_id}'
@@ -1613,6 +1623,20 @@ def web_index(request):
 @login_required
 def web_viewer(request):
     """Render the web viewer page. Expects ?study_id in query."""
+    # If an admin/radiologist opens a specific study, mark it in_progress
+    try:
+        study_id_param = request.GET.get('study_id')
+        if study_id_param and hasattr(request.user, 'can_edit_reports') and request.user.can_edit_reports():
+            try:
+                study = get_object_or_404(Study, id=int(study_id_param))
+                # Only update if not already completed/cancelled
+                if study.status in ['scheduled', 'suspended']:
+                    study.status = 'in_progress'
+                    study.save(update_fields=['status'])
+            except Exception:
+                pass
+    except Exception:
+        pass
     return render(request, 'dicom_viewer/base.html')
 
 

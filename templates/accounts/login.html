@@ -1,7 +1,6 @@
 {% extends 'base.html' %}
 
 {% block title %}Login - Noctis Pro PACS{% endblock %}
-
 {% block extra_css %}
 <style>
     .login-container {
@@ -235,6 +234,7 @@
 {% endblock %}
 
 {% block content %}
+{% with True as hide_navbar %}
 <div class="login-container">
     <div class="login-card fade-in">
         <div class="logo-container">
@@ -312,6 +312,7 @@
         Noctis Pro PACS v1.0 | © 2024 Medical Imaging Solutions
     </div>
 </div>
+{% endwith %}
 {% endblock %}
 
 {% block extra_js %}
