@@ -473,6 +473,8 @@
         await loadOverlaysForCurrentImage();
         // Prefetch neighbors
         prefetchAround(0, 3);
+        // Warm up MPR mid-slices so first MPR is instant
+        try { warmupMpr(); } catch(e) {}
       } catch (e) {
         await fallbackToDesktop();
       }
@@ -1318,6 +1320,16 @@
      }
  
      btnGenerateRecon.addEventListener('click', ()=>{ generateReconstruction(); });
+
+    // Preload MPR mid-slices after series load to avoid UI stall on first click
+    function warmupMpr(){
+      if (!currentSeries || !currentSeries.id) return;
+      const params = new URLSearchParams(); params.set('window_width', ww); params.set('window_level', wl); params.set('inverted', inverted);
+      fetch(`/viewer/api/series/${currentSeries.id}/mpr/?${params.toString()}`)
+        .then(r=>r.json())
+        .then(j=>{ if (j && j.counts) { mprScroll.counts = j.counts; mprScroll.axial = Math.floor((j.counts.axial||0)/2); mprScroll.sagittal = Math.floor((j.counts.sagittal||0)/2); mprScroll.coronal = Math.floor((j.counts.coronal||0)/2); prefetchMprSlices('axial', mprScroll.axial); prefetchMprSlices('sagittal', mprScroll.sagittal); prefetchMprSlices('coronal', mprScroll.coronal);} })
+        .catch(()=>{});
+    }
  
      // 3D dropdown interactions
      btn3D.addEventListener('click', ()=>{
@@ -1446,11 +1458,13 @@
           three.controls = new window.OrbitControls(three.camera, three.renderer.domElement);
           const light1 = new THREE.DirectionalLight(0xffffff, 1.0); light1.position.set(1,1,1); three.scene.add(light1);
           const light2 = new THREE.AmbientLight(0x444444); three.scene.add(light2);
-          window.addEventListener('resize', ()=>{
+          const onResize3D = ()=>{
             if (!three.renderer) return;
             three.renderer.setSize(mount.clientWidth, mount.clientHeight);
             three.camera.aspect = mount.clientWidth/mount.clientHeight; three.camera.updateProjectionMatrix();
-          });
+          };
+          window.addEventListener('resize', onResize3D, { passive: true });
+          three._onResize3D = onResize3D;
         } else {
           disposeSceneObjects();
         }
@@ -1469,10 +1483,12 @@
         three.scene.add(mesh);
         // animate (single RAF loop)
         if (threeAnimId) cancelAnimationFrame(threeAnimId);
-        const animate = ()=>{ if (!three.renderer) return; three.controls.update(); three.renderer.render(three.scene, three.camera); threeAnimId = requestAnimationFrame(animate); };
+        const animate = ()=>{ if (!three.renderer || container.style.display === 'none') return; three.controls.update(); three.renderer.render(three.scene, three.camera); threeAnimId = requestAnimationFrame(animate); };
         animate();
         document.getElementById('close3d').onclick = ()=>{ 
           if (threeAnimId) { cancelAnimationFrame(threeAnimId); threeAnimId = null; }
+          disposeSceneObjects();
+          if (three._onResize3D) { window.removeEventListener('resize', three._onResize3D); }
           container.style.display='none'; 
         };
       } catch(e){ console.warn('3D setup failed', e); }

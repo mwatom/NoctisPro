@@ -1548,6 +1548,13 @@ def launch_study_in_desktop_viewer(request, study_id):
     try:
         study = get_object_or_404(Study, id=study_id)
         user = request.user
+        # Mark study in progress for admins/radiologists when they open the viewer
+        try:
+            if hasattr(user, 'can_edit_reports') and user.can_edit_reports() and study.status in ['scheduled', 'suspended']:
+                study.status = 'in_progress'
+                study.save(update_fields=['status'])
+        except Exception:
+            pass
         if user.is_facility_user() and study.facility != user.facility:
             # Gracefully fall back to web viewer rather than hard 403, to match frontend behavior
             web_url = f'/viewer/web/viewer/?study_id={study_id}'
@@ -1613,6 +1620,20 @@ def web_index(request):
 @login_required
 def web_viewer(request):
     """Render the web viewer page. Expects ?study_id in query."""
+    # If an admin/radiologist opens a specific study, mark it in_progress
+    try:
+        study_id_param = request.GET.get('study_id')
+        if study_id_param and hasattr(request.user, 'can_edit_reports') and request.user.can_edit_reports():
+            try:
+                study = get_object_or_404(Study, id=int(study_id_param))
+                # Only update if not already completed/cancelled
+                if study.status in ['scheduled', 'suspended']:
+                    study.status = 'in_progress'
+                    study.save(update_fields=['status'])
+            except Exception:
+                pass
+    except Exception:
+        pass
     return render(request, 'dicom_viewer/base.html')
 
 

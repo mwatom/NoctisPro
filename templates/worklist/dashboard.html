@@ -598,10 +598,13 @@
                     <i class="fas fa-hospital-symbol"></i> Noctis Pro PACS
                 </div>
                 <div class="nav-tabs">
-                    <div class="nav-tab active">WORKLIST</div>
-                    <div class="nav-tab" onclick="window.location.href='{% url 'worklist:study_list' %}'">STUDIES</div>
-                    <div class="nav-tab" onclick="window.location.href='{% url 'reports:report_list' %}'">REPORTS</div>
-                </div>
+                <div class="nav-tab active">WORKLIST</div>
+                <div class="nav-tab" onclick="window.location.href='{% url 'worklist:study_list' %}'">STUDIES</div>
+                <div class="nav-tab" onclick="window.location.href='{% url 'reports:report_list' %}'">REPORTS</div>
+                {% if user.role == 'admin' %}
+                <div class="nav-tab" onclick="window.location.href='{% url 'admin_panel:user_management' %}'"><i class="fas fa-user-cog"></i> MANAGE USERS</div>
+                {% endif %}
+            </div>
             </div>
             <div class="nav-right">
                 <div class="status-indicator">
@@ -874,7 +877,7 @@
                                 </button>
                                 {% if user.role == 'admin' or user.role == 'radiologist' %}<button class="btn-viewer" style="margin-left:6px" onclick="openReport('${study.id}'); event.stopPropagation();" title="Write/Edit report"><i class="fas fa-file-signature"></i> REPORT</button>{% endif %}
                                 {% if user.role == 'facility' %}<button class="btn-viewer" style="margin-left:6px" onclick="printStudy('${study.id}'); event.stopPropagation();" title="Print"><i class="fas fa-print"></i> PRINT</button>{% endif %}
-                                {% if user.role == 'facility' %}<button class="btn-viewer" style="margin-left:6px" onclick="window.location.href='/worklist/study/${study.id}/upload/'; event.stopPropagation();" title="Attach files"><i class="fas fa-paperclip"></i> ATTACH</button>{% endif %}
+                                {% if user.role == 'facility' %}<button class="btn-viewer" style="margin-left:6px" onclick="window.location.href='/worklist/study/${study.id}/upload/'; event.stopPropagation();" title="Attach files"><i class="fas fa-paperclip"></i> ATTACH</button><button class="btn-viewer" style="margin-left:6px" onclick="window.location.href='/worklist/studies/'; event.stopPropagation();" title="View attachments list"><i class="fas fa-link"></i> ATTACHED</button>{% endif %}
                                 {% if user.role == 'admin' %}<button class="btn-viewer" style="margin-left:6px;background:var(--danger-color)" onclick="deleteStudy('${study.id}','${study.accession_number}'); event.stopPropagation();" title="Delete study (admin only)"><i class="fas fa-trash"></i> DELETE</button>{% endif %}
                                 ${isRecentUpload ? '<span style="color: var(--success-color); font-size: 10px; margin-left: 4px;">NEW</span>' : ''}
                             </div>
