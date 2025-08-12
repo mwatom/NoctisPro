@@ -556,10 +556,12 @@ def api_dicom_image_display(request, image_id):
         dicom_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
         ds = pydicom.dcmread(dicom_path)
         
-        # Get pixel array, apply VOI LUT if present (improves CR/DX contrast), then rescale
+        # Get pixel array, apply VOI LUT for projection modalities only (avoid CT distortion), then rescale
         pixel_array = ds.pixel_array
         try:
-            pixel_array = apply_voi_lut(pixel_array, ds)
+            modality = str(getattr(ds, 'Modality', '')).upper()
+            if modality in ['DX','CR','XA','RF','MG']:
+                pixel_array = apply_voi_lut(pixel_array, ds)
         except Exception:
             pass
         pixel_array = pixel_array.astype(np.float32)
@@ -1452,10 +1454,12 @@ def web_dicom_image(request, image_id):
         file_path = os.path.join(settings.MEDIA_ROOT, image.file_path.name)
         ds = pydicom.dcmread(file_path)
         pixel_array = ds.pixel_array
-        # Apply VOI LUT when present (improves CR/DX contrast)
+        # Apply VOI LUT only for projection modalities (CR/DX/XA/RF/MG) to avoid CT distortion
         try:
-            from pydicom.pixel_data_handlers.util import apply_voi_lut as _apply_voi_lut
-            pixel_array = _apply_voi_lut(pixel_array, ds)
+            modality = str(getattr(ds, 'Modality', '')).upper()
+            if modality in ['DX', 'CR', 'XA', 'RF', 'MG']:
+                from pydicom.pixel_data_handlers.util import apply_voi_lut as _apply_voi_lut
+                pixel_array = _apply_voi_lut(pixel_array, ds)
         except Exception:
             pass
         # apply slope/intercept
@@ -1503,7 +1507,7 @@ def web_dicom_image(request, image_id):
         response['Cache-Control'] = 'max-age=3600'
         return response
     except Exception as e:
-        return HttpResponse(status=404)
+        return HttpResponse(status=500)
 
 
 @login_required

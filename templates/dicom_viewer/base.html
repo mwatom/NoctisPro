@@ -44,6 +44,7 @@
       <button class="tool" data-tool="invert"><i class="fas fa-adjust"></i><span>Invert</span></button>
       <button class="tool" data-tool="reset"><i class="fas fa-undo"></i><span>Reset</span></button>
       <button class="tool" data-tool="ai"><i class="fas fa-robot"></i><span>AI</span></button>
+      <button class="tool" data-tool="mpr"><i class="fas fa-layer-group"></i><span>MPR</span></button>
     </div>
     <div class="topbar">
       <button id="btnLoadLocal" class="btn btn-primary"><i class="fas fa-folder-open"></i> Load Local DICOM</button>
@@ -51,8 +52,6 @@
       {% if user.is_authenticated and user.can_edit_reports %}
       <button id="btnWriteReport" class="btn btn-primary" style="display:none"><i class="fas fa-file-signature"></i> Write Report</button>
       {% endif %}
-      <button id="btnEnterMpr" class="btn" style="display:none"><i class="fas fa-layer-group"></i> MPR</button>
-      <button id="btnExitMpr" class="btn" style="display:none"><i class="fas fa-times"></i> Exit MPR</button>
       <input id="localDicom" type="file" multiple webkitdirectory directory accept=".dcm,.dicom,application/dicom" style="display:none" />
       <select id="seriesSelect" class="select"><option value="">Select Series</option></select>
       <div id="patientInfo" style="margin-left:auto;color:#ccc;font-size:13px;">Patient: - | Study Date: - | Modality: -</div>
@@ -157,6 +156,9 @@
     let ww = 400, wl = 40, inverted = false, zoom = 1.0;
     let mprMode = false;
     let mprImgs = { axial: null, sagittal: null, coronal: null };
+    let reconMode = null; // 'mpr' | 'mip' | 'bone' | null
+    let reconImgs = []; // ordered list of image data URLs for canvas display
+    let reconIndex = 0;
     let activeTool = 'window';
     let isDragging = false;
     let dragStart = null;
@@ -263,7 +265,7 @@
           wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl);
         }
         // Reset view state
-        zoom = 1.0; panOffset = {x:0,y:0}; activeTool = 'window'; crosshair = false; mprMode = false; mprImgs = {axial:null,sagittal:null,coronal:null};
+        zoom = 1.0; panOffset = {x:0,y:0}; activeTool = 'window'; crosshair = false; mprMode = false; mprImgs = {axial:null,sagittal:null,coronal:null}; reconMode = null; reconImgs = []; reconIndex = 0;
         document.getElementById('btnEnterMpr').style.display = images.length ? '' : 'none';
         document.getElementById('btnExitMpr').style.display = 'none';
         document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active'));
@@ -290,17 +292,15 @@
     }
 
     async function draw(){
-      if (!images.length) { ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height); return; }
+      if (!images.length && reconImgs.length===0) { ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height); return; }
       if (mprMode){
         try{
-          // Ensure MPR images
           if (!mprImgs.axial || !mprImgs.sagittal || !mprImgs.coronal){
             const params = new URLSearchParams(); params.set('window_width', ww); params.set('window_level', wl); params.set('inverted', inverted);
             const r = await fetch(`/viewer/api/series/${currentSeries.id}/mpr/?${params.toString()}`);
             const j = await r.json();
             if (j && j.mpr_views){ mprImgs = j.mpr_views; }
           }
-          // Draw three panels
           ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
           const regions = [
             { x: 0, y: 0, w: Math.floor(canvas.width/3), h: canvas.height, key: 'axial' },
@@ -319,6 +319,20 @@
           document.getElementById('zoominfo').textContent = `MPR`;
           return;
         } catch(e){ /* fallback to normal draw below */ }
+      }
+      if (reconMode && reconImgs.length){
+        try {
+          ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
+          const im = await loadImage(reconImgs[reconIndex]);
+          const scale = Math.min(canvas.width / im.width, canvas.height / im.height) * zoom;
+          const dw = im.width * scale, dh = im.height * scale;
+          const dx = (canvas.width - dw)/2 + panOffset.x; const dy = (canvas.height - dh)/2 + panOffset.y;
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(im, dx, dy, dw, dh);
+          document.getElementById('overlay').innerHTML = `${reconMode.toUpperCase()} | View ${reconIndex+1}/${reconImgs.length}`;
+          document.getElementById('zoominfo').textContent = `Zoom: ${Math.round(zoom*100)}%`;
+          return;
+        } catch(e){}
       }
       try {
         const img = images[index];
@@ -469,6 +483,13 @@
       if (tool === 'reset'){ zoom = 1.0; panOffset = {x:0,y:0}; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; draw(); return; }
       if (tool === 'ai'){ alert('AI analysis result: (stub) No backend connected.'); return; }
       if (tool === 'crosshair'){ crosshair = !crosshair; draw(); return; }
+      if (tool === 'mpr'){
+        if (!currentSeries || !currentSeries.id) return;
+        mprMode = !mprMode;
+        if (mprMode){ reconMode = null; reconImgs = []; reconIndex = 0; }
+        await draw();
+        return;
+      }
       if (mprMode){ return; }
       activeTool = tool;
     }));
@@ -515,8 +536,14 @@
     });
 
     // Mouse wheel slice/zoom
-    document.getElementById('viewport').addEventListener('wheel', (e)=>{
+    document.getElementById('viewport').addEventListener('wheel', async (e)=>{
       e.preventDefault();
+      if (reconMode && reconImgs.length){
+        const d = e.deltaY>0 ? 1 : -1;
+        reconIndex = Math.max(0, Math.min(reconImgs.length-1, reconIndex + d));
+        await draw();
+        return;
+      }
       if (e.ctrlKey){ const delta = e.deltaY>0?0.9:1.1; zoom = Math.max(0.1, Math.min(5.0, zoom*delta)); zoomSlider.value = Math.round(zoom*100); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; draw(); }
       else { const d = e.deltaY>0?1:-1; const ni = Math.max(0, Math.min(images.length-1, index+d)); if (ni !== index){ index = ni; sliceSlider.value = index; document.getElementById('sliceVal').textContent = index+1; loadOverlaysForCurrentImage(); } }
     }, { passive:false });
@@ -546,7 +573,6 @@
     // Recon controls
     reconType.addEventListener('change', ()=>{
       const v = reconType.value; boneCtrl.style.display = v==='bone' ? '' : 'none';
-      if (v==='bone') reconViews.style.display = 'none';
     });
     boneSlider.addEventListener('input', e=> boneVal.textContent = e.target.value);
 
@@ -554,7 +580,7 @@
       try {
         if (!currentSeries || !currentSeries.id){ alert('Select a series first'); return; }
         reconStatus.textContent = 'Generating...';
-        reconViews.style.display = 'none';
+        reconMode = null; reconImgs = []; reconIndex = 0; panOffset = {x:0,y:0}; zoom = 1.0;
         const params = new URLSearchParams();
         params.set('window_width', ww);
         params.set('window_level', wl);
@@ -566,13 +592,12 @@
         const r = await fetch(url);
         const j = await r.json();
         if (j.error) throw new Error(j.error);
-        let axial = null, sagittal = null, coronal = null;
-        if (j.mpr_views){ axial = j.mpr_views.axial; sagittal = j.mpr_views.sagittal; coronal = j.mpr_views.coronal; }
-        if (j.mip_views){ axial = j.mip_views.axial; sagittal = j.mip_views.sagittal; coronal = j.mip_views.coronal; }
-        if (j.bone_views){ axial = j.bone_views.axial || j.bone_views.bone_axial_preview; sagittal = j.bone_views.sagittal || j.bone_views.bone_sagittal_preview; coronal = j.bone_views.coronal || j.bone_views.bone_coronal_preview; }
-        if (axial && sagittal && coronal){
-          viewAxial.src = axial; viewSagittal.src = sagittal; viewCoronal.src = coronal; reconViews.style.display = '';
-        }
+        if (j.mpr_views){ reconMode = 'mpr'; reconImgs = [j.mpr_views.axial, j.mpr_views.sagittal, j.mpr_views.coronal]; }
+        if (j.mip_views){ reconMode = 'mip'; reconImgs = [j.mip_views.axial, j.mip_views.sagittal, j.mip_views.coronal]; }
+        if (j.bone_views){ reconMode = 'bone'; reconImgs = [j.bone_views.axial || j.bone_views.bone_axial_preview, j.bone_views.sagittal || j.bone_views.bone_sagittal_preview, j.bone_views.coronal || j.bone_views.bone_coronal_preview]; }
+        reconImgs = reconImgs.filter(Boolean);
+        reconIndex = 0;
+        await draw();
         reconStatus.textContent = 'Done'; setTimeout(()=> reconStatus.textContent = '', 1500);
       } catch (err){
         reconStatus.textContent = `Error: ${err.message}`;
@@ -589,15 +614,6 @@
     setCanvasSize();
     const studyId = q('study_id');
     if (studyId) loadStudy(studyId);
-
-    // MPR buttons
-    document.getElementById('btnEnterMpr').addEventListener('click', async ()=>{
-      if (!currentSeries || !currentSeries.id) return;
-      mprMode = true; document.getElementById('btnEnterMpr').style.display='none'; document.getElementById('btnExitMpr').style.display=''; await draw();
-    });
-    document.getElementById('btnExitMpr').addEventListener('click', async ()=>{
-      mprMode = false; mprImgs = {axial:null,sagittal:null,coronal:null}; document.getElementById('btnExitMpr').style.display='none'; document.getElementById('btnEnterMpr').style.display=''; await draw();
-    });
   })();
   </script>
 </body>
