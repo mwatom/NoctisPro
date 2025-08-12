@@ -281,11 +281,13 @@
     function debounce(fn, delay){
       let t; return (...args)=>{ clearTimeout(t); t = setTimeout(()=> fn(...args), delay); };
     }
+    // Cancelable overlay requests
+    let overlayRequestId = 0;
     function getImageKey(imageId, ww, wl, inverted){
       return `${imageId}|${Math.round(ww)}|${Math.round(wl)}|${inverted?1:0}`;
     }
     async function loadHtmlImage(src){
-      return new Promise((resolve, reject)=>{ const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = ()=> resolve(im); im.onerror = reject; im.src = src; });
+      return new Promise((resolve, reject)=>{ const im = new Image(); im.crossOrigin = 'anonymous'; im.decoding = 'async'; im.onload = ()=> resolve(im); im.onerror = reject; im.src = src; });
     }
     async function getImageForIndex(i){
       const imgMeta = images[i];
@@ -309,7 +311,13 @@
       const promise = loadHtmlImage(url).then(im=>{ imageCache.set(key, im); return im; }).catch(()=>{ imageCache.delete(key); });
       imageCache.set(key, promise);
     }
-    const debouncedLoadOverlaysForCurrentImage = debounce(()=>{ loadOverlaysForCurrentImage(); }, 120);
+    function prefetchAround(center, radius=3){
+      for (let o = -radius; o <= radius; o++){
+        if (o === 0) continue;
+        prefetchIndex(center + o);
+      }
+    }
+    const debouncedLoadOverlaysForCurrentImage = debounce(()=>{ loadOverlaysForCurrentImage(); }, 80);
 
     // Helper: parse pixel spacing robustly (string "0.5\\0.5", "0.5,0.5" or array)
     function parsePixelSpacing(ps){
@@ -417,7 +425,7 @@
         await draw();
         await loadOverlaysForCurrentImage();
         // Prefetch neighbors
-        prefetchIndex(1);
+        prefetchAround(0, 3);
       } catch (e) {
         await fallbackToDesktop();
       }
@@ -625,8 +633,8 @@
         }
         document.getElementById('overlay').innerHTML = `WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}<br>Slice: ${index+1}/${images.length}`;
         document.getElementById('zoominfo').textContent = `Zoom: ${Math.round(zoom*100)}%`;
-        // opportunistically prefetch neighbors
-        prefetchIndex(index+1); prefetchIndex(index-1);
+        // Opportunistically prefetch neighbors
+        prefetchAround(index, 3);
       } catch (e) {
         await fallbackToDesktop();
       }
@@ -771,39 +779,59 @@
     }
 
     async function loadOverlaysForCurrentImage(){
+      const reqId = ++overlayRequestId;
       const imageId = getCurrentImageId();
       if (!imageId) return;
-      // Load from cache or backend
-      if (imageIdToMeasurements.has(imageId)) measurements = imageIdToMeasurements.get(imageId); else {
-        try {
-          const r = await fetch(`/viewer/measurements/${imageId}/`); const j = await r.json();
-          measurements = (j.measurements||[]).map(m=>({ start: m.points[0], end: m.points[1], label: m.unit==='mm' ? `${(+m.value).toFixed(2)} mm` : `${(+m.value).toFixed(1)} px` }));
-          imageIdToMeasurements.set(imageId, measurements);
-        } catch(e){ measurements = []; }
+      const tasks = [];
+      if (imageIdToMeasurements.has(imageId)) {
+        measurements = imageIdToMeasurements.get(imageId);
+      } else {
+        tasks.push(
+          (async ()=>{
+            try {
+              const r = await fetch(`/viewer/measurements/${imageId}/`); const j = await r.json();
+              measurements = (j.measurements||[]).map(m=>({ start: m.points[0], end: m.points[1], label: m.unit==='mm' ? `${(+m.value).toFixed(2)} mm` : `${(+m.value).toFixed(1)} px` }));
+              imageIdToMeasurements.set(imageId, measurements);
+            } catch(e){ measurements = []; }
+          })()
+        );
       }
-      if (imageIdToAnnotations.has(imageId)) annotations = imageIdToAnnotations.get(imageId); else {
-        try {
-          const r = await fetch(`/viewer/annotations/${imageId}/`); const j = await r.json();
-          annotations = (j.annotations||[]).map(a=>({ pos: {x:a.position_x, y:a.position_y}, text: a.text }));
-          imageIdToAnnotations.set(imageId, annotations);
-        } catch(e){ annotations = []; }
+      if (imageIdToAnnotations.has(imageId)) {
+        annotations = imageIdToAnnotations.get(imageId);
+      } else {
+        tasks.push(
+          (async ()=>{
+            try {
+              const r = await fetch(`/viewer/annotations/${imageId}/`); const j = await r.json();
+              annotations = (j.annotations||[]).map(a=>({ pos: {x:a.position_x, y:a.position_y}, text: a.text }));
+              imageIdToAnnotations.set(imageId, annotations);
+            } catch(e){ annotations = []; }
+          })()
+        );
       }
-      // Load tags if overlay is on
-      currentImageTags = null;
       if (showTagsOverlay){
-        try {
-          const r = await fetch(`/viewer/api/image/${imageId}/data/`); const j = await r.json();
-          currentImageTags = {
-            patient_name: j.patient_name || j.image_info?.patient_name,
-            study_date: j.study_date || j.image_info?.study_date,
-            series_number: j.series?.series_number ?? j.series_number,
-            slice_thickness: j.series?.slice_thickness ?? j.slice_thickness,
-            pixel_spacing: j.series?.pixel_spacing ?? j.pixel_spacing
-          };
-        } catch(e){ currentImageTags = null; }
+        tasks.push(
+          (async ()=>{
+            try {
+              const r = await fetch(`/viewer/api/image/${imageId}/data/`); const j = await r.json();
+              currentImageTags = {
+                patient_name: j.patient_name || j.image_info?.patient_name,
+                study_date: j.study_date || j.image_info?.study_date,
+                series_number: j.series?.series_number ?? j.series_number,
+                slice_thickness: j.series?.slice_thickness ?? j.slice_thickness,
+                pixel_spacing: j.series?.pixel_spacing ?? j.pixel_spacing
+              };
+            } catch(e){ currentImageTags = null; }
+          })()
+        );
+      } else {
+        currentImageTags = null;
       }
+      if (tasks.length) { try { await Promise.all(tasks); } catch(e){} }
+      // If a newer overlay request superseded this one or image changed, skip applying
+      if (reqId !== overlayRequestId || imageId !== getCurrentImageId()) return;
       renderMeasurementsList();
-      await draw();
+      requestDraw();
     }
 
     function renderMeasurementsList(){
@@ -819,7 +847,7 @@
     seriesSelect.addEventListener('change', e=>{ if(e.target.value) loadSeries(e.target.value); });
     wwSlider.addEventListener('input', e=>{ ww = +e.target.value; document.getElementById('wwVal').textContent = ww; requestDraw(); });
     wlSlider.addEventListener('input', e=>{ wl = +e.target.value; document.getElementById('wlVal').textContent = wl; requestDraw(); });
-    sliceSlider.addEventListener('input', e=>{ index = +e.target.value; document.getElementById('sliceVal').textContent = index+1; debouncedLoadOverlaysForCurrentImage(); prefetchIndex(index+1); prefetchIndex(index-1); });
+    sliceSlider.addEventListener('input', e=>{ index = +e.target.value; document.getElementById('sliceVal').textContent = index+1; requestDraw(); debouncedLoadOverlaysForCurrentImage(); prefetchAround(index, 3); });
     zoomSlider.addEventListener('input', e=>{ zoom = (+e.target.value)/100; document.getElementById('zoomVal').textContent = `${e.target.value}%`; requestDraw(); });
     document.querySelectorAll('[data-preset]').forEach(btn=>btn.addEventListener('click', ()=>{
       const p = btn.getAttribute('data-preset');
@@ -843,8 +871,8 @@
         cineActive = !cineActive;
         if (cineActive){
           if (cineTimer) clearInterval(cineTimer);
-          cineTimer = setInterval(async ()=>{
-            if (!images.length) return; index = (index + 1) % images.length; sliceSlider.value = index; document.getElementById('sliceVal').textContent = index+1; await loadOverlaysForCurrentImage();
+          cineTimer = setInterval(()=>{
+            if (!images.length) return; index = (index + 1) % images.length; sliceSlider.value = index; document.getElementById('sliceVal').textContent = index+1; requestDraw(); debouncedLoadOverlaysForCurrentImage();
           }, Math.max(30, Math.round(1000/cineFps)));
         } else { if (cineTimer) { clearInterval(cineTimer); cineTimer = null; } }
         return;
@@ -1106,7 +1134,7 @@
         return;
       }
       if (e.ctrlKey){ const delta = e.deltaY>0?0.9:1.1; zoom = Math.max(0.1, Math.min(5.0, zoom*delta)); zoomSlider.value = Math.round(zoom*100); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; requestDraw(); }
-      else { const d = e.deltaY>0?1:-1; const ni = Math.max(0, Math.min(images.length-1, index+d)); if (ni !== index){ index = ni; sliceSlider.value = index; document.getElementById('sliceVal').textContent = index+1; debouncedLoadOverlaysForCurrentImage(); prefetchIndex(index+1); prefetchIndex(index-1); } }
+      else { const d = e.deltaY>0?1:-1; const ni = Math.max(0, Math.min(images.length-1, index+d)); if (ni !== index){ index = ni; sliceSlider.value = index; document.getElementById('sliceVal').textContent = index+1; requestDraw(); debouncedLoadOverlaysForCurrentImage(); prefetchAround(index, 3); } }
     }, { passive:false });
 
     // Local DICOM upload
@@ -1229,7 +1257,7 @@
 
     // Utils
     function loadImage(src){
-      return new Promise((res, rej)=>{ const im = new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=src; });
+      return new Promise((res, rej)=>{ const im = new Image(); im.decoding='async'; im.onload=()=>res(im); im.onerror=rej; im.src=src; });
     }
 
     // 3D viewer for bone mesh
