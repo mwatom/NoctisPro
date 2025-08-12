@@ -39,13 +39,13 @@ from threading import Lock
 _MPR_CACHE_LOCK = Lock()
 _MPR_CACHE = {}  # series_id -> { 'volume': np.ndarray }
 _MPR_CACHE_ORDER = []
-_MAX_MPR_CACHE = 2
+_MAX_MPR_CACHE = 4
 
 # Encoded MPR slice cache (LRU) to avoid repeated windowing+encoding per slice/plane/WW/WL
 _MPR_IMG_CACHE_LOCK = Lock()
 _MPR_IMG_CACHE = {}  # key -> base64 data URL
 _MPR_IMG_CACHE_ORDER = []  # list of keys in LRU order
-_MAX_MPR_IMG_CACHE = 300
+_MAX_MPR_IMG_CACHE = 800
 
 def _mpr_cache_key(series_id, plane, slice_index, ww, wl, inverted):
     return f"{series_id}|{plane}|{int(slice_index)}|{int(round(float(ww)))}|{int(round(float(wl)))}|{1 if inverted else 0}"
