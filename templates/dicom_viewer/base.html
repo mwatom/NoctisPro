@@ -47,6 +47,10 @@
     </div>
     <div class="topbar">
       <button id="btnLoadLocal" class="btn btn-primary"><i class="fas fa-folder-open"></i> Load Local DICOM</button>
+      <button id="btnBackWorklist" class="btn" onclick="window.location.href='{% url 'worklist:dashboard' %}'"><i class="fas fa-arrow-left"></i> Back to Worklist</button>
+      {% if user.is_authenticated and (user.role == 'admin' or user.role == 'radiologist') %}
+      <button id="btnWriteReport" class="btn btn-primary" style="display:none"><i class="fas fa-file-signature"></i> Write Report</button>
+      {% endif %}
       <input id="localDicom" type="file" multiple webkitdirectory directory accept=".dcm,.dicom,application/dicom" style="display:none" />
       <select id="seriesSelect" class="select"><option value="">Select Series</option></select>
       <div id="patientInfo" style="margin-left:auto;color:#ccc;font-size:13px;">Patient: - | Study Date: - | Modality: -</div>
@@ -208,6 +212,12 @@
         if (!r.ok) throw new Error('study fetch failed');
         const data = await r.json();
         currentStudy = data.study;
+        // Enable write report button when study is known
+        const wr = document.getElementById('btnWriteReport');
+        if (wr && currentStudy && currentStudy.id){
+          wr.style.display = '';
+          wr.onclick = function(){ window.location.href = `/reports/write/${currentStudy.id}/`; };
+        }
         document.getElementById('patientInfo').textContent = `Patient: ${currentStudy.patient_name} | Study Date: ${currentStudy.study_date} | Modality: ${currentStudy.modality}`;
         // Show clinical info and priority
         const clin = (currentStudy.clinical_info && currentStudy.clinical_info.trim()) ? currentStudy.clinical_info : '-';
