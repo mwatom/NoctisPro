@@ -143,7 +143,7 @@ def api_mpr_reconstruction(request, series_id):
     user = request.user
     
     # Check permissions
-    if user.is_facility_user() and series.study.facility != user.facility:
+    if user.is_facility_user() and getattr(user, 'facility', None) and series.study.facility != user.facility:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
     try:
@@ -533,7 +533,7 @@ def api_dicom_image_display(request, image_id):
     user = request.user
     
     # Check permissions
-    if user.is_facility_user() and image.series.study.facility != user.facility:
+    if user.is_facility_user() and getattr(user, 'facility', None) and image.series.study.facility != user.facility:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
     try:
@@ -1330,7 +1330,7 @@ def web_viewer(request):
 def web_study_detail(request, study_id):
     """Return study detail JSON for web viewer"""
     study = get_object_or_404(Study, id=study_id)
-    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and study.facility != request.user.facility:
+    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and study.facility != request.user.facility:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     series_qs = study.series_set.all().annotate(image_count=Count('images')).order_by('series_number')
     data = {
@@ -1359,7 +1359,7 @@ def web_study_detail(request, study_id):
 @login_required
 def web_series_images(request, series_id):
     series = get_object_or_404(Series, id=series_id)
-    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and series.study.facility != request.user.facility:
+    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and series.study.facility != request.user.facility:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     images = series.images.all().order_by('instance_number')
     data = {
@@ -1390,7 +1390,7 @@ def web_series_images(request, series_id):
 @login_required
 def web_dicom_image(request, image_id):
     image = get_object_or_404(DicomImage, id=image_id)
-    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and image.series.study.facility != request.user.facility:
+    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and image.series.study.facility != request.user.facility:
         return HttpResponse(status=403)
     window_width = float(request.GET.get('ww', 400))
     window_level = float(request.GET.get('wl', 40))

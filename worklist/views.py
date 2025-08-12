@@ -34,7 +34,7 @@ def study_list(request):
     user = request.user
     
     # Base queryset based on user role
-    if user.is_facility_user():
+    if user.is_facility_user() and getattr(user, 'facility', None):
         studies = Study.objects.filter(facility=user.facility)
     else:
         studies = Study.objects.all()
@@ -351,7 +351,7 @@ def api_studies(request):
     """API endpoint for studies data"""
     user = request.user
     
-    if user.is_facility_user():
+    if user.is_facility_user() and getattr(user, 'facility', None):
         studies = Study.objects.filter(facility=user.facility)
     else:
         studies = Study.objects.all()
@@ -668,7 +668,7 @@ def api_search_studies(request):
         return JsonResponse({'studies': []})
     
     # Base queryset based on user role
-    if user.is_facility_user():
+    if user.is_facility_user() and getattr(user, 'facility', None):
         studies = Study.objects.filter(facility=user.facility)
     else:
         studies = Study.objects.all()
@@ -710,7 +710,7 @@ def api_update_study_status(request, study_id):
     user = request.user
     
     # Check permissions
-    if user.is_facility_user() and study.facility != user.facility:
+    if user.is_facility_user() and getattr(user, 'facility', None) and study.facility != user.facility:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
     try:
@@ -790,7 +790,7 @@ def api_refresh_worklist(request):
     from datetime import timedelta
     recent_cutoff = timezone.now() - timedelta(hours=24)
     
-    if user.is_facility_user():
+    if user.is_facility_user() and getattr(user, 'facility', None):
         studies = Study.objects.filter(facility=user.facility, upload_date__gte=recent_cutoff)
     else:
         studies = Study.objects.filter(upload_date__gte=recent_cutoff)
@@ -830,7 +830,7 @@ def api_get_upload_stats(request):
     from datetime import timedelta
     week_ago = timezone.now() - timedelta(days=7)
     
-    if user.is_facility_user():
+    if user.is_facility_user() and getattr(user, 'facility', None):
         recent_studies = Study.objects.filter(facility=user.facility, upload_date__gte=week_ago)
     else:
         recent_studies = Study.objects.filter(upload_date__gte=week_ago)
