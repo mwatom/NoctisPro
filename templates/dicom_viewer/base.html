@@ -125,6 +125,16 @@
         </div>
       </div>
       <div class="panel">
+        <h3>Measurement Units</h3>
+        <div class="control">
+          <label class="label" for="unitSelect"><span>Display Unit</span><span id="unitVal">mm</span></label>
+          <select id="unitSelect" class="select">
+            <option value="mm" selected>Millimeters (mm)</option>
+            <option value="cm">Centimeters (cm)</option>
+          </select>
+        </div>
+      </div>
+      <div class="panel">
         <h3>Navigation</h3>
         <div class="control"><div class="label"><span>Slice</span><span id="sliceVal">1</span></div><input id="slice" type="range" min="0" max="0" value="0"></div>
       </div>
@@ -538,6 +548,23 @@
               ctx.font = '12px monospace';
               ctx.fillText(`${reg.key.toUpperCase()} ${ (mprScroll[reg.key]||0) + 1 }/${ mprScroll.counts[reg.key]||0 }`, dx + 12, dy + 24);
               ctx.restore();
+              // Draw measurement overlays for this plane
+              ctx.save();
+              ctx.strokeStyle = 'yellow'; ctx.fillStyle = 'yellow'; ctx.lineWidth = 2;
+              const planeMeasures = mprMeasurements[reg.key] || [];
+              for (const m of planeMeasures){
+                const x1 = dx + m.start.x * scale, y1 = dy + m.start.y * scale;
+                const x2 = dx + m.end.x * scale, y2 = dy + m.end.y * scale;
+                ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+                if (m.label){ ctx.font='12px monospace'; ctx.fillText(m.label, x2 + 6, y2 - 6); }
+              }
+              // Draft line if belongs to this plane
+              if (measureDraft && measureDraft.plane === reg.key && measureDraft.start && measureDraft.end){
+                const x1 = dx + measureDraft.start.x * scale, y1 = dy + measureDraft.start.y * scale;
+                const x2 = dx + measureDraft.end.x * scale, y2 = dy + measureDraft.end.y * scale;
+                ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+              }
+              ctx.restore();
               // Draw HU ellipse overlay if belongs to this plane
               if (huEllipse && huEllipse.mode==='mpr' && huEllipse.plane===reg.key){
                 drawEllipseOverlay(reg.key);
@@ -743,9 +770,26 @@
       const spacing = parsePixelSpacing(currentSeries && currentSeries.pixel_spacing);
       if (spacing && spacing.length >= 2 && isFinite(spacing[0]) && isFinite(spacing[1])){
         const mm = Math.sqrt((dx*spacing[0])**2 + (dy*spacing[1])**2);
-        return { px, mm };
+        const value = (measureUnit === 'cm') ? (mm/10.0) : mm;
+        const unit = (measureUnit === 'cm') ? 'cm' : 'mm';
+        return { px, mm, value, unit };
       }
-      return { px, mm: null };
+      return { px, mm: null, value: px, unit: 'px' };
+    }
+
+    function mprImageDistance(planeKey, a, b){
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const px = Math.sqrt(dx*dx + dy*dy);
+      const ps = parsePixelSpacing(currentSeries && currentSeries.pixel_spacing) || [1,1];
+      const st = (currentSeries && +currentSeries.slice_thickness) || 1.0;
+      let sx = 1.0, sy = 1.0;
+      if (planeKey === 'axial') { sx = ps[0]; sy = ps[1]; }
+      else if (planeKey === 'sagittal') { sx = ps[0]; sy = st; }
+      else if (planeKey === 'coronal') { sx = ps[1]; sy = st; }
+      const mm = Math.sqrt((dx*sx)**2 + (dy*sy)**2);
+      const value = (measureUnit === 'cm') ? (mm/10.0) : mm;
+      const unit = (measureUnit === 'cm') ? 'cm' : 'mm';
+      return { px, mm, value, unit };
     }
 
     async function saveMeasurementToServer(m){
@@ -756,16 +800,18 @@
         image_id: imageId,
         type: 'distance',
         points: [m.start, m.end],
-        value: dist.mm || dist.px,
-        unit: dist.mm ? 'mm' : 'px',
+        value: (dist.mm ? (measureUnit==='cm' ? (dist.mm/10.0) : dist.mm) : dist.px),
+        unit: (dist.mm ? measureUnit : 'px'),
         notes: ''
       };
       try {
         const r = await fetch('/viewer/measurements/save/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
         const j = await r.json();
         if (j && j.success){
-          if (dist.mm){ const cm = dist.mm/10.0; m.label = `${dist.mm.toFixed(2)} mm / ${cm.toFixed(2)} cm`; }
-          else { m.label = `${dist.px.toFixed(1)} px`; }
+          if (dist.mm){
+            const mm = dist.mm; const cm = mm/10.0;
+            m.label = (measureUnit==='cm') ? `${cm.toFixed(2)} cm` : `${mm.toFixed(2)} mm`;
+          } else { m.label = `${dist.px.toFixed(1)} px`; }
         }
       } catch(e){}
     }
@@ -898,8 +944,24 @@
       isDragging = true; dragStart = { x: e.offsetX, y: e.offsetY };
       // Start measurement draft
       if (activeTool === 'measure'){
-        const vp2 = lastVp || { x:0, y:0, scale:1 };
-        measureDraft = { start: canvasToImageCoords(vp2, e.offsetX, e.offsetY), end: canvasToImageCoords(vp2, e.offsetX, e.offsetY) };
+        if (mprMode){
+          const halfW = Math.floor(canvas.width/2), halfH = Math.floor(canvas.height/2);
+          const mx = e.offsetX, my = e.offsetY;
+          let plane = null; if (mx < halfW && my < halfH) plane='sagittal'; else if (mx>=halfW && my<halfH) plane='coronal'; else if (mx<halfW && my>=halfH) plane='axial';
+          if (mprFullPlane) plane = mprFullPlane;
+          if (plane && mprRegionVps[plane]){
+            const vpR = mprRegionVps[plane];
+            // Ignore clicks outside the image bounds within region
+            if (mx < vpR.x || mx > vpR.x + vpR.imgW * vpR.scale || my < vpR.y || my > vpR.y + vpR.imgH * vpR.scale) {
+              return;
+            }
+            const imgPt = canvasToImageCoords(vpR, e.offsetX, e.offsetY);
+            measureDraft = { plane, start: imgPt, end: imgPt };
+          }
+        } else {
+          const vp2 = lastVp || { x:0, y:0, scale:1 };
+          measureDraft = { start: canvasToImageCoords(vp2, e.offsetX, e.offsetY), end: canvasToImageCoords(vp2, e.offsetX, e.offsetY) };
+        }
       }
       if (mprMode && activeTool === 'crosshair'){
         const halfW = Math.floor(canvas.width/2), halfH = Math.floor(canvas.height/2);
@@ -965,7 +1027,13 @@
       } else if (activeTool === 'pan'){
         panOffset.x += (e.offsetX - dragStart.x); panOffset.y += (e.offsetY - dragStart.y); dragStart = { x: e.offsetX, y: e.offsetY }; requestDraw();
       } else if (activeTool === 'measure' && measureDraft){
-        measureDraft.end = canvasToImageCoords(vp, e.offsetX, e.offsetY); requestDraw();
+        if (mprMode && measureDraft.plane && mprRegionVps[measureDraft.plane]){
+          const vpR = mprRegionVps[measureDraft.plane];
+          measureDraft.end = canvasToImageCoords(vpR, e.offsetX, e.offsetY);
+        } else {
+          measureDraft.end = canvasToImageCoords(vp, e.offsetX, e.offsetY);
+        }
+        requestDraw();
       } else if (activeTool === 'annotate'){
         // no-op while dragging
       } else if (activeTool === 'zoom'){
@@ -1052,10 +1120,24 @@
       if (!isDragging) return; isDragging = false;
       const vp = lastVp || { x:0, y:0, scale:1 };
       if (activeTool === 'measure' && measureDraft){
-        measureDraft.end = canvasToImageCoords(vp, e.offsetX, e.offsetY);
-        const m = { start: measureDraft.start, end: measureDraft.end };
-        measureDraft = null; measurements.push(m); imageIdToMeasurements.set(getCurrentImageId(), measurements);
-        await saveMeasurementToServer(m); renderMeasurementsList(); await draw();
+        if (mprMode && measureDraft.plane && mprRegionVps[measureDraft.plane]){
+          const vpR = mprRegionVps[measureDraft.plane];
+          measureDraft.end = canvasToImageCoords(vpR, e.offsetX, e.offsetY);
+          const plane = measureDraft.plane;
+          const m = { plane, start: measureDraft.start, end: measureDraft.end };
+          const dist = mprImageDistance(plane, m.start, m.end);
+          if (dist.mm){
+            const mm = dist.mm; const cm = mm/10.0;
+            m.label = (measureUnit==='cm') ? `${cm.toFixed(2)} cm` : `${mm.toFixed(2)} mm`;
+          } else { m.label = `${dist.px.toFixed(1)} px`; }
+          mprMeasurements[plane].push(m);
+          measureDraft = null; await draw();
+        } else {
+          measureDraft.end = canvasToImageCoords(vp, e.offsetX, e.offsetY);
+          const m = { start: measureDraft.start, end: measureDraft.end };
+          measureDraft = null; measurements.push(m); imageIdToMeasurements.set(getCurrentImageId(), measurements);
+          await saveMeasurementToServer(m); renderMeasurementsList(); await draw();
+        }
       } else if (activeTool === 'annotate'){
         const pos = canvasToImageCoords(vp, e.offsetX, e.offsetY);
         const text = prompt('Enter annotation text:');
@@ -1217,7 +1299,8 @@
  
      // Clear measurements
      btnClearMeasurements.addEventListener('click', ()=>{
-       measurements = []; imageIdToMeasurements.set(getCurrentImageId(), measurements); renderMeasurementsList(); draw();
+       if (mprMode){ mprMeasurements.axial = []; mprMeasurements.sagittal = []; mprMeasurements.coronal = []; draw(); }
+       else { measurements = []; imageIdToMeasurements.set(getCurrentImageId(), measurements); renderMeasurementsList(); draw(); }
      });
 
      // Sorting
@@ -1312,6 +1395,42 @@
      setCanvasSize();
      const studyId = q('study_id');
      if (studyId) loadStudy(studyId);
+
+     // Unit selector wiring
+     const unitSelect = document.getElementById('unitSelect');
+     const unitVal = document.getElementById('unitVal');
+     if (unitSelect){
+             unitSelect.addEventListener('change', ()=>{
+        measureUnit = unitSelect.value === 'cm' ? 'cm' : 'mm';
+        unitVal.textContent = measureUnit;
+        // Recompute labels for current measurements (series view)
+        measurements = (measurements||[]).map(m=>{
+          if (m && m.start && m.end){
+            const dist = imageDistance(m.start, m.end);
+            if (dist.mm){
+              const mm = dist.mm; const cm = mm/10.0;
+              m.label = (measureUnit==='cm') ? `${cm.toFixed(2)} cm` : `${mm.toFixed(2)} mm`;
+            }
+          }
+          return m;
+        });
+        // Recompute MPR measurement labels
+        ['axial','sagittal','coronal'].forEach(plane=>{
+          mprMeasurements[plane] = (mprMeasurements[plane]||[]).map(m=>{
+            if (m && m.start && m.end){
+              const dist = mprImageDistance(plane, m.start, m.end);
+              if (dist.mm){
+                const mm = dist.mm; const cm = mm/10.0;
+                m.label = (measureUnit==='cm') ? `${cm.toFixed(2)} cm` : `${mm.toFixed(2)} mm`;
+              }
+            }
+            return m;
+          });
+        });
+        renderMeasurementsList();
+        requestDraw();
+      });
+     }
    })();
   </script>
 </body>
