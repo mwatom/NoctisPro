@@ -28,6 +28,8 @@ from worklist.models import Patient, Study, Series, DicomImage, Modality, Facili
 from accounts.models import User
 from django.utils import timezone
 from django.db import transaction
+from notifications.models import Notification, NotificationType
+from django.db import models
 
 # Configure logging
 logging.basicConfig(
@@ -189,13 +191,32 @@ class DicomReceiver:
                     'study_description': study_description,
                     'study_date': study_datetime,
                     'referring_physician': referring_physician,
-                    'status': 'completed',
+                    'status': 'scheduled',
                     'priority': 'normal'
                 }
             )
             
             if created:
                 logger.info(f"Created new study: {study}")
+                try:
+                    notif_type, _ = NotificationType.objects.get_or_create(
+                        code='new_study', defaults={'name': 'New Study Uploaded', 'description': 'A new study has been uploaded', 'is_system': True}
+                    )
+                    recipients = User.objects.filter(models.Q(role='radiologist') | models.Q(role='admin') | models.Q(facility=default_facility))
+                    for recipient in recipients:
+                        Notification.objects.create(
+                            type=notif_type,
+                            recipient=recipient,
+                            sender=None,
+                            title=f"New {modality.code} study for {patient.full_name}",
+                            message=f"Study {accession_number} uploaded from {default_facility.name}",
+                            priority='normal',
+                            study=study,
+                            facility=default_facility,
+                            data={'study_id': study.id, 'accession_number': accession_number}
+                        )
+                except Exception as _e:
+                    logger.warning(f"Failed to send notifications for new study: {_e}")
             
             # Extract series information
             series_number = getattr(ds, 'SeriesNumber', 1)

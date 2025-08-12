@@ -54,7 +54,7 @@ def login_view(request):
         else:
             messages.error(request, 'Please provide both username and password.')
     
-    return render(request, 'accounts/login.html')
+    return render(request, 'accounts/login.html', {'hide_navbar': True})
 
 @login_required
 def logout_view(request):
