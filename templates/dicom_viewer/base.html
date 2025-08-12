@@ -134,6 +134,24 @@
           </select>
         </div>
       </div>
+      <div class="panel" id="mprMeasurePanel" style="display:none;">
+        <h3>MPR Measurements</h3>
+        <div class="control">
+          <div class="label"><span>Plane Selection</span></div>
+          <select id="mprMeasurePlane" class="select">
+            <option value="auto" selected>Auto (by quadrant)</option>
+            <option value="axial">Axial</option>
+            <option value="sagittal">Sagittal</option>
+            <option value="coronal">Coronal</option>
+          </select>
+        </div>
+        <div class="control">
+          <div class="label"><span>Measurement</span></div>
+          <select id="mprMeasureType" class="select">
+            <option value="distance" selected>Distance</option>
+          </select>
+        </div>
+      </div>
       <div class="panel">
         <h3>Navigation</h3>
         <div class="control"><div class="label"><span>Slice</span><span id="sliceVal">1</span></div><input id="slice" type="range" min="0" max="0" value="0"></div>
@@ -264,6 +282,11 @@
     let measurements = []; // persisted per image id
     let annotations = [];
     let crosshair = false;
+    let measureUnit = 'mm';
+    let mprMeasurements = { axial: [], sagittal: [], coronal: [] };
+    let mprMeasurePlaneMode = 'auto'; // 'auto' | 'axial' | 'sagittal' | 'coronal'
+    let mprMeasureType = 'distance';
+    const mprImageCache = new Map(); // key: series|plane|slice|ww|wl|inv -> Promise<string>|string
 
     // New states
     let showTagsOverlay = false;
@@ -425,6 +448,8 @@
         // Reset view state
         zoom = 1.0; panOffset = {x:0,y:0}; activeTool = 'window'; crosshair = false; mprMode = false; mprImgs = {axial:null,sagittal:null,coronal:null}; reconMode = null; reconImgs = []; reconIndex = 0;
         mprCross = { x: null, y: null, z: null }; // reset crosshair linkage
+        mprMeasurements = { axial: [], sagittal: [], coronal: [] };
+        mprImageCache.clear();
         const enterMpr = document.getElementById('btnEnterMpr');
         const exitMpr = document.getElementById('btnExitMpr');
         if (enterMpr) enterMpr.style.display = images.length ? '' : 'none';
@@ -477,15 +502,15 @@
             ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
             const imgSrc = mprImgs[mprFullPlane];
             if (imgSrc){
-              const im = await loadImage(imgSrc);
-              const scale = Math.min(canvas.width / im.width, canvas.height / im.height);
-              const dw = im.width * scale, dh = im.height * scale;
-              const dx = (canvas.width - dw)/2, dy = (canvas.height - dh)/2;
-              ctx.imageSmoothingEnabled = false; ctx.drawImage(im, dx, dy, dw, dh);
-              mprRegionVps[mprFullPlane] = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height, rect: {x:0,y:0,w:canvas.width,h:canvas.height} };
-              if (huEllipse && huEllipse.mode==='mpr' && huEllipse.plane===mprFullPlane){ drawEllipseOverlay(mprFullPlane); }
-              // Draw linked crosshair on enlarged plane (only if enabled)
-              if (crosshair) { drawMprCrosshairOverlay(mprFullPlane, dx, dy, scale, im.width, im.height); }
+                             const im = await loadImage(imgSrc);
+               const scale = Math.min(canvas.width / im.width, canvas.height / im.height);
+               const dw = im.width * scale, dh = im.height * scale;
+               const dx = (canvas.width - dw)/2, dy = (canvas.height - dh)/2;
+               if (ctx.imageSmoothingEnabled !== false) ctx.imageSmoothingEnabled = false; ctx.drawImage(im, dx, dy, dw, dh);
+               mprRegionVps[mprFullPlane] = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height, rect: {x:0,y:0,w:canvas.width,h:canvas.height} };
+               if (huEllipse && huEllipse.mode==='mpr' && huEllipse.plane===mprFullPlane){ drawEllipseOverlay(mprFullPlane); }
+               // Draw linked crosshair on enlarged plane (only if enabled)
+               if (crosshair) { drawMprCrosshairOverlay(mprFullPlane, dx, dy, scale, im.width, im.height); }
             }
             document.getElementById('overlay').innerHTML = `MPR (${mprFullPlane.toUpperCase()}) | WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}`;
             document.getElementById('zoominfo').textContent = `MPR`;
@@ -509,6 +534,9 @@
                   z: mprScroll.axial
                 };
               }
+              prefetchMprSlices('axial', mprScroll.axial);
+              prefetchMprSlices('sagittal', mprScroll.sagittal);
+              prefetchMprSlices('coronal', mprScroll.coronal);
             }
           }
           ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -532,12 +560,13 @@
             if (reg.key === 'empty') continue;
             const imgSrc = mprImgs[reg.key];
             if (imgSrc){
-              const im = await loadImage(imgSrc);
-              const scale = Math.min(reg.w / im.width, reg.h / im.height);
-              const dw = im.width * scale, dh = im.height * scale;
-              const dx = reg.x + (reg.w - dw)/2, dy = reg.y + (reg.h - dh)/2;
-              ctx.imageSmoothingEnabled = false;
-              ctx.drawImage(im, dx, dy, dw, dh);
+                         const im = await loadImage(imgSrc);
+               const scale = Math.min(reg.w / im.width, reg.h / im.height);
+               const dw = im.width * scale, dh = im.height * scale;
+               const dx = reg.x + (reg.w - dw)/2, dy = reg.y + (reg.h - dh)/2;
+               // Hint to use low quality interpolation for speed
+               if (ctx.imageSmoothingEnabled !== false) ctx.imageSmoothingEnabled = false;
+               ctx.drawImage(im, dx, dy, dw, dh);
               // Save mapping for tools
               mprRegionVps[reg.key] = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height, rect: reg };
               // Draw plane label and slice index
@@ -574,16 +603,9 @@
             }
             // Fetch updated slice without blocking draw
             (async ()=>{
-              const params2 = new URLSearchParams();
-              params2.set('plane', reg.key);
-              params2.set('slice', mprScroll[reg.key] || 0);
-              params2.set('window_width', ww);
-              params2.set('window_level', wl);
-              params2.set('inverted', inverted);
               try {
-                const r2 = await fetch(`/viewer/api/series/${currentSeries.id}/mpr/?${params2.toString()}`);
-                const j2 = await r2.json();
-                if (j2 && j2.image){ mprImgs[reg.key] = j2.image; if (j2.counts) mprScroll.counts = j2.counts; requestAnimationFrame(()=>draw()); }
+                const img = await getMprImage(currentSeries.id, reg.key, mprScroll[reg.key] || 0);
+                mprImgs[reg.key] = img; requestAnimationFrame(()=>draw());
               } catch(e){}
             })();
           }
@@ -611,8 +633,8 @@
         const htmlImg = await getImageForIndex(index);
         const vp = getViewportPlacement(htmlImg.width, htmlImg.height);
         ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(htmlImg, vp.x, vp.y, vp.w, vp.h);
+                 if (ctx.imageSmoothingEnabled !== false) ctx.imageSmoothingEnabled = false;
+         ctx.drawImage(htmlImg, vp.x, vp.y, vp.w, vp.h);
         lastVp = { x: vp.x, y: vp.y, scale: vp.scale, imgW: htmlImg.width, imgH: htmlImg.height };
         drawOverlays(vp);
         if (huEllipse && huEllipse.mode==='series') drawEllipseOverlay();
@@ -891,8 +913,8 @@
 
     // UI wiring
     seriesSelect.addEventListener('change', e=>{ if(e.target.value) loadSeries(e.target.value); });
-    wwSlider.addEventListener('input', e=>{ ww = +e.target.value; document.getElementById('wwVal').textContent = ww; requestDraw(); });
-    wlSlider.addEventListener('input', e=>{ wl = +e.target.value; document.getElementById('wlVal').textContent = wl; requestDraw(); });
+         wwSlider.addEventListener('input', e=>{ ww = +e.target.value; document.getElementById('wwVal').textContent = ww; imageCache.clear(); mprImageCache.clear(); requestDraw(); });
+     wlSlider.addEventListener('input', e=>{ wl = +e.target.value; document.getElementById('wlVal').textContent = wl; imageCache.clear(); mprImageCache.clear(); requestDraw(); });
     sliceSlider.addEventListener('input', e=>{ index = +e.target.value; document.getElementById('sliceVal').textContent = index+1; requestDraw(); debouncedLoadOverlaysForCurrentImage(); prefetchAround(index, 3); });
     zoomSlider.addEventListener('input', e=>{ zoom = (+e.target.value)/100; document.getElementById('zoomVal').textContent = `${e.target.value}%`; requestDraw(); });
     document.querySelectorAll('[data-preset]').forEach(btn=>btn.addEventListener('click', ()=>{
@@ -903,7 +925,7 @@
     document.querySelectorAll('.tool').forEach(t=>t.addEventListener('click', ()=>{
       const tool = t.getAttribute('data-tool');
       document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active')); t.classList.add('active');
-      if (tool === 'invert'){ inverted = !inverted; imageCache.clear(); requestDraw(); return; }
+             if (tool === 'invert'){ inverted = !inverted; imageCache.clear(); mprImageCache.clear(); requestDraw(); return; }
       if (tool === 'reset'){ zoom = 1.0; panOffset = {x:0,y:0}; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; requestDraw(); return; }
       if (tool === 'fit'){ panOffset = {x:0,y:0}; zoom = 1.0; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; requestDraw(); return; }
       if (tool === 'one'){
@@ -929,14 +951,18 @@
       if (tool === 'ai'){ alert('AI analysis result: (stub) No backend connected.'); return; }
       if (tool === 'crosshair'){ if (activeTool === 'crosshair'){ crosshair = false; activeTool = 'window'; } else { activeTool = 'crosshair'; crosshair = true; } requestDraw(); return; }
       if (tool === 'hu'){ showHuProbe = true; huEllipse = null; requestDraw(); return; }
-      if (tool === 'measure') { showHuProbe = false; }
+             if (tool === 'measure') { showHuProbe = false; if (mprMode) document.getElementById('mprMeasurePanel').style.display=''; }
       // remove old inline MPR toggle from tool button; handled by 3D dropdown now
-      if (tool === 'mpr'){
-        return; // no-op
-      }
-      if (mprMode){ return; }
-      activeTool = tool;
-    }));
+             if (tool === 'mpr'){
+         return; // no-op
+       }
+       if (mprMode){
+         // In MPR, toggle measure panel visibility based on tool
+         document.getElementById('mprMeasurePanel').style.display = (tool === 'measure') ? '' : document.getElementById('mprMeasurePanel').style.display;
+         return;
+       }
+       activeTool = tool;
+     }));
 
     // Mouse interactions on viewport
     const viewport = document.getElementById('viewport');
@@ -949,6 +975,7 @@
           const mx = e.offsetX, my = e.offsetY;
           let plane = null; if (mx < halfW && my < halfH) plane='sagittal'; else if (mx>=halfW && my<halfH) plane='coronal'; else if (mx<halfW && my>=halfH) plane='axial';
           if (mprFullPlane) plane = mprFullPlane;
+          if (mprMeasurePlaneMode !== 'auto') plane = mprMeasurePlaneMode;
           if (plane && mprRegionVps[plane]){
             const vpR = mprRegionVps[plane];
             // Ignore clicks outside the image bounds within region
@@ -1207,12 +1234,13 @@
         const count = (mprScroll.counts[plane]||1);
         const cur = (mprScroll[plane]||0);
         const ni = Math.max(0, Math.min(count-1, cur + d));
-        if (ni !== cur){
-          mprScroll[plane] = ni;
-          // keep crosshair in sync with the scrolled plane axis
-          if (plane === 'axial') mprCross.z = ni; else if (plane === 'sagittal') mprCross.x = ni; else if (plane === 'coronal') mprCross.y = ni;
-          await draw();
-        }
+                 if (ni !== cur){
+           mprScroll[plane] = ni;
+           // keep crosshair in sync with the scrolled plane axis
+           if (plane === 'axial') mprCross.z = ni; else if (plane === 'sagittal') mprCross.x = ni; else if (plane === 'coronal') mprCross.y = ni;
+           prefetchMprSlices(plane, ni);
+           await draw();
+         }
         return;
       }
       if (e.ctrlKey){ const delta = e.deltaY>0?0.9:1.1; zoom = Math.max(0.1, Math.min(5.0, zoom*delta)); zoomSlider.value = Math.round(zoom*100); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; requestDraw(); }
@@ -1265,13 +1293,13 @@
         const r = await fetch(url);
         const j = await r.json();
         if (j.error) throw new Error(j.error);
-        if (j.mpr_views){ reconMode = 'mpr'; reconImgs = [j.mpr_views.axial, j.mpr_views.sagittal, j.mpr_views.coronal]; mprMode = true; if (j.counts){ mprScroll.counts = j.counts; mprScroll.axial = Math.floor((j.counts.axial||0)/2); mprScroll.sagittal = Math.floor((j.counts.sagittal||0)/2); mprScroll.coronal = Math.floor((j.counts.coronal||0)/2); mprCross = { x: mprScroll.sagittal, y: mprScroll.coronal, z: mprScroll.axial }; } }
-        if (j.mip_views){ reconMode = 'mip'; reconImgs = [j.mip_views.axial, j.mip_views.sagittal, j.mip_views.coronal]; }
-        if (j.bone_views){ reconMode = 'bone'; reconImgs = [j.bone_views.axial || j.bone_views.bone_axial_preview, j.bone_views.sagittal || j.bone_views.bone_sagittal_preview, j.bone_views.coronal || j.bone_views.bone_coronal_preview]; if (j.mesh) showBone3D(j.mesh); }
-        reconImgs = reconImgs.filter(Boolean);
-        reconIndex = 0;
-        await draw();
-        reconStatus.textContent = 'Done'; setTimeout(()=> reconStatus.textContent = '', 1500);
+        if (j.mpr_views){ reconMode = 'mpr'; reconImgs = [j.mpr_views.axial, j.mpr_views.sagittal, j.mpr_views.coronal]; mprMode = true; document.getElementById('mprMeasurePanel').style.display=''; if (j.counts){ mprScroll.counts = j.counts; mprScroll.axial = Math.floor((j.counts.axial||0)/2); mprScroll.sagittal = Math.floor((j.counts.sagittal||0)/2); mprScroll.coronal = Math.floor((j.counts.coronal||0)/2); mprCross = { x: mprScroll.sagittal, y: mprScroll.coronal, z: mprScroll.axial }; prefetchMprSlices('axial', mprScroll.axial); prefetchMprSlices('sagittal', mprScroll.sagittal); prefetchMprSlices('coronal', mprScroll.coronal); } }
+                 if (j.mip_views){ reconMode = 'mip'; reconImgs = [j.mip_views.axial, j.mip_views.sagittal, j.mip_views.coronal]; document.getElementById('mprMeasurePanel').style.display='none'; mprMode = false; }
+         if (j.bone_views){ reconMode = 'bone'; reconImgs = [j.bone_views.axial || j.bone_views.bone_axial_preview, j.bone_views.sagittal || j.bone_views.bone_sagittal_preview, j.bone_views.coronal || j.bone_views.bone_coronal_preview]; document.getElementById('mprMeasurePanel').style.display='none'; mprMode = false; if (j.mesh) showBone3D(j.mesh); }
+         reconImgs = reconImgs.filter(Boolean);
+         reconIndex = 0;
+         await draw();
+         reconStatus.textContent = 'Done'; setTimeout(()=> reconStatus.textContent = '', 1500);
        } catch (err){
          reconStatus.textContent = `Error: ${err.message}`;
          await fallbackToDesktop();
@@ -1431,6 +1459,9 @@
         requestDraw();
       });
      }
+
+     document.getElementById('mprMeasurePlane').addEventListener('change', (e)=>{ mprMeasurePlaneMode = e.target.value; });
+     document.getElementById('mprMeasureType').addEventListener('change', (e)=>{ mprMeasureType = e.target.value; });
    })();
   </script>
 </body>

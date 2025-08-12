@@ -41,6 +41,58 @@ _MPR_CACHE = {}  # series_id -> { 'volume': np.ndarray }
 _MPR_CACHE_ORDER = []
 _MAX_MPR_CACHE = 2
 
+# Encoded MPR slice cache (LRU) to avoid repeated windowing+encoding per slice/plane/WW/WL
+_MPR_IMG_CACHE_LOCK = Lock()
+_MPR_IMG_CACHE = {}  # key -> base64 data URL
+_MPR_IMG_CACHE_ORDER = []  # list of keys in LRU order
+_MAX_MPR_IMG_CACHE = 300
+
+def _mpr_cache_key(series_id, plane, slice_index, ww, wl, inverted):
+    return f"{series_id}|{plane}|{int(slice_index)}|{int(round(float(ww)))}|{int(round(float(wl)))}|{1 if inverted else 0}"
+
+def _mpr_cache_get(series_id, plane, slice_index, ww, wl, inverted):
+    key = _mpr_cache_key(series_id, plane, slice_index, ww, wl, inverted)
+    with _MPR_IMG_CACHE_LOCK:
+        val = _MPR_IMG_CACHE.get(key)
+        if val is not None:
+            try:
+                _MPR_IMG_CACHE_ORDER.remove(key)
+            except ValueError:
+                pass
+            _MPR_IMG_CACHE_ORDER.append(key)
+        return val
+
+def _mpr_cache_set(series_id, plane, slice_index, ww, wl, inverted, img_b64):
+    key = _mpr_cache_key(series_id, plane, slice_index, ww, wl, inverted)
+    with _MPR_IMG_CACHE_LOCK:
+        if key not in _MPR_IMG_CACHE:
+            while len(_MPR_IMG_CACHE_ORDER) >= _MAX_MPR_IMG_CACHE:
+                evict = _MPR_IMG_CACHE_ORDER.pop(0)
+                _MPR_IMG_CACHE.pop(evict, None)
+        _MPR_IMG_CACHE[key] = img_b64
+        try:
+            _MPR_IMG_CACHE_ORDER.remove(key)
+        except ValueError:
+            pass
+        _MPR_IMG_CACHE_ORDER.append(key)
+
+def _get_encoded_mpr_slice(series_id, volume, plane, slice_index, ww, wl, inverted):
+    """Get encoded base64 PNG for given MPR slice, using cache if possible.
+    volume is a numpy array (depth,height,width).
+    """
+    cached = _mpr_cache_get(series_id, plane, slice_index, ww, wl, inverted)
+    if cached is not None:
+        return cached
+    if plane == 'axial':
+        slice_array = volume[slice_index, :, :]
+    elif plane == 'sagittal':
+        slice_array = volume[:, :, slice_index]
+    else:  # coronal
+        slice_array = volume[:, slice_index, :]
+    img_b64 = _array_to_base64_image(slice_array, ww, wl, inverted)
+    if img_b64:
+        _mpr_cache_set(series_id, plane, slice_index, ww, wl, inverted, img_b64)
+    return img_b64
 
 def _get_mpr_volume_for_series(series):
     """Return a 3D numpy volume (depth, height, width) for the given series.
@@ -242,10 +294,17 @@ def api_mpr_reconstruction(request, series_id):
             except Exception:
                 return fallback
 
-        default_window_width, default_window_level = _derive_window(volume)
-        window_width = float(request.GET.get('window_width', default_window_width))
-        window_level = float(request.GET.get('window_level', default_window_level))
+        # Use provided window params if present; otherwise derive once
+        ww_param = request.GET.get('window_width')
+        wl_param = request.GET.get('window_level')
         inverted = request.GET.get('inverted', 'false').lower() == 'true'
+        if ww_param is None or wl_param is None:
+            default_window_width, default_window_level = _derive_window(volume)
+            window_width = float(ww_param) if ww_param is not None else float(default_window_width)
+            window_level = float(wl_param) if wl_param is not None else float(default_window_level)
+        else:
+            window_width = float(ww_param)
+            window_level = float(wl_param)
 
         # Counts per plane
         counts = {
@@ -266,15 +325,8 @@ def api_mpr_reconstruction(request, series_id):
                 slice_index = counts[plane] // 2
             slice_index = max(0, min(counts[plane] - 1, slice_index))
 
-            # Extract slice
-            if plane == 'axial':
-                slice_array = volume[slice_index, :, :]
-            elif plane == 'sagittal':
-                slice_array = volume[:, :, slice_index]
-            else:  # coronal
-                slice_array = volume[:, slice_index, :]
-
-            img_b64 = _array_to_base64_image(slice_array, window_width, window_level, inverted)
+            # Get encoded slice via cache
+            img_b64 = _get_encoded_mpr_slice(series.id, volume, plane, slice_index, window_width, window_level, inverted)
             return JsonResponse({
                 'plane': plane,
                 'index': slice_index,
@@ -291,12 +343,12 @@ def api_mpr_reconstruction(request, series_id):
 
         # Default: return mid-slice previews for all planes
         mpr_views = {}
-        axial_slice = volume[volume.shape[0] // 2]
-        sagittal_slice = volume[:, :, volume.shape[2] // 2]
-        coronal_slice = volume[:, volume.shape[1] // 2, :]
-        mpr_views['axial'] = _array_to_base64_image(axial_slice, window_width, window_level, inverted)
-        mpr_views['sagittal'] = _array_to_base64_image(sagittal_slice, window_width, window_level, inverted)
-        mpr_views['coronal'] = _array_to_base64_image(coronal_slice, window_width, window_level, inverted)
+        axial_idx = volume.shape[0] // 2
+        sagittal_idx = volume.shape[2] // 2
+        coronal_idx = volume.shape[1] // 2
+        mpr_views['axial'] = _get_encoded_mpr_slice(series.id, volume, 'axial', axial_idx, window_width, window_level, inverted)
+        mpr_views['sagittal'] = _get_encoded_mpr_slice(series.id, volume, 'sagittal', sagittal_idx, window_width, window_level, inverted)
+        mpr_views['coronal'] = _get_encoded_mpr_slice(series.id, volume, 'coronal', coronal_idx, window_width, window_level, inverted)
 
         return JsonResponse({
             'mpr_views': mpr_views,
@@ -628,7 +680,11 @@ def _array_to_base64_image(array, window_width=None, window_level=None, inverted
         
         # Convert to base64
         buffer = BytesIO()
-        img.save(buffer, format='PNG')
+        try:
+            # Favor speed over size
+            img.save(buffer, format='PNG', optimize=False, compress_level=1)
+        except Exception:
+            img.save(buffer, format='PNG')
         img_str = base64.b64encode(buffer.getvalue()).decode()
         
         return f"data:image/png;base64,{img_str}"
