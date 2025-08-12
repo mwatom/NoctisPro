@@ -943,32 +943,40 @@
       } else if (activeTool === 'zoom'){
         const dy = e.offsetY - dragStart.y; dragStart = { x: e.offsetX, y: e.offsetY }; const factor = dy<0 ? 1.05 : 0.95; zoom = Math.min(5.0, Math.max(0.25, zoom*factor)); zoomSlider.value = Math.round(zoom*100); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; requestDraw();
       } else if (mprMode && activeTool === 'crosshair'){
-        // Drag crosshair across planes
         const halfW = Math.floor(canvas.width/2), halfH = Math.floor(canvas.height/2);
         const mx = e.offsetX, my = e.offsetY;
         let plane = null; if (mx < halfW && my < halfH) plane='sagittal'; else if (mx>=halfW && my<halfH) plane='coronal'; else if (mx<halfW && my>=halfH) plane='axial';
+        if (mprFullPlane) plane = mprFullPlane;
         if (plane && mprRegionVps[plane]){
           const vpR = mprRegionVps[plane];
-          if (!(mx < vpR.x || mx > vpR.x + vpR.imgW * vpR.scale || my < vpR.y || my > vpR.y + vpR.imgH * vpR.scale)){
-            const imgPt = canvasToImageCoords(vpR, mx, my);
-            if (plane === 'axial'){
-              mprCross.x = Math.round(imgPt.x);
-              mprCross.y = Math.round(imgPt.y);
-              mprScroll.sagittal = Math.max(0, Math.min((mprScroll.counts.sagittal||1)-1, mprCross.x));
-              mprScroll.coronal = Math.max(0, Math.min((mprScroll.counts.coronal||1)-1, mprCross.y));
-            } else if (plane === 'sagittal'){
-              mprCross.y = Math.round(imgPt.x);
-              mprCross.z = Math.round(imgPt.y);
-              mprScroll.axial = Math.max(0, Math.min((mprScroll.counts.axial||1)-1, mprCross.z));
-              mprScroll.coronal = Math.max(0, Math.min((mprScroll.counts.coronal||1)-1, mprCross.y));
-            } else if (plane === 'coronal'){
-              mprCross.x = Math.round(imgPt.x);
-              mprCross.z = Math.round(imgPt.y);
-              mprScroll.axial = Math.max(0, Math.min((mprScroll.counts.axial||1)-1, mprCross.z));
-              mprScroll.sagittal = Math.max(0, Math.min((mprScroll.counts.sagittal||1)-1, mprCross.x));
-            }
-            await draw();
+          // Ignore clicks outside the image bounds within region
+          if (mx < vpR.x || mx > vpR.x + vpR.imgW * vpR.scale || my < vpR.y || my > vpR.y + vpR.imgH * vpR.scale) {
+            return;
           }
+          const imgPt = canvasToImageCoords(vpR, mx, my);
+          // Update crosshair global coordinates and plane slices
+          if (plane === 'axial'){
+            mprCross.x = Math.round(imgPt.x);
+            mprCross.y = Math.round(imgPt.y);
+            // Update orthogonal planes to intersect this point
+            mprScroll.sagittal = Math.max(0, Math.min((mprScroll.counts.sagittal||1)-1, mprCross.x));
+            mprScroll.coronal = Math.max(0, Math.min((mprScroll.counts.coronal||1)-1, mprCross.y));
+          } else if (plane === 'sagittal'){
+            // sagittal image: x->height(y), y->depth(z)
+            mprCross.y = Math.round(imgPt.x);
+            mprCross.z = Math.round(imgPt.y);
+            mprScroll.axial = Math.max(0, Math.min((mprScroll.counts.axial||1)-1, mprCross.z));
+            // coronal slice corresponds to height index
+            mprScroll.coronal = Math.max(0, Math.min((mprScroll.counts.coronal||1)-1, mprCross.y));
+          } else if (plane === 'coronal'){
+            // coronal image: x->width(x), y->depth(z)
+            mprCross.x = Math.round(imgPt.x);
+            mprCross.z = Math.round(imgPt.y);
+            mprScroll.axial = Math.max(0, Math.min((mprScroll.counts.axial||1)-1, mprCross.z));
+            // sagittal slice corresponds to width index
+            mprScroll.sagittal = Math.max(0, Math.min((mprScroll.counts.sagittal||1)-1, mprCross.x));
+          }
+          draw();
         }
       } else if (showHuProbe && huEllipse){
         if (huEllipse.mode==='mpr' && mprRegionVps[huEllipse.plane]){
@@ -990,33 +998,26 @@
       if (!mprMode || !showHuProbe || (huEllipse && (huEllipse.rx>1 || huEllipse.ry>1))) return;
       // Determine which plane region the mouse is in
       const halfW = Math.floor(canvas.width/2), halfH = Math.floor(canvas.height/2);
-      const regions = [
-        { x: 0, y: 0, w: halfW, h: halfH, key: 'sagittal' },
-        { x: halfW, y: 0, w: canvas.width-halfW, h: halfH, key: 'coronal' },
-        { x: 0, y: halfH, w: halfW, h: canvas.height-halfH, key: 'axial' },
-      ];
       const mx = e.offsetX, my = e.offsetY;
-      const region = regions.find(r=> mx>=r.x && mx<r.x+r.w && my>=r.y && my<r.y+r.h);
-      if (!region) return;
-      // Load current image for region to compute mapping
-      const im = await loadImage(mprImgs[region.key]);
-      const scale = Math.min(region.w / im.width, region.h / im.height);
-      const dw = im.width * scale, dh = im.height * scale;
-      const dx = region.x + (region.w - dw)/2, dy = region.y + (region.h - dh)/2;
-      if (mx < dx || mx > dx+dw || my < dy || my > dy+dh) return;
-      const px = (mx - dx) / scale; // image coordinates
-      const py = (my - dy) / scale;
-      // Query HU from backend
-      const q = new URLSearchParams();
-      q.set('mode','mpr'); q.set('series_id', currentSeries.id); q.set('plane', region.key);
-      q.set('slice', mprScroll[region.key]||0); q.set('x', Math.floor(px)); q.set('y', Math.floor(py));
+      let plane = null; if (mx < halfW && my < halfH) plane='sagittal'; else if (mx>=halfW && my<halfH) plane='coronal'; else if (mx<halfW && my>=halfH) plane='axial';
+      if (mprFullPlane) plane = mprFullPlane;
+      if (!plane || !mprRegionVps[plane]) return;
       try {
-        const resp = await fetch(`/viewer/api/hu/?${q.toString()}`);
-        const j = await resp.json();
-        if (j && typeof j.hu === 'number'){
-          const base = `MPR | WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}`;
-          document.getElementById('overlay').innerHTML = `${base}<br>${region.key.toUpperCase()} HU: ${j.hu}`;
-        }
+        const vpR = mprRegionVps[plane];
+        const imgPt = canvasToImageCoords(vpR, mx, my);
+        const px = Math.max(0, Math.min(vpR.imgW-1, imgPt.x));
+        const py = Math.max(0, Math.min(vpR.imgH-1, imgPt.y));
+        // Query HU from backend
+        const q = new URLSearchParams();
+        q.set('mode','mpr'); q.set('series_id', currentSeries.id); q.set('plane', plane);
+        q.set('slice', mprScroll[plane]||0); q.set('x', Math.floor(px)); q.set('y', Math.floor(py));
+        try {
+          const resp = await fetch(`/viewer/api/hu/?${q.toString()}`);
+          const j = await resp.json();
+          if (j && typeof j.hu === 'number'){
+            document.getElementById('overlay').innerHTML = `HU (${plane}): ${j.hu} @ x:${Math.floor(px)} y:${Math.floor(py)} slice:${(mprScroll[plane]||0)+1}/${mprScroll.counts[plane]||0}`;
+          }
+        } catch(e){}
       } catch(e){}
     });
     viewport.addEventListener('mouseup', async (e)=>{
@@ -1063,10 +1064,10 @@
     // Double-click enlarge/restore MPR plane
     viewport.addEventListener('dblclick', async (e)=>{
       if (!mprMode) return;
+      if (mprFullPlane) { mprFullPlane = null; await draw(); return; }
       const halfW = Math.floor(canvas.width/2), halfH = Math.floor(canvas.height/2);
       const mx = e.offsetX, my = e.offsetY;
       let plane = null; if (mx < halfW && my < halfH) plane='sagittal'; else if (mx>=halfW && my<halfH) plane='coronal'; else if (mx<halfW && my>=halfH) plane='axial';
-      if (mprFullPlane && plane === mprFullPlane) { mprFullPlane = null; await draw(); return; }
       if (plane) { mprFullPlane = plane; await draw(); }
     });
 
@@ -1091,6 +1092,7 @@
         else if (mx >= halfW && my < halfH) plane = 'coronal';
         else if (mx < halfW && my >= halfH) plane = 'axial';
         else plane = null; // bottom-right empty
+        if (mprFullPlane) plane = mprFullPlane;
         if (!plane) return;
         const count = (mprScroll.counts[plane]||1);
         const cur = (mprScroll[plane]||0);
