@@ -22,6 +22,7 @@ urlpatterns = [
     path('api/series/<int:series_id>/mpr/', views.api_mpr_reconstruction, name='api_mpr_reconstruction'),
     path('api/series/<int:series_id>/mip/', views.api_mip_reconstruction, name='api_mip_reconstruction'),
     path('api/series/<int:series_id>/bone/', views.api_bone_reconstruction, name='api_bone_reconstruction'),
+    path('api/hu/', views.api_hu_value, name='api_hu_value'),
     
     # Real-time features
     path('api/realtime/studies/', views.api_realtime_studies, name='api_realtime_studies'),

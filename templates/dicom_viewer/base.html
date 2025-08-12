@@ -46,6 +46,7 @@
       <button class="tool" data-tool="measure"><i class="fas fa-ruler"></i><span>Measure</span></button>
       <button class="tool" data-tool="annotate"><i class="fas fa-comment-dots"></i><span>Annotate</span></button>
       <button class="tool" data-tool="crosshair"><i class="fas fa-crosshairs"></i><span>Crosshair</span></button>
+      <button class="tool" data-tool="hu"><i class="fas fa-thermometer-half"></i><span>HU</span></button>
       <button class="tool" data-tool="invert"><i class="fas fa-adjust"></i><span>Invert</span></button>
       <button class="tool" data-tool="reset"><i class="fas fa-undo"></i><span>Reset</span></button>
       <button class="tool" data-tool="ai"><i class="fas fa-robot"></i><span>AI</span></button>
@@ -176,6 +177,9 @@
     let reconMode = null; // 'mpr' | 'mip' | 'bone' | null
     let reconImgs = []; // ordered list of image data URLs for canvas display
     let reconIndex = 0;
+    // MPR plane browsing state
+    let mprScroll = { axial: 0, sagittal: 0, coronal: 0, counts: { axial: 0, sagittal: 0, coronal: 0 } };
+    let showHuProbe = false;
     let activeTool = 'window';
     let isDragging = false;
     let dragStart = null;
@@ -315,11 +319,18 @@
       if (!images.length && reconImgs.length===0) { ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height); return; }
       if (mprMode){
         try{
+          // Ensure counts and initial mid-slice indices are loaded
           if (!mprImgs.axial || !mprImgs.sagittal || !mprImgs.coronal){
             const params = new URLSearchParams(); params.set('window_width', ww); params.set('window_level', wl); params.set('inverted', inverted);
             const r = await fetch(`/viewer/api/series/${currentSeries.id}/mpr/?${params.toString()}`);
             const j = await r.json();
             if (j && j.mpr_views){ mprImgs = j.mpr_views; }
+            if (j && j.counts){
+              mprScroll.counts = j.counts;
+              mprScroll.axial = Math.floor((j.counts.axial||0)/2);
+              mprScroll.sagittal = Math.floor((j.counts.sagittal||0)/2);
+              mprScroll.coronal = Math.floor((j.counts.coronal||0)/2);
+            }
           }
           ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
           const regions = [
@@ -328,6 +339,16 @@
             { x: Math.floor(2*canvas.width/3), y: 0, w: canvas.width - Math.floor(2*canvas.width/3), h: canvas.height, key: 'coronal' },
           ];
           for (const reg of regions){
+            // Fetch specific slice for this plane index
+            const params2 = new URLSearchParams();
+            params2.set('plane', reg.key);
+            params2.set('slice', mprScroll[reg.key] || 0);
+            params2.set('window_width', ww);
+            params2.set('window_level', wl);
+            params2.set('inverted', inverted);
+            const r2 = await fetch(`/viewer/api/series/${currentSeries.id}/mpr/?${params2.toString()}`);
+            const j2 = await r2.json();
+            if (j2 && j2.image){ mprImgs[reg.key] = j2.image; if (j2.counts) mprScroll.counts = j2.counts; }
             if (!mprImgs[reg.key]) continue;
             const im = await loadImage(mprImgs[reg.key]);
             const scale = Math.min(reg.w / im.width, reg.h / im.height);
@@ -335,6 +356,14 @@
             const dx = reg.x + (reg.w - dw)/2, dy = reg.y + (reg.h - dh)/2;
             ctx.imageSmoothingEnabled = false;
             ctx.drawImage(im, dx, dy, dw, dh);
+            // Draw plane label and slice index
+            ctx.save();
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(dx + 8, dy + 8, 130, 22);
+            ctx.fillStyle = '#0ff';
+            ctx.font = '12px monospace';
+            ctx.fillText(`${reg.key.toUpperCase()} ${ (mprScroll[reg.key]||0) + 1 }/${ mprScroll.counts[reg.key]||0 }`, dx + 12, dy + 24);
+            ctx.restore();
           }
           document.getElementById('overlay').innerHTML = `MPR | WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}`;
           document.getElementById('zoominfo').textContent = `MPR`;
@@ -504,6 +533,8 @@
       if (tool === 'reset'){ zoom = 1.0; panOffset = {x:0,y:0}; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; draw(); return; }
       if (tool === 'ai'){ alert('AI analysis result: (stub) No backend connected.'); return; }
       if (tool === 'crosshair'){ crosshair = !crosshair; draw(); return; }
+      if (tool === 'hu'){ showHuProbe = !showHuProbe; draw(); return; }
+      if (tool === 'measure') { showHuProbe = false; }
       // remove old inline MPR toggle from tool button; handled by 3D dropdown now
       if (tool === 'mpr'){
         return; // no-op
@@ -538,6 +569,39 @@
         const dy = e.offsetY - dragStart.y; dragStart = { x: e.offsetX, y: e.offsetY }; const factor = dy<0 ? 1.05 : 0.95; zoom = Math.min(5.0, Math.max(0.25, zoom*factor)); zoomSlider.value = Math.round(zoom*100); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; await draw();
       }
     });
+    // HU probe on mousemove in MPR when enabled
+    viewport.addEventListener('mousemove', async (e)=>{
+      if (!mprMode || !showHuProbe) return;
+      // Determine which plane region the mouse is in
+      const regions = [
+        { x: 0, y: 0, w: Math.floor(canvas.width/3), h: canvas.height, key: 'axial' },
+        { x: Math.floor(canvas.width/3), y: 0, w: Math.floor(canvas.width/3), h: canvas.height, key: 'sagittal' },
+        { x: Math.floor(2*canvas.width/3), y: 0, w: canvas.width - Math.floor(2*canvas.width/3), h: canvas.height, key: 'coronal' },
+      ];
+      const mx = e.offsetX, my = e.offsetY;
+      const region = regions.find(r=> mx>=r.x && mx<r.x+r.w && my>=r.y && my<r.y+r.h);
+      if (!region) return;
+      // Load current image for region to compute mapping
+      const im = await loadImage(mprImgs[region.key]);
+      const scale = Math.min(region.w / im.width, region.h / im.height);
+      const dw = im.width * scale, dh = im.height * scale;
+      const dx = region.x + (region.w - dw)/2, dy = region.y + (region.h - dh)/2;
+      if (mx < dx || mx > dx+dw || my < dy || my > dy+dh) return;
+      const px = (mx - dx) / scale; // image coordinates
+      const py = (my - dy) / scale;
+      // Query HU from backend
+      const q = new URLSearchParams();
+      q.set('mode','mpr'); q.set('series_id', currentSeries.id); q.set('plane', region.key);
+      q.set('slice', mprScroll[region.key]||0); q.set('x', Math.floor(px)); q.set('y', Math.floor(py));
+      try {
+        const resp = await fetch(`/viewer/api/hu/?${q.toString()}`);
+        const j = await resp.json();
+        if (j && typeof j.hu === 'number'){
+          const base = `MPR | WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}`;
+          document.getElementById('overlay').innerHTML = `${base}<br>${region.key.toUpperCase()} HU: ${j.hu}`;
+        }
+      } catch(e){}
+    });
     viewport.addEventListener('mouseup', async (e)=>{
       if (!isDragging) return; isDragging = false;
       const vp = getViewportPlacement(canvas.width, canvas.height);
@@ -560,6 +624,19 @@
         const d = e.deltaY>0 ? 1 : -1;
         reconIndex = Math.max(0, Math.min(reconImgs.length-1, reconIndex + d));
         await draw();
+        return;
+      }
+      if (mprMode){
+        // Determine which third the cursor is in and scroll that plane
+        const mx = e.offsetX, w = canvas.width; const d = e.deltaY>0 ? 1 : -1;
+        let plane = 'axial';
+        if (mx < Math.floor(w/3)) plane = 'axial';
+        else if (mx < Math.floor(2*w/3)) plane = 'sagittal';
+        else plane = 'coronal';
+        const count = (mprScroll.counts[plane]||1);
+        const cur = (mprScroll[plane]||0);
+        const ni = Math.max(0, Math.min(count-1, cur + d));
+        if (ni !== cur){ mprScroll[plane] = ni; await draw(); }
         return;
       }
       if (e.ctrlKey){ const delta = e.deltaY>0?0.9:1.1; zoom = Math.max(0.1, Math.min(5.0, zoom*delta)); zoomSlider.value = Math.round(zoom*100); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; draw(); }
@@ -612,53 +689,53 @@
         const r = await fetch(url);
         const j = await r.json();
         if (j.error) throw new Error(j.error);
-        if (j.mpr_views){ reconMode = 'mpr'; reconImgs = [j.mpr_views.axial, j.mpr_views.sagittal, j.mpr_views.coronal]; }
+        if (j.mpr_views){ reconMode = 'mpr'; reconImgs = [j.mpr_views.axial, j.mpr_views.sagittal, j.mpr_views.coronal]; mprMode = true; if (j.counts){ mprScroll.counts = j.counts; mprScroll.axial = Math.floor((j.counts.axial||0)/2); mprScroll.sagittal = Math.floor((j.counts.sagittal||0)/2); mprScroll.coronal = Math.floor((j.counts.coronal||0)/2); } }
         if (j.mip_views){ reconMode = 'mip'; reconImgs = [j.mip_views.axial, j.mip_views.sagittal, j.mip_views.coronal]; }
         if (j.bone_views){ reconMode = 'bone'; reconImgs = [j.bone_views.axial || j.bone_views.bone_axial_preview, j.bone_views.sagittal || j.bone_views.bone_sagittal_preview, j.bone_views.coronal || j.bone_views.bone_coronal_preview]; }
         reconImgs = reconImgs.filter(Boolean);
         reconIndex = 0;
         await draw();
-        reconStatus.textContent = 'Done'; setTimeout(()=> reconStatus.textContent = '', 1500);
-      } catch (err){
-        reconStatus.textContent = `Error: ${err.message}`;
-        await fallbackToDesktop();
-      }
-    }
-
-    btnGenerateRecon.addEventListener('click', async ()=>{ await generateReconstruction(); });
-
-    // 3D dropdown interactions
-    btn3D.addEventListener('click', ()=>{
-      menu3D.style.display = (menu3D.style.display === 'flex') ? 'none' : 'flex';
-      if (menu3D.style.display === '' || menu3D.style.display === 'none') menu3D.style.display = 'flex';
-    });
-    menu3D.addEventListener('click', async (e)=>{
-      const btn = e.target.closest('button[data-recon]');
-      if (!btn) return;
-      const kind = btn.getAttribute('data-recon');
-      menu3D.style.display = 'none';
-      await generateReconstruction(kind);
-    });
-    // Close dropdown when clicking outside
-    document.addEventListener('click', (e)=>{
-      if (!menu3D.contains(e.target) && e.target !== btn3D) menu3D.style.display = 'none';
-    });
-
-    // Clear measurements
-    btnClearMeasurements.addEventListener('click', ()=>{
-      measurements = []; imageIdToMeasurements.set(getCurrentImageId(), measurements); renderMeasurementsList(); draw();
-    });
-
-    // Utils
-    function loadImage(src){
-      return new Promise((res, rej)=>{ const im = new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=src; });
-    }
-
-    // Init
-    setCanvasSize();
-    const studyId = q('study_id');
-    if (studyId) loadStudy(studyId);
-  })();
-  </script>
-</body>
-</html>
+                reconStatus.textContent = 'Done'; setTimeout(()=> reconStatus.textContent = '', 1500);
+       } catch (err){
+         reconStatus.textContent = `Error: ${err.message}`;
+         await fallbackToDesktop();
+       }
+     }
+ 
+     btnGenerateRecon.addEventListener('click', async ()=>{ await generateReconstruction(); });
+ 
+     // 3D dropdown interactions
+     btn3D.addEventListener('click', ()=>{
+       menu3D.style.display = (menu3D.style.display === 'flex') ? 'none' : 'flex';
+       if (menu3D.style.display === '' || menu3D.style.display === 'none') menu3D.style.display = 'flex';
+     });
+     menu3D.addEventListener('click', async (e)=>{
+       const btn = e.target.closest('button[data-recon]');
+       if (!btn) return;
+       const kind = btn.getAttribute('data-recon');
+       menu3D.style.display = 'none';
+       await generateReconstruction(kind);
+     });
+     // Close dropdown when clicking outside
+     document.addEventListener('click', (e)=>{
+       if (!menu3D.contains(e.target) && e.target !== btn3D) menu3D.style.display = 'none';
+     });
+ 
+     // Clear measurements
+     btnClearMeasurements.addEventListener('click', ()=>{
+       measurements = []; imageIdToMeasurements.set(getCurrentImageId(), measurements); renderMeasurementsList(); draw();
+     });
+ 
+     // Utils
+     function loadImage(src){
+       return new Promise((res, rej)=>{ const im = new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=src; });
+     }
+ 
+     // Init
+     setCanvasSize();
+     const studyId = q('study_id');
+     if (studyId) loadStudy(studyId);
+   })();
+   </script>
+ </body>
+ </html>

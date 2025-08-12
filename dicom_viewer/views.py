@@ -144,37 +144,38 @@ def api_image_data(request, image_id):
 @login_required
 @csrf_exempt
 def api_mpr_reconstruction(request, series_id):
-    """API endpoint for Multiplanar Reconstruction (MPR)"""
+    """API endpoint for Multiplanar Reconstruction (MPR)
+    - If no plane is provided, returns mid-slice preview images for axial/sagittal/coronal plus counts
+    - If plane is provided (?plane=axial|sagittal|coronal&slice=<idx>), returns that slice image and counts
+    """
     series = get_object_or_404(Series, id=series_id)
     user = request.user
-    
+
     # Check permissions
     if user.is_facility_user() and getattr(user, 'facility', None) and series.study.facility != user.facility:
         return JsonResponse({'error': 'Permission denied'}, status=403)
-    
+
     try:
         # Get all images in the series sorted by slice location
         images = series.images.all().order_by('slice_location', 'instance_number')
-        
+
         if images.count() < 2:
             return JsonResponse({'error': 'Need at least 2 images for MPR'}, status=400)
-        
-        # Read DICOM data
+
+        # Read DICOM data into a 3D volume (depth, height, width)
         volume_data = []
         default_window_width = 400
         default_window_level = 40
-        
+
         for img in images:
             try:
                 dicom_path = os.path.join(settings.MEDIA_ROOT, str(img.file_path))
                 ds = pydicom.dcmread(dicom_path)
-                
-                # Get pixel array and apply rescale slope/intercept
+
                 pixel_array = ds.pixel_array.astype(np.float32)
                 if hasattr(ds, 'RescaleSlope') and hasattr(ds, 'RescaleIntercept'):
                     pixel_array = pixel_array * float(ds.RescaleSlope) + float(ds.RescaleIntercept)
-                
-                # Get default window/level from first image
+
                 if len(volume_data) == 0:
                     default_window_width = getattr(ds, 'WindowWidth', 400)
                     default_window_level = getattr(ds, 'WindowCenter', 40)
@@ -182,52 +183,90 @@ def api_mpr_reconstruction(request, series_id):
                         default_window_width = default_window_width[0]
                     if hasattr(default_window_level, '__iter__') and not isinstance(default_window_level, str):
                         default_window_level = default_window_level[0]
-                
+
                 volume_data.append(pixel_array)
             except Exception:
                 continue
-        
+
         if len(volume_data) < 2:
             return JsonResponse({'error': 'Could not read enough images for MPR'}, status=400)
-        
-        # Stack into 3D volume
+
         volume = np.stack(volume_data, axis=0)
-        
+
         # If very thin stack, interpolate along depth to improve reformat quality
         if volume.shape[0] < 16:
             factor = max(2, int(np.ceil(16 / max(volume.shape[0], 1))))
             volume = ndimage.zoom(volume, (factor, 1, 1), order=1)
-        
-        # Get windowing parameters from request
+
+        # Windowing params
         window_width = float(request.GET.get('window_width', default_window_width))
         window_level = float(request.GET.get('window_level', default_window_level))
         inverted = request.GET.get('inverted', 'false').lower() == 'true'
-        
-        # Generate MPR views
+
+        # Counts per plane
+        counts = {
+            'axial': int(volume.shape[0]),
+            'sagittal': int(volume.shape[2]),
+            'coronal': int(volume.shape[1]),
+        }
+
+        plane = request.GET.get('plane')
+        if plane:
+            plane = plane.lower()
+            if plane not in counts:
+                return JsonResponse({'error': 'Invalid plane'}, status=400)
+            # slice index
+            try:
+                slice_index = int(request.GET.get('slice', counts[plane] // 2))
+            except Exception:
+                slice_index = counts[plane] // 2
+            slice_index = max(0, min(counts[plane] - 1, slice_index))
+
+            # Extract slice
+            if plane == 'axial':
+                slice_array = volume[slice_index, :, :]
+            elif plane == 'sagittal':
+                # YZ plane: (depth, height)
+                slice_array = volume[:, :, slice_index]
+            else:  # coronal
+                # XZ plane: (depth, width)
+                slice_array = volume[:, slice_index, :]
+
+            img_b64 = _array_to_base64_image(slice_array, window_width, window_level, inverted)
+            return JsonResponse({
+                'plane': plane,
+                'index': slice_index,
+                'count': counts[plane],
+                'image': img_b64,
+                'counts': counts,
+                'volume_shape': tuple(int(x) for x in volume.shape),
+                'series_info': {
+                    'id': series.id,
+                    'description': series.series_description,
+                    'modality': series.modality,
+                },
+            })
+
+        # Default: return mid-slice previews for all planes
         mpr_views = {}
-        
-        # Axial (original orientation)
         axial_slice = volume[volume.shape[0] // 2]
-        mpr_views['axial'] = _array_to_base64_image(axial_slice, window_width, window_level, inverted)
-        
-        # Sagittal (YZ plane)
         sagittal_slice = volume[:, :, volume.shape[2] // 2]
-        mpr_views['sagittal'] = _array_to_base64_image(sagittal_slice, window_width, window_level, inverted)
-        
-        # Coronal (XZ plane)
         coronal_slice = volume[:, volume.shape[1] // 2, :]
+        mpr_views['axial'] = _array_to_base64_image(axial_slice, window_width, window_level, inverted)
+        mpr_views['sagittal'] = _array_to_base64_image(sagittal_slice, window_width, window_level, inverted)
         mpr_views['coronal'] = _array_to_base64_image(coronal_slice, window_width, window_level, inverted)
-        
+
         return JsonResponse({
             'mpr_views': mpr_views,
-            'volume_shape': volume.shape,
+            'volume_shape': tuple(int(x) for x in volume.shape),
+            'counts': counts,
             'series_info': {
                 'id': series.id,
                 'description': series.series_description,
                 'modality': series.modality
             }
         })
-        
+
     except Exception as e:
         return JsonResponse({'error': f'Error generating MPR: {str(e)}'}, status=500)
 
@@ -1766,3 +1805,102 @@ def process_mri_reconstruction(job_id):
         job.status = 'failed'
         job.error_message = str(e)
         job.save()
+
+@login_required
+@csrf_exempt
+def api_hu_value(request):
+    """Return Hounsfield Unit at a given pixel.
+    Query params:
+    - mode=series&image_id=<id>&x=<col>&y=<row>
+    - mode=mpr&series_id=<id>&plane=axial|sagittal|coronal&slice=<idx>&x=<col>&y=<row>
+    Coordinates x,y are in pixel indices within the displayed 2D slice (0-based).
+    """
+    user = request.user
+    mode = (request.GET.get('mode') or '').lower()
+
+    try:
+        if mode == 'series':
+            image_id = int(request.GET.get('image_id'))
+            x = int(float(request.GET.get('x')))
+            y = int(float(request.GET.get('y')))
+            image = get_object_or_404(DicomImage, id=image_id)
+            if user.is_facility_user() and getattr(user, 'facility', None) and image.series.study.facility != user.facility:
+                return JsonResponse({'error': 'Permission denied'}, status=403)
+            dicom_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
+            ds = pydicom.dcmread(dicom_path)
+            arr = ds.pixel_array.astype(np.float32)
+            slope = float(getattr(ds, 'RescaleSlope', 1.0))
+            intercept = float(getattr(ds, 'RescaleIntercept', 0.0))
+            arr = arr * slope + intercept
+            h, w = arr.shape[:2]
+            if x < 0 or y < 0 or x >= w or y >= h:
+                return JsonResponse({'error': 'Out of bounds'}, status=400)
+            hu = float(arr[y, x])
+            return JsonResponse({'mode': 'series', 'image_id': image_id, 'x': x, 'y': y, 'hu': round(hu, 2)})
+
+        elif mode == 'mpr':
+            series_id = int(request.GET.get('series_id'))
+            plane = (request.GET.get('plane') or '').lower()
+            slice_index = int(float(request.GET.get('slice', '0')))
+            x = int(float(request.GET.get('x')))
+            y = int(float(request.GET.get('y')))
+            series = get_object_or_404(Series, id=series_id)
+            if user.is_facility_user() and getattr(user, 'facility', None) and series.study.facility != user.facility:
+                return JsonResponse({'error': 'Permission denied'}, status=403)
+            images = series.images.all().order_by('slice_location', 'instance_number')
+            if images.count() < 2:
+                return JsonResponse({'error': 'Need at least 2 images for MPR'}, status=400)
+            volume_data = []
+            for img in images:
+                try:
+                    dicom_path = os.path.join(settings.MEDIA_ROOT, str(img.file_path))
+                    ds = pydicom.dcmread(dicom_path)
+                    a = ds.pixel_array.astype(np.float32)
+                    slope = float(getattr(ds, 'RescaleSlope', 1.0))
+                    intercept = float(getattr(ds, 'RescaleIntercept', 0.0))
+                    a = a * slope + intercept
+                    volume_data.append(a)
+                except Exception:
+                    continue
+            if len(volume_data) < 2:
+                return JsonResponse({'error': 'Could not read enough images for MPR'}, status=400)
+            volume = np.stack(volume_data, axis=0)
+            if volume.shape[0] < 16:
+                factor = max(2, int(np.ceil(16 / max(volume.shape[0], 1))))
+                volume = ndimage.zoom(volume, (factor, 1, 1), order=1)
+            counts = {
+                'axial': int(volume.shape[0]),
+                'sagittal': int(volume.shape[2]),
+                'coronal': int(volume.shape[1]),
+            }
+            if plane not in counts:
+                return JsonResponse({'error': 'Invalid plane'}, status=400)
+            slice_index = max(0, min(counts[plane] - 1, slice_index))
+            # Map x,y (col,row) from 2D plane to volume indices
+            if plane == 'axial':
+                h, w = volume.shape[1], volume.shape[2]
+                if x < 0 or y < 0 or x >= w or y >= h:
+                    return JsonResponse({'error': 'Out of bounds'}, status=400)
+                hu = float(volume[slice_index, int(y), int(x)])
+            elif plane == 'sagittal':
+                # slice = volume[:, :, slice_index] shape (depth, height)
+                h, w = volume.shape[0], volume.shape[1]
+                if x < 0 or y < 0 or x >= w or y >= h:
+                    return JsonResponse({'error': 'Out of bounds'}, status=400)
+                z = int(y)
+                y_idx = int(x)
+                hu = float(volume[z, y_idx, slice_index])
+            else:  # coronal
+                # slice = volume[:, slice_index, :] shape (depth, width)
+                h, w = volume.shape[0], volume.shape[2]
+                if x < 0 or y < 0 or x >= w or y >= h:
+                    return JsonResponse({'error': 'Out of bounds'}, status=400)
+                z = int(y)
+                x_idx = int(x)
+                hu = float(volume[z, slice_index, x_idx])
+            return JsonResponse({'mode': 'mpr', 'series_id': series_id, 'plane': plane, 'slice': slice_index, 'x': x, 'y': y, 'hu': round(hu, 2)})
+
+        else:
+            return JsonResponse({'error': 'Invalid mode'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': f'Failed to compute HU: {str(e)}'}, status=500)
