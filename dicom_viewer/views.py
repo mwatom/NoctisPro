@@ -606,43 +606,54 @@ def api_dicom_image_display(request, image_id):
     if user.is_facility_user() and getattr(user, 'facility', None) and image.series.study.facility != user.facility:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
+    # Always attempt to return a response (avoid 500 for robustness)
+    warnings = {}
     try:
         # Get windowing parameters from request
-        window_width = request.GET.get('window_width')
-        window_level = request.GET.get('window_level')
+        window_width_param = request.GET.get('window_width')
+        window_level_param = request.GET.get('window_level')
         inverted = request.GET.get('inverted', 'false').lower() == 'true'
 
-        # Read DICOM file
-        dicom_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
-        ds = pydicom.dcmread(dicom_path, stop_before_pixels=False)
+        # Read DICOM file (best-effort)
+        ds = None
+        try:
+            dicom_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
+            ds = pydicom.dcmread(dicom_path, stop_before_pixels=False)
+        except Exception as e:
+            warnings['dicom_read_error'] = str(e)
 
         pixel_array = None
         pixel_decode_error = None
-        try:
-            pixel_array = ds.pixel_array
+        if ds is not None:
             try:
-                modality = str(getattr(ds, 'Modality', '')).upper()
-                if modality in ['DX','CR','XA','RF','MG']:
-                    pixel_array = apply_voi_lut(pixel_array, ds)
-            except Exception:
-                pass
-            pixel_array = pixel_array.astype(np.float32)
-        except Exception as e:
-            # Fallback for compressed DICOMs without pixel handler: try SimpleITK
-            try:
-                import SimpleITK as sitk
-                sitk_image = sitk.ReadImage(dicom_path)
-                pixel_array = sitk.GetArrayFromImage(sitk_image)
-                if pixel_array.ndim == 3 and pixel_array.shape[0] == 1:
-                    pixel_array = pixel_array[0]
+                pixel_array = ds.pixel_array
+                try:
+                    modality = str(getattr(ds, 'Modality', '')).upper()
+                    if modality in ['DX','CR','XA','RF','MG']:
+                        pixel_array = apply_voi_lut(pixel_array, ds)
+                except Exception:
+                    pass
                 pixel_array = pixel_array.astype(np.float32)
-            except Exception as _e:
-                pixel_decode_error = str(_e)
-                pixel_array = None
+            except Exception as e:
+                # Fallback for compressed DICOMs without pixel handler: try SimpleITK
+                try:
+                    import SimpleITK as sitk
+                    dicom_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
+                    sitk_image = sitk.ReadImage(dicom_path)
+                    pixel_array = sitk.GetArrayFromImage(sitk_image)
+                    if pixel_array.ndim == 3 and pixel_array.shape[0] == 1:
+                        pixel_array = pixel_array[0]
+                    pixel_array = pixel_array.astype(np.float32)
+                except Exception as _e:
+                    pixel_decode_error = str(_e)
+                    pixel_array = None
         
         # Apply rescale slope/intercept
-        if pixel_array is not None and hasattr(ds, 'RescaleSlope') and hasattr(ds, 'RescaleIntercept'):
-            pixel_array = pixel_array * float(ds.RescaleSlope) + float(ds.RescaleIntercept)
+        if pixel_array is not None and ds is not None and hasattr(ds, 'RescaleSlope') and hasattr(ds, 'RescaleIntercept'):
+            try:
+                pixel_array = pixel_array * float(ds.RescaleSlope) + float(ds.RescaleIntercept)
+            except Exception:
+                pass
         
         # Derive sensible defaults
         def derive_window(arr, fallback=(400.0, 40.0)):
@@ -658,78 +669,119 @@ def api_dicom_image_display(request, image_id):
             wl = (p99 + p1) / 2.0
             return ww, wl
         
-        default_window_width = getattr(ds, 'WindowWidth', None)
-        default_window_level = getattr(ds, 'WindowCenter', None)
-        if hasattr(default_window_width, '__iter__') and not isinstance(default_window_width, str):
-            default_window_width = default_window_width[0]
-        if hasattr(default_window_level, '__iter__') and not isinstance(default_window_level, str):
-            default_window_level = default_window_level[0]
+        default_window_width = None
+        default_window_level = None
+        if ds is not None:
+            default_window_width = getattr(ds, 'WindowWidth', None)
+            default_window_level = getattr(ds, 'WindowCenter', None)
+            if hasattr(default_window_width, '__iter__') and not isinstance(default_window_width, str):
+                default_window_width = default_window_width[0]
+            if hasattr(default_window_level, '__iter__') and not isinstance(default_window_level, str):
+                default_window_level = default_window_level[0]
         if default_window_width is None or default_window_level is None:
             dw, dl = derive_window(pixel_array)
             default_window_width = default_window_width or dw
             default_window_level = default_window_level or dl
         
         # CR/DX defaults and MONOCHROME1 auto-invert
-        modality = getattr(ds, 'Modality', '')
-        photo = str(getattr(ds, 'PhotometricInterpretation', '')).upper()
+        modality = getattr(ds, 'Modality', '') if ds is not None else (image.series.modality or '')
+        photo = str(getattr(ds, 'PhotometricInterpretation', '')).upper() if ds is not None else ''
         default_inverted = False
-        if modality in ['DX','CR','XA','RF']:
+        if str(modality).upper() in ['DX','CR','XA','RF']:
             default_window_width = float(default_window_width) if default_window_width is not None else 3000.0
             default_window_level = float(default_window_level) if default_window_level is not None else 1500.0
             default_inverted = (photo == 'MONOCHROME1')
         
         # Overwrite request params only if not provided
         try:
-            if window_width is None:
+            if window_width_param is None:
                 window_width = float(default_window_width)
             else:
-                window_width = float(window_width)
-            if window_level is None:
+                window_width = float(window_width_param)
+            if window_level_param is None:
                 window_level = float(default_window_level)
             else:
-                window_level = float(window_level)
+                window_level = float(window_level_param)
             if request.GET.get('inverted') is None:
                 inverted = bool(default_inverted)
         except Exception:
-            # Fall back to defaults on parse errors
             window_width = float(default_window_width)
             window_level = float(default_window_level)
         
         # Generate image if pixels are available
         image_data_url = None
         if pixel_array is not None:
-            image_data_url = _array_to_base64_image(pixel_array, window_width, window_level, inverted)
+            try:
+                image_data_url = _array_to_base64_image(pixel_array, window_width, window_level, inverted)
+            except Exception as e:
+                warnings['render_error'] = str(e)
+                image_data_url = None
         
-        # Build response, even if image_data_url is None
-        return JsonResponse({
+        # Build image_info from ds if possible, otherwise from model/series
+        def safe_float(v, fallback):
+            try:
+                return float(v)
+            except Exception:
+                return fallback
+        
+        image_info = {
+            'id': image.id,
+            'instance_number': getattr(image, 'instance_number', None),
+            'slice_location': getattr(image, 'slice_location', None),
+            'dimensions': [int(getattr(ds, 'Rows', 0) or 0), int(getattr(ds, 'Columns', 0) or 0)] if ds is not None else [0, 0],
+            'pixel_spacing': getattr(ds, 'PixelSpacing', [1.0, 1.0]) if ds is not None else (image.series.pixel_spacing or [1.0, 1.0]),
+            'slice_thickness': getattr(ds, 'SliceThickness', 1.0) if ds is not None else safe_float(getattr(image.series, 'slice_thickness', 1.0), 1.0),
+            'default_window_width': float(default_window_width) if default_window_width is not None else 400.0,
+            'default_window_level': float(default_window_level) if default_window_level is not None else 40.0,
+            'modality': getattr(ds, 'Modality', '') if ds is not None else (image.series.modality or ''),
+            'series_description': getattr(ds, 'SeriesDescription', '') if ds is not None else getattr(image.series, 'series_description', ''),
+            'patient_name': str(getattr(ds, 'PatientName', '')) if ds is not None else (getattr(image.series.study.patient, 'full_name', '') if hasattr(image.series.study, 'patient') else ''),
+            'study_date': str(getattr(ds, 'StudyDate', '')) if ds is not None else (getattr(image.series.study, 'study_date', '') or ''),
+            'bits_allocated': getattr(ds, 'BitsAllocated', 16) if ds is not None else 16,
+            'bits_stored': getattr(ds, 'BitsStored', 16) if ds is not None else 16,
+            'photometric_interpretation': getattr(ds, 'PhotometricInterpretation', '') if ds is not None else '',
+        }
+        
+        payload = {
             'image_data': image_data_url,
-            'image_info': {
-                'id': image.id,
-                'instance_number': image.instance_number,
-                'slice_location': image.slice_location,
-                'dimensions': [int(getattr(ds, 'Rows', 0) or 0), int(getattr(ds, 'Columns', 0) or 0)],
-                'pixel_spacing': getattr(ds, 'PixelSpacing', [1.0, 1.0]),
-                'slice_thickness': getattr(ds, 'SliceThickness', 1.0),
-                'default_window_width': float(default_window_width) if default_window_width is not None else 400.0,
-                'default_window_level': float(default_window_level) if default_window_level is not None else 40.0,
-                'modality': getattr(ds, 'Modality', ''),
-                'series_description': getattr(ds, 'SeriesDescription', ''),
-                'patient_name': str(getattr(ds, 'PatientName', '')),
-                'study_date': str(getattr(ds, 'StudyDate', '')),
-                'bits_allocated': getattr(ds, 'BitsAllocated', 16),
-                'bits_stored': getattr(ds, 'BitsStored', 16),
-                'photometric_interpretation': getattr(ds, 'PhotometricInterpretation', ''),
-            },
+            'image_info': image_info,
             'windowing': {
                 'window_width': window_width,
                 'window_level': window_level,
                 'inverted': inverted
             },
-            'warnings': ({'pixel_decode_error': pixel_decode_error} if pixel_decode_error else None)
-        })
-        
+            'warnings': ({'pixel_decode_error': pixel_decode_error, **warnings} if (pixel_decode_error or warnings) else None)
+        }
+        return JsonResponse(payload)
     except Exception as e:
-        return JsonResponse({'error': f'Error processing DICOM image: {str(e)}'}, status=500)
+        # Last-resort: never 500; return minimal defaults
+        minimal = {
+            'image_data': None,
+            'image_info': {
+                'id': image.id,
+                'instance_number': getattr(image, 'instance_number', None),
+                'slice_location': getattr(image, 'slice_location', None),
+                'dimensions': [0, 0],
+                'pixel_spacing': [1.0, 1.0],
+                'slice_thickness': 1.0,
+                'default_window_width': 400.0,
+                'default_window_level': 40.0,
+                'modality': image.series.modality if hasattr(image.series, 'modality') else '',
+                'series_description': getattr(image.series, 'series_description', ''),
+                'patient_name': getattr(image.series.study.patient, 'full_name', '') if hasattr(image.series.study, 'patient') else '',
+                'study_date': str(getattr(image.series.study, 'study_date', '')),
+                'bits_allocated': 16,
+                'bits_stored': 16,
+                'photometric_interpretation': ''
+            },
+            'windowing': {
+                'window_width': 400.0,
+                'window_level': 40.0,
+                'inverted': False
+            },
+            'warnings': {'fatal_error': str(e), **warnings}
+        }
+        return JsonResponse(minimal)  # 200 OK to avoid frontend failure
 
 @login_required
 @csrf_exempt
