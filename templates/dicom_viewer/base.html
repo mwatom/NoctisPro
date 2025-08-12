@@ -92,7 +92,7 @@
     </div>
     <div class="topbar">
       <button id="btnLoadLocal" class="btn btn-primary"><i class="fas fa-folder-open"></i> Load Local DICOM</button>
-      <button id="btnBackWorklist" class="btn" onclick="window.location.href='{% url 'worklist:dashboard' %}'"><i class="fas fa-arrow-left"></i> Back to Worklist</button>
+      <button id="btnBackWorklist" class="btn" onclick="returnToWorklist(event)"><i class="fas fa-arrow-left"></i> Back to Worklist</button>
       {% if user.is_authenticated and user.can_edit_reports %}
       <button id="btnWriteReport" class="btn btn-primary" style="display:none"><i class="fas fa-file-signature"></i> Write Report</button>
       {% endif %}
@@ -1301,7 +1301,7 @@
         let url = '';
         const type = kind || reconType.value;
         if (type === 'mpr') url = `/viewer/api/series/${currentSeries.id}/mpr/?${params.toString()}`;
-        else if (type === 'mip') url = `/viewer/api/series/${currentSeries.id}/mip/?${params.toString()}`;
+        else if (type === 'mip') url = `/viewer/api/series/${currentSeries.id}/mip/?quality=high&${params.toString()}`;
         else { url = `/viewer/api/series/${currentSeries.id}/bone/?threshold=${boneSlider.value}&mesh=true&quality=high`; }
         const r = await fetch(url);
         const j = await r.json();
@@ -1319,7 +1319,24 @@
        }
      }
  
-     btnGenerateRecon.addEventListener('click', ()=>{ generateReconstruction(); });
+           btnGenerateRecon.addEventListener('click', ()=>{ generateReconstruction(); });
+
+      // Worklist navigation that prefers returning to the original/mother worklist window
+      function returnToWorklist(e){
+        try {
+          const targetUrl = '{% url 'worklist:dashboard' %}';
+          if (window.opener && !window.opener.closed) {
+            try { window.opener.location.href = targetUrl; } catch(err) {}
+            window.close();
+            return false;
+          }
+          if (window.top && window.top !== window){
+            try { window.top.location.href = targetUrl; return false; } catch(err) {}
+          }
+          window.location.href = targetUrl;
+          return false;
+        } catch(_) { window.location.href = '{% url 'worklist:dashboard' %}'; return false; }
+      }
 
     // Preload MPR mid-slices after series load to avoid UI stall on first click
     function warmupMpr(){
