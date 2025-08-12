@@ -782,6 +782,27 @@
         }
 
         // Render studies table
+        function openReport(studyId){ window.location.href = `/reports/write/${studyId}/`; }
+        function printStudy(studyId){ window.open(`/reports/print/${studyId}/`, '_blank'); }
+
+        // Inject quick print button for facility users
+        document.addEventListener('DOMContentLoaded', function(){
+            {% if user.is_facility_user %}
+            const navTabs = document.querySelector('.nav-tabs');
+            if (navTabs && !document.getElementById('quickPrintBtn')){
+                const btn = document.createElement('div');
+                btn.id = 'quickPrintBtn';
+                btn.className = 'nav-tab';
+                btn.innerHTML = '<i class="fas fa-print"></i> PRINT SELECTED';
+                btn.addEventListener('click', function(){
+                    const sel = document.querySelector('.data-table tbody tr[style*="rgba(0, 212, 255, 0.15)"]');
+                    if (sel){ const id = sel.getAttribute('data-study-id'); if (id){ window.open(`/reports/print/${id}/`, '_blank'); } }
+                });
+                navTabs.appendChild(btn);
+            }
+            {% endif %}
+        });
+
         function renderStudiesTable() {
             const tbody = document.getElementById('studiesTableBody');
             const noDataRow = document.getElementById('noDataRow');
@@ -819,7 +840,7 @@
                         <td><span class="status-badge status-${study.status}">
                             ${getStatusIcon(study.status)}${study.status.toUpperCase().replace('_', ' ')}
                         </span></td>
-                        <td class="priority-${study.priority}">${study.priority.toUpperCase()}</td>
+                        <td class="priority-${study.priority}" title="${(study.clinical_info||'').replace(/"/g,'&quot;')}">${study.priority.toUpperCase()}</td>
                         <td class="timestamp">${scheduledTime}</td>
                         <td title="${seriesCount} series, ${imageCount} images">
                             ${imageCount} <small style="color: var(--text-secondary);">(${seriesCount}s)</small>
@@ -828,9 +849,11 @@
                         <td title="Uploaded: ${uploadTime} by ${study.uploaded_by || 'Unknown'}">${study.uploaded_by || '-'}</td>
                         <td>
                             <div class="viewer-buttons">
-                                <button class="btn-viewer" onclick="openStudyInViewer('${study.id}')" title="Open study in DICOM viewer">
+                                <button class="btn-viewer" onclick="openStudyInViewer('${study.id}'); event.stopPropagation();" title="Open study in DICOM viewer">
                                     <i class="fas fa-eye"></i> VIEW
                                 </button>
+                                ${(['admin','radiologist'].includes('{{ user.role }}')) ? `<button class=\"btn-viewer\" style=\"margin-left:6px\" onclick=\"openReport('${study.id}'); event.stopPropagation();\" title=\"Write/Edit report\"><i class=\"fas fa-file-signature\"></i> REPORT</button>` : ''}
+                                ${('{{ user.role }}' === 'facility') ? `<button class=\"btn-viewer\" style=\"margin-left:6px\" onclick=\"printStudy('${study.id}'); event.stopPropagation();\" title=\"Print\"><i class=\"fas fa-print\"></i> PRINT</button>` : ''}
                                 ${isRecentUpload ? '<span style="color: var(--success-color); font-size: 10px; margin-left: 4px;">NEW</span>' : ''}
                             </div>
                         </td>

@@ -235,7 +235,8 @@ def upload_study(request):
                         'study_date': sdt,
                         'referring_physician': referring_physician,
                         'status': 'scheduled',
-                        'priority': 'normal',
+                        'priority': request.POST.get('priority', 'normal'),
+                        'clinical_info': request.POST.get('clinical_info', ''),
                         'uploaded_by': request.user,
                     }
                 )
@@ -271,6 +272,19 @@ def upload_study(request):
                             'image_orientation': image_orientation,
                         }
                     )
+                    # If study existed, update clinical info/priority once
+                    if not created:
+                        updated = False
+                        new_priority = request.POST.get('priority')
+                        new_clin = request.POST.get('clinical_info')
+                        if new_priority and study.priority != new_priority:
+                            study.priority = new_priority
+                            updated = True
+                        if new_clin is not None and new_clin != '' and study.clinical_info != new_clin:
+                            study.clinical_info = new_clin
+                            updated = True
+                        if updated:
+                            study.save(update_fields=['priority','clinical_info'])
                     
                     # Enhanced image processing with better error handling
                     for ds, fobj in items:
@@ -396,6 +410,7 @@ def api_studies(request):
             'image_count': study.get_image_count(),
             'series_count': study.get_series_count(),
             'study_description': study.study_description,
+            'clinical_info': study.clinical_info,
             'uploaded_by': study.uploaded_by.get_full_name() if study.uploaded_by else 'Unknown',
         })
     

@@ -106,6 +106,8 @@
         <div id="spacingInfo" style="color:#ccc;font-size:12px;">Pixel Spacing: -</div>
         <div id="seriesInfo" style="color:#ccc;font-size:12px;">Series: -</div>
         <div id="institutionInfo" style="color:#ccc;font-size:12px;">Institution: -</div>
+        <div id="clinicalInfo" style="color:#ccc;font-size:12px; margin-top:8px; white-space:pre-wrap;">Clinical Info: -</div>
+        <div id="priorityInfo" style="color:#ccc;font-size:12px;">Priority: -</div>
       </div>
       <div class="panel">
         <h3>Measurements</h3>
@@ -207,6 +209,10 @@
         const data = await r.json();
         currentStudy = data.study;
         document.getElementById('patientInfo').textContent = `Patient: ${currentStudy.patient_name} | Study Date: ${currentStudy.study_date} | Modality: ${currentStudy.modality}`;
+        // Show clinical info and priority
+        const clin = (currentStudy.clinical_info && currentStudy.clinical_info.trim()) ? currentStudy.clinical_info : '-';
+        document.getElementById('clinicalInfo').textContent = `Clinical Info: ${clin}`;
+        document.getElementById('priorityInfo').textContent = `Priority: ${currentStudy.priority ? currentStudy.priority.toUpperCase() : '-'}`;
         seriesSelect.innerHTML = '<option value="">Select Series</option>';
         (data.series_list || []).forEach(s=>{
           const opt = document.createElement('option');
@@ -229,10 +235,20 @@
         const data = await r.json();
         currentSeries = data.series; images = data.images || []; index = 0;
         sliceSlider.max = Math.max(0, images.length - 1); sliceSlider.value = 0; document.getElementById('sliceVal').textContent = '1';
-        if (images.length){
-          ww = data.images[0].window_width || ww; wl = data.images[0].window_center || wl;
-          wwSlider.value = ww; wlSlider.value = wl; document.getElementById('wwVal').textContent = ww; document.getElementById('wlVal').textContent = wl;
-        }
+                 if (images.length){
+           // Attempt to fetch first image with defaults to derive ww/wl from backend
+           const probe = await fetch(`/viewer/image/${images[0].id}/`);
+           if (probe.ok){
+             const j = await probe.json();
+             if (j && j.image_info){
+               ww = j.image_info.default_window_width || ww;
+               wl = j.image_info.default_window_level || wl;
+               // Apply inversion suggestion only on first load
+               if (j.windowing && typeof j.windowing.inverted === 'boolean') { inverted = j.windowing.inverted; }
+             }
+           }
+           wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl);
+         }
         // Reset view state
         zoom = 1.0; panOffset = {x:0,y:0}; activeTool = 'window'; inverted = false; crosshair = false;
         document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active'));
