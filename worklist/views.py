@@ -117,7 +117,7 @@ def study_detail(request, study_id):
 
 @login_required
 def upload_study(request):
-    """Upload new studies"""
+    """Upload new studies with enhanced folder support for CT/MRI modalities"""
     if request.method == 'POST':
         try:
             uploaded_files = request.FILES.getlist('dicom_files')
@@ -125,23 +125,33 @@ def upload_study(request):
             if not uploaded_files:
                 return JsonResponse({'success': False, 'error': 'No files uploaded'})
             
-            # Group incoming files by StudyInstanceUID then SeriesInstanceUID
+            # Enhanced grouping with better series detection for CT/MRI
             studies_map = {}
             invalid_files = 0
             processed_files = 0
             total_files = len(uploaded_files)
+            
+            # Process files with enhanced DICOM metadata extraction
             for in_file in uploaded_files:
                 try:
                     # Read dataset without saving to disk first
                     ds = pydicom.dcmread(in_file, force=True)
+                    
+                    # Enhanced metadata extraction for CT/MRI
                     study_uid = getattr(ds, 'StudyInstanceUID', None)
                     series_uid = getattr(ds, 'SeriesInstanceUID', None)
                     sop_uid = getattr(ds, 'SOPInstanceUID', None)
+                    modality = getattr(ds, 'Modality', 'OT')
+                    
                     if not (study_uid and series_uid and sop_uid):
                         invalid_files += 1
                         continue
-                    studies_map.setdefault(study_uid, {}).setdefault(series_uid, []).append((ds, in_file))
-                except Exception:
+                    
+                    # Enhanced series grouping for CT/MRI with multiple series
+                    series_key = f"{series_uid}_{modality}"
+                    studies_map.setdefault(study_uid, {}).setdefault(series_key, []).append((ds, in_file))
+                    
+                except Exception as e:
                     invalid_files += 1
                     continue
             
@@ -149,12 +159,14 @@ def upload_study(request):
                 return JsonResponse({'success': False, 'error': 'No valid DICOM files found'})
             
             created_studies = []
+            total_series_processed = 0
+            
             for study_uid, series_map in studies_map.items():
                 # Extract representative dataset
                 first_series_key = next(iter(series_map))
                 rep_ds = series_map[first_series_key][0][0]
                 
-                # Patient info
+                # Enhanced patient info extraction
                 patient_id = getattr(rep_ds, 'PatientID', 'UNKNOWN')
                 patient_name = str(getattr(rep_ds, 'PatientName', 'UNKNOWN')).replace('^', ' ')
                 name_parts = patient_name.split(' ', 1)
@@ -178,7 +190,7 @@ def upload_study(request):
                     defaults={'first_name': first_name, 'last_name': last_name, 'date_of_birth': dob, 'gender': gender}
                 )
                 
-                # Modality and basic study fields
+                # Enhanced modality and study fields
                 modality_code = getattr(rep_ds, 'Modality', 'OT')
                 modality, _ = Modality.objects.get_or_create(code=modality_code, defaults={'name': modality_code})
                 study_description = getattr(rep_ds, 'StudyDescription', 'DICOM Study')
@@ -216,15 +228,23 @@ def upload_study(request):
                     }
                 )
                 
-                # Create series and images
-                for series_uid, items in series_map.items():
-                    # Rep dataset for series
+                # Enhanced series creation with better CT/MRI support
+                for series_key, items in series_map.items():
+                    # Parse series key to get series_uid and modality
+                    series_uid = series_key.split('_')[0]
+                    
+                    # Representative dataset for series
                     ds0 = items[0][0]
                     series_number = getattr(ds0, 'SeriesNumber', 1) or 1
                     series_desc = getattr(ds0, 'SeriesDescription', f'Series {series_number}')
                     slice_thickness = getattr(ds0, 'SliceThickness', None)
                     pixel_spacing = str(getattr(ds0, 'PixelSpacing', ''))
                     image_orientation = str(getattr(ds0, 'ImageOrientationPatient', ''))
+                    
+                    # Enhanced series metadata for CT/MRI
+                    body_part = getattr(ds0, 'BodyPartExamined', '')
+                    protocol_name = getattr(ds0, 'ProtocolName', '')
+                    contrast_bolus_agent = getattr(ds0, 'ContrastBolusAgent', '')
                     
                     series, _ = Series.objects.get_or_create(
                         series_instance_uid=series_uid,
@@ -233,40 +253,53 @@ def upload_study(request):
                             'series_number': int(series_number),
                             'series_description': series_desc,
                             'modality': modality_code,
-                            'body_part': getattr(ds0, 'BodyPartExamined', ''),
+                            'body_part': body_part,
                             'slice_thickness': slice_thickness if slice_thickness is not None else None,
                             'pixel_spacing': pixel_spacing,
                             'image_orientation': image_orientation,
                         }
                     )
                     
-                    # Save each file to storage and register image
+                    # Enhanced image processing with better error handling
                     for ds, fobj in items:
                         try:
                             sop_uid = getattr(ds, 'SOPInstanceUID')
                             instance_number = getattr(ds, 'InstanceNumber', 1) or 1
+                            
+                            # Enhanced file path structure for better organization
                             rel_path = f"dicom/images/{study_uid}/{series_uid}/{sop_uid}.dcm"
+                            
                             # Ensure we read from start
                             fobj.seek(0)
                             saved_path = default_storage.save(rel_path, ContentFile(fobj.read()))
+                            
+                            # Enhanced image metadata
+                            image_position = str(getattr(ds, 'ImagePositionPatient', ''))
+                            slice_location = getattr(ds, 'SliceLocation', None)
+                            window_center = getattr(ds, 'WindowCenter', None)
+                            window_width = getattr(ds, 'WindowWidth', None)
+                            
                             DicomImage.objects.get_or_create(
                                 sop_instance_uid=sop_uid,
                                 defaults={
                                     'series': series,
                                     'instance_number': int(instance_number),
-                                    'image_position': str(getattr(ds, 'ImagePositionPatient', '')),
-                                    'slice_location': getattr(ds, 'SliceLocation', None),
+                                    'image_position': image_position,
+                                    'slice_location': slice_location,
                                     'file_path': saved_path,
                                     'file_size': getattr(fobj, 'size', 0) or 0,
                                     'processed': False,
                                 }
                             )
                             processed_files += 1
-                        except Exception:
+                        except Exception as e:
                             continue
+                    
+                    total_series_processed += 1
+                
                 created_studies.append(study.id)
                 
-                # Create notifications for new study upload
+                # Enhanced notifications for new study upload
                 try:
                     notif_type, _ = NotificationType.objects.get_or_create(
                         code='new_study', defaults={'name': 'New Study Uploaded', 'description': 'A new study has been uploaded', 'is_system': True}
@@ -278,22 +311,24 @@ def upload_study(request):
                             recipient=recipient,
                             sender=request.user,
                             title=f"New {modality_code} study for {patient.full_name}",
-                            message=f"Study {accession_number} uploaded from {facility.name}",
+                            message=f"Study {accession_number} uploaded from {facility.name} with {total_series_processed} series",
                             priority='normal',
                             study=study,
                             facility=facility,
-                            data={'study_id': study.id, 'accession_number': accession_number}
+                            data={'study_id': study.id, 'accession_number': accession_number, 'series_count': total_series_processed}
                         )
                 except Exception:
                     pass
             
             return JsonResponse({
                 'success': True,
-                'message': f'Uploaded {sum(len(v) for s in studies_map.values() for v in s.values()) - invalid_files} DICOM file(s) across {len(created_studies)} study(ies)',
+                'message': f'Successfully uploaded {processed_files} DICOM files across {len(created_studies)} study(ies) with {total_series_processed} series',
                 'created_study_ids': created_studies,
                 'invalid_files': invalid_files,
                 'processed_files': processed_files,
                 'total_files': total_files,
+                'total_series': total_series_processed,
+                'studies_created': len(created_studies),
             })
             
         except Exception as e:
@@ -753,6 +788,81 @@ def api_delete_study(request, study_id):
         
     except Exception as e:
         return JsonResponse({'error': f'Failed to delete study: {str(e)}'}, status=500)
+
+@login_required
+def api_refresh_worklist(request):
+    """API endpoint to refresh worklist and get latest studies"""
+    user = request.user
+    
+    # Get recent studies (last 24 hours)
+    from datetime import timedelta
+    recent_cutoff = timezone.now() - timedelta(hours=24)
+    
+    if user.is_facility_user():
+        studies = Study.objects.filter(facility=user.facility, upload_date__gte=recent_cutoff)
+    else:
+        studies = Study.objects.filter(upload_date__gte=recent_cutoff)
+    
+    studies_data = []
+    for study in studies.order_by('-upload_date')[:20]:  # Last 20 uploaded studies
+        studies_data.append({
+            'id': study.id,
+            'accession_number': study.accession_number,
+            'patient_name': study.patient.full_name,
+            'patient_id': study.patient.patient_id,
+            'modality': study.modality.code,
+            'status': study.status,
+            'priority': study.priority,
+            'study_date': study.study_date.isoformat(),
+            'upload_date': study.upload_date.isoformat(),
+            'facility': study.facility.name,
+            'series_count': study.get_series_count(),
+            'image_count': study.get_image_count(),
+            'uploaded_by': study.uploaded_by.get_full_name() if study.uploaded_by else 'Unknown',
+            'study_description': study.study_description,
+        })
+    
+    return JsonResponse({
+        'success': True, 
+        'studies': studies_data,
+        'total_recent': len(studies_data),
+        'refresh_time': timezone.now().isoformat()
+    })
+
+@login_required
+def api_get_upload_stats(request):
+    """API endpoint to get upload statistics"""
+    user = request.user
+    
+    # Get upload statistics for the last 7 days
+    from datetime import timedelta
+    week_ago = timezone.now() - timedelta(days=7)
+    
+    if user.is_facility_user():
+        recent_studies = Study.objects.filter(facility=user.facility, upload_date__gte=week_ago)
+    else:
+        recent_studies = Study.objects.filter(upload_date__gte=week_ago)
+    
+    total_studies = recent_studies.count()
+    total_series = sum(study.get_series_count() for study in recent_studies)
+    total_images = sum(study.get_image_count() for study in recent_studies)
+    
+    # Group by modality
+    modality_stats = {}
+    for study in recent_studies:
+        modality = study.modality.code
+        modality_stats[modality] = modality_stats.get(modality, 0) + 1
+    
+    return JsonResponse({
+        'success': True,
+        'stats': {
+            'total_studies': total_studies,
+            'total_series': total_series,
+            'total_images': total_images,
+            'modality_breakdown': modality_stats,
+            'period': '7 days'
+        }
+    })
 
 def process_attachment_metadata(attachment):
     """Extract metadata from uploaded attachment"""

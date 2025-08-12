@@ -15,7 +15,7 @@
         border: 1px solid var(--border-color);
         border-radius: 16px;
         padding: 2rem;
-        max-width: 800px;
+        max-width: 900px;
         margin: 0 auto;
         box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
     }
@@ -40,6 +40,73 @@
     .file-size { color: var(--text-secondary); font-size: 0.9rem; }
     .remove-file { background: var(--danger-color); border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: white; cursor: pointer; transition: all 0.3s ease; }
     .remove-file:hover { background: #dc2626; transform: scale(1.1); }
+
+    .upload-stats {
+        background: rgba(0, 212, 255, 0.1);
+        border: 1px solid var(--accent-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1rem;
+        display: none;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .stat-item {
+        text-align: center;
+        padding: 0.5rem;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 6px;
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: var(--accent-color);
+    }
+
+    .stat-label {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        margin-top: 0.25rem;
+    }
+
+    .folder-info {
+        background: rgba(255, 170, 0, 0.1);
+        border: 1px solid var(--warning-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1rem;
+        display: none;
+    }
+
+    .series-preview {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1rem;
+        max-height: 200px;
+        overflow-y: auto;
+        display: none;
+    }
+
+    .series-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .series-item:last-child {
+        border-bottom: none;
+    }
 </style>
 {% endblock %}
 
@@ -51,7 +118,7 @@
                 <i class="fas fa-cloud-upload-alt"></i>
             </div>
             <h2 class="text-light">Upload DICOM Studies</h2>
-            <p class="text-secondary">Upload individual DICOM files or select a folder containing an entire study</p>
+            <p class="text-secondary">Upload individual DICOM files or entire folders containing CT/MRI studies with multiple series</p>
         </div>
 
         <form id="uploadForm" enctype="multipart/form-data">
@@ -59,7 +126,7 @@
             <div class="drop-zone" id="dropZone">
                 <i class="fas fa-file-medical text-accent" style="font-size: 3rem; margin-bottom: 1rem;"></i>
                 <h4 class="text-light mb-3">Drop DICOM files or folders here</h4>
-                <p class="text-secondary mb-3">or click to browse</p>
+                <p class="text-secondary mb-3">Supports large CT/MRI studies with multiple series in subfolders</p>
                 <button type="button" class="btn btn-medical" onclick="document.getElementById('fileInput').click()">
                     <i class="fas fa-folder-open me-2"></i>
                     Choose Files / Folder
@@ -68,6 +135,39 @@
             
             <input type="file" id="fileInput" class="file-input" multiple webkitdirectory directory>
             
+            <div class="upload-stats" id="uploadStats">
+                <h5 class="text-light mb-2">Upload Summary</h5>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalFiles">0</div>
+                        <div class="stat-label">Total Files</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="dicomFiles">0</div>
+                        <div class="stat-label">DICOM Files</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalSize">0 MB</div>
+                        <div class="stat-label">Total Size</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="estimatedStudies">0</div>
+                        <div class="stat-label">Est. Studies</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="folder-info" id="folderInfo">
+                <h6 class="text-warning mb-2"><i class="fas fa-folder-open me-2"></i>Folder Structure Detected</h6>
+                <p class="text-secondary mb-2">Large folder with multiple series detected. This may take several minutes to process.</p>
+                <div id="folderStructure"></div>
+            </div>
+            
+            <div class="series-preview" id="seriesPreview">
+                <h6 class="text-light mb-2"><i class="fas fa-layer-group me-2"></i>Series Preview</h6>
+                <div id="seriesList"></div>
+            </div>
+            
             <div class="file-list" id="fileList" style="display: none;">
                 <h5 class="text-light mb-3">Selected Files</h5>
                 <div id="selectedFiles"></div>
@@ -75,7 +175,7 @@
             
             <div class="progress-section" id="progressSection">
                 <h5 class="text-light mb-3">Upload Progress</h5>
-                <div class="progress">
+                <div class="progress mb-2">
                     <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
                          role="progressbar" 
                          style="width: 0%" 
@@ -84,6 +184,7 @@
                     </div>
                 </div>
                 <div id="progressMeta" class="text-secondary mt-2" style="font-size: 0.9rem;"></div>
+                <div id="uploadDetails" class="text-secondary mt-1" style="font-size: 0.8rem;"></div>
             </div>
             
             <div class="upload-actions">
@@ -112,13 +213,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const selectedFilesDiv = document.getElementById('selectedFiles');
     const progressSection = document.getElementById('progressSection');
     const progressMeta = document.getElementById('progressMeta');
+    const uploadStats = document.getElementById('uploadStats');
+    const folderInfo = document.getElementById('folderInfo');
+    const seriesPreview = document.getElementById('seriesPreview');
+    const seriesList = document.getElementById('seriesList');
+    const folderStructure = document.getElementById('folderStructure');
+    const totalFilesCount = document.getElementById('totalFiles');
+    const dicomFilesCount = document.getElementById('dicomFiles');
+    const totalSizeCount = document.getElementById('totalSize');
+    const estimatedStudiesCount = document.getElementById('estimatedStudies');
 
     // Click to browse
     dropZone.addEventListener('click', () => {
         fileInput.click();
     });
 
-    // Drag and drop handlers
+    // Enhanced drag and drop handlers with better folder support
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
         dropZone.classList.add('dragover');
@@ -134,7 +244,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const items = e.dataTransfer.items;
         if (items && items.length) {
-            // Robust folder traversal (handles subfolders and >100 entries per dir)
+            // Enhanced folder traversal for CT/MRI studies with multiple series
             const traverseEntry = async (entry) => {
                 if (entry.isFile) {
                     return new Promise(resolve => entry.file(f => resolve([f])));
@@ -181,11 +291,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function handleFiles(files) {
-        // Filter DICOM files
+        // Enhanced DICOM file filtering with better detection
         const dicomFiles = files.filter(file => {
             return file.name.toLowerCase().endsWith('.dcm') || 
                    file.name.toLowerCase().endsWith('.dicom') ||
-                   file.type === 'application/dicom';
+                   file.type === 'application/dicom' ||
+                   file.name.toLowerCase().includes('dicom');
         });
 
         if (dicomFiles.length === 0) {
@@ -194,8 +305,78 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         selectedFiles = [...selectedFiles, ...dicomFiles];
+        updateUploadStats();
         updateFileList();
         updateUploadButton();
+        analyzeFolderStructure();
+    }
+
+    function updateUploadStats() {
+        if (selectedFiles.length === 0) {
+            uploadStats.style.display = 'none';
+            return;
+        }
+
+        const totalSize = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+        const estimatedStudies = Math.ceil(selectedFiles.length / 100); // Rough estimate
+
+        totalFilesCount.textContent = selectedFiles.length;
+        dicomFilesCount.textContent = selectedFiles.length;
+        totalSizeCount.textContent = formatFileSize(totalSize);
+        estimatedStudiesCount.textContent = estimatedStudies;
+
+        uploadStats.style.display = 'block';
+    }
+
+    function analyzeFolderStructure() {
+        if (selectedFiles.length < 50) {
+            folderInfo.style.display = 'none';
+            seriesPreview.style.display = 'none';
+            return;
+        }
+
+        // Analyze folder structure for large uploads
+        const folderStructure = {};
+        const seriesMap = {};
+
+        selectedFiles.forEach(file => {
+            const pathParts = file.webkitRelativePath ? file.webkitRelativePath.split('/') : [file.name];
+            const folder = pathParts[0];
+            const subfolder = pathParts[1] || 'root';
+            
+            folderStructure[folder] = folderStructure[folder] || {};
+            folderStructure[folder][subfolder] = (folderStructure[folder][subfolder] || 0) + 1;
+
+            // Try to extract series info from filename or path
+            const fileName = file.name.toLowerCase();
+            if (fileName.includes('series') || fileName.includes('ser')) {
+                const seriesMatch = fileName.match(/series[_-]?(\d+)/i) || fileName.match(/ser[_-]?(\d+)/i);
+                if (seriesMatch) {
+                    const seriesNum = seriesMatch[1];
+                    seriesMap[seriesNum] = (seriesMap[seriesNum] || 0) + 1;
+                }
+            }
+        });
+
+        // Display folder structure
+        if (Object.keys(folderStructure).length > 1) {
+            folderStructure.innerHTML = Object.entries(folderStructure).map(([folder, subfolders]) => 
+                `<div class="mb-2"><strong>${folder}</strong>: ${Object.entries(subfolders).map(([sub, count]) => 
+                    `${sub} (${count} files)`).join(', ')}</div>`
+            ).join('');
+            folderInfo.style.display = 'block';
+        }
+
+        // Display series preview
+        if (Object.keys(seriesMap).length > 0) {
+            seriesList.innerHTML = Object.entries(seriesMap).map(([series, count]) => 
+                `<div class="series-item">
+                    <span><i class="fas fa-layer-group me-2"></i>Series ${series}</span>
+                    <span class="text-secondary">${count} images</span>
+                </div>`
+            ).join('');
+            seriesPreview.style.display = 'block';
+        }
     }
 
     function updateFileList() {
@@ -223,7 +404,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updateUploadButton() { uploadBtn.disabled = selectedFiles.length === 0; }
 
-    window.removeFile = function(index) { selectedFiles.splice(index, 1); updateFileList(); updateUploadButton(); };
+    window.removeFile = function(index) { 
+        selectedFiles.splice(index, 1); 
+        updateUploadStats();
+        updateFileList(); 
+        updateUploadButton(); 
+        analyzeFolderStructure();
+    };
 
     function formatFileSize(bytes) {
         if (bytes === 0) return '0 Bytes';
@@ -233,12 +420,15 @@ document.addEventListener('DOMContentLoaded', function() {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
-    function updateProgress(percent, meta = '') {
+    function updateProgress(percent, meta = '', details = '') {
         const bar = document.getElementById('progressBar');
         const text = document.getElementById('progressText');
+        const detailsEl = document.getElementById('uploadDetails');
+        
         bar.style.width = percent + '%';
         text.textContent = Math.round(percent) + '%';
         if (meta) progressMeta.textContent = meta; else progressMeta.textContent = '';
+        if (details) detailsEl.textContent = details; else detailsEl.textContent = '';
     }
 
     function resetUploadState() {
@@ -251,12 +441,14 @@ document.addEventListener('DOMContentLoaded', function() {
     async function uploadFilesInChunks() {
         const url = '{% url "worklist:upload_study" %}';
         const token = document.querySelector('[name=csrfmiddlewaretoken]').value;
-        const CHUNK_SIZE = 200; // files per request
-        const MAX_PARALLEL = 3; // concurrent requests
+        const CHUNK_SIZE = 100; // Reduced chunk size for better memory management
+        const MAX_PARALLEL = 2; // Reduced parallel requests for large uploads
 
         const totalFiles = selectedFiles.length;
         let uploadedCount = 0;
         let errors = [];
+        let studiesCreated = 0;
+        let totalSeries = 0;
 
         // Build chunks
         const chunks = [];
@@ -268,9 +460,9 @@ document.addEventListener('DOMContentLoaded', function() {
         progressSection.style.display = 'block';
         uploadBtn.disabled = true;
         uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Uploading...';
-        updateProgress(0, `0 / ${totalFiles} files`);
+        updateProgress(0, `0 / ${totalFiles} files`, 'Preparing upload...');
 
-        // Upload logic
+        // Upload logic with enhanced progress tracking
         let currentIndex = 0;
         async function uploadChunk(chunk) {
             const formData = new FormData();
@@ -278,10 +470,20 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 const res = await fetch(url, { method: 'POST', body: formData, headers: { 'X-CSRFToken': token } });
                 const data = await res.json();
-                const processed = typeof data.processed_files === 'number' ? data.processed_files : chunk.length;
-                uploadedCount += processed;
-                updateProgress((uploadedCount / totalFiles) * 100, `${uploadedCount} / ${totalFiles} files`);
-                if (!data.success) {
+                
+                if (data.success) {
+                    const processed = typeof data.processed_files === 'number' ? data.processed_files : chunk.length;
+                    uploadedCount += processed;
+                    studiesCreated = data.studies_created || studiesCreated;
+                    totalSeries = data.total_series || totalSeries;
+                    
+                    const percent = (uploadedCount / totalFiles) * 100;
+                    updateProgress(
+                        percent, 
+                        `${uploadedCount} / ${totalFiles} files`, 
+                        `Created ${studiesCreated} studies with ${totalSeries} series`
+                    );
+                } else {
                     errors.push(data.error || 'Unknown error');
                 }
             } catch (err) {
@@ -301,11 +503,11 @@ document.addEventListener('DOMContentLoaded', function() {
         await Promise.all(workers);
 
         if (errors.length === 0) {
-            showNotification('Files uploaded successfully! Updating worklist...', 'success');
-            setTimeout(() => { window.location.href = '{% url "worklist:modern_worklist" %}'; }, 600);
+            showNotification(`Successfully uploaded ${uploadedCount} files creating ${studiesCreated} studies with ${totalSeries} series!`, 'success');
+            setTimeout(() => { window.location.href = '{% url "worklist:dashboard" %}'; }, 1000);
         } else if (uploadedCount > 0) {
-            showNotification(`Upload completed with some errors. Processed ${uploadedCount} of ${totalFiles} files.`, 'warning');
-            setTimeout(() => { window.location.href = '{% url "worklist:modern_worklist" %}'; }, 1200);
+            showNotification(`Upload completed with some errors. Processed ${uploadedCount} of ${totalFiles} files, created ${studiesCreated} studies.`, 'warning');
+            setTimeout(() => { window.location.href = '{% url "worklist:dashboard" %}'; }, 1500);
         } else {
             showNotification('Upload failed: ' + errors[0], 'error');
             resetUploadState();

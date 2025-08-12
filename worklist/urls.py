@@ -29,4 +29,6 @@ urlpatterns = [
     path('api/search-studies/', views.api_search_studies, name='api_search_studies'),
     path('api/study/<int:study_id>/update-status/', views.api_update_study_status, name='api_update_study_status'),
     path('api/study/<int:study_id>/delete/', views.api_delete_study, name='api_delete_study'),
+    path('api/refresh-worklist/', views.api_refresh_worklist, name='api_refresh_worklist'),
+    path('api/upload-stats/', views.api_get_upload_stats, name='api_get_upload_stats'),
 ]
