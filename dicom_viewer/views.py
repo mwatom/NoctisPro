@@ -596,7 +596,9 @@ def _array_to_base64_image(array, window_width=None, window_level=None, inverted
 @login_required
 @csrf_exempt 
 def api_dicom_image_display(request, image_id):
-    """API endpoint to get processed DICOM image with windowing"""
+    """API endpoint to get processed DICOM image with windowing
+    - If pixel data cannot be decoded, still return metadata and sensible window defaults
+    """
     image = get_object_or_404(DicomImage, id=image_id)
     user = request.user
     
@@ -606,15 +608,16 @@ def api_dicom_image_display(request, image_id):
     
     try:
         # Get windowing parameters from request
-        window_width = float(request.GET.get('window_width', 400))
-        window_level = float(request.GET.get('window_level', 40))
+        window_width = request.GET.get('window_width')
+        window_level = request.GET.get('window_level')
         inverted = request.GET.get('inverted', 'false').lower() == 'true'
-        
+
         # Read DICOM file
         dicom_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
-        ds = pydicom.dcmread(dicom_path)
-        
-        # Get pixel array, apply VOI LUT for projection modalities only (avoid CT distortion), then rescale
+        ds = pydicom.dcmread(dicom_path, stop_before_pixels=False)
+
+        pixel_array = None
+        pixel_decode_error = None
         try:
             pixel_array = ds.pixel_array
             try:
@@ -624,28 +627,33 @@ def api_dicom_image_display(request, image_id):
             except Exception:
                 pass
             pixel_array = pixel_array.astype(np.float32)
-        except Exception:
+        except Exception as e:
             # Fallback for compressed DICOMs without pixel handler: try SimpleITK
             try:
                 import SimpleITK as sitk
                 sitk_image = sitk.ReadImage(dicom_path)
                 pixel_array = sitk.GetArrayFromImage(sitk_image)
-                # SimpleITK returns (depth,height,width) for 3D; for single-slice ensure 2D
                 if pixel_array.ndim == 3 and pixel_array.shape[0] == 1:
                     pixel_array = pixel_array[0]
                 pixel_array = pixel_array.astype(np.float32)
             except Exception as _e:
-                return JsonResponse({'error': f'Error decoding DICOM pixels: {str(_e)}'}, status=500)
+                pixel_decode_error = str(_e)
+                pixel_array = None
         
         # Apply rescale slope/intercept
-        if hasattr(ds, 'RescaleSlope') and hasattr(ds, 'RescaleIntercept'):
+        if pixel_array is not None and hasattr(ds, 'RescaleSlope') and hasattr(ds, 'RescaleIntercept'):
             pixel_array = pixel_array * float(ds.RescaleSlope) + float(ds.RescaleIntercept)
         
-        # Derive sensible defaults if not provided
-        def derive_window(arr):
+        # Derive sensible defaults
+        def derive_window(arr, fallback=(400.0, 40.0)):
+            if arr is None:
+                return fallback
             flat = arr.flatten()
-            p1 = float(np.percentile(flat, 1))
-            p99 = float(np.percentile(flat, 99))
+            try:
+                p1 = float(np.percentile(flat, 1))
+                p99 = float(np.percentile(flat, 99))
+            except Exception:
+                return fallback
             ww = max(1.0, p99 - p1)
             wl = (p99 + p1) / 2.0
             return ww, wl
@@ -672,35 +680,38 @@ def api_dicom_image_display(request, image_id):
         
         # Overwrite request params only if not provided
         try:
-            ww_req = request.GET.get('window_width')
-            wl_req = request.GET.get('window_level')
-            inv_req = request.GET.get('inverted')
-            if ww_req is None:
+            if window_width is None:
                 window_width = float(default_window_width)
-            if wl_req is None:
+            else:
+                window_width = float(window_width)
+            if window_level is None:
                 window_level = float(default_window_level)
-            if inv_req is None:
+            else:
+                window_level = float(window_level)
+            if request.GET.get('inverted') is None:
                 inverted = bool(default_inverted)
         except Exception:
-            pass
+            # Fall back to defaults on parse errors
+            window_width = float(default_window_width)
+            window_level = float(default_window_level)
         
-        # Generate image
-        image_data_url = _array_to_base64_image(pixel_array, window_width, window_level, inverted)
+        # Generate image if pixels are available
+        image_data_url = None
+        if pixel_array is not None:
+            image_data_url = _array_to_base64_image(pixel_array, window_width, window_level, inverted)
         
-        if not image_data_url:
-            return JsonResponse({'error': 'Failed to process image'}, status=500)
-        
+        # Build response, even if image_data_url is None
         return JsonResponse({
             'image_data': image_data_url,
             'image_info': {
                 'id': image.id,
                 'instance_number': image.instance_number,
                 'slice_location': image.slice_location,
-                'dimensions': [int(ds.Rows), int(ds.Columns)],
+                'dimensions': [int(getattr(ds, 'Rows', 0) or 0), int(getattr(ds, 'Columns', 0) or 0)],
                 'pixel_spacing': getattr(ds, 'PixelSpacing', [1.0, 1.0]),
                 'slice_thickness': getattr(ds, 'SliceThickness', 1.0),
-                'default_window_width': float(default_window_width),
-                'default_window_level': float(default_window_level),
+                'default_window_width': float(default_window_width) if default_window_width is not None else 400.0,
+                'default_window_level': float(default_window_level) if default_window_level is not None else 40.0,
                 'modality': getattr(ds, 'Modality', ''),
                 'series_description': getattr(ds, 'SeriesDescription', ''),
                 'patient_name': str(getattr(ds, 'PatientName', '')),
@@ -713,7 +724,8 @@ def api_dicom_image_display(request, image_id):
                 'window_width': window_width,
                 'window_level': window_level,
                 'inverted': inverted
-            }
+            },
+            'warnings': ({'pixel_decode_error': pixel_decode_error} if pixel_decode_error else None)
         })
         
     except Exception as e:
