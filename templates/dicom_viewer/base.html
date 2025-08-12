@@ -25,11 +25,16 @@
     input[type=range] { width: 100%; }
     .overlay { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.6); padding: 8px 10px; border-radius: 6px; font-family: monospace; font-size: 12px; }
     .zoominfo { position: absolute; bottom: 12px; left: 12px; background: rgba(0,0,0,0.6); padding: 6px 10px; border-radius: 6px; font-family: monospace; font-size: 12px; }
-    canvas { max-width: 100%; max-height: 100%; }
+    canvas { max-width: 100%; max-height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
     .thumbs { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
     .thumbs img { width:100%; background:#000; border-radius:6px; border:1px solid #444; }
     .row-3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; }
     .muted { color:#bbb; font-size:12px; }
+    /* 3D dropdown in toolbar */
+    .tool-dropdown { position: relative; }
+    .tool-dropdown-menu { position: absolute; top: 58px; left: 0; background: #2f2f2f; border: 1px solid #444; border-radius: 8px; width: 180px; display: none; flex-direction: column; overflow: hidden; z-index: 10; }
+    .tool-dropdown-menu button { background: transparent; border: none; color: #fff; text-align: left; padding: 10px 12px; cursor: pointer; font-size: 13px; }
+    .tool-dropdown-menu button:hover { background: #0078d4; }
   </style>
 </head>
 <body>
@@ -44,7 +49,15 @@
       <button class="tool" data-tool="invert"><i class="fas fa-adjust"></i><span>Invert</span></button>
       <button class="tool" data-tool="reset"><i class="fas fa-undo"></i><span>Reset</span></button>
       <button class="tool" data-tool="ai"><i class="fas fa-robot"></i><span>AI</span></button>
-      <button class="tool" data-tool="mpr"><i class="fas fa-layer-group"></i><span>MPR</span></button>
+      <!-- 3D dropdown moved into toolbar -->
+      <div class="tool-dropdown">
+        <button id="btn3D" class="tool"><i class="fas fa-cube"></i><span>3D</span></button>
+        <div id="menu3D" class="tool-dropdown-menu">
+          <button data-recon="mpr"><i class="fas fa-layer-group"></i> MPR</button>
+          <button data-recon="mip"><i class="fas fa-bullseye"></i> MIP</button>
+          <button data-recon="bone"><i class="fas fa-bone"></i> Bone</button>
+        </div>
+      </div>
     </div>
     <div class="topbar">
       <button id="btnLoadLocal" class="btn btn-primary"><i class="fas fa-folder-open"></i> Load Local DICOM</button>
@@ -148,6 +161,10 @@
     const viewAxial = document.getElementById('viewAxial');
     const viewSagittal = document.getElementById('viewSagittal');
     const viewCoronal = document.getElementById('viewCoronal');
+
+    // 3D dropdown controls
+    const btn3D = document.getElementById('btn3D');
+    const menu3D = document.getElementById('menu3D');
 
     let currentStudy = null;
     let currentSeries = null;
@@ -266,8 +283,11 @@
         }
         // Reset view state
         zoom = 1.0; panOffset = {x:0,y:0}; activeTool = 'window'; crosshair = false; mprMode = false; mprImgs = {axial:null,sagittal:null,coronal:null}; reconMode = null; reconImgs = []; reconIndex = 0;
-        document.getElementById('btnEnterMpr').style.display = images.length ? '' : 'none';
-        document.getElementById('btnExitMpr').style.display = 'none';
+        // Safely guard missing elements (fix: avoid null access halting draw)
+        const enterMpr = document.getElementById('btnEnterMpr');
+        const exitMpr = document.getElementById('btnExitMpr');
+        if (enterMpr) enterMpr.style.display = images.length ? '' : 'none';
+        if (exitMpr) exitMpr.style.display = 'none';
         document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active'));
         document.querySelector('.tool[data-tool="window"]').classList.add('active');
         setCanvasSize();
@@ -313,6 +333,7 @@
             const scale = Math.min(reg.w / im.width, reg.h / im.height);
             const dw = im.width * scale, dh = im.height * scale;
             const dx = reg.x + (reg.w - dw)/2, dy = reg.y + (reg.h - dh)/2;
+            ctx.imageSmoothingEnabled = false;
             ctx.drawImage(im, dx, dy, dw, dh);
           }
           document.getElementById('overlay').innerHTML = `MPR | WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}`;
@@ -483,12 +504,9 @@
       if (tool === 'reset'){ zoom = 1.0; panOffset = {x:0,y:0}; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; draw(); return; }
       if (tool === 'ai'){ alert('AI analysis result: (stub) No backend connected.'); return; }
       if (tool === 'crosshair'){ crosshair = !crosshair; draw(); return; }
+      // remove old inline MPR toggle from tool button; handled by 3D dropdown now
       if (tool === 'mpr'){
-        if (!currentSeries || !currentSeries.id) return;
-        mprMode = !mprMode;
-        if (mprMode){ reconMode = null; reconImgs = []; reconIndex = 0; }
-        await draw();
-        return;
+        return; // no-op
       }
       if (mprMode){ return; }
       activeTool = tool;
@@ -576,7 +594,8 @@
     });
     boneSlider.addEventListener('input', e=> boneVal.textContent = e.target.value);
 
-    btnGenerateRecon.addEventListener('click', async ()=>{
+    // Extracted function so both dropdown and button can trigger
+    async function generateReconstruction(kind){
       try {
         if (!currentSeries || !currentSeries.id){ alert('Select a series first'); return; }
         reconStatus.textContent = 'Generating...';
@@ -586,8 +605,9 @@
         params.set('window_level', wl);
         params.set('inverted', inverted);
         let url = '';
-        if (reconType.value === 'mpr') url = `/viewer/api/series/${currentSeries.id}/mpr/?${params.toString()}`;
-        else if (reconType.value === 'mip') url = `/viewer/api/series/${currentSeries.id}/mip/?${params.toString()}`;
+        const type = kind || reconType.value;
+        if (type === 'mpr') url = `/viewer/api/series/${currentSeries.id}/mpr/?${params.toString()}`;
+        else if (type === 'mip') url = `/viewer/api/series/${currentSeries.id}/mip/?${params.toString()}`;
         else { url = `/viewer/api/series/${currentSeries.id}/bone/?threshold=${boneSlider.value}`; }
         const r = await fetch(url);
         const j = await r.json();
@@ -603,12 +623,36 @@
         reconStatus.textContent = `Error: ${err.message}`;
         await fallbackToDesktop();
       }
+    }
+
+    btnGenerateRecon.addEventListener('click', async ()=>{ await generateReconstruction(); });
+
+    // 3D dropdown interactions
+    btn3D.addEventListener('click', ()=>{
+      menu3D.style.display = (menu3D.style.display === 'flex') ? 'none' : 'flex';
+      if (menu3D.style.display === '' || menu3D.style.display === 'none') menu3D.style.display = 'flex';
+    });
+    menu3D.addEventListener('click', async (e)=>{
+      const btn = e.target.closest('button[data-recon]');
+      if (!btn) return;
+      const kind = btn.getAttribute('data-recon');
+      menu3D.style.display = 'none';
+      await generateReconstruction(kind);
+    });
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e)=>{
+      if (!menu3D.contains(e.target) && e.target !== btn3D) menu3D.style.display = 'none';
     });
 
     // Clear measurements
     btnClearMeasurements.addEventListener('click', ()=>{
       measurements = []; imageIdToMeasurements.set(getCurrentImageId(), measurements); renderMeasurementsList(); draw();
     });
+
+    // Utils
+    function loadImage(src){
+      return new Promise((res, rej)=>{ const im = new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=src; });
+    }
 
     // Init
     setCanvasSize();
