@@ -166,6 +166,10 @@ def api_mpr_reconstruction(request, series_id):
         volume_data = []
         default_window_width = 400
         default_window_level = 40
+        # Spacing in mm for x (columns/width), y (rows/height), z (slice/depth)
+        spacing_x = 1.0
+        spacing_y = 1.0
+        spacing_z = 1.0
 
         for img in images:
             try:
@@ -183,6 +187,33 @@ def api_mpr_reconstruction(request, series_id):
                         default_window_width = default_window_width[0]
                     if hasattr(default_window_level, '__iter__') and not isinstance(default_window_level, str):
                         default_window_level = default_window_level[0]
+                    # Extract spacing from first slice
+                    try:
+                        ps = getattr(ds, 'PixelSpacing', None)
+                        if ps is not None:
+                            if hasattr(ps, '__iter__') and not isinstance(ps, str):
+                                # DICOM order is [row spacing (mm), column spacing (mm)]
+                                spacing_y = float(ps[0])
+                                spacing_x = float(ps[1]) if len(ps) > 1 else float(ps[0])
+                            else:
+                                parts = str(ps).replace(',', '\\').split('\\')
+                                if len(parts) >= 1:
+                                    spacing_y = float(parts[0])
+                                if len(parts) >= 2:
+                                    spacing_x = float(parts[1])
+                                else:
+                                    spacing_x = spacing_y
+                    except Exception:
+                        pass
+                    try:
+                        # Prefer SpacingBetweenSlices; fallback to SliceThickness
+                        spacing_between = getattr(ds, 'SpacingBetweenSlices', None)
+                        if spacing_between is not None:
+                            spacing_z = float(spacing_between)
+                        else:
+                            spacing_z = float(getattr(ds, 'SliceThickness', spacing_z))
+                    except Exception:
+                        pass
 
                 volume_data.append(pixel_array)
             except Exception:
@@ -239,6 +270,7 @@ def api_mpr_reconstruction(request, series_id):
                 'count': counts[plane],
                 'image': img_b64,
                 'counts': counts,
+                'spacing': {'x': float(spacing_x), 'y': float(spacing_y), 'z': float(spacing_z)},
                 'volume_shape': tuple(int(x) for x in volume.shape),
                 'series_info': {
                     'id': series.id,
@@ -260,6 +292,7 @@ def api_mpr_reconstruction(request, series_id):
             'mpr_views': mpr_views,
             'volume_shape': tuple(int(x) for x in volume.shape),
             'counts': counts,
+            'spacing': {'x': float(spacing_x), 'y': float(spacing_y), 'z': float(spacing_z)},
             'series_info': {
                 'id': series.id,
                 'description': series.series_description,
