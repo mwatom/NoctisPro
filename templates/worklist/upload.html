@@ -124,6 +124,13 @@
         color: var(--success-color);
         margin-bottom: 1rem;
     }
+
+    /* New: metadata form */
+    .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+    .meta-field { display:flex; flex-direction: column; gap:6px; }
+    .meta-label { color: var(--text-secondary); font-size: 0.9rem; }
+    .meta-input, .meta-select, .meta-textarea { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; padding: 0.5rem 0.75rem; }
+    .meta-textarea { min-height: 80px; resize: vertical; }
 </style>
 {% endblock %}
 
@@ -140,6 +147,23 @@
 
         <form id="uploadForm" enctype="multipart/form-data">
             {% csrf_token %}
+            <!-- New: study metadata inputs -->
+            <div class="meta-grid">
+                <div class="meta-field">
+                    <label class="meta-label" for="priorityInput">Priority</label>
+                    <select id="priorityInput" class="meta-select">
+                        <option value="low">Low</option>
+                        <option value="normal" selected>Normal</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                    </select>
+                </div>
+                <div class="meta-field" style="grid-column: 1 / -1;">
+                    <label class="meta-label" for="clinicalInfoInput">Clinical Information / Indication</label>
+                    <textarea id="clinicalInfoInput" class="meta-textarea" placeholder="Enter relevant clinical history and indication (optional)"></textarea>
+                </div>
+            </div>
+            <!-- End metadata inputs -->
             <div class="drop-zone" id="dropZone">
                 <i class="fas fa-file-medical text-accent" style="font-size: 3rem; margin-bottom: 1rem;"></i>
                 <h4 class="text-light mb-3">Drop DICOM files or folders here</h4>
@@ -253,6 +277,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const dicomFilesCount = document.getElementById('dicomFiles');
     const totalSizeCount = document.getElementById('totalSize');
     const estimatedStudiesCount = document.getElementById('estimatedStudies');
+    const priorityInput = document.getElementById('priorityInput');
+    const clinicalInfoInput = document.getElementById('clinicalInfoInput');
 
     // Click to browse - prevent multiple triggers
     chooseFilesBtn.addEventListener('click', (e) => {
@@ -334,14 +360,14 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleFiles(files) {
         // Enhanced DICOM file filtering with better detection
         const dicomFiles = files.filter(file => {
-            return file.name.toLowerCase().endsWith('.dcm') || 
-                   file.name.toLowerCase().endsWith('.dicom') ||
-                   file.type === 'application/dicom' ||
-                   file.name.toLowerCase().includes('dicom');
+            const name = file.name.toLowerCase();
+            if (name.endsWith('.dcm') || name.endsWith('.dicom') || file.type === 'application/dicom' || name.includes('dicom')) return true;
+            // Heuristic: accept if size > 128 and header likely contains DICM when read later server-side
+            return file.size > 132; // don't over-restrict; backend will validate
         });
 
         if (dicomFiles.length === 0) {
-            showNotification('Please select valid DICOM files (.dcm, .dicom)', 'error');
+            showNotification('Please select DICOM files or folders. Files without .dcm are allowed; they will be validated during upload.', 'error');
             return;
         }
 
@@ -377,7 +403,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Analyze folder structure for large uploads
-        const folderStructure = {};
+        const folderStructureMap = {};
         const seriesMap = {};
 
         selectedFiles.forEach(file => {
@@ -385,8 +411,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const folder = pathParts[0];
             const subfolder = pathParts[1] || 'root';
             
-            folderStructure[folder] = folderStructure[folder] || {};
-            folderStructure[folder][subfolder] = (folderStructure[folder][subfolder] || 0) + 1;
+            folderStructureMap[folder] = folderStructureMap[folder] || {};
+            folderStructureMap[folder][subfolder] = (folderStructureMap[folder][subfolder] || 0) + 1;
 
             // Try to extract series info from filename or path
             const fileName = file.name.toLowerCase();
@@ -400,8 +426,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // Display folder structure
-        if (Object.keys(folderStructure).length > 1) {
-            folderStructure.innerHTML = Object.entries(folderStructure).map(([folder, subfolders]) => 
+        if (Object.keys(folderStructureMap).length > 1) {
+            folderStructure.innerHTML = Object.entries(folderStructureMap).map(([folder, subfolders]) => 
                 `<div class="mb-2"><strong>${folder}</strong>: ${Object.entries(subfolders).map(([sub, count]) => 
                     `${sub} (${count} files)`).join(', ')}</div>`
             ).join('');
@@ -518,6 +544,9 @@ document.addEventListener('DOMContentLoaded', function() {
         async function uploadChunk(chunk) {
             const formData = new FormData();
             chunk.forEach((file) => formData.append('dicom_files', file));
+            // New: include metadata fields
+            formData.append('priority', priorityInput.value || 'normal');
+            formData.append('clinical_info', clinicalInfoInput.value || '');
             try {
                 const res = await fetch(url, { method: 'POST', body: formData, headers: { 'X-CSRFToken': token } });
                 const data = await res.json();

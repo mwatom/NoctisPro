@@ -347,7 +347,7 @@
                                     <button type="button" class="macro-btn" onclick="insertMacro('clinicalHistory', 'No significant clinical history.')">No History</button>
                                     <button type="button" class="macro-btn" onclick="insertMacro('clinicalHistory', 'Patient presents with...')">Presenting Complaint</button>
                                 </div>
-                                <textarea id="clinicalHistory" name="clinical_history" class="form-textarea" placeholder="Enter clinical history and indication for study...">{{ report.clinical_history|default:"" }}</textarea>
+                                <textarea id="clinicalHistory" name="clinical_history" class="form-textarea" placeholder="Enter clinical history and indication for study...">{{ report.clinical_history|default:study.clinical_info }}</textarea>
                             </div>
 
                             <!-- Technique -->

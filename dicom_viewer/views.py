@@ -78,6 +78,8 @@ def api_study_data(request, study_id):
             'modality': study.modality.code,
             'description': study.study_description,
             'body_part': study.body_part,
+            'priority': study.priority,
+            'clinical_info': study.clinical_info,
         },
         'series': []
     }
@@ -93,6 +95,8 @@ def api_study_data(request, study_id):
             'slice_thickness': series.slice_thickness,
             'pixel_spacing': series.pixel_spacing,
             'image_orientation': series.image_orientation,
+            'priority': series.study.priority,
+            'clinical_info': series.study.clinical_info,
             'images': []
         }
         
@@ -553,21 +557,54 @@ def api_dicom_image_display(request, image_id):
         if hasattr(ds, 'RescaleSlope') and hasattr(ds, 'RescaleIntercept'):
             pixel_array = pixel_array * float(ds.RescaleSlope) + float(ds.RescaleIntercept)
         
+        # If defaults missing, derive sensible WW/WL by robust min/max percentiles
+        def derive_window(arr):
+            flat = arr.flatten()
+            p1 = float(np.percentile(flat, 1))
+            p99 = float(np.percentile(flat, 99))
+            ww = max(1.0, p99 - p1)
+            wl = (p99 + p1) / 2.0
+            return ww, wl
+        # Determine defaults
+        default_window_width = getattr(ds, 'WindowWidth', None)
+        default_window_level = getattr(ds, 'WindowCenter', None)
+        if hasattr(default_window_width, '__iter__') and not isinstance(default_window_width, str):
+            default_window_width = default_window_width[0]
+        if hasattr(default_window_level, '__iter__') and not isinstance(default_window_level, str):
+            default_window_level = default_window_level[0]
+        if default_window_width is None or default_window_level is None:
+            dw, dl = derive_window(pixel_array)
+            default_window_width = default_window_width or dw
+            default_window_level = default_window_level or dl
+        # DX/CR default adjustments
+        modality = getattr(ds, 'Modality', '')
+        photo = getattr(ds, 'PhotometricInterpretation', '')
+        default_inverted = False
+        if modality in ['DX','CR','XA','RF']:
+            # Broader width and appropriate level typical for projection radiography
+            default_window_width = float(default_window_width) if default_window_width is not None else 3000.0
+            default_window_level = float(default_window_level) if default_window_level is not None else 1500.0
+            # Invert if MONOCHROME1
+            default_inverted = (str(photo).upper() == 'MONOCHROME1')
+        # Overwrite request params only if not provided
+        try:
+            ww_req = request.GET.get('window_width')
+            wl_req = request.GET.get('window_level')
+            inv_req = request.GET.get('inverted')
+            if ww_req is None:
+                window_width = float(default_window_width)
+            if wl_req is None:
+                window_level = float(default_window_level)
+            if inv_req is None:
+                inverted = bool(default_inverted)
+        except Exception:
+            pass
+
         # Generate image with proper windowing
         image_data_url = _array_to_base64_image(pixel_array, window_width, window_level, inverted)
         
         if not image_data_url:
             return JsonResponse({'error': 'Failed to process image'}, status=500)
-        
-        # Get default window/level values from DICOM if available
-        default_window_width = getattr(ds, 'WindowWidth', window_width)
-        default_window_level = getattr(ds, 'WindowCenter', window_level)
-        
-        # Handle multiple window values (take first if array)
-        if hasattr(default_window_width, '__iter__') and not isinstance(default_window_width, str):
-            default_window_width = default_window_width[0]
-        if hasattr(default_window_level, '__iter__') and not isinstance(default_window_level, str):
-            default_window_level = default_window_level[0]
         
         return JsonResponse({
             'image_data': image_data_url,

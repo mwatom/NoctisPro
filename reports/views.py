@@ -138,3 +138,44 @@ def write_report(request, study_id):
     }
     
     return render(request, 'reports/write_report.html', context)
+
+@login_required
+def print_report_stub(request, study_id):
+    """Simple printable page for facility users; if report exists include it, else show study details and clinical info."""
+    study = get_object_or_404(Study, id=study_id)
+    report = Report.objects.filter(study=study).first()
+    html = f"""
+    <html>
+      <head>
+        <title>Print Study {study.accession_number}</title>
+        <style>
+          body {{ font-family: Arial, sans-serif; color: #000; }}
+          .header {{ display:flex; justify-content: space-between; border-bottom:1px solid #000; padding-bottom:6px; margin-bottom:10px; }}
+          .section {{ margin-bottom: 12px; }}
+          .label {{ font-weight:bold; }}
+          pre {{ white-space: pre-wrap; font-family: inherit; }}
+          @media print {{ .noprint {{ display:none; }} }}
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <div class="label">Facility:</div>
+            <div>{study.facility.name}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="label">Accession:</div>
+            <div>{study.accession_number}</div>
+          </div>
+        </div>
+        <div class="section"><span class="label">Patient:</span> {study.patient.full_name} ({study.patient.patient_id})</div>
+        <div class="section"><span class="label">Modality:</span> {study.modality.code} &nbsp; <span class="label">Date:</span> {study.study_date}</div>
+        <div class="section"><span class="label">Priority:</span> {study.priority.upper()}</div>
+        <div class="section"><span class="label">Clinical Information:</span><br/><pre>{(study.clinical_info or '').strip() or '-'}</pre></div>
+        {f'<div class="section"><span class="label">Findings:</span><br/><pre>{(report.findings or '').strip()}</pre></div>' if report else ''}
+        {f'<div class="section"><span class="label">Impression:</span><br/><pre>{(report.impression or '').strip()}</pre></div>' if report else ''}
+        <div class="noprint"><button onclick="window.print()">Print</button></div>
+      </body>
+    </html>
+    """
+    return HttpResponse(html)
