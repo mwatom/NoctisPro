@@ -1302,7 +1302,7 @@
         const type = kind || reconType.value;
         if (type === 'mpr') url = `/viewer/api/series/${currentSeries.id}/mpr/?${params.toString()}`;
         else if (type === 'mip') url = `/viewer/api/series/${currentSeries.id}/mip/?${params.toString()}`;
-        else { url = `/viewer/api/series/${currentSeries.id}/bone/?threshold=${boneSlider.value}&mesh=true`; }
+        else { url = `/viewer/api/series/${currentSeries.id}/bone/?threshold=${boneSlider.value}&mesh=true&quality=high`; }
         const r = await fetch(url);
         const j = await r.json();
         if (j.error) throw new Error(j.error);

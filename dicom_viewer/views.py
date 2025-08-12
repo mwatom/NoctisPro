@@ -469,6 +469,7 @@ def api_bone_reconstruction(request, series_id):
         # Get threshold from request
         threshold = int(request.GET.get('threshold', 300))  # Default bone threshold in HU
         want_mesh = (request.GET.get('mesh','false').lower() == 'true')
+        quality = (request.GET.get('quality','').lower())  # 'high' to disable downsampling
         
         # Get all images in the series
         images = series.images.all().order_by('slice_location', 'instance_number')
@@ -531,14 +532,16 @@ def api_bone_reconstruction(request, series_id):
         
         mesh_payload = None
         if want_mesh:
-            # Light mesh via marching cubes at low resolution for web
+            # Mesh via marching cubes; downsample unless high-quality requested
             try:
                 from skimage import measure as _measure
-                # Downsample for speed
-                ds_factor = max(1, int(np.ceil(max(1, bone_volume.shape[0]) / 128)))
-                vol_ds = bone_volume[::ds_factor, ::2, ::2]
-                verts, faces, normals, values = _measure.marching_cubes(vol_ds.astype(np.float32) > 0, level=0.5)
-                # Convert to simple lists
+                if quality == 'high':
+                    vol_for_mesh = (bone_volume > 0).astype(np.float32)
+                else:
+                    # Downsample for speed
+                    ds_factor = max(1, int(np.ceil(max(1, bone_volume.shape[0]) / 128)))
+                    vol_for_mesh = (bone_volume[::ds_factor, ::2, ::2] > 0).astype(np.float32)
+                verts, faces, normals, values = _measure.marching_cubes(vol_for_mesh, level=0.5)
                 mesh_payload = {
                     'vertices': verts.tolist(),
                     'faces': faces.tolist(),
