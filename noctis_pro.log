@@ -5,3 +5,15 @@ Watching for file changes with StatReloader
 "GET /worklist/ui/ HTTP/1.1" 302 0
 "GET / HTTP/1.1" 302 0
 Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+"GET /worklist/ HTTP/1.1" 302 0
+/workspace/worklist/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/worklist/views.py changed, reloading.
+Watching for file changes with StatReloader
+"GET /worklist/ HTTP/1.1" 302 0
+"GET /login/?next=/worklist/ HTTP/1.1" 200 20298
+Not Found: /accounts/login/
+Not Found: /accounts/login/
+"GET /worklist/api/studies/ HTTP/1.1" 302 0
+"HEAD /worklist/api/studies/ HTTP/1.1" 302 0

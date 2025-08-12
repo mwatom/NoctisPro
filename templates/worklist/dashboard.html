@@ -737,15 +737,22 @@
         // Enhanced studies loading with better support for uploaded studies
         async function loadStudiesData() {
             try {
+                console.log('Loading studies data...');
                 // Fetch studies from the enhanced API
                 const response = await fetch('{% url "worklist:api_studies" %}');
                 const data = await response.json();
                 
+                console.log('API response:', data);
+                
                 if (data.success) {
                     studiesData = data.studies || [];
                     filteredData = [...studiesData];
+                    console.log('Studies loaded:', studiesData.length);
                     renderStudiesTable();
                     updateStatusCounts();
+                    
+                    // Apply any active filters after data is loaded
+                    applyFilters();
                     
                     // Show upload stats if available
                     await loadUploadStats();
@@ -783,10 +790,14 @@
 
         // Render studies table
         function renderStudiesTable() {
+            console.log('Rendering studies table...');
             const tbody = document.getElementById('studiesTableBody');
             const noDataRow = document.getElementById('noDataRow');
             
+            console.log('Filtered data length:', filteredData.length);
+            
             if (filteredData.length === 0) {
+                console.log('No data to display, showing no data message');
                 tbody.innerHTML = '';
                 tbody.appendChild(noDataRow);
                 return;
@@ -1038,9 +1049,8 @@
 
         // Enhanced initialization with better auto-refresh and upload detection
         document.addEventListener('DOMContentLoaded', function() {
-            // Set current date in date filter
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('dateFilter').value = today;
+            // Set date filter to empty to show all studies by default
+            document.getElementById('dateFilter').value = '';
             
             // Load initial data
             loadStudiesData();
@@ -1114,11 +1124,23 @@
         document.getElementById('searchFilter').addEventListener('input', applyFilters); // Add search filter
 
         function applyFilters() {
+            console.log('Applying filters...');
+            console.log('Studies data length:', studiesData.length);
+            
             const statusFilter = document.getElementById('statusFilter').value.toLowerCase();
             const modalityFilter = document.getElementById('modalityFilter').value.toLowerCase();
             const priorityFilter = document.getElementById('priorityFilter').value.toLowerCase();
             const dateFilter = document.getElementById('dateFilter').value;
             const searchFilter = document.getElementById('searchFilter').value.toLowerCase();
+            
+            console.log('Filters:', { statusFilter, modalityFilter, priorityFilter, dateFilter, searchFilter });
+            
+            if (studiesData.length === 0) {
+                console.log('No studies data available for filtering');
+                filteredData = [];
+                renderStudiesTable();
+                return;
+            }
             
             filteredData = studiesData.filter(study => {
                 const matchesStatus = !statusFilter || study.status.toLowerCase().includes(statusFilter);
