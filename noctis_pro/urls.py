@@ -41,8 +41,9 @@ urlpatterns = [
     path('worklist/', include('worklist.urls')),
     # Alias endpoints expected by the dashboard UI
     path('api/studies/', worklist_views.api_studies, name='api_studies_root'),
-    path('dicom-viewer/', include('dicom_viewer.urls')),  # align with dashboard links
-    path('viewer/', include('dicom_viewer.urls')),
+    # Temporarily commented out to avoid import issues
+    # path('dicom-viewer/', include('dicom_viewer.urls')),  # align with dashboard links
+    # path('viewer/', include('dicom_viewer.urls')),
     path('reports/', include('reports.urls')),
     path('admin-panel/', include('admin_panel.urls')),
     path('chat/', include('chat.urls')),  # Re-enabled to fix template URLs
