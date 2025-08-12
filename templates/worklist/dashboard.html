@@ -232,6 +232,9 @@
             flex: 1;
             overflow: auto;
             background: var(--primary-bg);
+            scroll-behavior: auto; /* consistent immediate scroll */
+            will-change: scroll-position;
+            contain: content;
         }
 
         .data-table {
@@ -292,6 +295,8 @@
 
         .data-table tbody tr:hover {
             background: rgba(0, 212, 255, 0.08);
+            /* reduce layout work on hover */
+            will-change: background-color;
         }
 
         .data-table tbody tr:nth-child(even) {
@@ -497,7 +502,8 @@
 
         .btn-viewer:hover {
             background: #00b8d4;
-            transform: scale(1.05);
+            /* remove scale to avoid reflow/throttle on many buttons */
+            /* transform: scale(1.05); */
         }
 
         .btn-viewer.viewer-only {
@@ -554,7 +560,7 @@
 
         .btn-upload:hover {
             background: #00b8d4;
-            transform: translateY(-2px);
+            /* transform: translateY(-2px); */
         }
 
         /* Responsive adjustments */

@@ -151,9 +151,9 @@
         </div>
         <div class="muted" id="reconStatus"></div>
         <div class="row-3" id="reconViews" style="margin-top:8px; display:none;">
-          <img id="viewAxial" alt="Axial"/>
-          <img id="viewSagittal" alt="Sagittal"/>
-          <img id="viewCoronal" alt="Coronal"/>
+          <img id="viewAxial" alt="Axial" loading="lazy" decoding="async"/>
+          <img id="viewSagittal" alt="Sagittal" loading="lazy" decoding="async"/>
+          <img id="viewCoronal" alt="Coronal" loading="lazy" decoding="async"/>
         </div>
       </div>
       <div class="panel">
@@ -270,6 +270,47 @@
     const imageIdToMeasurements = new Map();
     const imageIdToAnnotations = new Map();
 
+    // Image cache and render scheduler to improve responsiveness
+    const imageCache = new Map(); // key -> Promise<HTMLImageElement> | HTMLImageElement
+    let drawScheduled = false;
+    function requestDraw(){
+      if (drawScheduled) return;
+      drawScheduled = true;
+      requestAnimationFrame(async ()=>{ drawScheduled = false; await draw(); });
+    }
+    function debounce(fn, delay){
+      let t; return (...args)=>{ clearTimeout(t); t = setTimeout(()=> fn(...args), delay); };
+    }
+    function getImageKey(imageId, ww, wl, inverted){
+      return `${imageId}|${Math.round(ww)}|${Math.round(wl)}|${inverted?1:0}`;
+    }
+    async function loadHtmlImage(src){
+      return new Promise((resolve, reject)=>{ const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = ()=> resolve(im); im.onerror = reject; im.src = src; });
+    }
+    async function getImageForIndex(i){
+      const imgMeta = images[i];
+      if (!imgMeta) return null;
+      const key = getImageKey(imgMeta.id, ww, wl, inverted);
+      if (imageCache.has(key)){
+        const val = imageCache.get(key);
+        return typeof val.then === 'function' ? await val : val;
+      }
+      const url = `/viewer/image/${imgMeta.id}/?ww=${ww}&wl=${wl}&invert=${inverted}`;
+      const promise = loadHtmlImage(url).then(im=>{ imageCache.set(key, im); return im; }).catch(err=>{ imageCache.delete(key); throw err; });
+      imageCache.set(key, promise);
+      return await promise;
+    }
+    function prefetchIndex(i){
+      if (i < 0 || i >= images.length) return;
+      const imgMeta = images[i];
+      const key = getImageKey(imgMeta.id, ww, wl, inverted);
+      if (imageCache.has(key)) return;
+      const url = `/viewer/image/${imgMeta.id}/?ww=${ww}&wl=${wl}&invert=${inverted}`;
+      const promise = loadHtmlImage(url).then(im=>{ imageCache.set(key, im); return im; }).catch(()=>{ imageCache.delete(key); });
+      imageCache.set(key, promise);
+    }
+    const debouncedLoadOverlaysForCurrentImage = debounce(()=>{ loadOverlaysForCurrentImage(); }, 120);
+
     // Helper: parse pixel spacing robustly (string "0.5\\0.5", "0.5,0.5" or array)
     function parsePixelSpacing(ps){
       if (!ps) return null;
@@ -306,7 +347,7 @@
       canvas.width = Math.max(100, rect.width - 20);
       canvas.height = Math.max(100, rect.height - 20);
     }
-    window.addEventListener('resize', ()=>{ setCanvasSize(); draw(); });
+    window.addEventListener('resize', ()=>{ setCanvasSize(); requestDraw(); });
 
     function q(name){ return new URLSearchParams(window.location.search).get(name); }
 
@@ -348,9 +389,9 @@
         if (!r.ok) throw new Error('series fetch failed');
         const data = await r.json();
         currentSeries = data.series; images = data.images || []; index = 0;
+        imageCache.clear();
         sliceSlider.max = Math.max(0, images.length - 1); sliceSlider.value = 0; document.getElementById('sliceVal').textContent = '1';
         if (images.length){
-          // Fetch defaults from JSON API
           const probe = await fetch(`/viewer/api/image/${images[0].id}/display/`);
           if (probe.ok){
             const j = await probe.json();
@@ -366,7 +407,6 @@
         // Reset view state
         zoom = 1.0; panOffset = {x:0,y:0}; activeTool = 'window'; crosshair = false; mprMode = false; mprImgs = {axial:null,sagittal:null,coronal:null}; reconMode = null; reconImgs = []; reconIndex = 0;
         mprCross = { x: null, y: null, z: null }; // reset crosshair linkage
-        // Safely guard missing elements (fix: avoid null access halting draw)
         const enterMpr = document.getElementById('btnEnterMpr');
         const exitMpr = document.getElementById('btnExitMpr');
         if (enterMpr) enterMpr.style.display = images.length ? '' : 'none';
@@ -376,6 +416,8 @@
         setCanvasSize();
         await draw();
         await loadOverlaysForCurrentImage();
+        // Prefetch neighbors
+        prefetchIndex(1);
       } catch (e) {
         await fallbackToDesktop();
       }
@@ -531,10 +573,7 @@
         } catch(e){}
       }
       try {
-        const img = images[index];
-        const url = `/viewer/image/${img.id}/?ww=${ww}&wl=${wl}&invert=${inverted}`;
-        const htmlImg = new Image(); htmlImg.crossOrigin = 'anonymous';
-        await new Promise((resolve,reject)=>{ htmlImg.onload=resolve; htmlImg.onerror=reject; htmlImg.src=url; });
+        const htmlImg = await getImageForIndex(index);
         const vp = getViewportPlacement(htmlImg.width, htmlImg.height);
         ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
         ctx.imageSmoothingEnabled = false;
@@ -586,6 +625,8 @@
         }
         document.getElementById('overlay').innerHTML = `WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}<br>Slice: ${index+1}/${images.length}`;
         document.getElementById('zoominfo').textContent = `Zoom: ${Math.round(zoom*100)}%`;
+        // opportunistically prefetch neighbors
+        prefetchIndex(index+1); prefetchIndex(index-1);
       } catch (e) {
         await fallbackToDesktop();
       }
@@ -776,25 +817,25 @@
 
     // UI wiring
     seriesSelect.addEventListener('change', e=>{ if(e.target.value) loadSeries(e.target.value); });
-    wwSlider.addEventListener('input', e=>{ ww = +e.target.value; document.getElementById('wwVal').textContent = ww; draw(); });
-    wlSlider.addEventListener('input', e=>{ wl = +e.target.value; document.getElementById('wlVal').textContent = wl; draw(); });
-    sliceSlider.addEventListener('input', e=>{ index = +e.target.value; document.getElementById('sliceVal').textContent = index+1; loadOverlaysForCurrentImage(); });
-    zoomSlider.addEventListener('input', e=>{ zoom = (+e.target.value)/100; document.getElementById('zoomVal').textContent = `${e.target.value}%`; draw(); });
+    wwSlider.addEventListener('input', e=>{ ww = +e.target.value; document.getElementById('wwVal').textContent = ww; requestDraw(); });
+    wlSlider.addEventListener('input', e=>{ wl = +e.target.value; document.getElementById('wlVal').textContent = wl; requestDraw(); });
+    sliceSlider.addEventListener('input', e=>{ index = +e.target.value; document.getElementById('sliceVal').textContent = index+1; debouncedLoadOverlaysForCurrentImage(); prefetchIndex(index+1); prefetchIndex(index-1); });
+    zoomSlider.addEventListener('input', e=>{ zoom = (+e.target.value)/100; document.getElementById('zoomVal').textContent = `${e.target.value}%`; requestDraw(); });
     document.querySelectorAll('[data-preset]').forEach(btn=>btn.addEventListener('click', ()=>{
       const p = btn.getAttribute('data-preset');
       const map = { lung:{ww:1500,wl:-600}, bone:{ww:2000,wl:300}, soft:{ww:400,wl:40}, brain:{ww:100,wl:50} };
-      if (map[p]){ ww = map[p].ww; wl = map[p].wl; wwSlider.value = ww; wlSlider.value = wl; document.getElementById('wwVal').textContent = ww; document.getElementById('wlVal').textContent = wl; draw(); }
+      if (map[p]){ ww = map[p].ww; wl = map[p].wl; wwSlider.value = ww; wlSlider.value = wl; document.getElementById('wwVal').textContent = ww; document.getElementById('wlVal').textContent = wl; requestDraw(); }
     }));
     document.querySelectorAll('.tool').forEach(t=>t.addEventListener('click', ()=>{
       const tool = t.getAttribute('data-tool');
       document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active')); t.classList.add('active');
-      if (tool === 'invert'){ inverted = !inverted; draw(); return; }
-      if (tool === 'reset'){ zoom = 1.0; panOffset = {x:0,y:0}; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; draw(); return; }
-      if (tool === 'fit'){ panOffset = {x:0,y:0}; zoom = 1.0; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; draw(); return; }
+      if (tool === 'invert'){ inverted = !inverted; imageCache.clear(); requestDraw(); return; }
+      if (tool === 'reset'){ zoom = 1.0; panOffset = {x:0,y:0}; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; requestDraw(); return; }
+      if (tool === 'fit'){ panOffset = {x:0,y:0}; zoom = 1.0; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; requestDraw(); return; }
       if (tool === 'one'){
         if (lastVp){
           const baseFit = Math.min(canvas.width / lastVp.imgW, canvas.height / lastVp.imgH);
-          zoom = 1 / baseFit; zoomSlider.value = Math.min(500, Math.max(25, Math.round(zoom*100))); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; panOffset={x:0,y:0}; draw();
+          zoom = 1 / baseFit; zoomSlider.value = Math.min(500, Math.max(25, Math.round(zoom*100))); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; panOffset={x:0,y:0}; requestDraw();
         }
         return;
       }
@@ -808,12 +849,12 @@
         } else { if (cineTimer) { clearInterval(cineTimer); cineTimer = null; } }
         return;
       }
-      if (tool === 'spyglass'){ spyglass.active = !spyglass.active; draw(); return; }
-      if (tool === 'align-center'){ panOffset = {x:0,y:0}; draw(); return; }
-      if (tool === 'reload'){ ww = defaultWw; wl = defaultWl; inverted = false; panOffset={x:0,y:0}; zoom=1.0; wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); zoomSlider.value=100; document.getElementById('zoomVal').textContent='100%'; draw(); return; }
+      if (tool === 'spyglass'){ spyglass.active = !spyglass.active; requestDraw(); return; }
+      if (tool === 'align-center'){ panOffset = {x:0,y:0}; requestDraw(); return; }
+      if (tool === 'reload'){ ww = defaultWw; wl = defaultWl; inverted = false; panOffset={x:0,y:0}; zoom=1.0; wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); zoomSlider.value=100; document.getElementById('zoomVal').textContent='100%'; imageCache.clear(); requestDraw(); return; }
       if (tool === 'ai'){ alert('AI analysis result: (stub) No backend connected.'); return; }
-      if (tool === 'crosshair'){ if (activeTool === 'crosshair'){ crosshair = false; activeTool = 'window'; } else { activeTool = 'crosshair'; crosshair = true; } draw(); return; }
-      if (tool === 'hu'){ showHuProbe = true; huEllipse = null; draw(); return; }
+      if (tool === 'crosshair'){ if (activeTool === 'crosshair'){ crosshair = false; activeTool = 'window'; } else { activeTool = 'crosshair'; crosshair = true; } requestDraw(); return; }
+      if (tool === 'hu'){ showHuProbe = true; huEllipse = null; requestDraw(); return; }
       if (tool === 'measure') { showHuProbe = false; }
       // remove old inline MPR toggle from tool button; handled by 3D dropdown now
       if (tool === 'mpr'){
@@ -888,19 +929,19 @@
       if (spyglass.active){ spyglass.isPress = true; spyglass.cx = e.offsetX; spyglass.cy = e.offsetY; draw(); }
     });
     viewport.addEventListener('mousemove', async (e)=>{
-      if (!isDragging) { if (spyglass.active && spyglass.isPress){ spyglass.cx = e.offsetX; spyglass.cy = e.offsetY; await draw(); } return; }
+      if (!isDragging) { if (spyglass.active && spyglass.isPress){ spyglass.cx = e.offsetX; spyglass.cy = e.offsetY; requestDraw(); } return; }
       const vp = lastVp || { x:0, y:0, scale:1 };
       if (activeTool === 'window'){
         const dx = e.offsetX - dragStart.x; const dy = e.offsetY - dragStart.y; dragStart = { x: e.offsetX, y: e.offsetY };
-        ww = Math.max(1, ww + dx*4); wl = wl + dy*2; wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); await draw();
+        ww = Math.max(1, ww + dx*4); wl = wl + dy*2; wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); requestDraw();
       } else if (activeTool === 'pan'){
-        panOffset.x += (e.offsetX - dragStart.x); panOffset.y += (e.offsetY - dragStart.y); dragStart = { x: e.offsetX, y: e.offsetY }; await draw();
+        panOffset.x += (e.offsetX - dragStart.x); panOffset.y += (e.offsetY - dragStart.y); dragStart = { x: e.offsetX, y: e.offsetY }; requestDraw();
       } else if (activeTool === 'measure' && measureDraft){
-        measureDraft.end = canvasToImageCoords(vp, e.offsetX, e.offsetY); await draw();
+        measureDraft.end = canvasToImageCoords(vp, e.offsetX, e.offsetY); requestDraw();
       } else if (activeTool === 'annotate'){
         // no-op while dragging
       } else if (activeTool === 'zoom'){
-        const dy = e.offsetY - dragStart.y; dragStart = { x: e.offsetX, y: e.offsetY }; const factor = dy<0 ? 1.05 : 0.95; zoom = Math.min(5.0, Math.max(0.25, zoom*factor)); zoomSlider.value = Math.round(zoom*100); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; await draw();
+        const dy = e.offsetY - dragStart.y; dragStart = { x: e.offsetX, y: e.offsetY }; const factor = dy<0 ? 1.05 : 0.95; zoom = Math.min(5.0, Math.max(0.25, zoom*factor)); zoomSlider.value = Math.round(zoom*100); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; requestDraw();
       } else if (mprMode && activeTool === 'crosshair'){
         // Drag crosshair across planes
         const halfW = Math.floor(canvas.width/2), halfH = Math.floor(canvas.height/2);
@@ -1033,12 +1074,12 @@
     document.getElementById('viewport').addEventListener('wheel', async (e)=>{
       e.preventDefault();
       if (spyglass.active && spyglass.isPress){
-        const d = e.deltaY>0 ? -10 : 10; spyglass.radius = Math.max(20, Math.min(300, spyglass.radius + d)); await draw(); return;
+        const d = e.deltaY>0 ? -10 : 10; spyglass.radius = Math.max(20, Math.min(300, spyglass.radius + d)); requestDraw(); return;
       }
       if (reconMode && reconImgs.length){
         const d = e.deltaY>0 ? 1 : -1;
         reconIndex = Math.max(0, Math.min(reconImgs.length-1, reconIndex + d));
-        await draw();
+        requestDraw();
         return;
       }
       if (mprMode){
@@ -1062,8 +1103,8 @@
         }
         return;
       }
-      if (e.ctrlKey){ const delta = e.deltaY>0?0.9:1.1; zoom = Math.max(0.1, Math.min(5.0, zoom*delta)); zoomSlider.value = Math.round(zoom*100); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; draw(); }
-      else { const d = e.deltaY>0?1:-1; const ni = Math.max(0, Math.min(images.length-1, index+d)); if (ni !== index){ index = ni; sliceSlider.value = index; document.getElementById('sliceVal').textContent = index+1; loadOverlaysForCurrentImage(); } }
+      if (e.ctrlKey){ const delta = e.deltaY>0?0.9:1.1; zoom = Math.max(0.1, Math.min(5.0, zoom*delta)); zoomSlider.value = Math.round(zoom*100); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; requestDraw(); }
+      else { const d = e.deltaY>0?1:-1; const ni = Math.max(0, Math.min(images.length-1, index+d)); if (ni !== index){ index = ni; sliceSlider.value = index; document.getElementById('sliceVal').textContent = index+1; debouncedLoadOverlaysForCurrentImage(); prefetchIndex(index+1); prefetchIndex(index-1); } }
     }, { passive:false });
 
     // Local DICOM upload
