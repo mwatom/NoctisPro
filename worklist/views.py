@@ -786,14 +786,11 @@ def api_refresh_worklist(request):
     """API endpoint to refresh worklist and get latest studies"""
     user = request.user
     
-    # Get recent studies (last 24 hours)
-    from datetime import timedelta
-    recent_cutoff = timezone.now() - timedelta(hours=24)
-    
+    # Get all studies (not just recent ones) to ensure worklist displays properly
     if user.is_facility_user():
-        studies = Study.objects.filter(facility=user.facility, upload_date__gte=recent_cutoff)
+        studies = Study.objects.filter(facility=user.facility)
     else:
-        studies = Study.objects.filter(upload_date__gte=recent_cutoff)
+        studies = Study.objects.all()
     
     studies_data = []
     for study in studies.order_by('-upload_date')[:20]:  # Last 20 uploaded studies
@@ -817,7 +814,7 @@ def api_refresh_worklist(request):
     return JsonResponse({
         'success': True, 
         'studies': studies_data,
-        'total_recent': len(studies_data),
+        'total_recent': studies.count(),  # Total count of all studies
         'refresh_time': timezone.now().isoformat()
     })
 

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Worklist Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>Worklist API Test</h1>
+    
+    <div class="test-section">
+        <h2>API Test Results</h2>
+        <div id="apiResults"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Studies Table</h2>
+        <table id="studiesTable">
+            <thead>
+                <tr>
+                    <th>Accession</th>
+                    <th>Patient Name</th>
+                    <th>Patient ID</th>
+                    <th>Modality</th>
+                    <th>Status</th>
+                    <th>Priority</th>
+                </tr>
+            </thead>
+            <tbody id="studiesTableBody">
+                <tr>
+                    <td colspan="6">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        async function testAPI() {
+            const resultsDiv = document.getElementById('apiResults');
+            
+            try {
+                resultsDiv.innerHTML = '<p class="info">Testing API...</p>';
+                
+                // Test the studies API
+                const response = await fetch('/worklist/api/studies/');
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultsDiv.innerHTML = `
+                        <p class="success">✓ API Test Successful</p>
+                        <p>Status: ${response.status}</p>
+                        <p>Studies returned: ${data.studies.length}</p>
+                        <p>First study: ${data.studies[0] ? data.studies[0].accession_number : 'None'}</p>
+                    `;
+                    
+                    // Display studies in table
+                    displayStudies(data.studies);
+                } else {
+                    resultsDiv.innerHTML = `
+                        <p class="error">✗ API Test Failed</p>
+                        <p>Error: ${data.error || 'Unknown error'}</p>
+                    `;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <p class="error">✗ API Test Failed</p>
+                    <p>Error: ${error.message}</p>
+                `;
+            }
+        }
+        
+        function displayStudies(studies) {
+            const tbody = document.getElementById('studiesTableBody');
+            
+            if (studies.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6">No studies found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = studies.map(study => `
+                <tr>
+                    <td>${study.accession_number}</td>
+                    <td>${study.patient_name}</td>
+                    <td>${study.patient_id}</td>
+                    <td>${study.modality}</td>
+                    <td>${study.status}</td>
+                    <td>${study.priority}</td>
+                </tr>
+            `).join('');
+        }
+        
+        // Run test when page loads
+        document.addEventListener('DOMContentLoaded', testAPI);
+    </script>
+</body>
+</html>
