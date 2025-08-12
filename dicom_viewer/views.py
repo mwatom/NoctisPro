@@ -33,6 +33,77 @@ from .models import ViewerSession, Measurement, Annotation, ReconstructionJob
 from .dicom_utils import DicomProcessor
 from .reconstruction import MPRProcessor, MIPProcessor, Bone3DProcessor, MRI3DProcessor
 
+# MPR volume small LRU cache (per-process)
+from threading import Lock
+
+_MPR_CACHE_LOCK = Lock()
+_MPR_CACHE = {}  # series_id -> { 'volume': np.ndarray }
+_MPR_CACHE_ORDER = []
+_MAX_MPR_CACHE = 2
+
+
+def _get_mpr_volume_for_series(series):
+    """Return a 3D numpy volume (depth, height, width) for the given series.
+    Uses a tiny LRU cache to avoid re-reading and decoding DICOMs on each request.
+    """
+    # Local import to avoid circular issues
+    import numpy as _np
+    import pydicom as _pydicom
+    import os as _os
+
+    with _MPR_CACHE_LOCK:
+        entry = _MPR_CACHE.get(series.id)
+        if entry is not None and isinstance(entry.get('volume'), _np.ndarray):
+            # touch LRU order
+            try:
+                _MPR_CACHE_ORDER.remove(series.id)
+            except ValueError:
+                pass
+            _MPR_CACHE_ORDER.append(series.id)
+            return entry['volume']
+
+    # Build the volume (read from disk once)
+    images_qs = series.images.all().order_by('slice_location', 'instance_number')
+    volume_data = []
+    for img in images_qs:
+        try:
+            dicom_path = _os.path.join(settings.MEDIA_ROOT, str(img.file_path))
+            ds = _pydicom.dcmread(dicom_path)
+            pixel_array = ds.pixel_array.astype(_np.float32)
+            if hasattr(ds, 'RescaleSlope') and hasattr(ds, 'RescaleIntercept'):
+                pixel_array = pixel_array * float(ds.RescaleSlope) + float(ds.RescaleIntercept)
+            volume_data.append(pixel_array)
+        except Exception:
+            continue
+
+    if len(volume_data) < 2:
+        raise ValueError('Not enough images for MPR')
+
+    volume = _np.stack(volume_data, axis=0)
+    # For very thin stacks, interpolate along depth to stabilize reformats
+    if volume.shape[0] < 16:
+        factor = max(2, int(_np.ceil(16 / max(volume.shape[0], 1))))
+        volume = ndimage.zoom(volume, (factor, 1, 1), order=1)
+
+    with _MPR_CACHE_LOCK:
+        if series.id not in _MPR_CACHE:
+            # Enforce tiny LRU size
+            while len(_MPR_CACHE_ORDER) >= _MAX_MPR_CACHE:
+                evict_id = _MPR_CACHE_ORDER.pop(0)
+                _MPR_CACHE.pop(evict_id, None)
+            _MPR_CACHE[series.id] = { 'volume': volume }
+            _MPR_CACHE_ORDER.append(series.id)
+        else:
+            # Update existing
+            _MPR_CACHE[series.id]['volume'] = volume
+            try:
+                _MPR_CACHE_ORDER.remove(series.id)
+            except ValueError:
+                pass
+            _MPR_CACHE_ORDER.append(series.id)
+
+    return volume
+
 
 # Removed web-based viewer entrypoints (standalone_viewer, advanced_standalone_viewer, view_study)
 
@@ -156,49 +227,22 @@ def api_mpr_reconstruction(request, series_id):
         return JsonResponse({'error': 'Permission denied'}, status=403)
 
     try:
-        # Get all images in the series sorted by slice location
-        images = series.images.all().order_by('slice_location', 'instance_number')
-
-        if images.count() < 2:
-            return JsonResponse({'error': 'Need at least 2 images for MPR'}, status=400)
-
-        # Read DICOM data into a 3D volume (depth, height, width)
-        volume_data = []
-        default_window_width = 400
-        default_window_level = 40
-
-        for img in images:
-            try:
-                dicom_path = os.path.join(settings.MEDIA_ROOT, str(img.file_path))
-                ds = pydicom.dcmread(dicom_path)
-
-                pixel_array = ds.pixel_array.astype(np.float32)
-                if hasattr(ds, 'RescaleSlope') and hasattr(ds, 'RescaleIntercept'):
-                    pixel_array = pixel_array * float(ds.RescaleSlope) + float(ds.RescaleIntercept)
-
-                if len(volume_data) == 0:
-                    default_window_width = getattr(ds, 'WindowWidth', 400)
-                    default_window_level = getattr(ds, 'WindowCenter', 40)
-                    if hasattr(default_window_width, '__iter__') and not isinstance(default_window_width, str):
-                        default_window_width = default_window_width[0]
-                    if hasattr(default_window_level, '__iter__') and not isinstance(default_window_level, str):
-                        default_window_level = default_window_level[0]
-
-                volume_data.append(pixel_array)
-            except Exception:
-                continue
-
-        if len(volume_data) < 2:
-            return JsonResponse({'error': 'Could not read enough images for MPR'}, status=400)
-
-        volume = np.stack(volume_data, axis=0)
-
-        # If very thin stack, interpolate along depth to improve reformat quality
-        if volume.shape[0] < 16:
-            factor = max(2, int(np.ceil(16 / max(volume.shape[0], 1))))
-            volume = ndimage.zoom(volume, (factor, 1, 1), order=1)
+        # Load volume from cache or build once
+        volume = _get_mpr_volume_for_series(series)
 
         # Windowing params
+        def _derive_window(arr, fallback=(400.0, 40.0)):
+            try:
+                flat = arr.astype(np.float32).flatten()
+                p1 = float(np.percentile(flat, 1))
+                p99 = float(np.percentile(flat, 99))
+                ww = max(1.0, p99 - p1)
+                wl = (p99 + p1) / 2.0
+                return ww, wl
+            except Exception:
+                return fallback
+
+        default_window_width, default_window_level = _derive_window(volume)
         window_width = float(request.GET.get('window_width', default_window_width))
         window_level = float(request.GET.get('window_level', default_window_level))
         inverted = request.GET.get('inverted', 'false').lower() == 'true'
@@ -226,10 +270,8 @@ def api_mpr_reconstruction(request, series_id):
             if plane == 'axial':
                 slice_array = volume[slice_index, :, :]
             elif plane == 'sagittal':
-                # YZ plane: (depth, height)
                 slice_array = volume[:, :, slice_index]
             else:  # coronal
-                # XZ plane: (depth, width)
                 slice_array = volume[:, slice_index, :]
 
             img_b64 = _array_to_base64_image(slice_array, window_width, window_level, inverted)
