@@ -26,6 +26,8 @@ from django.conf import settings
 from io import BytesIO
 from PIL import Image
 import base64
+from pydicom.pixel_data_handlers.util import apply_voi_lut
+import scipy.ndimage as ndimage
 
 from .models import ViewerSession, Measurement, Annotation, ReconstructionJob
 from .dicom_utils import DicomProcessor
@@ -182,7 +184,7 @@ def api_mpr_reconstruction(request, series_id):
                         default_window_level = default_window_level[0]
                 
                 volume_data.append(pixel_array)
-            except Exception as e:
+            except Exception:
                 continue
         
         if len(volume_data) < 2:
@@ -190,6 +192,11 @@ def api_mpr_reconstruction(request, series_id):
         
         # Stack into 3D volume
         volume = np.stack(volume_data, axis=0)
+        
+        # If very thin stack, interpolate along depth to improve reformat quality
+        if volume.shape[0] < 16:
+            factor = max(2, int(np.ceil(16 / max(volume.shape[0], 1))))
+            volume = ndimage.zoom(volume, (factor, 1, 1), order=1)
         
         # Get windowing parameters from request
         window_width = float(request.GET.get('window_width', default_window_width))
@@ -267,7 +274,7 @@ def api_mip_reconstruction(request, series_id):
                         default_window_level = default_window_level[0]
                 
                 volume_data.append(pixel_array)
-            except Exception as e:
+            except Exception:
                 continue
         
         if len(volume_data) < 2:
@@ -275,6 +282,11 @@ def api_mip_reconstruction(request, series_id):
         
         # Stack into 3D volume
         volume = np.stack(volume_data, axis=0)
+        
+        # If very thin stack, interpolate along depth to stabilize MIP
+        if volume.shape[0] < 16:
+            factor = max(2, int(np.ceil(16 / max(volume.shape[0], 1))))
+            volume = ndimage.zoom(volume, (factor, 1, 1), order=1)
         
         # Get windowing parameters from request
         window_width = float(request.GET.get('window_width', default_window_width))
@@ -345,7 +357,7 @@ def api_bone_reconstruction(request, series_id):
                     pixel_array = pixel_array * ds.RescaleSlope + ds.RescaleIntercept
                 
                 volume_data.append(pixel_array)
-            except Exception as e:
+            except Exception:
                 continue
         
         if len(volume_data) < 2:
@@ -353,6 +365,11 @@ def api_bone_reconstruction(request, series_id):
         
         # Stack into 3D volume
         volume = np.stack(volume_data, axis=0)
+        
+        # If very thin stack, interpolate depth to make previews stable
+        if volume.shape[0] < 16:
+            factor = max(2, int(np.ceil(16 / max(volume.shape[0], 1))))
+            volume = ndimage.zoom(volume, (factor, 1, 1), order=1)
         
         # Apply bone threshold
         bone_mask = volume >= threshold
@@ -378,19 +395,8 @@ def api_bone_reconstruction(request, series_id):
         coronal_bone = bone_volume[:, bone_volume.shape[1] // 2, :]
         bone_views['coronal'] = _array_to_base64_image(coronal_bone, window_width, window_level, inverted)
         
-        # MIP of bone structures
-        bone_mip_axial = np.max(bone_volume, axis=0)
-        bone_views['mip_axial'] = _array_to_base64_image(bone_mip_axial, window_width, window_level, inverted)
-        
-        bone_mip_sagittal = np.max(bone_volume, axis=1)
-        bone_views['mip_sagittal'] = _array_to_base64_image(bone_mip_sagittal, window_width, window_level, inverted)
-        
-        bone_mip_coronal = np.max(bone_volume, axis=2)
-        bone_views['mip_coronal'] = _array_to_base64_image(bone_mip_coronal, window_width, window_level, inverted)
-        
         return JsonResponse({
             'bone_views': bone_views,
-            'threshold': threshold,
             'volume_shape': volume.shape,
             'series_info': {
                 'id': series.id,
@@ -550,14 +556,19 @@ def api_dicom_image_display(request, image_id):
         dicom_path = os.path.join('/workspace/media', str(image.file_path))
         ds = pydicom.dcmread(dicom_path)
         
-        # Get pixel array
-        pixel_array = ds.pixel_array.astype(np.float32)
+        # Get pixel array, apply VOI LUT if present (improves CR/DX contrast), then rescale
+        pixel_array = ds.pixel_array
+        try:
+            pixel_array = apply_voi_lut(pixel_array, ds)
+        except Exception:
+            pass
+        pixel_array = pixel_array.astype(np.float32)
         
-        # Apply rescale slope and intercept if available (convert to Hounsfield Units)
+        # Apply rescale slope/intercept
         if hasattr(ds, 'RescaleSlope') and hasattr(ds, 'RescaleIntercept'):
             pixel_array = pixel_array * float(ds.RescaleSlope) + float(ds.RescaleIntercept)
         
-        # If defaults missing, derive sensible WW/WL by robust min/max percentiles
+        # Derive sensible defaults if not provided
         def derive_window(arr):
             flat = arr.flatten()
             p1 = float(np.percentile(flat, 1))
@@ -565,7 +576,7 @@ def api_dicom_image_display(request, image_id):
             ww = max(1.0, p99 - p1)
             wl = (p99 + p1) / 2.0
             return ww, wl
-        # Determine defaults
+        
         default_window_width = getattr(ds, 'WindowWidth', None)
         default_window_level = getattr(ds, 'WindowCenter', None)
         if hasattr(default_window_width, '__iter__') and not isinstance(default_window_width, str):
@@ -576,16 +587,16 @@ def api_dicom_image_display(request, image_id):
             dw, dl = derive_window(pixel_array)
             default_window_width = default_window_width or dw
             default_window_level = default_window_level or dl
-        # DX/CR default adjustments
+        
+        # CR/DX defaults and MONOCHROME1 auto-invert
         modality = getattr(ds, 'Modality', '')
-        photo = getattr(ds, 'PhotometricInterpretation', '')
+        photo = str(getattr(ds, 'PhotometricInterpretation', '')).upper()
         default_inverted = False
         if modality in ['DX','CR','XA','RF']:
-            # Broader width and appropriate level typical for projection radiography
             default_window_width = float(default_window_width) if default_window_width is not None else 3000.0
             default_window_level = float(default_window_level) if default_window_level is not None else 1500.0
-            # Invert if MONOCHROME1
-            default_inverted = (str(photo).upper() == 'MONOCHROME1')
+            default_inverted = (photo == 'MONOCHROME1')
+        
         # Overwrite request params only if not provided
         try:
             ww_req = request.GET.get('window_width')
@@ -599,8 +610,8 @@ def api_dicom_image_display(request, image_id):
                 inverted = bool(default_inverted)
         except Exception:
             pass
-
-        # Generate image with proper windowing
+        
+        # Generate image
         image_data_url = _array_to_base64_image(pixel_array, window_width, window_level, inverted)
         
         if not image_data_url:

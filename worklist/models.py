@@ -56,7 +56,7 @@ class Study(models.Model):
     ]
 
     study_instance_uid = models.CharField(max_length=100, unique=True)
-    accession_number = models.CharField(max_length=50, unique=True)
+    accession_number = models.CharField(max_length=50, db_index=True)
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE)
     facility = models.ForeignKey(Facility, on_delete=models.CASCADE)
     modality = models.ForeignKey(Modality, on_delete=models.CASCADE)
