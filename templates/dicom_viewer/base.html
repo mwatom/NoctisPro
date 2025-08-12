@@ -8,7 +8,7 @@
   <style>
     body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a1a; color: #fff; }
     .layout { display: grid; grid-template-columns: 80px 1fr 300px; grid-template-rows: 60px 1fr; height: 100vh; }
-    .toolbar { grid-row: 1 / span 2; grid-column: 1; background: #2a2a2a; border-right: 1px solid #444; padding: 8px 6px; display: flex; flex-direction: column; gap: 6px; }
+    .toolbar { grid-row: 1 / span 2; grid-column: 1; background: #2a2a2a; border-right: 1px solid #444; padding: 8px 6px; display: flex; flex-direction: column; gap: 6px; overflow:auto; }
     .tool { width: 66px; height: 56px; background: #3a3a3a; border: none; border-radius: 8px; color: #fff; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; }
     .tool.active { background: #0078d4; }
     .tool i { font-size: 18px; margin-bottom: 4px; }
@@ -39,6 +39,10 @@
     #threeContainer { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: none; z-index: 1000; }
     #threeMount { position: absolute; inset: 0; }
     #close3d { position: absolute; top: 12px; right: 12px; z-index: 1001; }
+    /* DICOM tags modal */
+    #dicomModal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); z-index: 1200; }
+    #dicomModal .modal-card { background:#1e1e1e; border:1px solid #444; padding:16px; width:70%; max-width: 960px; max-height:80%; overflow:auto; border-radius:8px; }
+    #dicomModal .modal-header { display:flex; justify-content: space-between; align-items:center; margin-bottom:8px; }
   </style>
   
   <!-- Import map to resolve bare specifier used by OrbitControls -->
@@ -62,6 +66,12 @@
       <button class="tool" data-tool="hu"><i class="fas fa-thermometer-half"></i><span>HU</span></button>
       <button class="tool" data-tool="invert"><i class="fas fa-adjust"></i><span>Invert</span></button>
       <button class="tool" data-tool="reset"><i class="fas fa-undo"></i><span>Reset</span></button>
+      <button class="tool" data-tool="fit"><i class="fas fa-compress-arrows-alt"></i><span>Fit</span></button>
+      <button class="tool" data-tool="one"><i class="fas fa-expand"></i><span>1:1</span></button>
+      <button class="tool" data-tool="cine"><i class="fas fa-film"></i><span>Cine</span></button>
+      <button class="tool" data-tool="spyglass"><i class="fas fa-search"></i><span>Spyglass</span></button>
+      <button class="tool" data-tool="align-center"><i class="fas fa-align-center"></i><span>Center</span></button>
+      <button class="tool" data-tool="reload"><i class="fas fa-sync"></i><span>Reload</span></button>
       <button class="tool" data-tool="ai"><i class="fas fa-robot"></i><span>AI</span></button>
       <!-- 3D dropdown moved into toolbar -->
       <div class="tool-dropdown">
@@ -81,6 +91,13 @@
       {% endif %}
       <input id="localDicom" type="file" multiple webkitdirectory directory accept=".dcm,.dicom,application/dicom" style="display:none" />
       <select id="seriesSelect" class="select"><option value="">Select Series</option></select>
+      <select id="sortSelect" class="select">
+        <option value="">Sort: Instance # (asc)</option>
+        <option value="inst_desc">Instance # (desc)</option>
+      </select>
+      <button id="btnToggleTags" class="btn"><i class="fas fa-tags"></i> Tags</button>
+      <button id="btnShowDicom" class="btn"><i class="fas fa-info-circle"></i> Show DICOM</button>
+      <button id="btnCapture" class="btn"><i class="fas fa-camera"></i> Capture</button>
       <div id="patientInfo" style="margin-left:auto;color:#ccc;font-size:13px;">Patient: - | Study Date: - | Modality: -</div>
     </div>
     <div class="viewport" id="viewport">
@@ -158,6 +175,15 @@
     <button id="close3d" class="btn">Close 3D</button>
     <div id="threeMount"></div>
   </div>
+  <div id="dicomModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 style="margin:0;">DICOM Tags</h3>
+        <button id="closeDicomModal" class="btn">Close</button>
+      </div>
+      <pre id="dicomTagsPre" style="white-space:pre-wrap; color:#ddd;"></pre>
+    </div>
+  </div>
 
   <script>
   (function(){
@@ -188,11 +214,21 @@
     const btn3D = document.getElementById('btn3D');
     const menu3D = document.getElementById('menu3D');
 
+    // Topbar extras
+    const sortSelect = document.getElementById('sortSelect');
+    const btnToggleTags = document.getElementById('btnToggleTags');
+    const btnShowDicom = document.getElementById('btnShowDicom');
+    const btnCapture = document.getElementById('btnCapture');
+    const dicomModal = document.getElementById('dicomModal');
+    const dicomTagsPre = document.getElementById('dicomTagsPre');
+    const closeDicomModal = document.getElementById('closeDicomModal');
+
     let currentStudy = null;
     let currentSeries = null;
     let images = [];
     let index = 0;
     let ww = 400, wl = 40, inverted = false, zoom = 1.0;
+    let defaultWw = 400, defaultWl = 40;
     let mprMode = false;
     let mprImgs = { axial: null, sagittal: null, coronal: null };
     let reconMode = null; // 'mpr' | 'mip' | 'bone' | null
@@ -210,6 +246,13 @@
     let measurements = []; // persisted per image id
     let annotations = [];
     let crosshair = false;
+
+    // New states
+    let showTagsOverlay = false;
+    let currentImageTags = null;
+    let cineActive = false; let cineTimer = null; let cineFps = 12;
+    let spyglass = { active:false, radius:80, factor:2.0, invert:false, isPress:false, cx:0, cy:0 };
+    let mprFullPlane = null; // enlarged plane key when in MPR
 
     // Track last viewport mapping for precise coordinate transforms
     let lastVp = null; // {x,y,scale,imgW,imgH}
@@ -306,6 +349,7 @@
             if (j && j.image_info){
               ww = j.image_info.default_window_width || ww;
               wl = j.image_info.default_window_level || wl;
+              defaultWw = ww; defaultWl = wl;
               if (j.windowing && typeof j.windowing.inverted === 'boolean') { inverted = j.windowing.inverted; }
             }
           }
@@ -345,6 +389,29 @@
       if (!images.length && reconImgs.length===0) { ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height); return; }
       if (mprMode){
         try{
+          // Enlarge one plane if set
+          if (mprFullPlane){
+            // Ensure image for that plane is current
+            if (!mprImgs[mprFullPlane]){
+              const params = new URLSearchParams(); params.set('window_width', ww); params.set('window_level', wl); params.set('inverted', inverted);
+              const r = await fetch(`/viewer/api/series/${currentSeries.id}/mpr/?${params.toString()}`);
+              const j = await r.json(); if (j && j.mpr_views) mprImgs = j.mpr_views; if (j && j.counts) mprScroll.counts = j.counts;
+            }
+            ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
+            const imgSrc = mprImgs[mprFullPlane];
+            if (imgSrc){
+              const im = await loadImage(imgSrc);
+              const scale = Math.min(canvas.width / im.width, canvas.height / im.height);
+              const dw = im.width * scale, dh = im.height * scale;
+              const dx = (canvas.width - dw)/2, dy = (canvas.height - dh)/2;
+              ctx.imageSmoothingEnabled = false; ctx.drawImage(im, dx, dy, dw, dh);
+              mprRegionVps[mprFullPlane] = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height, rect: {x:0,y:0,w:canvas.width,h:canvas.height} };
+              if (huEllipse && huEllipse.mode==='mpr' && huEllipse.plane===mprFullPlane){ drawEllipseOverlay(mprFullPlane); }
+            }
+            document.getElementById('overlay').innerHTML = `MPR (${mprFullPlane.toUpperCase()}) | WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}`;
+            document.getElementById('zoominfo').textContent = `MPR`;
+            return;
+          }
           // Ensure counts and initial mid-slice indices are loaded
           if (!mprImgs.axial || !mprImgs.sagittal || !mprImgs.coronal){
             const params = new URLSearchParams(); params.set('window_width', ww); params.set('window_level', wl); params.set('inverted', inverted);
@@ -447,6 +514,48 @@
         lastVp = { x: vp.x, y: vp.y, scale: vp.scale, imgW: htmlImg.width, imgH: htmlImg.height };
         drawOverlays(vp);
         if (huEllipse && huEllipse.mode==='series') drawEllipseOverlay();
+        // Spyglass lens on top
+        if (spyglass.active && spyglass.isPress && lastVp){
+          ctx.save();
+          const r = Math.max(20, spyglass.radius);
+          // Clip circle
+          ctx.beginPath(); ctx.arc(spyglass.cx, spyglass.cy, r, 0, Math.PI*2); ctx.clip();
+          // Compute anchor image coords under cursor
+          const imgPt = canvasToImageCoords(lastVp, spyglass.cx, spyglass.cy);
+          const factor = Math.max(1.2, spyglass.factor);
+          const scale2 = lastVp.scale * factor;
+          const dw2 = lastVp.imgW * scale2, dh2 = lastVp.imgH * scale2;
+          const dx2 = spyglass.cx - (imgPt.x * scale2);
+          const dy2 = spyglass.cy - (imgPt.y * scale2);
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(htmlImg, dx2, dy2, dw2, dh2);
+          if (spyglass.invert){
+            // Invert only inside lens
+            const imgData = ctx.getImageData(spyglass.cx - r, spyglass.cy - r, r*2, r*2);
+            const d = imgData.data; for (let i=0;i<d.length;i+=4){ d[i]=255-d[i]; d[i+1]=255-d[i+1]; d[i+2]=255-d[i+2]; }
+            ctx.putImageData(imgData, spyglass.cx - r, spyglass.cy - r);
+          }
+          ctx.restore();
+          // Lens ring and info
+          ctx.save(); ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(spyglass.cx, spyglass.cy, r, 0, Math.PI*2); ctx.stroke(); ctx.restore();
+          document.getElementById('overlay').innerHTML = `WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}<br>Slice: ${index+1}/${images.length}<br>Spyglass x:${Math.round(imgPt.x)} y:${Math.round(imgPt.y)} mag:${factor.toFixed(1)}x`;
+        }
+        if (showTagsOverlay && currentImageTags){
+          const lines = [];
+          const t = currentImageTags;
+          if (t.patient_name) lines.push(`Patient: ${t.patient_name}`);
+          if (t.study_date) lines.push(`Study: ${t.study_date}`);
+          if (t.series_number !== undefined) lines.push(`Series#: ${t.series_number}`);
+          if (images[index] && images[index].instance_number !== undefined) lines.push(`Instance#: ${images[index].instance_number}`);
+          if (t.slice_thickness) lines.push(`Slice Thk: ${t.slice_thickness}`);
+          if (t.pixel_spacing) lines.push(`Pix Spacing: ${t.pixel_spacing}`);
+          ctx.save();
+          ctx.fillStyle = 'rgba(0,0,0,0.6)';
+          ctx.fillRect(canvas.width - 260, 12, 248, lines.length*16 + 10);
+          ctx.fillStyle = '#ddd'; ctx.font = '12px monospace';
+          lines.forEach((ln, i)=> ctx.fillText(ln, canvas.width - 250, 28 + i*16));
+          ctx.restore();
+        }
         document.getElementById('overlay').innerHTML = `WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}<br>Slice: ${index+1}/${images.length}`;
         document.getElementById('zoominfo').textContent = `Zoom: ${Math.round(zoom*100)}%`;
       } catch (e) {
@@ -545,10 +654,10 @@
       try {
         const r = await fetch('/viewer/measurements/save/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
         const j = await r.json();
-                  if (j && j.success){
-            if (dist.mm){ const cm = dist.mm/10.0; m.label = `${dist.mm.toFixed(2)} mm / ${cm.toFixed(2)} cm`; }
-            else { m.label = `${dist.px.toFixed(1)} px`; }
-          }
+        if (j && j.success){
+          if (dist.mm){ const cm = dist.mm/10.0; m.label = `${dist.mm.toFixed(2)} mm / ${cm.toFixed(2)} cm`; }
+          else { m.label = `${dist.px.toFixed(1)} px`; }
+        }
       } catch(e){}
     }
 
@@ -577,6 +686,20 @@
           annotations = (j.annotations||[]).map(a=>({ pos: {x:a.position_x, y:a.position_y}, text: a.text }));
           imageIdToAnnotations.set(imageId, annotations);
         } catch(e){ annotations = []; }
+      }
+      // Load tags if overlay is on
+      currentImageTags = null;
+      if (showTagsOverlay){
+        try {
+          const r = await fetch(`/viewer/api/image/${imageId}/data/`); const j = await r.json();
+          currentImageTags = {
+            patient_name: j.patient_name || j.image_info?.patient_name,
+            study_date: j.study_date || j.image_info?.study_date,
+            series_number: j.series?.series_number ?? j.series_number,
+            slice_thickness: j.series?.slice_thickness ?? j.slice_thickness,
+            pixel_spacing: j.series?.pixel_spacing ?? j.pixel_spacing
+          };
+        } catch(e){ currentImageTags = null; }
       }
       renderMeasurementsList();
       await draw();
@@ -607,6 +730,27 @@
       document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active')); t.classList.add('active');
       if (tool === 'invert'){ inverted = !inverted; draw(); return; }
       if (tool === 'reset'){ zoom = 1.0; panOffset = {x:0,y:0}; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; draw(); return; }
+      if (tool === 'fit'){ panOffset = {x:0,y:0}; zoom = 1.0; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; draw(); return; }
+      if (tool === 'one'){
+        if (lastVp){
+          const baseFit = Math.min(canvas.width / lastVp.imgW, canvas.height / lastVp.imgH);
+          zoom = 1 / baseFit; zoomSlider.value = Math.min(500, Math.max(25, Math.round(zoom*100))); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; panOffset={x:0,y:0}; draw();
+        }
+        return;
+      }
+      if (tool === 'cine'){
+        cineActive = !cineActive;
+        if (cineActive){
+          if (cineTimer) clearInterval(cineTimer);
+          cineTimer = setInterval(async ()=>{
+            if (!images.length) return; index = (index + 1) % images.length; sliceSlider.value = index; document.getElementById('sliceVal').textContent = index+1; await loadOverlaysForCurrentImage();
+          }, Math.max(30, Math.round(1000/cineFps)));
+        } else { if (cineTimer) { clearInterval(cineTimer); cineTimer = null; } }
+        return;
+      }
+      if (tool === 'spyglass'){ spyglass.active = !spyglass.active; draw(); return; }
+      if (tool === 'align-center'){ panOffset = {x:0,y:0}; draw(); return; }
+      if (tool === 'reload'){ ww = defaultWw; wl = defaultWl; inverted = false; panOffset={x:0,y:0}; zoom=1.0; wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); zoomSlider.value=100; document.getElementById('zoomVal').textContent='100%'; draw(); return; }
       if (tool === 'ai'){ alert('AI analysis result: (stub) No backend connected.'); return; }
       if (tool === 'crosshair'){ crosshair = !crosshair; draw(); return; }
       if (tool === 'hu'){ showHuProbe = true; huEllipse = null; draw(); return; }
@@ -645,9 +789,10 @@
         }
         draw();
       }
+      if (spyglass.active){ spyglass.isPress = true; spyglass.cx = e.offsetX; spyglass.cy = e.offsetY; draw(); }
     });
     viewport.addEventListener('mousemove', async (e)=>{
-      if (!isDragging) return;
+      if (!isDragging) { if (spyglass.active && spyglass.isPress){ spyglass.cx = e.offsetX; spyglass.cy = e.offsetY; await draw(); } return; }
       const vp = lastVp || { x:0, y:0, scale:1 };
       if (activeTool === 'window'){
         const dx = e.offsetX - dragStart.x; const dy = e.offsetY - dragStart.y; dragStart = { x: e.offsetX, y: e.offsetY };
@@ -748,11 +893,24 @@
         } catch(e){}
         await draw();
       }
+      if (spyglass.active){ spyglass.isPress = false; }
+    });
+    // Double-click enlarge/restore MPR plane
+    viewport.addEventListener('dblclick', async (e)=>{
+      if (!mprMode) return;
+      const halfW = Math.floor(canvas.width/2), halfH = Math.floor(canvas.height/2);
+      const mx = e.offsetX, my = e.offsetY;
+      let plane = null; if (mx < halfW && my < halfH) plane='sagittal'; else if (mx>=halfW && my<halfH) plane='coronal'; else if (mx<halfW && my>=halfH) plane='axial';
+      if (mprFullPlane && plane === mprFullPlane) { mprFullPlane = null; await draw(); return; }
+      if (plane) { mprFullPlane = plane; await draw(); }
     });
 
     // Mouse wheel slice/zoom
     document.getElementById('viewport').addEventListener('wheel', async (e)=>{
       e.preventDefault();
+      if (spyglass.active && spyglass.isPress){
+        const d = e.deltaY>0 ? -10 : 10; spyglass.radius = Math.max(20, Math.min(300, spyglass.radius + d)); await draw(); return;
+      }
       if (reconMode && reconImgs.length){
         const d = e.deltaY>0 ? 1 : -1;
         reconIndex = Math.max(0, Math.min(reconImgs.length-1, reconIndex + d));
@@ -831,7 +989,7 @@
         reconImgs = reconImgs.filter(Boolean);
         reconIndex = 0;
         await draw();
-                reconStatus.textContent = 'Done'; setTimeout(()=> reconStatus.textContent = '', 1500);
+        reconStatus.textContent = 'Done'; setTimeout(()=> reconStatus.textContent = '', 1500);
        } catch (err){
          reconStatus.textContent = `Error: ${err.message}`;
          await fallbackToDesktop();
@@ -861,65 +1019,100 @@
      btnClearMeasurements.addEventListener('click', ()=>{
        measurements = []; imageIdToMeasurements.set(getCurrentImageId(), measurements); renderMeasurementsList(); draw();
      });
- 
-     // Utils
-     function loadImage(src){
-       return new Promise((res, rej)=>{ const im = new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=src; });
-     }
 
-     // 3D viewer for bone mesh
-     let three = { renderer:null, scene:null, camera:null, controls:null };
-     function showBone3D(meshData){
+     // Sorting
+     sortSelect.addEventListener('change', async ()=>{
+       if (!images || !images.length) return;
+       const mode = sortSelect.value;
+       if (mode === 'inst_desc') images.sort((a,b)=> (b.instance_number||0) - (a.instance_number||0));
+       else images.sort((a,b)=> (a.instance_number||0) - (b.instance_number||0));
+       index = 0; sliceSlider.max = Math.max(0, images.length - 1); sliceSlider.value = 0; document.getElementById('sliceVal').textContent = '1';
+       await loadOverlaysForCurrentImage();
+     });
+
+     // Toggle tags overlay
+     btnToggleTags.addEventListener('click', async ()=>{
+       showTagsOverlay = !showTagsOverlay; await loadOverlaysForCurrentImage();
+     });
+
+     // Show DICOM modal
+     btnShowDicom.addEventListener('click', async ()=>{
        try {
-         const container = document.getElementById('threeContainer');
-         const mount = document.getElementById('threeMount');
-         container.style.display = 'block';
-         // init three only once
-         if (!three.renderer){
-           three.renderer = new THREE.WebGLRenderer({ antialias: true });
-           three.renderer.setSize(mount.clientWidth, mount.clientHeight);
-           mount.appendChild(three.renderer.domElement);
-           three.scene = new THREE.Scene();
-           three.scene.background = new THREE.Color(0x000000);
-           three.camera = new THREE.PerspectiveCamera(45, mount.clientWidth/mount.clientHeight, 0.1, 10000);
-           three.camera.position.set(0, 0, 400);
-           three.controls = new THREE.OrbitControls(three.camera, three.renderer.domElement);
-           const light1 = new THREE.DirectionalLight(0xffffff, 1.0); light1.position.set(1,1,1); three.scene.add(light1);
-           const light2 = new THREE.AmbientLight(0x444444); three.scene.add(light2);
-           window.addEventListener('resize', ()=>{
-             if (!three.renderer) return;
-             three.renderer.setSize(mount.clientWidth, mount.clientHeight);
-             three.camera.aspect = mount.clientWidth/mount.clientHeight; three.camera.updateProjectionMatrix();
-           });
-         } else {
-           // clear scene children except lights
-           const keep = []; three.scene.children.forEach(obj=>{ if (obj.isLight) keep.push(obj); }); three.scene.children = keep; keep.forEach(obj=> three.scene.add(obj));
-         }
-         // build geometry
-         const vertices = new Float32Array(meshData.vertices.flat());
-         const indices = new Uint32Array(meshData.faces.flat());
-         const geom = new THREE.BufferGeometry();
-         geom.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-         geom.setIndex(new THREE.BufferAttribute(indices, 1));
-         geom.computeVertexNormals();
-         const material = new THREE.MeshPhongMaterial({ color: 0xdddddd, specular: 0x111111, shininess: 30 });
-         const mesh = new THREE.Mesh(geom, material);
-         // center & scale
-         geom.computeBoundingSphere();
-         const bs = geom.boundingSphere; if (bs){ mesh.position.sub(bs.center); const target = 150; const s = bs.radius>0 ? target/bs.radius : 1; mesh.scale.setScalar(s); }
-         three.scene.add(mesh);
-         // animate
-         const animate = ()=>{ if (!three.renderer) return; three.controls.update(); three.renderer.render(three.scene, three.camera); requestAnimationFrame(animate); };
-         animate();
-         document.getElementById('close3d').onclick = ()=>{ container.style.display='none'; };
-       } catch(e){ console.warn('3D setup failed', e); }
-     }
+         const imageId = getCurrentImageId(); if (!imageId) return;
+         const r = await fetch(`/viewer/api/image/${imageId}/data/`); const j = await r.json();
+         dicomTagsPre.textContent = JSON.stringify(j, null, 2);
+         dicomModal.style.display = 'flex';
+       } catch(e){}
+     });
+     closeDicomModal.addEventListener('click', ()=>{ dicomModal.style.display = 'none'; });
+     dicomModal.addEventListener('click', (e)=>{ if (e.target === dicomModal) dicomModal.style.display = 'none'; });
+
+     // Capture canvas
+     btnCapture.addEventListener('click', ()=>{
+       try {
+         const url = canvas.toDataURL('image/jpeg', 0.92);
+         const a = document.createElement('a'); a.href = url; a.download = `dicom_capture_${Date.now()}.jpg`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+       } catch(e){}
+     });
+
+    // Utils
+    function loadImage(src){
+      return new Promise((res, rej)=>{ const im = new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=src; });
+    }
+
+    // 3D viewer for bone mesh
+    let three = { renderer:null, scene:null, camera:null, controls:null };
+    function showBone3D(meshData){
+      try {
+        const container = document.getElementById('threeContainer');
+        const mount = document.getElementById('threeMount');
+        container.style.display = 'block';
+        // init three only once
+        if (!three.renderer){
+          three.renderer = new THREE.WebGLRenderer({ antialias: true });
+          three.renderer.setSize(mount.clientWidth, mount.clientHeight);
+          mount.appendChild(three.renderer.domElement);
+          three.scene = new THREE.Scene();
+          three.scene.background = new THREE.Color(0x000000);
+          three.camera = new THREE.PerspectiveCamera(45, mount.clientWidth/mount.clientHeight, 0.1, 10000);
+          three.camera.position.set(0, 0, 400);
+          three.controls = new THREE.OrbitControls(three.camera, three.renderer.domElement);
+          const light1 = new THREE.DirectionalLight(0xffffff, 1.0); light1.position.set(1,1,1); three.scene.add(light1);
+          const light2 = new THREE.AmbientLight(0x444444); three.scene.add(light2);
+          window.addEventListener('resize', ()=>{
+            if (!three.renderer) return;
+            three.renderer.setSize(mount.clientWidth, mount.clientHeight);
+            three.camera.aspect = mount.clientWidth/mount.clientHeight; three.camera.updateProjectionMatrix();
+          });
+        } else {
+          // clear scene children except lights
+          const keep = []; three.scene.children.forEach(obj=>{ if (obj.isLight) keep.push(obj); }); three.scene.children = keep; keep.forEach(obj=> three.scene.add(obj));
+        }
+        // build geometry
+        const vertices = new Float32Array(meshData.vertices.flat());
+        const indices = new Uint32Array(meshData.faces.flat());
+        const geom = new THREE.BufferGeometry();
+        geom.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+        geom.setIndex(new THREE.BufferAttribute(indices, 1));
+        geom.computeVertexNormals();
+        const material = new THREE.MeshPhongMaterial({ color: 0xdddddd, specular: 0x111111, shininess: 30 });
+        const mesh = new THREE.Mesh(geom, material);
+        // center & scale
+        geom.computeBoundingSphere();
+        const bs = geom.boundingSphere; if (bs){ mesh.position.sub(bs.center); const target = 150; const s = bs.radius>0 ? target/bs.radius : 1; mesh.scale.setScalar(s); }
+        three.scene.add(mesh);
+        // animate
+        const animate = ()=>{ if (!three.renderer) return; three.controls.update(); three.renderer.render(three.scene, three.camera); requestAnimationFrame(animate); };
+        animate();
+        document.getElementById('close3d').onclick = ()=>{ container.style.display='none'; };
+      } catch(e){ console.warn('3D setup failed', e); }
+    }
  
-      // Init
-      setCanvasSize();
-      const studyId = q('study_id');
-      if (studyId) loadStudy(studyId);
-    })();
+     // Init
+     setCanvasSize();
+     const studyId = q('study_id');
+     if (studyId) loadStudy(studyId);
+   })();
   </script>
 </body>
 </html>
