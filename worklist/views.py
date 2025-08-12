@@ -210,7 +210,19 @@ def upload_study(request):
                 # Facility attribution
                 facility = request.user.facility if getattr(request.user, 'facility', None) else Facility.objects.filter(is_active=True).first()
                 if not facility:
-                    return JsonResponse({'success': False, 'error': 'No active facility configured'})
+                    # Allow admin to upload without preconfigured facility by creating a default one
+                    if hasattr(request.user, 'is_admin') and request.user.is_admin():
+                        facility = Facility.objects.create(
+                            name='Default Facility',
+                            address='N/A',
+                            phone='N/A',
+                            email='default@example.com',
+                            license_number=f'DEFAULT-{int(timezone.now().timestamp())}',
+                            ae_title='',
+                            is_active=True
+                        )
+                    else:
+                        return JsonResponse({'success': False, 'error': 'No active facility configured'})
                 
                 study, created = Study.objects.get_or_create(
                     study_instance_uid=study_uid,

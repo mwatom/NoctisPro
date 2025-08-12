@@ -1003,15 +1003,19 @@ def upload_dicom(request):
             if not facility:
                 facility = Facility.objects.filter(is_active=True).first()
             if not facility:
-                facility = Facility.objects.create(
-                    name='Default Facility',
-                    address='N/A',
-                    phone='N/A',
-                    email='default@example.com',
-                    license_number=f'DEFAULT-{upload_id[:8]}',
-                    ae_title='',
-                    is_active=True
-                )
+                # Allow admin uploads without configured facility by creating a default one
+                if hasattr(request.user, 'is_admin') and request.user.is_admin():
+                    facility = Facility.objects.create(
+                        name='Default Facility',
+                        address='N/A',
+                        phone='N/A',
+                        email='default@example.com',
+                        license_number=f'DEFAULT-{upload_id[:8]}',
+                        ae_title='',
+                        is_active=True
+                    )
+                else:
+                    return JsonResponse({'success': False, 'error': 'No active facility configured'})
 
             modality_code = getattr(rep_ds, 'Modality', 'OT')
             modality_obj, _ = Modality.objects.get_or_create(code=modality_code, defaults={'name': modality_code})
