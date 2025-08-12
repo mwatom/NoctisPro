@@ -193,6 +193,11 @@
             box-shadow: 0 0 0 1px var(--accent-color);
         }
 
+        .control-input::placeholder {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
         .btn-control {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
@@ -622,7 +627,11 @@
         <div class="controls-bar">
             <div class="control-group">
                 <label class="control-label">Date:</label>
-                <input type="date" class="control-input" id="dateFilter" value="2024-01-15">
+                <input type="date" class="control-input" id="dateFilter" value="">
+            </div>
+            <div class="control-group">
+                <label class="control-label">Search:</label>
+                <input type="text" class="control-input" id="searchFilter" placeholder="Patient, ID, Accession...">
             </div>
             <div class="control-group">
                 <label class="control-label">Status:</label>
@@ -658,6 +667,7 @@
                 </select>
             </div>
             <button class="btn-control reset" onclick="refreshData()">REFRESH</button>
+            <button class="btn-control" onclick="resetFilters()">RESET FILTERS</button>
             <button class="btn-control" onclick="launchDicomViewer()">
                 <i class="fas fa-external-link-alt"></i> DICOM VIEWER
             </button>
@@ -795,9 +805,9 @@
                 const studyTime = formatTime(study.study_time);
                 const scheduledTime = formatTime(study.scheduled_time);
                 
-                // Determine if this is a recently uploaded study
+                // Determine if this is a recently uploaded study (within last 10 minutes)
                 const isRecentUpload = study.upload_date && 
-                    (new Date() - new Date(study.upload_date)) < 300000; // 5 minutes
+                    (new Date() - new Date(study.upload_date)) < 600000; // 10 minutes
                 
                 return `
                     <tr onclick="selectStudy(this)" data-study-id="${study.id}" ${isRecentUpload ? 'class="recent-upload"' : ''}>
@@ -815,7 +825,7 @@
                             ${imageCount} <small style="color: var(--text-secondary);">(${seriesCount}s)</small>
                         </td>
                         <td>${study.facility || '-'}</td>
-                        <td title="Uploaded: ${uploadTime}">${study.room || '-'}</td>
+                        <td title="Uploaded: ${uploadTime} by ${study.uploaded_by || 'Unknown'}">${study.uploaded_by || '-'}</td>
                         <td>
                             <div class="viewer-buttons">
                                 <button class="btn-viewer" onclick="openStudyInViewer('${study.id}')" title="Open study in DICOM viewer">
@@ -981,15 +991,17 @@
         }
 
         function resetFilters() {
-            document.getElementById('dateFilter').value = '2024-01-15';
+            // Reset to current date
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('dateFilter').value = today;
             document.getElementById('statusFilter').value = '';
             document.getElementById('modalityFilter').value = '';
             document.getElementById('priorityFilter').value = '';
+            document.getElementById('searchFilter').value = '';
             
-            // Show all rows
-            document.querySelectorAll('.data-table tbody tr').forEach(row => {
-                row.style.display = '';
-            });
+            // Reset filtered data to show all studies
+            filteredData = [...studiesData];
+            renderStudiesTable();
         }
 
         // Enhanced refresh function with better error handling
@@ -1026,11 +1038,17 @@
 
         // Enhanced initialization with better auto-refresh and upload detection
         document.addEventListener('DOMContentLoaded', function() {
+            // Set current date in date filter
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('dateFilter').value = today;
+            
             // Load initial data
             loadStudiesData();
             
             // Set up enhanced auto-refresh with upload detection
             let lastStudyCount = 0;
+            let lastUploadTime = null;
+            
             setInterval(async () => {
                 try {
                     // Check for new studies
@@ -1039,6 +1057,7 @@
                     
                     if (data.success) {
                         const currentStudyCount = data.total_recent;
+                        const currentUploadTime = data.refresh_time;
                         
                         // If new studies were uploaded, show notification and refresh
                         if (currentStudyCount > lastStudyCount && lastStudyCount > 0) {
@@ -1047,12 +1066,16 @@
                             
                             // Full refresh
                             await loadStudiesData();
+                        } else if (lastUploadTime && currentUploadTime !== lastUploadTime) {
+                            // Check if there are any new uploads by comparing refresh times
+                            await loadStudiesData();
                         } else {
                             // Regular refresh
                             loadStudiesData();
                         }
                         
                         lastStudyCount = currentStudyCount;
+                        lastUploadTime = currentUploadTime;
                     }
                     
                     // Update last update time
@@ -1088,12 +1111,14 @@
         document.getElementById('modalityFilter').addEventListener('change', applyFilters);
         document.getElementById('priorityFilter').addEventListener('change', applyFilters);
         document.getElementById('dateFilter').addEventListener('change', applyFilters);
+        document.getElementById('searchFilter').addEventListener('input', applyFilters); // Add search filter
 
         function applyFilters() {
             const statusFilter = document.getElementById('statusFilter').value.toLowerCase();
             const modalityFilter = document.getElementById('modalityFilter').value.toLowerCase();
             const priorityFilter = document.getElementById('priorityFilter').value.toLowerCase();
             const dateFilter = document.getElementById('dateFilter').value;
+            const searchFilter = document.getElementById('searchFilter').value.toLowerCase();
             
             filteredData = studiesData.filter(study => {
                 const matchesStatus = !statusFilter || study.status.toLowerCase().includes(statusFilter);
@@ -1106,8 +1131,15 @@
                     const filterDate = new Date(dateFilter).toDateString();
                     matchesDate = studyDate === filterDate;
                 }
+
+                const matchesSearch = 
+                    !searchFilter || 
+                    (study.patient_id && study.patient_id.toLowerCase().includes(searchFilter)) ||
+                    (study.patient_name && study.patient_name.toLowerCase().includes(searchFilter)) ||
+                    (study.accession_number && study.accession_number.toLowerCase().includes(searchFilter)) ||
+                    (study.study_description && study.study_description.toLowerCase().includes(searchFilter));
                 
-                return matchesStatus && matchesModality && matchesPriority && matchesDate;
+                return matchesStatus && matchesModality && matchesPriority && matchesDate && matchesSearch;
             });
             
             renderStudiesTable();

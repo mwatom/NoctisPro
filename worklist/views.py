@@ -357,25 +357,16 @@ def api_studies(request):
         studies = Study.objects.all()
     
     studies_data = []
-    for study in studies.order_by('-study_date')[:50]:
-        # Generate realistic data for the modern dashboard
-        import random
-        from datetime import datetime, timedelta
+    for study in studies.order_by('-study_date')[:100]:  # Increased limit to show more studies
+        # Use real study data with fallback to reasonable defaults
+        study_time = study.study_date
+        scheduled_time = study.study_date
         
-        # Generate random times for today
-        base_time = datetime.now().replace(hour=8, minute=0, second=0, microsecond=0)
-        study_time = base_time + timedelta(minutes=random.randint(0, 480))  # 8 hours of studies
-        
-        # Generate scheduled time (usually 30-60 minutes after study time)
-        scheduled_time = study_time + timedelta(minutes=random.randint(30, 60))
-        
-        # Generate estimated duration
-        durations = ['30 min', '45 min', '60 min', '90 min', '120 min']
-        estimated_duration = random.choice(durations)
-        
-        # Generate technologist and room
-        technologists = ['John Smith', 'Sarah Wilson', 'Mike Johnson', 'Lisa Davis', 'Tom Brown']
-        rooms = ['Room 1', 'Room 2', 'Room 3', 'Room 4', 'Room 5']
+        # If study has upload_date, use it for better tracking
+        if hasattr(study, 'upload_date') and study.upload_date:
+            upload_date = study.upload_date.isoformat()
+        else:
+            upload_date = study.study_date.isoformat()
         
         studies_data.append({
             'id': study.id,
@@ -388,11 +379,12 @@ def api_studies(request):
             'study_date': study.study_date.isoformat(),
             'study_time': study_time.isoformat(),
             'scheduled_time': scheduled_time.isoformat(),
-            'estimated_duration': estimated_duration,
-            'technologist': random.choice(technologists),
-            'room': random.choice(rooms),
+            'upload_date': upload_date,
             'facility': study.facility.name,
             'image_count': study.get_image_count(),
+            'series_count': study.get_series_count(),
+            'study_description': study.study_description,
+            'uploaded_by': study.uploaded_by.get_full_name() if study.uploaded_by else 'Unknown',
         })
     
     return JsonResponse({'success': True, 'studies': studies_data})
