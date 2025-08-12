@@ -61,14 +61,14 @@
                     <i class="fas fa-users me-3"></i>User Management
                 </h1>
                 <div class="btn-group" role="group">
-                    <a href="{% url 'admin_panel:facility_create' %}" class="btn btn-success me-2">
+                    <a href="{% url 'admin_panel:facility_create' %}" class="btn-control me-2">
                         <i class="fas fa-hospital me-2"></i>Add Facility
                     </a>
-                    <a href="{% url 'admin_panel:user_create' %}" class="btn btn-medical">
+                    <a href="{% url 'admin_panel:user_create' %}" class="btn-control">
                         <i class="fas fa-user-plus me-2"></i>Add User
                     </a>
                     <div class="btn-group" role="group">
-                        <button type="button" class="btn btn-outline-light dropdown-toggle" data-bs-toggle="dropdown">
+                        <button type="button" class="btn-control dropdown-toggle" data-bs-toggle="dropdown">
                             <i class="fas fa-user-md me-2"></i>Add Radiologist
                         </button>
                         <ul class="dropdown-menu">
@@ -139,10 +139,10 @@
                         <i class="fas fa-list me-2"></i>Users List
                     </h5>
                     <div class="d-flex gap-2">
-                        <a href="{% url 'admin_panel:user_create' %}?role=radiologist" class="btn btn-outline-primary btn-sm">
+                        <a href="{% url 'admin_panel:user_create' %}?role=radiologist" class="btn-control btn-sm">
                             <i class="fas fa-user-md me-1"></i>Add Radiologist
                         </a>
-                        <a href="{% url 'admin_panel:facility_create' %}" class="btn btn-outline-success btn-sm">
+                        <a href="{% url 'admin_panel:facility_create' %}" class="btn-control btn-sm">
                             <i class="fas fa-hospital me-1"></i>Add Facility
                         </a>
                     </div>
@@ -214,11 +214,11 @@
                                 </td>
                                 <td>
                                     <div class="btn-group btn-group-sm" role="group">
-                                        <a href="{% url 'admin_panel:user_edit' user_item.id %}" class="btn btn-outline-light">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
+                                                                        <a href="{% url 'admin_panel:user_edit' user_item.id %}" class="btn-control">
+                                    <i class="fas fa-edit"></i>
+                                </a>
                                         {% if user_item.id != user.id %}
-                                        <a href="{% url 'admin_panel:user_delete' user_item.id %}" class="btn btn-outline-danger">
+                                        <a href="{% url 'admin_panel:user_delete' user_item.id %}" class="btn-control">
                                             <i class="fas fa-trash"></i>
                                         </a>
                                         {% endif %}
@@ -231,9 +231,9 @@
                                     <i class="fas fa-users fa-3x mb-3 opacity-50"></i>
                                     <div>No users found matching your criteria</div>
                                     <div class="mt-2">
-                                        <a href="{% url 'admin_panel:user_create' %}" class="btn btn-medical btn-sm">
-                                            <i class="fas fa-user-plus me-2"></i>Add First User
-                                        </a>
+                                                                        <a href="{% url 'admin_panel:user_create' %}" class="btn-control btn-sm">
+                                    <i class="fas fa-user-plus me-2"></i>Add First User
+                                </a>
                                     </div>
                                 </td>
                             </tr>
