@@ -374,6 +374,7 @@ def api_bone_reconstruction(request, series_id):
     try:
         # Get threshold from request
         threshold = int(request.GET.get('threshold', 300))  # Default bone threshold in HU
+        want_mesh = (request.GET.get('mesh','false').lower() == 'true')
         
         # Get all images in the series
         images = series.images.all().order_by('slice_location', 'instance_number')
@@ -434,6 +435,23 @@ def api_bone_reconstruction(request, series_id):
         coronal_bone = bone_volume[:, bone_volume.shape[1] // 2, :]
         bone_views['coronal'] = _array_to_base64_image(coronal_bone, window_width, window_level, inverted)
         
+        mesh_payload = None
+        if want_mesh:
+            # Light mesh via marching cubes at low resolution for web
+            try:
+                from skimage import measure as _measure
+                # Downsample for speed
+                ds_factor = max(1, int(np.ceil(max(1, bone_volume.shape[0]) / 128)))
+                vol_ds = bone_volume[::ds_factor, ::2, ::2]
+                verts, faces, normals, values = _measure.marching_cubes(vol_ds.astype(np.float32) > 0, level=0.5)
+                # Convert to simple lists
+                mesh_payload = {
+                    'vertices': verts.tolist(),
+                    'faces': faces.tolist(),
+                }
+            except Exception:
+                mesh_payload = None
+        
         return JsonResponse({
             'bone_views': bone_views,
             'volume_shape': volume.shape,
@@ -441,7 +459,8 @@ def api_bone_reconstruction(request, series_id):
                 'id': series.id,
                 'description': series.series_description,
                 'modality': series.modality
-            }
+            },
+            'mesh': mesh_payload
         })
         
     except Exception as e:
@@ -1813,6 +1832,8 @@ def api_hu_value(request):
     Query params:
     - mode=series&image_id=<id>&x=<col>&y=<row>
     - mode=mpr&series_id=<id>&plane=axial|sagittal|coronal&slice=<idx>&x=<col>&y=<row>
+    Optional ROI:
+     - shape=ellipse&cx=<cx>&cy=<cy>&rx=<rx>&ry=<ry>
     Coordinates x,y are in pixel indices within the displayed 2D slice (0-based).
     """
     user = request.user
@@ -1833,6 +1854,25 @@ def api_hu_value(request):
             intercept = float(getattr(ds, 'RescaleIntercept', 0.0))
             arr = arr * slope + intercept
             h, w = arr.shape[:2]
+            shape = (request.GET.get('shape') or '').lower()
+            if shape == 'ellipse':
+                cx = int(float(request.GET.get('cx', x)))
+                cy = int(float(request.GET.get('cy', y)))
+                rx = max(1, int(float(request.GET.get('rx', 1))))
+                ry = max(1, int(float(request.GET.get('ry', 1))))
+                yy, xx = np.ogrid[:h, :w]
+                mask = ((xx - cx) ** 2) / (rx ** 2) + ((yy - cy) ** 2) / (ry ** 2) <= 1.0
+                roi = arr[mask]
+                if roi.size == 0:
+                    return JsonResponse({'error': 'Empty ROI'}, status=400)
+                stats = {
+                    'mean': float(np.mean(roi)),
+                    'std': float(np.std(roi)),
+                    'min': float(np.min(roi)),
+                    'max': float(np.max(roi)),
+                    'n': int(roi.size),
+                }
+                return JsonResponse({'mode': 'series', 'image_id': image_id, 'stats': stats})
             if x < 0 or y < 0 or x >= w or y >= h:
                 return JsonResponse({'error': 'Out of bounds'}, status=400)
             hu = float(arr[y, x])
@@ -1879,25 +1919,70 @@ def api_hu_value(request):
             # Map x,y (col,row) from 2D plane to volume indices
             if plane == 'axial':
                 h, w = volume.shape[1], volume.shape[2]
+                shape = (request.GET.get('shape') or '').lower()
+                if shape == 'ellipse':
+                    cx = int(float(request.GET.get('cx', x)))
+                    cy = int(float(request.GET.get('cy', y)))
+                    rx = max(1, int(float(request.GET.get('rx', 1))))
+                    ry = max(1, int(float(request.GET.get('ry', 1))))
+                    yy, xx = np.ogrid[:h, :w]
+                    mask = ((xx - cx) ** 2) / (rx ** 2) + ((yy - cy) ** 2) / (ry ** 2) <= 1.0
+                    roi = volume[slice_index][mask]
+                    if roi.size == 0:
+                        return JsonResponse({'error': 'Empty ROI'}, status=400)
+                    stats = {
+                        'mean': float(np.mean(roi)),
+                        'std': float(np.std(roi)),
+                        'min': float(np.min(roi)),
+                        'max': float(np.max(roi)),
+                        'n': int(roi.size),
+                    }
+                    return JsonResponse({'mode': 'mpr', 'series_id': series_id, 'plane': plane, 'slice': slice_index, 'stats': stats})
                 if x < 0 or y < 0 or x >= w or y >= h:
                     return JsonResponse({'error': 'Out of bounds'}, status=400)
                 hu = float(volume[slice_index, int(y), int(x)])
             elif plane == 'sagittal':
                 # slice = volume[:, :, slice_index] shape (depth, height)
                 h, w = volume.shape[0], volume.shape[1]
+                shape = (request.GET.get('shape') or '').lower()
+                if shape == 'ellipse':
+                    cx = int(float(request.GET.get('cx', x)))
+                    cy = int(float(request.GET.get('cy', y)))
+                    rx = max(1, int(float(request.GET.get('rx', 1))))
+                    ry = max(1, int(float(request.GET.get('ry', 1))))
+                    yy, xx = np.ogrid[:h, :w]
+                    mask = ((xx - cx) ** 2) / (rx ** 2) + ((yy - cy) ** 2) / (ry ** 2) <= 1.0
+                    z_idx = yy
+                    y_idx = xx
+                    roi = volume[z_idx, y_idx, slice_index][mask]
+                    if roi.size == 0:
+                        return JsonResponse({'error': 'Empty ROI'}, status=400)
+                    stats = { 'mean': float(np.mean(roi)), 'std': float(np.std(roi)), 'min': float(np.min(roi)), 'max': float(np.max(roi)), 'n': int(roi.size) }
+                    return JsonResponse({'mode': 'mpr', 'series_id': series_id, 'plane': plane, 'slice': slice_index, 'stats': stats})
                 if x < 0 or y < 0 or x >= w or y >= h:
                     return JsonResponse({'error': 'Out of bounds'}, status=400)
-                z = int(y)
-                y_idx = int(x)
-                hu = float(volume[z, y_idx, slice_index])
+                hu = float(volume[int(y), int(x), slice_index])
             else:  # coronal
                 # slice = volume[:, slice_index, :] shape (depth, width)
                 h, w = volume.shape[0], volume.shape[2]
+                shape = (request.GET.get('shape') or '').lower()
+                if shape == 'ellipse':
+                    cx = int(float(request.GET.get('cx', x)))
+                    cy = int(float(request.GET.get('cy', y)))
+                    rx = max(1, int(float(request.GET.get('rx', 1))))
+                    ry = max(1, int(float(request.GET.get('ry', 1))))
+                    yy, xx = np.ogrid[:h, :w]
+                    mask = ((xx - cx) ** 2) / (rx ** 2) + ((yy - cy) ** 2) / (ry ** 2) <= 1.0
+                    z_idx = yy
+                    x_idx = xx
+                    roi = volume[z_idx, slice_index, x_idx][mask]
+                    if roi.size == 0:
+                        return JsonResponse({'error': 'Empty ROI'}, status=400)
+                    stats = { 'mean': float(np.mean(roi)), 'std': float(np.std(roi)), 'min': float(np.min(roi)), 'max': float(np.max(roi)), 'n': int(roi.size) }
+                    return JsonResponse({'mode': 'mpr', 'series_id': series_id, 'plane': plane, 'slice': slice_index, 'stats': stats})
                 if x < 0 or y < 0 or x >= w or y >= h:
                     return JsonResponse({'error': 'Out of bounds'}, status=400)
-                z = int(y)
-                x_idx = int(x)
-                hu = float(volume[z, slice_index, x_idx])
+                hu = float(volume[int(y), slice_index, int(x)])
             return JsonResponse({'mode': 'mpr', 'series_id': series_id, 'plane': plane, 'slice': slice_index, 'x': x, 'y': y, 'hu': round(hu, 2)})
 
         else:
