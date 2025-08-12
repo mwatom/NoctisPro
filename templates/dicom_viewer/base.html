@@ -48,7 +48,7 @@
     <div class="topbar">
       <button id="btnLoadLocal" class="btn btn-primary"><i class="fas fa-folder-open"></i> Load Local DICOM</button>
       <button id="btnBackWorklist" class="btn" onclick="window.location.href='{% url 'worklist:dashboard' %}'"><i class="fas fa-arrow-left"></i> Back to Worklist</button>
-      {% if user.is_authenticated and (user.role == 'admin' or user.role == 'radiologist') %}
+      {% if user.is_authenticated and user.can_edit_reports %}
       <button id="btnWriteReport" class="btn btn-primary" style="display:none"><i class="fas fa-file-signature"></i> Write Report</button>
       {% endif %}
       <input id="localDicom" type="file" multiple webkitdirectory directory accept=".dcm,.dicom,application/dicom" style="display:none" />

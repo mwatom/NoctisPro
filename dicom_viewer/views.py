@@ -166,7 +166,7 @@ def api_mpr_reconstruction(request, series_id):
         
         for img in images:
             try:
-                dicom_path = os.path.join('/workspace/media', str(img.file_path))
+                dicom_path = os.path.join(settings.MEDIA_ROOT, str(img.file_path))
                 ds = pydicom.dcmread(dicom_path)
                 
                 # Get pixel array and apply rescale slope/intercept
@@ -256,7 +256,7 @@ def api_mip_reconstruction(request, series_id):
         
         for img in images:
             try:
-                dicom_path = os.path.join('/workspace/media', str(img.file_path))
+                dicom_path = os.path.join(settings.MEDIA_ROOT, str(img.file_path))
                 ds = pydicom.dcmread(dicom_path)
                 
                 # Get pixel array and apply rescale slope/intercept
@@ -346,7 +346,7 @@ def api_bone_reconstruction(request, series_id):
         volume_data = []
         for img in images:
             try:
-                dicom_path = os.path.join('/workspace/media', str(img.file_path))
+                dicom_path = os.path.join(settings.MEDIA_ROOT, str(img.file_path))
                 ds = pydicom.dcmread(dicom_path)
                 
                 # Convert to Hounsfield Units if possible
@@ -553,7 +553,7 @@ def api_dicom_image_display(request, image_id):
         inverted = request.GET.get('inverted', 'false').lower() == 'true'
         
         # Read DICOM file
-        dicom_path = os.path.join('/workspace/media', str(image.file_path))
+        dicom_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
         ds = pydicom.dcmread(dicom_path)
         
         # Get pixel array, apply VOI LUT if present (improves CR/DX contrast), then rescale
