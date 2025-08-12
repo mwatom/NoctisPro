@@ -61,10 +61,10 @@
                     <i class="fas fa-hospital me-3"></i>Facility Management
                 </h1>
                 <div class="btn-group" role="group">
-                    <a href="{% url 'admin_panel:facility_create' %}" class="btn btn-medical me-2">
+                    <a href="{% url 'admin_panel:facility_create' %}" class="btn-control me-2">
                         <i class="fas fa-hospital me-2"></i>Add Facility
                     </a>
-                    <a href="{% url 'admin_panel:user_create' %}?role=radiologist" class="btn btn-outline-light">
+                    <a href="{% url 'admin_panel:user_create' %}?role=radiologist" class="btn-control">
                         <i class="fas fa-user-md me-2"></i>Add Radiologist
                     </a>
                 </div>
@@ -137,10 +137,10 @@
 
                 <div class="mt-3">
                     <div class="btn-group w-100" role="group">
-                        <a href="{% url 'admin_panel:facility_edit' facility.id %}" class="btn btn-outline-light btn-sm">
+                        <a href="{% url 'admin_panel:facility_edit' facility.id %}" class="btn-control btn-sm">
                             <i class="fas fa-edit me-1"></i>Edit
                         </a>
-                        <a href="{% url 'admin_panel:user_create' %}?facility={{ facility.id }}" class="btn btn-outline-primary btn-sm">
+                        <a href="{% url 'admin_panel:user_create' %}?facility={{ facility.id }}" class="btn-control btn-sm">
                             <i class="fas fa-user-plus me-1"></i>Add User
                         </a>
                     </div>
@@ -157,7 +157,7 @@
                     <a href="{% url 'admin_panel:facility_create' %}" class="btn btn-medical">
                         <i class="fas fa-hospital me-2"></i>Add First Facility
                     </a>
-                    <a href="{% url 'admin_panel:user_create' %}?role=radiologist" class="btn btn-outline-light">
+                    <a href="{% url 'admin_panel:user_create' %}?role=radiologist" class="btn-control">
                         <i class="fas fa-user-md me-2"></i>Add Radiologist
                     </a>
                 </div>
@@ -239,7 +239,7 @@
                         </a>
                     </div>
                     <div class="col-lg-3 col-md-6 mb-3">
-                        <a href="{% url 'admin_panel:user_create' %}?role=radiologist" class="btn btn-outline-light w-100 p-3 text-start">
+                        <a href="{% url 'admin_panel:user_create' %}?role=radiologist" class="btn-control w-100 p-3 text-start">
                             <i class="fas fa-user-md text-primary me-3"></i>
                             <div>
                                 <strong>Add Radiologist</strong>

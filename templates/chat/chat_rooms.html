@@ -152,7 +152,7 @@
                     <p class="text-light opacity-75 mb-0">Communicate with your medical team</p>
                 </div>
                 <div class="col-md-6 text-end">
-                    <a href="{% url 'worklist:dashboard' %}" class="btn btn-medical">
+                    <a href="{% url 'worklist:dashboard' %}" class="btn-control">
                         <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
                     </a>
                 </div>
@@ -167,8 +167,8 @@
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <span>{{ invitation.invited_by.get_full_name }} invited you to join "{{ invitation.room.name }}"</span>
                 <div>
-                    <a href="{% url 'chat:join_room' invitation.room.id %}" class="btn btn-sm btn-success me-2">Accept</a>
-                    <button class="btn btn-sm btn-secondary">Decline</button>
+                    <a href="{% url 'chat:join_room' invitation.room.id %}" class="btn-control me-2">Accept</a>
+                    <button class="btn-control">Decline</button>
                 </div>
             </div>
             {% endfor %}
@@ -296,7 +296,7 @@
             <i class="fas fa-comments"></i>
             <h4>No Chat Rooms Available</h4>
             <p>Create your first chat room to start communicating with your team.</p>
-            <button class="btn btn-medical" onclick="createNewRoom()">
+            <button class="btn-control" onclick="createNewRoom()">
                 <i class="fas fa-plus me-2"></i>Create Room
             </button>
         </div>
@@ -340,8 +340,8 @@
                     </div>
                 </div>
                 <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-medical">Create Room</button>
+                    <button type="button" class="btn-control" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn-control">Create Room</button>
                 </div>
             </form>
         </div>

@@ -183,7 +183,7 @@
                     <p class="text-light opacity-75 mb-0">View and manage radiology reports</p>
                 </div>
                 <div class="col-md-6 text-end">
-                    <a href="{% url 'worklist:dashboard' %}" class="btn btn-medical">
+                    <a href="{% url 'worklist:dashboard' %}" class="btn-control">
                         <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
                     </a>
                 </div>
@@ -231,7 +231,7 @@
                     <option value="XR">X-Ray</option>
                     <option value="US">Ultrasound</option>
                 </select>
-                <button class="btn btn-medical" onclick="applyFilters()">
+                <button class="btn-control" onclick="applyFilters()">
                     <i class="fas fa-filter me-2"></i>Filter
                 </button>
             </div>
@@ -302,7 +302,7 @@
                 <i class="fas fa-file-medical"></i>
                 <h4>No Reports Found</h4>
                 <p>Reports will appear here when radiologists create them for studies.</p>
-                <a href="{% url 'worklist:dashboard' %}" class="btn btn-medical">
+                <a href="{% url 'worklist:dashboard' %}" class="btn-control">
                     <i class="fas fa-arrow-left me-2"></i>Back to Worklist
                 </a>
             </div>
