@@ -1613,7 +1613,7 @@ def web_index(request):
 @login_required
 def web_viewer(request):
     """Render the web viewer page. Expects ?study_id in query."""
-    return render(request, 'dicom_viewer/viewer.html')
+    return render(request, 'dicom_viewer/base.html')
 
 
 @login_required
