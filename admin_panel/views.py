@@ -240,28 +240,23 @@ def user_edit(request, user_id):
 @login_required
 @user_passes_test(is_admin)
 def user_delete(request, user_id):
-    """Delete user"""
+    """Delete user immediately without confirmation"""
     user = get_object_or_404(User, id=user_id)
-    
-    if request.method == 'POST':
-        username = user.username
-        
-        # Log the action before deleting
-        AuditLog.objects.create(
-            user=request.user,
-            action='delete',
-            model_name='User',
-            object_id=str(user.id),
-            object_repr=str(user),
-            description=f'Deleted user {username}'
-        )
-        
-        user.delete()
-        messages.success(request, f'User {username} deleted successfully')
-        return redirect('admin_panel:user_management')
-    
-    context = {'user_obj': user}
-    return render(request, 'admin_panel/user_confirm_delete.html', context)
+    username = user.username
+
+    # Log the action before deleting
+    AuditLog.objects.create(
+        user=request.user,
+        action='delete',
+        model_name='User',
+        object_id=str(user.id),
+        object_repr=str(user),
+        description=f'Deleted user {username}'
+    )
+
+    user.delete()
+    messages.success(request, f'User {username} deleted successfully')
+    return redirect('admin_panel:user_management')
 
 @login_required
 @user_passes_test(is_admin)
