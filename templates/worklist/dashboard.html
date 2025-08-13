@@ -991,38 +991,12 @@
 
         // DICOM Viewer Functions
         async function openStudyInViewer(studyId) {
-            try {
-                const resp = await fetch(`/viewer/launch-desktop/${studyId}/`, { method: 'GET', credentials: 'same-origin' });
-                const data = await resp.json();
-                if (data && data.fallback_url) {
-                    window.open(data.fallback_url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
-                    showNotification('Opening web DICOM viewer...', 'info');
-                } else if (data.success) {
-                    showNotification('Desktop DICOM viewer launched.', 'success');
-                } else {
-                    const url = `/viewer/web/viewer/?study_id=${studyId}`;
-                    window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
-                }
-            } catch (e) {
-                const url = `/viewer/web/viewer/?study_id=${studyId}`;
-                window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
-            }
+            const url = `/viewer/web/viewer/?study_id=${studyId}`;
+            window.location.href = url;
         }
 
         async function launchDicomViewer() {
-            try {
-                const resp = await fetch('/viewer/launch-desktop/', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-                const data = await resp.json();
-                if (data && data.fallback_url) {
-                    window.open(data.fallback_url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
-                } else if (data.success) {
-                    showNotification('Desktop DICOM viewer launched.', 'success');
-                } else {
-                    window.open('/viewer/web/viewer/', '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
-                }
-            } catch (e) {
-                window.open('/viewer/web/viewer/', '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
-            }
+            window.location.href = '/viewer/web/viewer/';
         }
 
         function uploadStudies() {
