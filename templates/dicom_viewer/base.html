@@ -1355,8 +1355,8 @@
         const j = await r.json();
         if (j.error) throw new Error(j.error);
         if (j.mpr_views){ reconMode = 'mpr'; reconImgs = [j.mpr_views.axial, j.mpr_views.sagittal, j.mpr_views.coronal]; mprMode = true; document.getElementById('mprMeasurePanel').style.display=''; if (j.counts){ mprScroll.counts = j.counts; mprScroll.axial = Math.floor((j.counts.axial||0)/2); mprScroll.sagittal = Math.floor((j.counts.sagittal||0)/2); mprScroll.coronal = Math.floor((j.counts.coronal||0)/2); mprCross = { x: mprScroll.sagittal, y: mprScroll.coronal, z: mprScroll.axial }; prefetchMprSlices('axial', mprScroll.axial); prefetchMprSlices('sagittal', mprScroll.sagittal); prefetchMprSlices('coronal', mprScroll.coronal); } }
-                 if (j.mip_views){ reconMode = 'mip'; reconImgs = [j.mip_views.axial, j.mip_views.sagittal, j.mip_views.coronal]; document.getElementById('mprMeasurePanel').style.display='none'; mprMode = true; mprFullPlane = null; mprScroll.counts = j.counts || mprScroll.counts; }
-         if (j.bone_views){ reconMode = 'bone'; reconImgs = [j.bone_views.axial || j.bone_views.bone_axial_preview, j.bone_views.sagittal || j.bone_views.bone_sagittal_preview, j.bone_views.coronal || j.bone_views.bone_coronal_preview]; document.getElementById('mprMeasurePanel').style.display='none'; mprMode = true; mprFullPlane = null; if (j.mesh) showBone3D(j.mesh); }
+                 if (j.mip_views){ reconMode = 'mip'; reconImgs = [j.mip_views.axial, j.mip_views.sagittal, j.mip_views.coronal]; document.getElementById('mprMeasurePanel').style.display='none'; mprMode = false; mprFullPlane = null; mprScroll.counts = j.counts || mprScroll.counts; }
+         if (j.bone_views){ reconMode = 'bone'; reconImgs = [j.bone_views.axial || j.bone_views.bone_axial_preview, j.bone_views.sagittal || j.bone_views.bone_sagittal_preview, j.bone_views.coronal || j.bone_views.bone_coronal_preview]; document.getElementById('mprMeasurePanel').style.display='none'; mprMode = false; mprFullPlane = null; if (j.mesh) showBone3D(j.mesh); }
          reconImgs = reconImgs.filter(Boolean);
          reconIndex = 0;
          await draw();
@@ -1369,22 +1369,23 @@
  
            btnGenerateRecon.addEventListener('click', ()=>{ generateReconstruction(); });
 
-      // Worklist navigation that prefers returning to the original/mother worklist window
-      function returnToWorklist(e){
-        try {
-          const targetUrl = '{% url 'worklist:dashboard' %}';
-          if (window.opener && !window.opener.closed) {
-            try { window.opener.location.href = targetUrl; } catch(err) {}
-            window.close();
-            return false;
-          }
-          if (window.top && window.top !== window){
-            try { window.top.location.href = targetUrl; return false; } catch(err) {}
-          }
-          window.location.href = targetUrl;
-          return false;
-        } catch(_) { window.location.href = '{% url 'worklist:dashboard' %}'; return false; }
-      }
+             // Worklist navigation that prefers returning to the original/mother worklist window
+       function returnToWorklist(e){
+         try {
+           const targetUrl = '{% url 'worklist:dashboard' %}';
+           if (window.opener && !window.opener.closed) {
+             try { window.opener.location.href = targetUrl; } catch(err) {}
+             window.close();
+             return false;
+           }
+           if (window.top && window.top !== window){
+             try { window.top.location.href = targetUrl; return false; } catch(err) {}
+           }
+           window.location.href = targetUrl;
+           return false;
+         } catch(_) { window.location.href = '{% url 'worklist:dashboard' %}'; return false; }
+       }
+       window.returnToWorklist = returnToWorklist;
 
     // Preload MPR mid-slices after series load to avoid UI stall on first click
     function warmupMpr(){
