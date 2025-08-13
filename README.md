@@ -174,3 +174,35 @@ Key architectural improvements:
 - Event-driven architecture with proper signal handling
 - Defensive programming with input validation
 - Modular design for easy extension
+
+## Auto-reload on Ubuntu 24.04 (Development Mode)
+
+For rapid iteration on a server, you can enable auto-reload so code changes restart Django, Celery, and the DICOM receiver.
+
+1) Install and run using the deploy script with `AUTO_RELOAD=1`:
+
+```bash
+# From project root
+chmod +x deploy.sh
+AUTO_RELOAD=1 ./deploy.sh
+```
+
+This will:
+- Run `python manage.py runserver 0.0.0.0:8000` with Django’s reloader
+- Install `watchdog` and use `watchmedo auto-restart` for Celery and `dicom_receiver.py`
+- Automatically restart workers on `*.py` file changes
+
+2) To stop background processes (if needed):
+
+```bash
+pkill -f "manage.py runserver" || true
+pkill -f "watchmedo .* celery" || true
+pkill -f "watchmedo .* dicom_receiver.py" || true
+pkill -f "dicom_receiver.py" || true
+```
+
+3) For production (no auto-reload), run normally:
+
+```bash
+./deploy.sh
+```

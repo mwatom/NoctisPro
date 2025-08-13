@@ -31,6 +31,11 @@ pip install --upgrade pip wheel setuptools
 
 echo "==> Installing Python requirements"
 pip install -r "$APP_DIR/requirements.txt"
+# If AUTO_RELOAD is enabled, install watchdog for watchmedo
+if [ "${AUTO_RELOAD:-}" = "1" ] || [ "${AUTO_RELOAD:-}" = "true" ] || [ "${AUTO_RELOAD:-}" = "True" ]; then
+  echo "==> AUTO_RELOAD enabled: installing watchdog"
+  pip install watchdog
+fi
 
 export DJANGO_SETTINGS_MODULE=noctis_pro.settings
 export REDIS_URL
@@ -65,19 +70,45 @@ pkill -f "daphne .*noctis_pro.asgi" || true
 pkill -f "celery .* worker" || true
 pkill -f "dicom_receiver.py" || true
 
-# Start Daphne (ASGI) for Django Channels
-echo "==> Starting Daphne on ${HOST}:${PORT}"
-nohup daphne -b "$HOST" -p "$PORT" noctis_pro.asgi:application > "$APP_DIR/daphne.log" 2>&1 &
+# Start server processes
+if [ "${AUTO_RELOAD:-}" = "1" ] || [ "${AUTO_RELOAD:-}" = "true" ] || [ "${AUTO_RELOAD:-}" = "True" ]; then
+  echo "==> Starting Django dev server with auto-reload on ${HOST}:${PORT}"
+  nohup "$VENV_DIR/bin/python" manage.py runserver "$HOST:$PORT" > "$APP_DIR/django-dev.log" 2>&1 &
 
-# Start Celery worker (optional but recommended for recon tasks)
-if command -v celery >/dev/null 2>&1; then
-  echo "==> Starting Celery worker"
-  nohup celery -A noctis_pro worker -l info > "$APP_DIR/celery.log" 2>&1 &
+  # Start Celery with auto-restart on code changes if available
+  if command -v celery >/dev/null 2>&1; then
+    if command -v watchmedo >/dev/null 2>&1; then
+      echo "==> Starting Celery worker with auto-restart"
+      nohup watchmedo auto-restart -d "$APP_DIR" -p "*.py" -R -- celery -A noctis_pro worker -l info > "$APP_DIR/celery.log" 2>&1 &
+    else
+      echo "==> Starting Celery worker (no auto-restart)"
+      nohup celery -A noctis_pro worker -l info > "$APP_DIR/celery.log" 2>&1 &
+    fi
+  fi
+
+  # Start DICOM receiver with auto-restart on code changes
+  if command -v watchmedo >/dev/null 2>&1; then
+    echo "==> Starting DICOM receiver (auto-restart enabled)"
+    nohup watchmedo auto-restart -d "$APP_DIR" -p "*.py" -R -- "$VENV_DIR/bin/python" "$APP_DIR/dicom_receiver.py" --port 11112 --aet NOCTIS_SCP > "$APP_DIR/dicom_receiver.log" 2>&1 &
+  else
+    echo "==> Starting DICOM receiver (no auto-restart)"
+    nohup "$VENV_DIR/bin/python" "$APP_DIR/dicom_receiver.py" --port 11112 --aet NOCTIS_SCP > "$APP_DIR/dicom_receiver.log" 2>&1 &
+  fi
+else
+  # Start Daphne (ASGI) for Django Channels
+  echo "==> Starting Daphne on ${HOST}:${PORT}"
+  nohup daphne -b "$HOST" -p "$PORT" noctis_pro.asgi:application > "$APP_DIR/daphne.log" 2>&1 &
+
+  # Start Celery worker (optional but recommended for recon tasks)
+  if command -v celery >/dev/null 2>&1; then
+    echo "==> Starting Celery worker"
+    nohup celery -A noctis_pro worker -l info > "$APP_DIR/celery.log" 2>&1 &
+  fi
+
+  # Start DICOM receiver (storescp)
+  echo "==> Starting DICOM receiver (SCP)"
+  nohup "$VENV_DIR/bin/python" "$APP_DIR/dicom_receiver.py" --port 11112 --aet NOCTIS_SCP > "$APP_DIR/dicom_receiver.log" 2>&1 &
 fi
-
-# Start DICOM receiver (storescp)
-echo "==> Starting DICOM receiver (SCP)"
-nohup "$VENV_DIR/bin/python" "$APP_DIR/dicom_receiver.py" --port 11112 --aet NOCTIS_SCP > "$APP_DIR/dicom_receiver.log" 2>&1 &
 
 sleep 2
 

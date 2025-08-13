@@ -26,3 +26,6 @@ sphinx-rtd-theme==2.0.0
 
 # Environment Management
 python-dotenv==1.0.1
+
+# Auto-reload / file watching
+watchdog
