@@ -245,8 +245,10 @@
     const viewCoronal = document.getElementById('viewCoronal');
 
     // 3D dropdown controls
-    const btn3D = document.getElementById('btn3D');
-    const menu3D = document.getElementById('menu3D');
+          const btn3D = document.getElementById('btn3D');
+      const menu3D = document.getElementById('menu3D');
+      // Reduce initial image decode overhead for large previews
+      [viewAxial, viewSagittal, viewCoronal].forEach(img=>{ if(img){ img.loading='eager'; img.decoding='async'; }});
 
     // Topbar extras
     const sortSelect = document.getElementById('sortSelect');
@@ -630,16 +632,45 @@
       if (reconMode && reconImgs.length){
         try {
           ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
-          const im = await loadImage(reconImgs[reconIndex]);
-          const scale = Math.min(canvas.width / im.width, canvas.height / im.height) * zoom;
-          const dw = im.width * scale, dh = im.height * scale;
-          const dx = (canvas.width - dw)/2 + panOffset.x; const dy = (canvas.height - dh)/2 + panOffset.y;
-          ctx.imageSmoothingEnabled = false;
-          ctx.drawImage(im, dx, dy, dw, dh);
-          lastVp = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height };
-          document.getElementById('overlay').innerHTML = `${reconMode.toUpperCase()} | View ${reconIndex+1}/${reconImgs.length}`;
-          document.getElementById('zoominfo').textContent = `Zoom: ${Math.round(zoom*100)}%`;
-          return;
+          if (reconMode === 'mip' || reconMode === 'bone'){
+            // Draw 3-plane grid similar to MPR using the three recon previews
+            const imgs = [];
+            for (let i=0;i<3;i++){ if (reconImgs[i]) { try { imgs[i] = await loadImage(reconImgs[i]); } catch(e){ imgs[i] = null; } } }
+            const halfW = Math.floor(canvas.width/2), halfH = Math.floor(canvas.height/2);
+            const regions = [
+              { x: 0, y: 0, w: halfW, h: halfH, key: 'sagittal', im: imgs[1] },
+              { x: halfW, y: 0, w: canvas.width - halfW, h: halfH, key: 'coronal', im: imgs[2] },
+              { x: 0, y: halfH, w: halfW, h: canvas.height - halfH, key: 'axial', im: imgs[0] },
+              { x: halfW, y: halfH, w: canvas.width - halfW, h: canvas.height - halfH, key: 'empty', im: null },
+            ];
+            // Crosshair dividing lines
+            ctx.save(); ctx.strokeStyle = 'rgba(0,255,255,0.8)'; ctx.beginPath(); ctx.moveTo(halfW, 0); ctx.lineTo(halfW, canvas.height); ctx.moveTo(0, halfH); ctx.lineTo(canvas.width, halfH); ctx.stroke(); ctx.restore();
+            for (const reg of regions){
+              if (!reg.im) continue;
+              const im = reg.im;
+              const scale = Math.min(reg.w / im.width, reg.h / im.height);
+              const dw = im.width * scale, dh = im.height * scale;
+              const dx = reg.x + (reg.w - dw)/2 + panOffset.x; const dy = reg.y + (reg.h - dh)/2 + panOffset.y;
+              ctx.imageSmoothingEnabled = false;
+              ctx.drawImage(im, dx, dy, dw, dh);
+              // Label
+              ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(dx + 8, dy + 8, 150, 22); ctx.fillStyle = '#0ff'; ctx.font = '12px monospace'; ctx.fillText(`${reg.key.toUpperCase()}`, dx + 12, dy + 24); ctx.restore();
+            }
+            document.getElementById('overlay').innerHTML = `${reconMode.toUpperCase()} | 3-Plane`;
+            document.getElementById('zoominfo').textContent = `${reconMode.toUpperCase()}`;
+            return;
+          } else {
+            const im = await loadImage(reconImgs[reconIndex]);
+            const scale = Math.min(canvas.width / im.width, canvas.height / im.height) * zoom;
+            const dw = im.width * scale, dh = im.height * scale;
+            const dx = (canvas.width - dw)/2 + panOffset.x; const dy = (canvas.height - dh)/2 + panOffset.y;
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(im, dx, dy, dw, dh);
+            lastVp = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height };
+            document.getElementById('overlay').innerHTML = `${reconMode.toUpperCase()} | View ${reconIndex+1}/${reconImgs.length}`;
+            document.getElementById('zoominfo').textContent = `Zoom: ${Math.round(zoom*100)}%`;
+            return;
+          }
         } catch(e){}
       }
       try {
@@ -1264,15 +1295,32 @@
     btnLoadLocal.addEventListener('click', ()=> inputLocal.click());
     inputLocal.addEventListener('change', async (e)=>{
       try {
-        if (!e.target.files || !e.target.files.length) return;
+        const files = e.target.files ? Array.from(e.target.files) : [];
+        if (!files.length) return;
         reconStatus.textContent = 'Uploading DICOM files...';
-        const form = new FormData();
-        Array.from(e.target.files).forEach(f=> form.append('dicom_files', f));
-        const resp = await fetch('/viewer/upload/', { method:'POST', body: form });
-        const data = await resp.json();
-        if (!data.success) throw new Error(data.error || 'Upload failed');
+        const CHUNK_SIZE = 80;
+        const MAX_PARALLEL = 2;
+        const chunks = [];
+        for (let i=0; i<files.length; i+=CHUNK_SIZE){ chunks.push(files.slice(i, i+CHUNK_SIZE)); }
+        let current = 0; let lastStudyId = null; let errors = 0;
+        async function uploadChunk(chunk){
+          const form = new FormData();
+          chunk.forEach(f=> form.append('dicom_files', f));
+          const resp = await fetch('/viewer/upload/', { method:'POST', body: form });
+          const data = await resp.json();
+          if (!data.success){ errors++; return; }
+          current += chunk.length;
+          if (!lastStudyId && data.study_id) lastStudyId = data.study_id;
+          reconStatus.textContent = `Uploading... ${current}/${files.length}`;
+        }
+        let idx = 0;
+        const workers = Array.from({length: Math.min(MAX_PARALLEL, chunks.length)}).map(async ()=>{
+          while (true){ const i = idx++; if (i >= chunks.length) break; await uploadChunk(chunks[i]); }
+        });
+        await Promise.all(workers);
+        if (errors > 0 && current === 0) throw new Error('Upload failed');
         reconStatus.textContent = 'Upload complete. Loading study...';
-        await loadStudy(data.study_id);
+        if (lastStudyId) { await loadStudy(lastStudyId); }
         reconStatus.textContent = '';
       } catch (err){
         reconStatus.textContent = `Error: ${err.message}`;
@@ -1307,8 +1355,8 @@
         const j = await r.json();
         if (j.error) throw new Error(j.error);
         if (j.mpr_views){ reconMode = 'mpr'; reconImgs = [j.mpr_views.axial, j.mpr_views.sagittal, j.mpr_views.coronal]; mprMode = true; document.getElementById('mprMeasurePanel').style.display=''; if (j.counts){ mprScroll.counts = j.counts; mprScroll.axial = Math.floor((j.counts.axial||0)/2); mprScroll.sagittal = Math.floor((j.counts.sagittal||0)/2); mprScroll.coronal = Math.floor((j.counts.coronal||0)/2); mprCross = { x: mprScroll.sagittal, y: mprScroll.coronal, z: mprScroll.axial }; prefetchMprSlices('axial', mprScroll.axial); prefetchMprSlices('sagittal', mprScroll.sagittal); prefetchMprSlices('coronal', mprScroll.coronal); } }
-                 if (j.mip_views){ reconMode = 'mip'; reconImgs = [j.mip_views.axial, j.mip_views.sagittal, j.mip_views.coronal]; document.getElementById('mprMeasurePanel').style.display='none'; mprMode = false; }
-         if (j.bone_views){ reconMode = 'bone'; reconImgs = [j.bone_views.axial || j.bone_views.bone_axial_preview, j.bone_views.sagittal || j.bone_views.bone_sagittal_preview, j.bone_views.coronal || j.bone_views.bone_coronal_preview]; document.getElementById('mprMeasurePanel').style.display='none'; mprMode = false; if (j.mesh) showBone3D(j.mesh); }
+                 if (j.mip_views){ reconMode = 'mip'; reconImgs = [j.mip_views.axial, j.mip_views.sagittal, j.mip_views.coronal]; document.getElementById('mprMeasurePanel').style.display='none'; mprMode = true; mprFullPlane = null; mprScroll.counts = j.counts || mprScroll.counts; }
+         if (j.bone_views){ reconMode = 'bone'; reconImgs = [j.bone_views.axial || j.bone_views.bone_axial_preview, j.bone_views.sagittal || j.bone_views.bone_sagittal_preview, j.bone_views.coronal || j.bone_views.bone_coronal_preview]; document.getElementById('mprMeasurePanel').style.display='none'; mprMode = true; mprFullPlane = null; if (j.mesh) showBone3D(j.mesh); }
          reconImgs = reconImgs.filter(Boolean);
          reconIndex = 0;
          await draw();
