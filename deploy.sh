@@ -2,11 +2,12 @@
 set -euo pipefail
 
 # Config
-APP_DIR="/workspace"
-VENV_DIR="$APP_DIR/venv"
-HOST="0.0.0.0"
-PORT="8000"
-REDIS_URL="redis://127.0.0.1:6379/0"
+# Allow overriding via env; default to the script directory
+APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+VENV_DIR="${VENV_DIR:-$APP_DIR/venv}"
+HOST="${HOST:-0.0.0.0}"
+PORT="${PORT:-8000}"
+REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379/0}"
 
 # Detect IP for message
 IP_ADDR=$(hostname -I 2>/dev/null | awk '{print $1}')
