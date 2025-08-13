@@ -10,11 +10,27 @@ from accounts.models import User, Facility
 from worklist.models import Study, Modality
 from .models import SystemConfiguration, AuditLog, SystemUsageStatistics
 import json
+import re
+from django.utils.crypto import get_random_string
 
 
 def is_admin(user):
     """Check if user is admin"""
     return user.is_authenticated and user.is_admin()
+
+def _standardize_aetitle(source: str) -> str:
+    """Generate a DICOM-compliant AE Title (<=16 chars, A-Z 0-9 _), ensure uniqueness."""
+    base = re.sub(r"[^A-Z0-9 ]+", "", (source or "").upper()).strip().replace(" ", "_") or "FACILITY"
+    aet = base[:16]
+    suffix = 1
+    # Ensure uniqueness (case-insensitive)
+    while Facility.objects.filter(ae_title__iexact=aet).exists():
+        tail = f"_{suffix}"
+        aet = (base[: 16 - len(tail)] + tail)[:16] or f"FAC_{suffix:02d}"
+        suffix += 1
+        if suffix > 99:
+            break
+    return aet
 
 @login_required
 @user_passes_test(is_admin)
@@ -120,16 +136,40 @@ def user_create(request):
             role = request.POST.get('role')
             facility_id = request.POST.get('facility')
             password = request.POST.get('password')
-            
+            confirm_password = request.POST.get('password_confirm')
+            phone = request.POST.get('phone', '')
+            license_number = request.POST.get('license_number', '')
+            specialization = request.POST.get('specialization', '')
+
             # Validation
+            if not username or not password:
+                messages.error(request, 'Username and password are required')
+                return redirect('admin_panel:user_create')
+
+            if password != confirm_password:
+                messages.error(request, 'Passwords do not match')
+                return redirect('admin_panel:user_create')
+
+            if len(password) < 8:
+                messages.error(request, 'Password must be at least 8 characters long')
+                return redirect('admin_panel:user_create')
+
             if User.objects.filter(username=username).exists():
                 messages.error(request, 'Username already exists')
                 return redirect('admin_panel:user_create')
             
-            if User.objects.filter(email=email).exists():
+            if email and User.objects.filter(email=email).exists():
                 messages.error(request, 'Email already exists')
                 return redirect('admin_panel:user_create')
             
+            # Facility role must have a facility assigned
+            facility = None
+            if role == 'facility':
+                if not facility_id:
+                    messages.error(request, 'Facility is required for Facility User role')
+                    return redirect('admin_panel:user_create')
+                facility = get_object_or_404(Facility, id=facility_id)
+
             # Create user
             user = User.objects.create_user(
                 username=username,
@@ -139,12 +179,12 @@ def user_create(request):
                 last_name=last_name,
                 role=role
             )
-            
-            # Set facility if provided
-            if facility_id:
-                facility = get_object_or_404(Facility, id=facility_id)
+            if facility:
                 user.facility = facility
-                user.save()
+            user.phone = phone
+            user.license_number = license_number
+            user.specialization = specialization
+            user.save()
             
             # Log the action
             AuditLog.objects.create(
@@ -300,11 +340,12 @@ def facility_create(request):
     if request.method == 'POST':
         try:
             name = request.POST.get('name')
-            ae_title = (request.POST.get('ae_title', '') or '').strip().upper()
-            # Auto-generate AE Title if missing
-            if not ae_title and name:
-                base = ''.join(ch for ch in name.upper() if ch.isalnum() or ch == ' ').strip().replace(' ', '_')
-                ae_title = (base[:12] or 'FACILITY')  # limit length, DICOM AE max 16; keep some headroom
+            ae_title_raw = (request.POST.get('ae_title', '') or '').strip()
+            if ae_title_raw:
+                # Standardize provided AE Title
+                ae_title = _standardize_aetitle(ae_title_raw)
+            else:
+                ae_title = _standardize_aetitle(name)
             facility = Facility.objects.create(
                 name=name,
                 address=request.POST.get('address'),
@@ -320,17 +361,39 @@ def facility_create(request):
                 facility.letterhead = request.FILES['letterhead']
                 facility.save()
             
-            # Log the action
-            AuditLog.objects.create(
-                user=request.user,
-                action='create',
-                model_name='Facility',
-                object_id=str(facility.id),
-                object_repr=str(facility),
-                description=f'Created facility {facility.name}'
-            )
+            # Optionally create a facility user account
+            if request.POST.get('create_facility_user') in ['on', '1', 'true', 'True']:
+                desired_username = (request.POST.get('facility_username') or facility.ae_title or name or '').strip()
+                desired_username = re.sub(r"[^A-Za-z0-9_.-]", "", desired_username)[:150] or facility.ae_title
+                username = desired_username
+                idx = 1
+                while User.objects.filter(username=username).exists():
+                    suffix = f"{idx}"
+                    username = (desired_username[:150 - len(suffix)] + suffix)
+                    idx += 1
+                facility_email = request.POST.get('facility_email') or ''
+                raw_password = request.POST.get('facility_password') or get_random_string(12)
+                user = User.objects.create_user(
+                    username=username,
+                    email=facility_email,
+                    password=raw_password,
+                    role='facility'
+                )
+                user.facility = facility
+                user.first_name = name
+                user.save()
+                AuditLog.objects.create(
+                    user=request.user,
+                    action='create',
+                    model_name='User',
+                    object_id=str(user.id),
+                    object_repr=str(user),
+                    description=f'Created facility user {user.username} for {facility.name}'
+                )
+                messages.success(request, f"Facility {facility.name} created. Facility login '{username}' has been created.")
+            else:
+                messages.success(request, f'Facility {facility.name} created successfully')
             
-            messages.success(request, f'Facility {facility.name} created successfully')
             return redirect('admin_panel:facility_management')
             
         except Exception as e:
@@ -351,11 +414,8 @@ def facility_edit(request, facility_id):
             facility.phone = request.POST.get('phone')
             facility.email = request.POST.get('email')
             facility.license_number = request.POST.get('license_number')
-            ae_title = (request.POST.get('ae_title', '') or '').strip().upper()
-            if not ae_title and facility.name:
-                base = ''.join(ch for ch in facility.name.upper() if ch.isalnum() or ch == ' ').strip().replace(' ', '_')
-                ae_title = (base[:12] or 'FACILITY')
-            facility.ae_title = ae_title
+            ae_title_raw = (request.POST.get('ae_title', '') or '').strip()
+            facility.ae_title = _standardize_aetitle(ae_title_raw or facility.name)
             facility.is_active = request.POST.get('is_active') == 'on'
             
             # Handle letterhead upload
@@ -364,17 +424,38 @@ def facility_edit(request, facility_id):
             
             facility.save()
             
-            # Log the action
-            AuditLog.objects.create(
-                user=request.user,
-                action='update',
-                model_name='Facility',
-                object_id=str(facility.id),
-                object_repr=str(facility),
-                description=f'Updated facility {facility.name}'
-            )
-            
-            messages.success(request, f'Facility {facility.name} updated successfully')
+            # Optionally create a facility user account during edit
+            if request.POST.get('create_facility_user') in ['on', '1', 'true', 'True']:
+                desired_username = (request.POST.get('facility_username') or facility.ae_title or facility.name or '').strip()
+                desired_username = re.sub(r"[^A-Za-z0-9_.-]", "", desired_username)[:150] or facility.ae_title
+                username = desired_username
+                idx = 1
+                while User.objects.filter(username=username).exists():
+                    suffix = f"{idx}"
+                    username = (desired_username[:150 - len(suffix)] + suffix)
+                    idx += 1
+                facility_email = request.POST.get('facility_email') or ''
+                raw_password = request.POST.get('facility_password') or get_random_string(12)
+                user = User.objects.create_user(
+                    username=username,
+                    email=facility_email,
+                    password=raw_password,
+                    role='facility'
+                )
+                user.facility = facility
+                user.first_name = facility.name
+                user.save()
+                AuditLog.objects.create(
+                    user=request.user,
+                    action='create',
+                    model_name='User',
+                    object_id=str(user.id),
+                    object_repr=str(user),
+                    description=f'Created facility user {user.username} for {facility.name}'
+                )
+                messages.success(request, f"Facility updated. Facility login '{username}' has been created.")
+            else:
+                messages.success(request, f'Facility {facility.name} updated successfully')
             return redirect('admin_panel:facility_management')
             
         except Exception as e:
