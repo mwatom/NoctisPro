@@ -787,8 +787,9 @@ def api_update_study_status(request, study_id):
 @login_required
 @csrf_exempt
 def api_delete_study(request, study_id):
-    """API endpoint to delete a study (admin only)"""
-    if request.method != 'DELETE':
+    """API endpoint to delete a study (admin only)
+    Accepts DELETE and POST (for environments where DELETE is blocked)."""
+    if request.method not in ['DELETE', 'POST']:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
     # Check if user is admin

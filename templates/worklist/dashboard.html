@@ -924,7 +924,11 @@
                     method: 'DELETE',
                     headers: { 'X-CSRFToken': getCSRFToken() },
                     credentials: 'same-origin'
-                });
+                }).catch(()=> fetch(`/worklist/api/study/${studyId}/delete/`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': getCSRFToken() },
+                    credentials: 'same-origin'
+                }));
                 const data = await resp.json();
                 if(!resp.ok || data.error){
                     throw new Error(data.error || 'Failed to delete study');

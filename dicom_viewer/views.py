@@ -367,7 +367,8 @@ def api_mpr_reconstruction(request, series_id):
 @login_required
 @csrf_exempt
 def api_mip_reconstruction(request, series_id):
-    """API endpoint for Maximum Intensity Projection (MIP)"""
+    """API endpoint for Maximum Intensity Projection (MIP)
+    Optimized to reuse cached 3D volume when available for instant response."""
     series = get_object_or_404(Series, id=series_id)
     user = request.user
     
@@ -376,45 +377,36 @@ def api_mip_reconstruction(request, series_id):
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
     try:
-        # Get all images in the series
-        images = series.images.all().order_by('slice_location', 'instance_number')
-
-        if images.count() < 2:
-            return JsonResponse({'error': 'Need at least 2 images for MIP'}, status=400)
-        
-        # Read DICOM data
-        volume_data = []
-        default_window_width = 400
-        default_window_level = 40
-        
-        for img in images:
-            try:
-                dicom_path = os.path.join(settings.MEDIA_ROOT, str(img.file_path))
-                ds = pydicom.dcmread(dicom_path)
-                
-                # Get pixel array and apply rescale slope/intercept
-                pixel_array = ds.pixel_array.astype(np.float32)
-                if hasattr(ds, 'RescaleSlope') and hasattr(ds, 'RescaleIntercept'):
-                    pixel_array = pixel_array * float(ds.RescaleSlope) + float(ds.RescaleIntercept)
-                
-                # Get default window/level from first image
-                if len(volume_data) == 0:
-                    default_window_width = getattr(ds, 'WindowWidth', 400)
-                    default_window_level = getattr(ds, 'WindowCenter', 40)
-                    if hasattr(default_window_width, '__iter__') and not isinstance(default_window_width, str):
-                        default_window_width = default_window_width[0]
-                    if hasattr(default_window_level, '__iter__') and not isinstance(default_window_level, str):
-                        default_window_level = default_window_level[0]
-                
-                volume_data.append(pixel_array)
-            except Exception:
-                continue
-        
-        if len(volume_data) < 2:
-            return JsonResponse({'error': 'Could not read enough images for MIP'}, status=400)
-        
-        # Stack into 3D volume
-        volume = np.stack(volume_data, axis=0)
+        # Reuse MPR 3D volume cache when available (fast path)
+        try:
+            volume = _get_mpr_volume_for_series(series)
+            default_window_width, default_window_level = 400, 40
+        except Exception:
+            # Fallback: build volume from DICOMs (slower)
+            images = series.images.all().order_by('slice_location', 'instance_number')
+            if images.count() < 2:
+                return JsonResponse({'error': 'Need at least 2 images for MIP'}, status=400)
+            volume_data = []
+            default_window_width = 400
+            default_window_level = 40
+            for img in images:
+                try:
+                    dicom_path = os.path.join(settings.MEDIA_ROOT, str(img.file_path))
+                    ds = pydicom.dcmread(dicom_path)
+                    px = ds.pixel_array.astype(np.float32)
+                    if hasattr(ds, 'RescaleSlope') and hasattr(ds, 'RescaleIntercept'):
+                        px = px * float(ds.RescaleSlope) + float(ds.RescaleIntercept)
+                    if not volume_data:
+                        ww = getattr(ds, 'WindowWidth', 400); wl = getattr(ds, 'WindowCenter', 40)
+                        if hasattr(ww, '__iter__') and not isinstance(ww, str): ww = ww[0]
+                        if hasattr(wl, '__iter__') and not isinstance(wl, str): wl = wl[0]
+                        default_window_width, default_window_level = ww, wl
+                    volume_data.append(px)
+                except Exception:
+                    continue
+            if len(volume_data) < 2:
+                return JsonResponse({'error': 'Could not read enough images for MIP'}, status=400)
+            volume = np.stack(volume_data, axis=0)
         
         # If very thin stack, interpolate along depth to stabilize MIP unless high quality requested
         quality = request.GET.get('quality', '').lower()
@@ -427,25 +419,15 @@ def api_mip_reconstruction(request, series_id):
         window_level = float(request.GET.get('window_level', default_window_level))
         inverted = request.GET.get('inverted', 'false').lower() == 'true'
         
-        # Generate MIP projections
+        # Generate MIP projections (vectorized)
         mip_views = {}
-
-        # For high quality, avoid any downsampling and keep precise max-intensity
-        # Axial MIP (maximum along Z-axis)
-        mip_axial = np.max(volume, axis=0)
-        mip_views['axial'] = _array_to_base64_image(mip_axial, window_width, window_level, inverted)
-        
-        # Sagittal MIP (maximum along Y-axis)
-        mip_sagittal = np.max(volume, axis=1)
-        mip_views['sagittal'] = _array_to_base64_image(mip_sagittal, window_width, window_level, inverted)
-        
-        # Coronal MIP (maximum along X-axis)
-        mip_coronal = np.max(volume, axis=2)
-        mip_views['coronal'] = _array_to_base64_image(mip_coronal, window_width, window_level, inverted)
+        mip_views['axial'] = _array_to_base64_image(np.max(volume, axis=0), window_width, window_level, inverted)
+        mip_views['sagittal'] = _array_to_base64_image(np.max(volume, axis=1), window_width, window_level, inverted)
+        mip_views['coronal'] = _array_to_base64_image(np.max(volume, axis=2), window_width, window_level, inverted)
         
         return JsonResponse({
             'mip_views': mip_views,
-            'volume_shape': volume.shape,
+            'volume_shape': tuple(int(x) for x in volume.shape),
             'series_info': {
                 'id': series.id,
                 'description': series.series_description,
@@ -459,7 +441,8 @@ def api_mip_reconstruction(request, series_id):
 @login_required
 @csrf_exempt
 def api_bone_reconstruction(request, series_id):
-    """API endpoint for bone reconstruction using thresholding"""
+    """API endpoint for bone reconstruction using thresholding
+    Optimized to reuse cached 3D volume when available; returns 3-plane previews instantly."""
     series = get_object_or_404(Series, id=series_id)
     user = request.user
     
@@ -468,79 +451,64 @@ def api_bone_reconstruction(request, series_id):
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
     try:
-        # Get threshold from request
-        threshold = int(request.GET.get('threshold', 300))  # Default bone threshold in HU
+        # Parameters
+        threshold = int(request.GET.get('threshold', 300))
         want_mesh = (request.GET.get('mesh','false').lower() == 'true')
-        quality = (request.GET.get('quality','').lower())  # 'high' to disable downsampling
+        quality = (request.GET.get('quality','').lower())
         
-        # Get all images in the series
-        images = series.images.all().order_by('slice_location', 'instance_number')
+        # Fast path: reuse cached volume
+        try:
+            volume = _get_mpr_volume_for_series(series)
+        except Exception:
+            # Fallback: construct volume
+            images = series.images.all().order_by('slice_location', 'instance_number')
+            if images.count() < 2:
+                return JsonResponse({'error': 'Need at least 2 images for bone reconstruction'}, status=400)
+            volume_data = []
+            for img in images:
+                try:
+                    dicom_path = os.path.join(settings.MEDIA_ROOT, str(img.file_path))
+                    ds = pydicom.dcmread(dicom_path)
+                    px = ds.pixel_array.astype(np.float32)
+                    if hasattr(ds, 'RescaleSlope') and hasattr(ds, 'RescaleIntercept'):
+                        px = px * ds.RescaleSlope + ds.RescaleIntercept
+                    volume_data.append(px)
+                except Exception:
+                    continue
+            if len(volume_data) < 2:
+                return JsonResponse({'error': 'Could not read enough images for bone reconstruction'}, status=400)
+            volume = np.stack(volume_data, axis=0)
         
-        if images.count() < 2:
-            return JsonResponse({'error': 'Need at least 2 images for bone reconstruction'}, status=400)
-        
-        # Read DICOM data
-        volume_data = []
-        for img in images:
-            try:
-                dicom_path = os.path.join(settings.MEDIA_ROOT, str(img.file_path))
-                ds = pydicom.dcmread(dicom_path)
-                
-                # Convert to Hounsfield Units if possible
-                pixel_array = ds.pixel_array.astype(np.float32)
-                
-                # Apply rescale slope and intercept if available
-                if hasattr(ds, 'RescaleSlope') and hasattr(ds, 'RescaleIntercept'):
-                    pixel_array = pixel_array * ds.RescaleSlope + ds.RescaleIntercept
-                
-                volume_data.append(pixel_array)
-            except Exception:
-                continue
-        
-        if len(volume_data) < 2:
-            return JsonResponse({'error': 'Could not read enough images for bone reconstruction'}, status=400)
-        
-        # Stack into 3D volume
-        volume = np.stack(volume_data, axis=0)
-        
-        # If very thin stack, interpolate depth to make previews stable
+        # Stabilize thin stacks
         if volume.shape[0] < 16:
             factor = max(2, int(np.ceil(16 / max(volume.shape[0], 1))))
             volume = ndimage.zoom(volume, (factor, 1, 1), order=1)
         
-        # Apply bone threshold
+        # Threshold to bone
         bone_mask = volume >= threshold
         bone_volume = volume * bone_mask
         
-        # Get windowing parameters optimized for bone
-        window_width = float(request.GET.get('window_width', 2000))  # Bone window
-        window_level = float(request.GET.get('window_level', 300))   # Bone level
+        # Windowing defaults for bone
+        window_width = float(request.GET.get('window_width', 2000))
+        window_level = float(request.GET.get('window_level', 300))
         inverted = request.GET.get('inverted', 'false').lower() == 'true'
         
-        # Generate bone reconstruction views
+        # 3-plane orthogonal previews
         bone_views = {}
-        
-        # Axial bone view
-        axial_bone = bone_volume[bone_volume.shape[0] // 2]
-        bone_views['axial'] = _array_to_base64_image(axial_bone, window_width, window_level, inverted)
-        
-        # Sagittal bone view
-        sagittal_bone = bone_volume[:, :, bone_volume.shape[2] // 2]
-        bone_views['sagittal'] = _array_to_base64_image(sagittal_bone, window_width, window_level, inverted)
-        
-        # Coronal bone view
-        coronal_bone = bone_volume[:, bone_volume.shape[1] // 2, :]
-        bone_views['coronal'] = _array_to_base64_image(coronal_bone, window_width, window_level, inverted)
+        axial_idx = bone_volume.shape[0] // 2
+        sag_idx = bone_volume.shape[2] // 2
+        cor_idx = bone_volume.shape[1] // 2
+        bone_views['axial'] = _array_to_base64_image(bone_volume[axial_idx], window_width, window_level, inverted)
+        bone_views['sagittal'] = _array_to_base64_image(bone_volume[:, :, sag_idx], window_width, window_level, inverted)
+        bone_views['coronal'] = _array_to_base64_image(bone_volume[:, cor_idx, :], window_width, window_level, inverted)
         
         mesh_payload = None
         if want_mesh:
-            # Mesh via marching cubes; downsample unless high-quality requested
             try:
                 from skimage import measure as _measure
                 if quality == 'high':
                     vol_for_mesh = (bone_volume > 0).astype(np.float32)
                 else:
-                    # Downsample for speed
                     ds_factor = max(1, int(np.ceil(max(1, bone_volume.shape[0]) / 128)))
                     vol_for_mesh = (bone_volume[::ds_factor, ::2, ::2] > 0).astype(np.float32)
                 verts, faces, normals, values = _measure.marching_cubes(vol_for_mesh, level=0.5)
@@ -553,7 +521,7 @@ def api_bone_reconstruction(request, series_id):
         
         return JsonResponse({
             'bone_views': bone_views,
-            'volume_shape': volume.shape,
+            'volume_shape': tuple(int(x) for x in bone_volume.shape),
             'series_info': {
                 'id': series.id,
                 'description': series.series_description,
