@@ -18,42 +18,64 @@
     <form method="post" class="row g-3">
       {% csrf_token %}
       <div class="col-md-6">
-        <label class="form-label text-white">Username</label>
-        <input type="text" class="form-control form-control-medical" name="username" required />
+        <label class="form-label text-white" for="username">Username</label>
+        <input type="text" class="form-control form-control-medical" id="username" name="username" required />
       </div>
       <div class="col-md-6">
-        <label class="form-label text-white">Email</label>
-        <input type="email" class="form-control form-control-medical" name="email" required />
+        <label class="form-label text-white" for="email">Email</label>
+        <input type="email" class="form-control form-control-medical" id="email" name="email" />
       </div>
       <div class="col-md-6">
-        <label class="form-label text-white">First Name</label>
-        <input type="text" class="form-control form-control-medical" name="first_name" />
+        <label class="form-label text-white" for="first_name">First Name</label>
+        <input type="text" class="form-control form-control-medical" id="first_name" name="first_name" />
       </div>
       <div class="col-md-6">
-        <label class="form-label text-white">Last Name</label>
-        <input type="text" class="form-control form-control-medical" name="last_name" />
+        <label class="form-label text-white" for="last_name">Last Name</label>
+        <input type="text" class="form-control form-control-medical" id="last_name" name="last_name" />
       </div>
       <div class="col-md-6">
-        <label class="form-label text-white">Role</label>
-        <select class="form-select form-control-medical" name="role" required>
+        <label class="form-label text-white" for="role">Role</label>
+        <select class="form-select form-control-medical" id="role" name="role" required>
           {% for role_code, role_name in user_roles %}
           <option value="{{ role_code }}" {% if preset_role == role_code %}selected{% endif %}>{{ role_name }}</option>
           {% endfor %}
         </select>
       </div>
       <div class="col-md-6">
-        <label class="form-label text-white">Facility</label>
-        <select class="form-select form-control-medical" name="facility">
+        <label class="form-label text-white" for="facility">Facility</label>
+        <select class="form-select form-control-medical" id="facility" name="facility">
           <option value="">-- None --</option>
           {% for facility in facilities %}
           <option value="{{ facility.id }}" {% if preset_facility == facility.id|stringformat:'s' %}selected{% endif %}>{{ facility.name }}</option>
           {% endfor %}
         </select>
+        <div class="form-text text-secondary">
+          <small id="facilityHelp">Assign user to a specific facility (required for Facility Users)</small>
+        </div>
       </div>
       <div class="col-md-6">
-        <label class="form-label text-white">Password</label>
-        <input type="password" class="form-control form-control-medical" name="password" required />
+        <label class="form-label text-white" for="password">Password</label>
+        <input type="password" class="form-control form-control-medical" id="password" name="password" required />
       </div>
+      <div class="col-md-6">
+        <label class="form-label text-white" for="password_confirm">Confirm Password</label>
+        <input type="password" class="form-control form-control-medical" id="password_confirm" name="password_confirm" required />
+      </div>
+
+      <!-- Optional fields for radiologists -->
+      <div class="col-md-6">
+        <label class="form-label text-white" for="phone">Phone (optional)</label>
+        <input type="text" class="form-control form-control-medical" id="phone" name="phone" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label text-white" for="license_number">License Number (optional)</label>
+        <input type="text" class="form-control form-control-medical" id="license_number" name="license_number" />
+      </div>
+      <div class="col-md-12">
+        <label class="form-label text-white" for="specialization">Specialization (optional)</label>
+        <input type="text" class="form-control form-control-medical" id="specialization" name="specialization" placeholder="e.g., Neuroradiology" />
+      </div>
+
       <div class="col-12 d-flex justify-content-end mt-3">
         <button type="submit" class="btn btn-medical">
           <i class="fas fa-save me-2"></i>Create User
@@ -97,49 +119,33 @@
 
 {% block extra_js %}
 <script>
-    function resetForm() {
-        document.querySelector('form').reset();
+  document.addEventListener('DOMContentLoaded', function() {
+    const roleSelect = document.getElementById('role');
+    const facilitySelect = document.getElementById('facility');
+    const facilityHelp = document.getElementById('facilityHelp');
+    const password = document.getElementById('password');
+    const passwordConfirm = document.getElementById('password_confirm');
+
+    function updateFacilityRequirement() {
+      const selectedRole = roleSelect.value;
+      const required = selectedRole === 'facility';
+      facilitySelect.required = required;
+      facilityHelp.innerText = required ? 'Facility is required for Facility Users' : 'Assign user to a specific facility (required for Facility Users)';
     }
 
-    // Password confirmation validation
-    document.addEventListener('DOMContentLoaded', function() {
-        const password = document.getElementById('password');
-        const passwordConfirm = document.getElementById('password_confirm');
-        
-        if (password && passwordConfirm) {
-            function validatePassword() {
-                if (password.value !== passwordConfirm.value) {
-                    passwordConfirm.setCustomValidity("Passwords don't match");
-                } else {
-                    passwordConfirm.setCustomValidity('');
-                }
-            }
-            
-            password.addEventListener('change', validatePassword);
-            passwordConfirm.addEventListener('keyup', validatePassword);
-        }
+    function validatePasswordMatch() {
+      if (password.value !== passwordConfirm.value) {
+        passwordConfirm.setCustomValidity("Passwords don't match");
+      } else {
+        passwordConfirm.setCustomValidity('');
+      }
+    }
 
-        // Role-based facility requirement
-        const roleSelect = document.getElementById('role');
-        const facilitySelect = document.getElementById('facility');
-        
-        if (roleSelect && facilitySelect) {
-            function updateFacilityRequirement() {
-                const selectedRole = roleSelect.value;
-                if (selectedRole === 'facility') {
-                    facilitySelect.required = true;
-                    facilitySelect.closest('.col-md-6').querySelector('.form-text').innerHTML = 
-                        '<small class="text-warning">Facility is required for facility users</small>';
-                } else {
-                    facilitySelect.required = false;
-                    facilitySelect.closest('.col-md-6').querySelector('.form-text').innerHTML = 
-                        '<small>Assign user to a specific facility (required for facility users)</small>';
-                }
-            }
-            
-            roleSelect.addEventListener('change', updateFacilityRequirement);
-            updateFacilityRequirement(); // Initial check
-        }
-    });
+    roleSelect.addEventListener('change', updateFacilityRequirement);
+    password.addEventListener('input', validatePasswordMatch);
+    passwordConfirm.addEventListener('input', validatePasswordMatch);
+
+    updateFacilityRequirement();
+  })
 </script>
 {% endblock %}
