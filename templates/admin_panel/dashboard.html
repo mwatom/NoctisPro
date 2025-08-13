@@ -856,11 +856,9 @@
         }
 
         function deleteItem(itemId) {
-            if (confirm('Are you sure you want to delete this item?')) {
-                console.log('Deleting item:', itemId);
-                showNotification('Item deleted successfully', 'success');
-                loadAdminData(); // Refresh data
-            }
+            console.log('Deleting item:', itemId);
+            showNotification('Item deleted successfully', 'success');
+            loadAdminData(); // Refresh data
         }
 
         function exportData() {

@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+
+{% block title %}Studies - Noctis Pro PACS{% endblock %}
+
+{% block extra_css %}
+<style>
+	.studies-container { padding: 16px; }
+	.filters { display: grid; grid-template-columns: repeat(5, minmax(160px, 1fr)); gap: 10px; margin-bottom: 12px; }
+	.filters .btn-control { align-self: end; }
+	.table-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; }
+	.table-card table { width: 100%; }
+	.table-card th { background: var(--header-bg); color: var(--text-secondary); text-transform: uppercase; font-size: 12px; padding: 10px; border-bottom: 1px solid var(--border-color); }
+	.table-card td { padding: 10px; border-bottom: 1px solid var(--border-color); vertical-align: top; }
+	.badge-mod { display: inline-block; padding: 2px 8px; border: 1px solid var(--accent-color); border-radius: 999px; font-size: 11px; color: var(--accent-color); }
+	.status-pill { padding: 2px 8px; border-radius: 999px; font-size: 11px; border: 1px solid var(--border-color); color: var(--text-secondary); }
+	.attachments, .prev-reports { display: flex; gap: 6px; flex-wrap: wrap; }
+	.attachment-chip { border: 1px solid var(--border-color); border-radius: 999px; padding: 2px 8px; font-size: 11px; color: var(--text-secondary); background: rgba(255,255,255,0.03); }
+	.attachment-chip i { margin-right: 6px; }
+	.btn-mini { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--secondary-bg); color: var(--text-secondary); font-weight: 600; }
+	.btn-mini:hover { color: var(--text-primary); border-color: var(--accent-color); box-shadow: 0 0 0 2px rgba(0,212,255,0.1) inset; }
+	.search-input { position: relative; }
+	.search-input input { width: 100%; background: var(--secondary-bg); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; padding: 8px 12px; }
+	.empty { text-align:center; color: var(--text-secondary); padding: 24px; }
+	.pagination-dark .page-link { background: var(--card-bg); border-color: var(--border-color); color: var(--text-primary); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid studies-container">
+	<div class="filters">
+		<div class="search-input"><input type="text" id="search" placeholder="Search patient, accession, description…" value="{{ search_query|default:'' }}"></div>
+		<select id="status" class="form-select form-control-medical">
+			<option value="">All Status</option>
+			<option value="scheduled" {% if status_filter == 'scheduled' %}selected{% endif %}>Scheduled</option>
+			<option value="in_progress" {% if status_filter == 'in_progress' %}selected{% endif %}>In Progress</option>
+			<option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Completed</option>
+			<option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Cancelled</option>
+		</select>
+		<select id="priority" class="form-select form-control-medical">
+			<option value="">All Priority</option>
+			<option value="low" {% if priority_filter == 'low' %}selected{% endif %}>Low</option>
+			<option value="normal" {% if priority_filter == 'normal' %}selected{% endif %}>Normal</option>
+			<option value="high" {% if priority_filter == 'high' %}selected{% endif %}>High</option>
+			<option value="urgent" {% if priority_filter == 'urgent' %}selected{% endif %}>Urgent</option>
+		</select>
+		<select id="modality" class="form-select form-control-medical">
+			<option value="">All Modalities</option>
+			{% for m in modalities %}
+			<option value="{{ m.code }}" {% if modality_filter == m.code %}selected{% endif %}>{{ m.code }}</option>
+			{% endfor %}
+		</select>
+		<button class="btn-mini" id="applyFilters"><i class="fas fa-filter me-1"></i>Apply</button>
+	</div>
+
+	<div class="table-card">
+		<table class="table table-dark table-hover mb-0">
+			<thead>
+				<tr>
+					<th>Patient</th>
+					<th>Accession</th>
+					<th>Study Date</th>
+					<th>Mod</th>
+					<th>Status</th>
+					<th>Attachments</th>
+					<th>Previous Reports</th>
+					<th>Actions</th>
+				</tr>
+			</thead>
+			<tbody>
+			{% for s in studies %}
+			<tr>
+				<td>
+					<div class="fw-bold">{{ s.patient.full_name }}</div>
+					<div class="text-secondary small">{{ s.patient.patient_id }}</div>
+				</td>
+				<td class="accession">{{ s.accession_number }}</td>
+				<td>{{ s.study_date|date:"M d, Y H:i" }}</td>
+				<td><span class="badge-mod">{{ s.modality.code }}</span></td>
+				<td><span class="status-pill">{{ s.status|title }}</span></td>
+				<td>
+					<div class="attachments">
+						{% for a in attachments_map|get_item:s.id %}
+							<span class="attachment-chip">
+								{% if a.file_type == 'dicom_study' %}<i class="fas fa-cubes"></i>{% elif a.file_type == 'pdf_document' %}<i class="fas fa-file-pdf"></i>{% elif a.file_type == 'image' %}<i class="fas fa-image"></i>{% else %}<i class="fas fa-paperclip"></i>{% endif %}
+								{{ a.name|truncatechars:24 }}
+							</span>
+						{% empty %}
+							<span class="text-secondary">None</span>
+						{% endfor %}
+					</div>
+				</td>
+				<td>
+					<div class="prev-reports">
+						{% for r in previous_reports_map|get_item:s.id %}
+							<a class="attachment-chip" href="{% url 'reports:write_report' r.study.id %}" title="{{ r.get_status_display }} by {{ r.radiologist.get_full_name }}">
+								<i class="fas fa-file-medical"></i>{{ r.status|title }} {{ r.report_date|date:"Y-m-d" }}
+							</a>
+						{% empty %}
+							<span class="text-secondary">None</span>
+						{% endfor %}
+					</div>
+				</td>
+				<td>
+					<div class="d-flex gap-2">
+						<a class="btn-mini" href="{% url 'worklist:study_detail' s.id %}" title="Open"><i class="fas fa-folder-open"></i></a>
+						<a class="btn-mini" href="{% url 'dicom_viewer:web_viewer' %}?study_id={{ s.id }}" title="View"><i class="fas fa-eye"></i></a>
+						<a class="btn-mini" href="{% url 'reports:write_report' s.id %}" title="Report"><i class="fas fa-file-medical"></i></a>
+					</div>
+				</td>
+			</tr>
+			{% empty %}
+			<tr><td colspan="8" class="empty">No studies</td></tr>
+			{% endfor %}
+			</tbody>
+		</table>
+	</div>
+
+	{% if studies.has_other_pages %}
+	<nav aria-label="Studies pagination" class="mt-3">
+		<ul class="pagination pagination-dark justify-content-center">
+			{% if studies.has_previous %}
+			<li class="page-item"><a class="page-link" href="?page=1">«</a></li>
+			<li class="page-item"><a class="page-link" href="?page={{ studies.previous_page_number }}">‹</a></li>
+			{% endif %}
+			{% for num in studies.paginator.page_range %}
+				{% if studies.number == num %}
+				<li class="page-item active"><span class="page-link">{{ num }}</span></li>
+				{% elif num > studies.number|add:'-3' and num < studies.number|add:'3' %}
+				<li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
+				{% endif %}
+			{% endfor %}
+			{% if studies.has_next %}
+			<li class="page-item"><a class="page-link" href="?page={{ studies.next_page_number }}">›</a></li>
+			<li class="page-item"><a class="page-link" href="?page={{ studies.paginator.num_pages }}">»</a></li>
+			{% endif %}
+		</ul>
+	</nav>
+	{% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+	function go(){
+		const p = new URLSearchParams();
+		const q = document.getElementById('search').value.trim(); if (q) p.set('search', q);
+		const s = document.getElementById('status').value; if (s) p.set('status', s);
+		const pr = document.getElementById('priority').value; if (pr) p.set('priority', pr);
+		const m = document.getElementById('modality').value; if (m) p.set('modality', m);
+		location.search = p.toString();
+	}
+	document.getElementById('applyFilters').addEventListener('click', go);
+	document.getElementById('search').addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); go(); }});
+})();
+</script>
+{% endblock %}

@@ -432,15 +432,11 @@ function insertMacro(fieldId, text) {
 }
 
 function generateAIFindings() {
-    // Simulate AI analysis
-    alert('AI analysis feature coming soon! This will analyze DICOM images and suggest preliminary findings.');
+	console.info('AI analysis feature is a stub.');
 }
 
 function previewReport() {
-    // Open report preview in new window
-    const formData = new FormData(document.getElementById('reportForm'));
-    // Implementation for preview functionality
-    alert('Report preview feature coming soon!');
+	console.info('Report preview is a stub.');
 }
 
 // Auto-save functionality
@@ -473,5 +469,16 @@ window.addEventListener('beforeunload', function(e) {
         e.returnValue = '';
     }
 });
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function generateAIFindings() {
+	console.info('AI analysis feature is a stub.');
+}
+function previewReport() {
+	console.info('Report preview is a stub.');
+}
 </script>
 {% endblock %}

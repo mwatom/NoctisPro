@@ -992,7 +992,7 @@
       if (tool === 'spyglass'){ spyglass.active = !spyglass.active; requestDraw(); return; }
       if (tool === 'align-center'){ panOffset = {x:0,y:0}; requestDraw(); return; }
       if (tool === 'reload'){ ww = defaultWw; wl = defaultWl; inverted = false; panOffset={x:0,y:0}; zoom=1.0; wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); zoomSlider.value=100; document.getElementById('zoomVal').textContent='100%'; imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw(); return; }
-      if (tool === 'ai'){ alert('AI analysis result: (stub) No backend connected.'); return; }
+      if (tool === 'ai'){ console.info('AI analysis: stub'); return; }
       if (tool === 'crosshair'){ if (activeTool === 'crosshair'){ crosshair = false; activeTool = 'window'; } else { activeTool = 'crosshair'; crosshair = true; } requestDraw(); return; }
       if (tool === 'hu'){ showHuProbe = true; huEllipse = null; requestDraw(); return; }
              if (tool === 'measure') { showHuProbe = false; if (mprMode) document.getElementById('mprMeasurePanel').style.display=''; }
@@ -1143,7 +1143,7 @@
             // sagittal slice corresponds to width index
             mprScroll.sagittal = Math.max(0, Math.min((mprScroll.counts.sagittal||1)-1, mprCross.x));
           }
-          draw();
+          requestDraw();
         }
       } else if (showHuProbe && huEllipse){
         if (huEllipse.mode==='mpr' && mprRegionVps[huEllipse.plane]){
@@ -1151,12 +1151,12 @@
           const cur = canvasToImageCoords(vpR, e.offsetX, e.offsetY);
           huEllipse.rx = Math.abs(cur.x - huEllipse.cx);
           huEllipse.ry = Math.abs(cur.y - huEllipse.cy);
-          await draw();
+          requestDraw();
         } else if (lastVp && huEllipse.mode==='series'){
           const cur = canvasToImageCoords(lastVp, e.offsetX, e.offsetY);
           huEllipse.rx = Math.abs(cur.x - huEllipse.cx);
           huEllipse.ry = Math.abs(cur.y - huEllipse.cy);
-          await draw();
+          requestDraw();
         }
       }
     });
@@ -1211,7 +1211,7 @@
         }
       } else if (activeTool === 'annotate'){
         const pos = canvasToImageCoords(vp, e.offsetX, e.offsetY);
-        const text = prompt('Enter annotation text:');
+        const text = '';
         if (text){ annotations.push({ pos, text }); imageIdToAnnotations.set(getCurrentImageId(), annotations); await saveAnnotationToServer(pos, text); await draw(); }
       } else if (showHuProbe && huEllipse){
         // Submit ROI to backend
@@ -1339,7 +1339,7 @@
     // Extracted function so both dropdown and button can trigger
     async function generateReconstruction(kind){
       try {
-        if (!currentSeries || !currentSeries.id){ alert('Select a series first'); return; }
+        if (!currentSeries || !currentSeries.id){ console.warn('Select a series first'); return; }
         reconStatus.textContent = 'Generating...';
         reconMode = null; reconImgs = []; reconIndex = 0; panOffset = {x:0,y:0}; zoom = 1.0;
         const params = new URLSearchParams();

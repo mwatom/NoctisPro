@@ -428,6 +428,11 @@ def api_mip_reconstruction(request, series_id):
         return JsonResponse({
             'mip_views': mip_views,
             'volume_shape': tuple(int(x) for x in volume.shape),
+            'counts': {
+                'axial': int(volume.shape[0]),
+                'sagittal': int(volume.shape[2]),
+                'coronal': int(volume.shape[1]),
+            },
             'series_info': {
                 'id': series.id,
                 'description': series.series_description,
@@ -522,6 +527,11 @@ def api_bone_reconstruction(request, series_id):
         return JsonResponse({
             'bone_views': bone_views,
             'volume_shape': tuple(int(x) for x in bone_volume.shape),
+            'counts': {
+                'axial': int(bone_volume.shape[0]),
+                'sagittal': int(bone_volume.shape[2]),
+                'coronal': int(bone_volume.shape[1]),
+            },
             'series_info': {
                 'id': series.id,
                 'description': series.series_description,

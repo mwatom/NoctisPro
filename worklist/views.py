@@ -22,409 +22,434 @@ from .models import (
 )
 from accounts.models import User, Facility
 from notifications.models import Notification, NotificationType
+from reports.models import Report
 
 @login_required
 def dashboard(request):
-    """Render the exact provided dashboard UI template"""
-    return render(request, 'worklist/dashboard.html', {'user': request.user})
+	"""Render the exact provided dashboard UI template"""
+	return render(request, 'worklist/dashboard.html', {'user': request.user})
 
 @login_required
 def study_list(request):
-    """List all studies with filtering and pagination"""
-    user = request.user
-    
-    # Base queryset based on user role
-    if user.is_facility_user() and getattr(user, 'facility', None):
-        studies = Study.objects.filter(facility=user.facility)
-    else:
-        studies = Study.objects.all()
-    
-    # Apply filters
-    status_filter = request.GET.get('status')
-    if status_filter:
-        studies = studies.filter(status=status_filter)
-    
-    priority_filter = request.GET.get('priority')
-    if priority_filter:
-        studies = studies.filter(priority=priority_filter)
-    
-    modality_filter = request.GET.get('modality')
-    if modality_filter:
-        studies = studies.filter(modality__code=modality_filter)
-    
-    search_query = request.GET.get('search')
-    if search_query:
-        studies = studies.filter(
-            Q(accession_number__icontains=search_query) |
-            Q(patient__first_name__icontains=search_query) |
-            Q(patient__last_name__icontains=search_query) |
-            Q(patient__patient_id__icontains=search_query) |
-            Q(study_description__icontains=search_query)
-        )
-    
-    # Sort by study date (most recent first)
-    studies = studies.select_related('patient', 'facility', 'modality', 'radiologist').order_by('-study_date')
-    
-    # Pagination
-    paginator = Paginator(studies, 25)
-    page_number = request.GET.get('page')
-    studies_page = paginator.get_page(page_number)
-    
-    # Get available modalities for filter
-    modalities = Modality.objects.filter(is_active=True)
-    
-    context = {
-        'studies': studies_page,
-        'modalities': modalities,
-        'status_filter': status_filter,
-        'priority_filter': priority_filter,
-        'modality_filter': modality_filter,
-        'search_query': search_query,
-        'user': user,
-    }
-    
-    return render(request, 'worklist/study_list.html', context)
+	"""List all studies with filtering and pagination"""
+	user = request.user
+	
+	# Base queryset based on user role
+	if user.is_facility_user() and getattr(user, 'facility', None):
+		studies = Study.objects.filter(facility=user.facility)
+	else:
+		studies = Study.objects.all()
+	
+	# Apply filters
+	status_filter = request.GET.get('status')
+	if status_filter:
+		studies = studies.filter(status=status_filter)
+	
+	priority_filter = request.GET.get('priority')
+	if priority_filter:
+		studies = studies.filter(priority=priority_filter)
+	
+	modality_filter = request.GET.get('modality')
+	if modality_filter:
+		studies = studies.filter(modality__code=modality_filter)
+	
+	search_query = request.GET.get('search')
+	if search_query:
+		studies = studies.filter(
+			Q(accession_number__icontains=search_query) |
+			Q(patient__first_name__icontains=search_query) |
+			Q(patient__last_name__icontains=search_query) |
+			Q(patient__patient_id__icontains=search_query) |
+			Q(study_description__icontains=search_query)
+		)
+	
+	# Sort by study date (most recent first) and prefetch attachments for display
+	studies = studies.select_related('patient', 'facility', 'modality', 'radiologist').prefetch_related('attachments').order_by('-study_date')
+	
+	# Pagination
+	paginator = Paginator(studies, 25)
+	page_number = request.GET.get('page')
+	studies_page = paginator.get_page(page_number)
+	
+	# Get available modalities for filter
+	modalities = Modality.objects.filter(is_active=True)
+	
+	# Build quick maps for previous reports (by same patient) and attachments per study
+	page_studies = list(studies_page.object_list)
+	patient_ids = list({s.patient_id for s in page_studies})
+	study_ids = [s.id for s in page_studies]
+	
+	# Previous reports grouped by patient, excluding current study
+	all_reports = Report.objects.filter(study__patient_id__in=patient_ids).select_related('study', 'radiologist').order_by('-report_date')
+	reports_by_patient = {}
+	for rep in all_reports:
+		reports_by_patient.setdefault(rep.study.patient_id, []).append(rep)
+	previous_reports_map = {}
+	for s in page_studies:
+		items = [r for r in reports_by_patient.get(s.patient_id, []) if r.study_id != s.id]
+		previous_reports_map[s.id] = items[:5]  # cap in template
+	
+	# Attachments per study (current version only)
+	atts = StudyAttachment.objects.filter(study_id__in=study_ids, is_current_version=True).order_by('-upload_date')
+	attachments_map = {}
+	for a in atts:
+		attachments_map.setdefault(a.study_id, []).append(a)
+	
+	context = {
+		'studies': studies_page,
+		'modalities': modalities,
+		'status_filter': status_filter,
+		'priority_filter': priority_filter,
+		'modality_filter': modality_filter,
+		'search_query': search_query,
+		'user': user,
+		'previous_reports_map': previous_reports_map,
+		'attachments_map': attachments_map,
+	}
+	
+	return render(request, 'worklist/study_list.html', context)
 
 @login_required
 def study_detail(request, study_id):
-    """Detailed view of a study"""
-    study = get_object_or_404(Study, id=study_id)
-    user = request.user
-    
-    # Check permissions
-    if user.is_facility_user() and study.facility != user.facility:
-        messages.error(request, 'You do not have permission to view this study.')
-        return redirect('worklist:study_list')
-    
-    # Get series and images
-    series_list = study.series_set.all().order_by('series_number')
-    
-    # Get study attachments
-    attachments = study.attachments.filter(is_current_version=True).order_by('-upload_date')
-    
-    # Get study notes
-    notes = study.notes.all().order_by('-created_at')
-    
-    context = {
-        'study': study,
-        'series_list': series_list,
-        'attachments': attachments,
-        'notes': notes,
-        'user': user,
-    }
-    
-    return render(request, 'worklist/study_detail.html', context)
+	"""Detailed view of a study"""
+	study = get_object_or_404(Study, id=study_id)
+	user = request.user
+	
+	# Check permissions
+	if user.is_facility_user() and study.facility != user.facility:
+		messages.error(request, 'You do not have permission to view this study.')
+		return redirect('worklist:study_list')
+	
+	# Get series and images
+	series_list = study.series_set.all().order_by('series_number')
+	
+	# Get study attachments
+	attachments = study.attachments.filter(is_current_version=True).order_by('-upload_date')
+	
+	# Get study notes
+	notes = study.notes.all().order_by('-created_at')
+	
+	context = {
+		'study': study,
+		'series_list': series_list,
+		'attachments': attachments,
+		'notes': notes,
+		'user': user,
+	}
+	
+	return render(request, 'worklist/study_detail.html', context)
 
 @login_required
+@csrf_exempt
 def upload_study(request):
-    """Upload new studies with enhanced folder support for CT/MRI modalities"""
-    if request.method == 'POST':
-        try:
-            uploaded_files = request.FILES.getlist('dicom_files')
-            
-            if not uploaded_files:
-                return JsonResponse({'success': False, 'error': 'No files uploaded'})
-            
-            # Enhanced grouping with better series detection for CT/MRI
-            studies_map = {}
-            invalid_files = 0
-            processed_files = 0
-            total_files = len(uploaded_files)
-            
-            # Process files with enhanced DICOM metadata extraction
-            for in_file in uploaded_files:
-                try:
-                    # Read dataset without saving to disk first
-                    ds = pydicom.dcmread(in_file, force=True)
-                    
-                    # Enhanced metadata extraction for CT/MRI
-                    study_uid = getattr(ds, 'StudyInstanceUID', None)
-                    series_uid = getattr(ds, 'SeriesInstanceUID', None)
-                    sop_uid = getattr(ds, 'SOPInstanceUID', None)
-                    modality = getattr(ds, 'Modality', 'OT')
-                    
-                    if not (study_uid and series_uid and sop_uid):
-                        invalid_files += 1
-                        continue
-                    
-                    # Enhanced series grouping for CT/MRI with multiple series
-                    series_key = f"{series_uid}_{modality}"
-                    studies_map.setdefault(study_uid, {}).setdefault(series_key, []).append((ds, in_file))
-                    
-                except Exception as e:
-                    invalid_files += 1
-                    continue
-            
-            if not studies_map:
-                return JsonResponse({'success': False, 'error': 'No valid DICOM files found'})
-            
-            created_studies = []
-            total_series_processed = 0
-            
-            for study_uid, series_map in studies_map.items():
-                # Extract representative dataset
-                first_series_key = next(iter(series_map))
-                rep_ds = series_map[first_series_key][0][0]
-                
-                # Enhanced patient info extraction
-                patient_id = getattr(rep_ds, 'PatientID', 'UNKNOWN')
-                patient_name = str(getattr(rep_ds, 'PatientName', 'UNKNOWN')).replace('^', ' ')
-                name_parts = patient_name.split(' ', 1)
-                first_name = name_parts[0] if name_parts else 'Unknown'
-                last_name = name_parts[1] if len(name_parts) > 1 else ''
-                birth_date = getattr(rep_ds, 'PatientBirthDate', None)
-                from datetime import datetime
-                if birth_date:
-                    try:
-                        dob = datetime.strptime(birth_date, '%Y%m%d').date()
-                    except Exception:
-                        dob = timezone.now().date()
-                else:
-                    dob = timezone.now().date()
-                gender = getattr(rep_ds, 'PatientSex', 'O')
-                if gender not in ['M','F','O']:
-                    gender = 'O'
-                
-                patient, _ = Patient.objects.get_or_create(
-                    patient_id=patient_id,
-                    defaults={'first_name': first_name, 'last_name': last_name, 'date_of_birth': dob, 'gender': gender}
-                )
-                
-                # Enhanced modality and study fields
-                modality_code = getattr(rep_ds, 'Modality', 'OT')
-                modality, _ = Modality.objects.get_or_create(code=modality_code, defaults={'name': modality_code})
-                study_description = getattr(rep_ds, 'StudyDescription', 'DICOM Study')
-                referring_physician = str(getattr(rep_ds, 'ReferringPhysicianName', 'UNKNOWN')).replace('^', ' ')
-                accession_number = getattr(rep_ds, 'AccessionNumber', f"ACC_{int(timezone.now().timestamp())}")
-                # Ensure accession_number not empty
-                if not accession_number:
-                    accession_number = f"ACC_{int(timezone.now().timestamp())}"
-                # Collision-safe: if accession_number already exists, append suffix
-                if Study.objects.filter(accession_number=accession_number).exists():
-                    suffix = 1
-                    base_acc = str(accession_number)
-                    while Study.objects.filter(accession_number=f"{base_acc}-{suffix}").exists():
-                        suffix += 1
-                    accession_number = f"{base_acc}-{suffix}"
-                study_date = getattr(rep_ds, 'StudyDate', None)
-                study_time = getattr(rep_ds, 'StudyTime', '000000')
-                if study_date:
-                    try:
-                        sdt = datetime.strptime(f"{study_date}{study_time[:6]}", '%Y%m%d%H%M%S')
-                        sdt = timezone.make_aware(sdt)
-                    except Exception:
-                        sdt = timezone.now()
-                else:
-                    sdt = timezone.now()
-                
-                # Facility attribution
-                facility = request.user.facility if getattr(request.user, 'facility', None) else Facility.objects.filter(is_active=True).first()
-                if not facility:
-                    # Allow admin to upload without preconfigured facility by creating a default one
-                    if hasattr(request.user, 'is_admin') and request.user.is_admin():
-                        facility = Facility.objects.create(
-                            name='Default Facility',
-                            address='N/A',
-                            phone='N/A',
-                            email='default@example.com',
-                            license_number=f'DEFAULT-{int(timezone.now().timestamp())}',
-                            ae_title='',
-                            is_active=True
-                        )
-                    else:
-                        return JsonResponse({'success': False, 'error': 'No active facility configured'})
-                
-                study, created = Study.objects.get_or_create(
-                    study_instance_uid=study_uid,
-                    defaults={
-                        'accession_number': accession_number,
-                        'patient': patient,
-                        'facility': facility,
-                        'modality': modality,
-                        'study_description': study_description,
-                        'study_date': sdt,
-                        'referring_physician': referring_physician,
-                        'status': 'scheduled',
-                        'priority': request.POST.get('priority', 'normal'),
-                        'clinical_info': request.POST.get('clinical_info', ''),
-                        'uploaded_by': request.user,
-                    }
-                )
-                
-                # Enhanced series creation with better CT/MRI support
-                for series_key, items in series_map.items():
-                    # Parse series key to get series_uid and modality
-                    series_uid = series_key.split('_')[0]
-                    
-                    # Representative dataset for series
-                    ds0 = items[0][0]
-                    series_number = getattr(ds0, 'SeriesNumber', 1) or 1
-                    series_desc = getattr(ds0, 'SeriesDescription', f'Series {series_number}')
-                    slice_thickness = getattr(ds0, 'SliceThickness', None)
-                    pixel_spacing = str(getattr(ds0, 'PixelSpacing', ''))
-                    image_orientation = str(getattr(ds0, 'ImageOrientationPatient', ''))
-                    
-                    # Enhanced series metadata for CT/MRI
-                    body_part = getattr(ds0, 'BodyPartExamined', '')
-                    protocol_name = getattr(ds0, 'ProtocolName', '')
-                    contrast_bolus_agent = getattr(ds0, 'ContrastBolusAgent', '')
-                    
-                    series, _ = Series.objects.get_or_create(
-                        series_instance_uid=series_uid,
-                        defaults={
-                            'study': study,
-                            'series_number': int(series_number),
-                            'series_description': series_desc,
-                            'modality': modality_code,
-                            'body_part': body_part,
-                            'slice_thickness': slice_thickness if slice_thickness is not None else None,
-                            'pixel_spacing': pixel_spacing,
-                            'image_orientation': image_orientation,
-                        }
-                    )
-                    # If study existed, update clinical info/priority once
-                    if not created:
-                        updated = False
-                        new_priority = request.POST.get('priority')
-                        new_clin = request.POST.get('clinical_info')
-                        if new_priority and study.priority != new_priority:
-                            study.priority = new_priority
-                            updated = True
-                        if new_clin is not None and new_clin != '' and study.clinical_info != new_clin:
-                            study.clinical_info = new_clin
-                            updated = True
-                        if updated:
-                            study.save(update_fields=['priority','clinical_info'])
-                    
-                    # Enhanced image processing with better error handling
-                    for ds, fobj in items:
-                        try:
-                            sop_uid = getattr(ds, 'SOPInstanceUID')
-                            instance_number = getattr(ds, 'InstanceNumber', 1) or 1
-                            
-                            # Enhanced file path structure for better organization
-                            rel_path = f"dicom/images/{study_uid}/{series_uid}/{sop_uid}.dcm"
-                            
-                            # Ensure we read from start
-                            fobj.seek(0)
-                            saved_path = default_storage.save(rel_path, ContentFile(fobj.read()))
-                            
-                            # Enhanced image metadata
-                            image_position = str(getattr(ds, 'ImagePositionPatient', ''))
-                            slice_location = getattr(ds, 'SliceLocation', None)
-                            window_center = getattr(ds, 'WindowCenter', None)
-                            window_width = getattr(ds, 'WindowWidth', None)
-                            
-                            DicomImage.objects.get_or_create(
-                                sop_instance_uid=sop_uid,
-                                defaults={
-                                    'series': series,
-                                    'instance_number': int(instance_number),
-                                    'image_position': image_position,
-                                    'slice_location': slice_location,
-                                    'file_path': saved_path,
-                                    'file_size': getattr(fobj, 'size', 0) or 0,
-                                    'processed': False,
-                                }
-                            )
-                            processed_files += 1
-                        except Exception as e:
-                            continue
-                    
-                    total_series_processed += 1
-                
-                created_studies.append(study.id)
-                
-                # Enhanced notifications for new study upload
-                try:
-                    notif_type, _ = NotificationType.objects.get_or_create(
-                        code='new_study', defaults={'name': 'New Study Uploaded', 'description': 'A new study has been uploaded', 'is_system': True}
-                    )
-                    recipients = User.objects.filter(Q(role='radiologist') | Q(role='admin') | Q(facility=facility))
-                    for recipient in recipients:
-                        Notification.objects.create(
-                            notification_type=notif_type,
-                            recipient=recipient,
-                            sender=request.user,
-                            title=f"New {modality_code} study for {patient.full_name}",
-                            message=f"Study {accession_number} uploaded from {facility.name} with {total_series_processed} series",
-                            priority='normal',
-                            study=study,
-                            facility=facility,
-                            data={'study_id': study.id, 'accession_number': accession_number, 'series_count': total_series_processed}
-                        )
-                except Exception:
-                    pass
-            
-            return JsonResponse({
-                'success': True,
-                'message': f'Successfully uploaded {processed_files} DICOM files across {len(created_studies)} study(ies) with {total_series_processed} series',
-                'created_study_ids': created_studies,
-                'invalid_files': invalid_files,
-                'processed_files': processed_files,
-                'total_files': total_files,
-                'total_series': total_series_processed,
-                'studies_created': len(created_studies),
-            })
-            
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
-    
-    return render(request, 'worklist/upload.html')
+	"""Upload new studies with enhanced folder support for CT/MRI modalities"""
+	if request.method == 'POST':
+		try:
+			uploaded_files = request.FILES.getlist('dicom_files')
+			
+			if not uploaded_files:
+				return JsonResponse({'success': False, 'error': 'No files uploaded'})
+			
+			# Enhanced grouping with better series detection for CT/MRI
+			studies_map = {}
+			invalid_files = 0
+			processed_files = 0
+			total_files = len(uploaded_files)
+			
+			# Process files with enhanced DICOM metadata extraction
+			for in_file in uploaded_files:
+				try:
+					# Read dataset without saving to disk first
+					ds = pydicom.dcmread(in_file, force=True)
+					
+					# Enhanced metadata extraction for CT/MRI
+					study_uid = getattr(ds, 'StudyInstanceUID', None)
+					series_uid = getattr(ds, 'SeriesInstanceUID', None)
+					sop_uid = getattr(ds, 'SOPInstanceUID', None)
+					modality = getattr(ds, 'Modality', 'OT')
+					
+					if not (study_uid and series_uid and sop_uid):
+						invalid_files += 1
+						continue
+					
+					# Enhanced series grouping for CT/MRI with multiple series
+					series_key = f"{series_uid}_{modality}"
+					studies_map.setdefault(study_uid, {}).setdefault(series_key, []).append((ds, in_file))
+					
+				except Exception as e:
+					invalid_files += 1
+					continue
+			
+			if not studies_map:
+				return JsonResponse({'success': False, 'error': 'No valid DICOM files found'})
+			
+			created_studies = []
+			total_series_processed = 0
+			
+			for study_uid, series_map in studies_map.items():
+				# Extract representative dataset
+				first_series_key = next(iter(series_map))
+				rep_ds = series_map[first_series_key][0][0]
+				
+				# Enhanced patient info extraction
+				patient_id = getattr(rep_ds, 'PatientID', 'UNKNOWN')
+				patient_name = str(getattr(rep_ds, 'PatientName', 'UNKNOWN')).replace('^', ' ')
+				name_parts = patient_name.split(' ', 1)
+				first_name = name_parts[0] if name_parts else 'Unknown'
+				last_name = name_parts[1] if len(name_parts) > 1 else ''
+				birth_date = getattr(rep_ds, 'PatientBirthDate', None)
+				from datetime import datetime
+				if birth_date:
+					try:
+						dob = datetime.strptime(birth_date, '%Y%m%d').date()
+					except Exception:
+						dob = timezone.now().date()
+				else:
+					dob = timezone.now().date()
+				gender = getattr(rep_ds, 'PatientSex', 'O')
+				if gender not in ['M','F','O']:
+					gender = 'O'
+				
+				patient, _ = Patient.objects.get_or_create(
+					patient_id=patient_id,
+					defaults={'first_name': first_name, 'last_name': last_name, 'date_of_birth': dob, 'gender': gender}
+				)
+				
+				# Enhanced modality and study fields
+				modality_code = getattr(rep_ds, 'Modality', 'OT')
+				modality, _ = Modality.objects.get_or_create(code=modality_code, defaults={'name': modality_code})
+				study_description = getattr(rep_ds, 'StudyDescription', 'DICOM Study')
+				referring_physician = str(getattr(rep_ds, 'ReferringPhysicianName', 'UNKNOWN')).replace('^', ' ')
+				accession_number = getattr(rep_ds, 'AccessionNumber', f"ACC_{int(timezone.now().timestamp())}")
+				# Ensure accession_number not empty
+				if not accession_number:
+					accession_number = f"ACC_{int(timezone.now().timestamp())}"
+				# Collision-safe: if accession_number already exists, append suffix
+				if Study.objects.filter(accession_number=accession_number).exists():
+					suffix = 1
+					base_acc = str(accession_number)
+					while Study.objects.filter(accession_number=f"{base_acc}-{suffix}").exists():
+						suffix += 1
+					accession_number = f"{base_acc}-{suffix}"
+				study_date = getattr(rep_ds, 'StudyDate', None)
+				study_time = getattr(rep_ds, 'StudyTime', '000000')
+				if study_date:
+					try:
+						sdt = datetime.strptime(f"{study_date}{study_time[:6]}", '%Y%m%d%H%M%S')
+						sdt = timezone.make_aware(sdt)
+					except Exception:
+						sdt = timezone.now()
+				else:
+					sdt = timezone.now()
+				
+				# Facility attribution
+				facility = request.user.facility if getattr(request.user, 'facility', None) else Facility.objects.filter(is_active=True).first()
+				if not facility:
+					# Allow admin to upload without preconfigured facility by creating a default one
+					if hasattr(request.user, 'is_admin') and request.user.is_admin():
+						facility = Facility.objects.create(
+							name='Default Facility',
+							address='N/A',
+							phone='N/A',
+							email='default@example.com',
+							license_number=f'DEFAULT-{int(timezone.now().timestamp())}',
+							ae_title='',
+							is_active=True
+						)
+					else:
+						return JsonResponse({'success': False, 'error': 'No active facility configured'})
+				
+				study, created = Study.objects.get_or_create(
+					study_instance_uid=study_uid,
+					defaults={
+						'accession_number': accession_number,
+						'patient': patient,
+						'facility': facility,
+						'modality': modality,
+						'study_description': study_description,
+						'study_date': sdt,
+						'referring_physician': referring_physician,
+						'status': 'scheduled',
+						'priority': request.POST.get('priority', 'normal'),
+						'clinical_info': request.POST.get('clinical_info', ''),
+						'uploaded_by': request.user,
+					}
+				)
+				
+				# Enhanced series creation with better CT/MRI support
+				for series_key, items in series_map.items():
+					# Parse series key to get series_uid and modality
+					series_uid = series_key.split('_')[0]
+					
+					# Representative dataset for series
+					ds0 = items[0][0]
+					series_number = getattr(ds0, 'SeriesNumber', 1) or 1
+					series_desc = getattr(ds0, 'SeriesDescription', f'Series {series_number}')
+					slice_thickness = getattr(ds0, 'SliceThickness', None)
+					pixel_spacing = str(getattr(ds0, 'PixelSpacing', ''))
+					image_orientation = str(getattr(ds0, 'ImageOrientationPatient', ''))
+					
+					# Enhanced series metadata for CT/MRI
+					body_part = getattr(ds0, 'BodyPartExamined', '')
+					protocol_name = getattr(ds0, 'ProtocolName', '')
+					contrast_bolus_agent = getattr(ds0, 'ContrastBolusAgent', '')
+					
+					series, _ = Series.objects.get_or_create(
+						series_instance_uid=series_uid,
+						defaults={
+							'study': study,
+							'series_number': int(series_number),
+							'series_description': series_desc,
+							'modality': modality_code,
+							'body_part': body_part,
+							'slice_thickness': slice_thickness if slice_thickness is not None else None,
+							'pixel_spacing': pixel_spacing,
+							'image_orientation': image_orientation,
+						}
+					)
+					# If study existed, update clinical info/priority once
+					if not created:
+						updated = False
+						new_priority = request.POST.get('priority')
+						new_clin = request.POST.get('clinical_info')
+						if new_priority and study.priority != new_priority:
+							study.priority = new_priority
+							updated = True
+						if new_clin is not None and new_clin != '' and study.clinical_info != new_clin:
+							study.clinical_info = new_clin
+							updated = True
+						if updated:
+							study.save(update_fields=['priority','clinical_info'])
+					
+					# Enhanced image processing with better error handling
+					for ds, fobj in items:
+						try:
+							sop_uid = getattr(ds, 'SOPInstanceUID')
+							instance_number = getattr(ds, 'InstanceNumber', 1) or 1
+							
+							# Enhanced file path structure for better organization
+							rel_path = f"dicom/images/{study_uid}/{series_uid}/{sop_uid}.dcm"
+							
+							# Ensure we read from start
+							fobj.seek(0)
+							saved_path = default_storage.save(rel_path, ContentFile(fobj.read()))
+							
+							# Enhanced image metadata
+							image_position = str(getattr(ds, 'ImagePositionPatient', ''))
+							slice_location = getattr(ds, 'SliceLocation', None)
+							window_center = getattr(ds, 'WindowCenter', None)
+							window_width = getattr(ds, 'WindowWidth', None)
+							
+							DicomImage.objects.get_or_create(
+								sop_instance_uid=sop_uid,
+								defaults={
+									'series': series,
+									'instance_number': int(instance_number),
+									'image_position': image_position,
+									'slice_location': slice_location,
+									'file_path': saved_path,
+									'file_size': getattr(fobj, 'size', 0) or 0,
+									'processed': False,
+								}
+							)
+							processed_files += 1
+						except Exception as e:
+							continue
+					
+					total_series_processed += 1
+				
+				created_studies.append(study.id)
+				
+				# Enhanced notifications for new study upload
+				try:
+					notif_type, _ = NotificationType.objects.get_or_create(
+						code='new_study', defaults={'name': 'New Study Uploaded', 'description': 'A new study has been uploaded', 'is_system': True}
+					)
+					recipients = User.objects.filter(Q(role='radiologist') | Q(role='admin') | Q(facility=facility))
+					for recipient in recipients:
+						Notification.objects.create(
+							notification_type=notif_type,
+							recipient=recipient,
+							sender=request.user,
+							title=f"New {modality_code} study for {patient.full_name}",
+							message=f"Study {accession_number} uploaded from {facility.name} with {total_series_processed} series",
+							priority='normal',
+							study=study,
+							facility=facility,
+							data={'study_id': study.id, 'accession_number': accession_number, 'series_count': total_series_processed}
+						)
+				except Exception:
+					pass
+			
+			return JsonResponse({
+				'success': True,
+				'message': f'Successfully uploaded {processed_files} DICOM files across {len(created_studies)} study(ies) with {total_series_processed} series',
+				'created_study_ids': created_studies,
+				'invalid_files': invalid_files,
+				'processed_files': processed_files,
+				'total_files': total_files,
+				'total_series': total_series_processed,
+				'studies_created': len(created_studies),
+			})
+			
+		except Exception as e:
+			return JsonResponse({'success': False, 'error': str(e)})
+	
+	return render(request, 'worklist/upload.html')
 
 @login_required
 def modern_worklist(request):
-    """Legacy route: redirect to main dashboard UI"""
-    return redirect('worklist:dashboard')
+	"""Legacy route: redirect to main dashboard UI"""
+	return redirect('worklist:dashboard')
 
 @login_required
 def modern_dashboard(request):
-    """Legacy route: redirect to main dashboard UI"""
-    return redirect('worklist:dashboard')
+	"""Legacy route: redirect to main dashboard UI"""
+	return redirect('worklist:dashboard')
 
 @login_required
 def api_studies(request):
-    """API endpoint for studies data"""
-    user = request.user
-    
-    if user.is_facility_user() and getattr(user, 'facility', None):
-        studies = Study.objects.filter(facility=user.facility)
-    else:
-        studies = Study.objects.all()
-    
-    studies_data = []
-    for study in studies.order_by('-study_date')[:100]:  # Increased limit to show more studies
-        # Use real study data with fallback to reasonable defaults
-        study_time = study.study_date
-        scheduled_time = study.study_date
-        
-        # If study has upload_date, use it for better tracking
-        if hasattr(study, 'upload_date') and study.upload_date:
-            upload_date = study.upload_date.isoformat()
-        else:
-            upload_date = study.study_date.isoformat()
-        
-        studies_data.append({
-            'id': study.id,
-            'accession_number': study.accession_number,
-            'patient_name': study.patient.full_name,
-            'patient_id': study.patient.patient_id,
-            'modality': study.modality.code,
-            'status': study.status,
-            'priority': study.priority,
-            'study_date': study.study_date.isoformat(),
-            'study_time': study_time.isoformat(),
-            'scheduled_time': scheduled_time.isoformat(),
-            'upload_date': upload_date,
-            'facility': study.facility.name,
-            'image_count': study.get_image_count(),
-            'series_count': study.get_series_count(),
-            'study_description': study.study_description,
-            'clinical_info': study.clinical_info,
-            'uploaded_by': study.uploaded_by.get_full_name() if study.uploaded_by else 'Unknown',
-        })
-    
-    return JsonResponse({'success': True, 'studies': studies_data})
+	"""API endpoint for studies data"""
+	user = request.user
+	
+	if user.is_facility_user() and getattr(user, 'facility', None):
+		studies = Study.objects.filter(facility=user.facility)
+	else:
+		studies = Study.objects.all()
+	
+	studies_data = []
+	for study in studies.order_by('-study_date')[:100]:  # Increased limit to show more studies
+		# Use real study data with fallback to reasonable defaults
+		study_time = study.study_date
+		scheduled_time = study.study_date
+		
+		# If study has upload_date, use it for better tracking
+		if hasattr(study, 'upload_date') and study.upload_date:
+			upload_date = study.upload_date.isoformat()
+		else:
+			upload_date = study.study_date.isoformat()
+		
+		studies_data.append({
+			'id': study.id,
+			'accession_number': study.accession_number,
+			'patient_name': study.patient.full_name,
+			'patient_id': study.patient.patient_id,
+			'modality': study.modality.code,
+			'status': study.status,
+			'priority': study.priority,
+			'study_date': study.study_date.isoformat(),
+			'study_time': study_time.isoformat(),
+			'scheduled_time': scheduled_time.isoformat(),
+			'upload_date': upload_date,
+			'facility': study.facility.name,
+			'image_count': study.get_image_count(),
+			'series_count': study.get_series_count(),
+			'study_description': study.study_description,
+			'clinical_info': study.clinical_info,
+			'uploaded_by': study.uploaded_by.get_full_name() if study.uploaded_by else 'Unknown',
+		})
+	
+	return JsonResponse({'success': True, 'studies': studies_data})
 
 @login_required
 @csrf_exempt

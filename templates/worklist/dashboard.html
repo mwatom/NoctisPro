@@ -918,8 +918,9 @@
         }
 
         async function deleteStudy(studyId, accession){
-            if(!confirm(`Delete study ${accession}? This cannot be undone.`)) return;
             try{
+                const proceed = true; // silent, non-blocking (no confirm dialog)
+                if(!proceed) return;
                 const resp = await fetch(`/worklist/api/study/${studyId}/delete/`, {
                     method: 'DELETE',
                     headers: { 'X-CSRFToken': getCSRFToken() },
@@ -938,7 +939,7 @@
                 filteredData = filteredData.filter(s => String(s.id) !== String(studyId));
                 renderStudiesTable();
             }catch(err){
-                alert(`Delete failed: ${err.message}`);
+                console.warn('Delete failed:', err);
             }
         }
         
@@ -953,9 +954,7 @@
                 {% if user.role == 'admin' %}
                 const id = row.getAttribute('data-study-id');
                 const acc = (row.querySelector('.accession')||{}).textContent || '';
-                if (confirm(`Delete study ${acc}? This cannot be undone.`)){
-                    deleteStudy(id, acc);
-                }
+                deleteStudy(id, acc);
                 {% endif %}
             });
         })();
