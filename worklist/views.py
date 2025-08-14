@@ -938,6 +938,33 @@ def api_get_upload_stats(request):
         }
     })
 
+@login_required
+@csrf_exempt
+def api_reassign_study_facility(request, study_id):
+	"""Reassign a study to a facility (admin/radiologist only). Useful for recovering a lost study."""
+	if request.method != 'POST':
+		return JsonResponse({'error': 'Method not allowed'}, status=405)
+	user = request.user
+	if not (user.is_admin() or user.is_radiologist()):
+		return JsonResponse({'error': 'Permission denied'}, status=403)
+	study = get_object_or_404(Study, id=study_id)
+	try:
+		payload = json.loads(request.body)
+		facility_id = str(payload.get('facility_id', '')).strip()
+		if not facility_id:
+			return JsonResponse({'error': 'facility_id is required'}, status=400)
+		target = Facility.objects.filter(id=facility_id, is_active=True).first()
+		if not target:
+			return JsonResponse({'error': 'Target facility not found or inactive'}, status=404)
+		old_fac = study.facility
+		study.facility = target
+		study.save(update_fields=['facility'])
+		return JsonResponse({'success': True, 'message': 'Study reassigned', 'old_facility': old_fac.name, 'new_facility': target.name})
+	except json.JSONDecodeError:
+		return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+	except Exception as e:
+		return JsonResponse({'error': str(e)}, status=500)
+
 def process_attachment_metadata(attachment):
     """Extract metadata from uploaded attachment"""
     try:
