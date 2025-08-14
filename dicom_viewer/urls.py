@@ -38,6 +38,8 @@ urlpatterns = [
     path('api/hanging/', views.api_hanging_protocols, name='api_hanging_protocols'),
     # DICOM SR export
     path('api/study/<int:study_id>/export-sr/', views.api_export_dicom_sr, name='api_export_dicom_sr'),
+    # Volume endpoint for GPU VR
+    path('api/series/<int:series_id>/volume/', views.api_series_volume_uint8, name='api_series_volume_uint8'),
     
     # DICOM file upload and processing
     path('upload/', views.upload_dicom, name='upload_dicom'),
