@@ -54,6 +54,7 @@ PyJWT
 python-magic
 requests
 urllib3
+qrcode
 
 # PyQt5 for standalone desktop applications
 PyQt5
