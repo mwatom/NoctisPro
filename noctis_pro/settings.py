@@ -78,6 +78,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'noctis_pro.context_processors.global_settings',
             ],
         },
     },
@@ -192,6 +193,9 @@ AUTH_USER_MODEL = 'accounts.User'
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/worklist/'
 LOGOUT_REDIRECT_URL = '/login/'
+
+# Public link (global access URL)
+PUBLIC_BASE_URL = os.getenv('PUBLIC_BASE_URL', '')
 
 # File upload settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100MB
