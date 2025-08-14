@@ -947,6 +947,44 @@ def api_reassign_study_facility(request, study_id):
 	except Exception as e:
 		return JsonResponse({'error': str(e)}, status=500)
 
+@login_required
+@csrf_exempt
+def api_update_clinical_info(request, study_id):
+	"""API endpoint to create or update a study's clinical information"""
+	if request.method != 'POST':
+		return JsonResponse({'error': 'Method not allowed'}, status=405)
+	
+	study = get_object_or_404(Study, id=study_id)
+	user = request.user
+	
+	# Check permissions
+	if user.is_facility_user() and getattr(user, 'facility', None) and study.facility != user.facility:
+		return JsonResponse({'error': 'Permission denied'}, status=403)
+	
+	try:
+		new_info = ''
+		if request.content_type and request.content_type.startswith('application/json'):
+			payload = json.loads(request.body)
+			new_info = (payload.get('clinical_info') or '').strip()
+		else:
+			new_info = (request.POST.get('clinical_info') or '').strip()
+		
+		old_info = study.clinical_info or ''
+		study.clinical_info = new_info
+		# Ensure auto_now updates last_updated when using update_fields
+		study.save(update_fields=['clinical_info', 'last_updated'])
+		
+		return JsonResponse({
+			'success': True,
+			'message': 'Clinical information updated',
+			'old_clinical_info': old_info,
+			'clinical_info': study.clinical_info,
+		})
+	except json.JSONDecodeError:
+		return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+	except Exception as e:
+		return JsonResponse({'error': str(e)}, status=500)
+
 def process_attachment_metadata(attachment):
     """Extract metadata from uploaded attachment"""
     try:
