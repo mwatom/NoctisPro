@@ -54,6 +54,13 @@ class DicomReceiver:
         self.ae.supported_contexts = AllStoragePresentationContexts
         self.ae.supported_contexts.extend(VerificationPresentationContexts)
         
+        # Allow any Called AE Title (facilities identify via Calling AE)
+        if hasattr(self.ae, 'require_called_aet'):
+            try:
+                self.ae.require_called_aet = False
+            except Exception:
+                pass
+        
         # Storage directory
         self.storage_dir = Path('/workspace/media/dicom/received')
         self.storage_dir.mkdir(parents=True, exist_ok=True)
