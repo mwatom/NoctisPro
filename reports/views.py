@@ -7,6 +7,17 @@ from django.utils import timezone
 from .models import Report, ReportTemplate
 from worklist.models import Study
 from accounts.models import User
+import io
+from django.core.files.base import ContentFile
+from django.utils.text import slugify
+try:
+    import fitz  # PyMuPDF
+except Exception:
+    fitz = None
+try:
+    from docx import Document
+except Exception:
+    Document = None
 
 @login_required
 def report_list(request):
@@ -185,3 +196,86 @@ def print_report_stub(request, study_id):
     </html>
     """
     return HttpResponse(html)
+
+
+@login_required
+def export_report_pdf(request, study_id):
+    # Restrict to admin and radiologist
+    if not getattr(request.user, 'can_edit_reports', None) or not request.user.can_edit_reports():
+        return HttpResponse(status=403)
+    study = get_object_or_404(Study, id=study_id)
+    report = Report.objects.filter(study=study).first()
+    html = f"""
+    <h2 style='margin:0'>Radiology Report</h2>
+    <div><b>Patient:</b> {study.patient.full_name} ({study.patient.patient_id})</div>
+    <div><b>Accession:</b> {study.accession_number} &nbsp; <b>Modality:</b> {study.modality.code} &nbsp; <b>Date:</b> {study.study_date}</div>
+    <div><b>Priority:</b> {study.priority.upper()}</div>
+    <hr/>
+    <div><b>Clinical History</b><br/>{(report.clinical_history if report else (study.clinical_info or '')) or '-'}</div>
+    <div><b>Technique</b><br/>{(report.technique if report else '') or '-'}</div>
+    <div><b>Comparison</b><br/>{(report.comparison if report else '') or '-'}</div>
+    <div><b>Findings</b><br/>{(report.findings if report else '') or '-'}</div>
+    <div><b>Impression</b><br/>{(report.impression if report else '') or '-'}</div>
+    <div><b>Recommendations</b><br/>{(report.recommendations if report else '') or '-'}</div>
+    """
+    filename = f"report_{slugify(study.accession_number)}.pdf"
+    if fitz is None:
+        return JsonResponse({'error': 'PDF export not available (PyMuPDF missing).'}, status=500)
+    try:
+        doc = fitz.open()
+        page = doc.new_page()
+        # Simple HTML rendering: use a text writer for robustness
+        text = fitz.TextWriter(page.rect)
+        y = 36
+        for line in html.replace('<br/>', '\n').replace('<hr/>', '\n' + '-'*80 + '\n').replace('<b>','').replace('</b>','').replace('<h2','\n<h2').split('\n'):
+            if '<h2' in line:
+                line = line.replace("</h2>", '').split('>')[-1]
+                text.append((36, y), line, fontsize=16)
+                y += 28
+            else:
+                text.append((36, y), fitz.strip_html(line).strip(), fontsize=11)
+                y += 16
+            if y > page.rect.height - 36:
+                page = doc.new_page(); text = fitz.TextWriter(page.rect); y = 36
+        page.insert_text((0,0), "")
+        buf = io.BytesIO()
+        doc.save(buf)
+        buf.seek(0)
+        resp = HttpResponse(buf.getvalue(), content_type='application/pdf')
+        resp['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return resp
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def export_report_docx(request, study_id):
+    # Restrict to admin and radiologist
+    if not getattr(request.user, 'can_edit_reports', None) or not request.user.can_edit_reports():
+        return HttpResponse(status=403)
+    if Document is None:
+        return JsonResponse({'error': 'DOCX export not available (python-docx missing).'}, status=500)
+    study = get_object_or_404(Study, id=study_id)
+    report = Report.objects.filter(study=study).first()
+    doc = Document()
+    doc.add_heading('Radiology Report', 0)
+    doc.add_paragraph(f"Patient: {study.patient.full_name} ({study.patient.patient_id})")
+    doc.add_paragraph(f"Accession: {study.accession_number}    Modality: {study.modality.code}    Date: {study.study_date}")
+    doc.add_paragraph(f"Priority: {study.priority.upper()}")
+    doc.add_paragraph('')
+    sections = [
+        ('Clinical History', (report.clinical_history if report else (study.clinical_info or '')) or '-'),
+        ('Technique', (report.technique if report else '') or '-'),
+        ('Comparison', (report.comparison if report else '') or '-'),
+        ('Findings', (report.findings if report else '') or '-'),
+        ('Impression', (report.impression if report else '') or '-'),
+        ('Recommendations', (report.recommendations if report else '') or '-'),
+    ]
+    for title, content in sections:
+        doc.add_heading(title, level=2)
+        doc.add_paragraph(content)
+    buf = io.BytesIO()
+    doc.save(buf); buf.seek(0)
+    resp = HttpResponse(buf.getvalue(), content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    resp['Content-Disposition'] = f'attachment; filename="report_{slugify(study.accession_number)}.docx"'
+    return resp

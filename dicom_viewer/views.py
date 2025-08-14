@@ -2471,3 +2471,40 @@ def api_export_dicom_sr(request, study_id):
         return JsonResponse({'success': True, 'download_url': f"{settings.MEDIA_URL}sr_exports/{filename}", 'filename': filename})
     except Exception as e:
         return JsonResponse({'error': f'Failed to export SR: {e}'}, status=500)
+
+@login_required
+@csrf_exempt
+def api_series_volume_uint8(request, series_id):
+    """Return a downsampled uint8 volume for GPU VR with basic windowing.
+    Query: ww, wl, max_dim (e.g., 256)
+    Response: { shape:[z,y,x], spacing:[z,y,x], data: base64 of raw uint8 array (z*y*x) }
+    """
+    series = get_object_or_404(Series, id=series_id)
+    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and series.study.facility != request.user.facility:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    try:
+        volume, spacing = _get_mpr_volume_and_spacing(series)
+        ww = float(request.GET.get('ww', 400))
+        wl = float(request.GET.get('wl', 40))
+        max_dim = int(request.GET.get('max_dim', 256))
+        # Normalize via window/level
+        min_val = wl - ww/2.0; max_val = wl + ww/2.0
+        vol = np.clip(volume, min_val, max_val)
+        if max_val > min_val:
+            vol = (vol - min_val) / (max_val - min_val) * 255.0
+        vol = vol.astype(np.uint8)
+        # Downsample to fit max_dim
+        z, y, x = vol.shape
+        scale = min(1.0, float(max_dim)/max(z, y, x))
+        if scale < 0.999:
+            vol = ndimage.zoom(vol, (scale, scale, scale), order=1)
+        buf = vol.tobytes()
+        import base64
+        b64 = base64.b64encode(buf).decode('ascii')
+        return JsonResponse({
+            'shape': [int(vol.shape[0]), int(vol.shape[1]), int(vol.shape[2])],
+            'spacing': [float(spacing[0]), float(spacing[1]), float(spacing[2])],
+            'data': b64,
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

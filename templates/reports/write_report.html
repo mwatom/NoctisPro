@@ -414,6 +414,12 @@
                                 <button type="button" class="btn btn-secondary" onclick="window.print()">
                                     <i class="fas fa-print me-2"></i>Print to PDF
                                 </button>
+                                <button type="button" class="btn btn-secondary" onclick="exportPDF()">
+                                    <i class="fas fa-file-pdf me-2"></i>Export PDF
+                                </button>
+                                <button type="button" class="btn btn-secondary" onclick="exportDOCX()">
+                                    <i class="fas fa-file-word me-2"></i>Export Word
+                                </button>
                                 <button type="submit" name="action" value="save" class="btn btn-save">
                                     <i class="fas fa-save me-2"></i>Save Draft
                                 </button>
@@ -457,6 +463,9 @@ async function exportDicomSR(){
         }
     } catch(e){ alert('SR export failed'); }
 }
+
+function exportPDF(){ window.open(`/reports/export/pdf/${{{ study.id }}}/`, '_blank'); }
+function exportDOCX(){ window.open(`/reports/export/docx/${{{ study.id }}}/`, '_blank'); }
 
 // Auto-save functionality
 let autoSaveInterval;
