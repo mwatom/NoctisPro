@@ -135,22 +135,24 @@
         }
 
         .worklist-btn {
-            background: var(--accent-color);
-            border: none;
-            color: var(--primary-bg);
-            padding: 4px 8px;
-            font-size: 9px;
-            border-radius: 3px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 4px 12px;
+            font-size: 11px;
+            border-radius: 2px;
             cursor: pointer;
             transition: all 0.2s ease;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-weight: bold;
+            text-transform: none;
+            letter-spacing: 0;
+            font-weight: 600;
         }
 
         .worklist-btn:hover {
-            background: #00b8d4;
-            transform: scale(1.05);
+            background: var(--accent-color);
+            color: var(--primary-bg);
+            transform: none;
+            border-color: var(--accent-color);
         }
 
         /* Controls Bar */
@@ -448,39 +450,23 @@
             border: 1px solid var(--border-color);
             color: var(--text-primary);
             padding: 4px 8px;
-            border-radius: 3px;
+            border-radius: 2px;
             font-size: 9px;
-            font-weight: bold;
+            font-weight: 600;
             cursor: pointer;
             transition: all 0.2s ease;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            text-transform: none;
+            letter-spacing: 0;
         }
 
         .btn-action:hover {
-            background: var(--text-secondary);
-            color: var(--primary-bg);
-        }
-
-        .btn-action.edit {
             background: var(--accent-color);
             color: var(--primary-bg);
             border-color: var(--accent-color);
         }
 
-        .btn-action.edit:hover {
-            background: #00b8d4;
-        }
-
-        .btn-action.delete {
-            background: var(--danger-color);
-            color: var(--text-primary);
-            border-color: var(--danger-color);
-        }
-
-        .btn-action.delete:hover {
-            background: #cc3333;
-        }
+        .btn-action.edit, .btn-action.delete { background: var(--card-bg); color: var(--text-primary); border-color: var(--border-color); }
+        .btn-action.edit:hover, .btn-action.delete:hover { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); }
 
         /* Footer Status Bar */
         .footer-status {
