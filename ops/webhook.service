@@ -1,0 +1,16 @@
+[Unit]
+Description=Noctis GitHub Webhook Listener
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+EnvironmentFile=/etc/noctis/noctis.env
+ExecStart=/usr/bin/bash -lc 'python3 -u "$APP_DIR/tools/webhook_listener.py"'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

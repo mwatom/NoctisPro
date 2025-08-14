@@ -1,0 +1,28 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run remote deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            set -Eeuo pipefail
+            # Discover APP_DIR from env file and run the deploy script
+            APP_DIR=$(bash -lc '. /etc/noctis/noctis.env 2>/dev/null || true; echo ${APP_DIR:-/workspace}')
+            echo "Using APP_DIR=$APP_DIR"
+            DEPLOY_BRANCH="main" ENV_FILE="/etc/noctis/noctis.env" bash "$APP_DIR/ops/deploy_from_git.sh" 2>&1 | sudo tee -a /var/log/noctis-deploy.log
