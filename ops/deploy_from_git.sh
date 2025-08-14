@@ -13,12 +13,26 @@ if [ -f "$ENV_FILE" ]; then
   . "$ENV_FILE"
 fi
 
-APP_DIR=${APP_DIR:-/workspace}
+APP_DIR=${APP_DIR:-/opt/noctis}
 VENV_DIR=${VENV_DIR:-"$APP_DIR/venv"}
 
+# Ensure git is available
+if ! command -v git >/dev/null 2>&1; then
+  $SUDO apt-get update -y
+  $SUDO apt-get install -y git
+fi
+
+# If APP_DIR is not a git repo, try to clone it using REPO_URL
 if [ ! -d "$APP_DIR/.git" ]; then
-  echo "APP_DIR ($APP_DIR) is not a git repository. Aborting." >&2
-  exit 1
+  REPO_URL=${REPO_URL:-https://github.com/mwatom/NoctisPro}
+  log "APP_DIR ($APP_DIR) is not a git repository. Bootstrapping from $REPO_URL"
+  if [ -d "$APP_DIR" ] && [ -n "$(ls -A "$APP_DIR" 2>/dev/null || true)" ]; then
+    echo "APP_DIR ($APP_DIR) exists and is not empty; cannot clone into it. Aborting." >&2
+    exit 1
+  fi
+  $SUDO mkdir -p "$APP_DIR"
+  $SUDO rm -rf "$APP_DIR"
+  $SUDO git clone "$REPO_URL" "$APP_DIR"
 fi
 
 cd "$APP_DIR"
