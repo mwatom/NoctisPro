@@ -7,11 +7,9 @@ Wants=network-online.target
 Type=simple
 User=root
 Group=root
-WorkingDirectory=/workspace
-Environment=DJANGO_SETTINGS_MODULE=noctis_pro.settings
-Environment=REDIS_URL=redis://127.0.0.1:6379/0
+EnvironmentFile=/etc/noctis/noctis.env
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/workspace/venv/bin/celery -A noctis_pro worker -l info
+ExecStart=/usr/bin/bash -lc '"$VENV_DIR/bin/celery" --workdir "$APP_DIR" -A "$CELERY_APP" worker -l "$CELERY_LOGLEVEL"'
 Restart=always
 RestartSec=5
 
