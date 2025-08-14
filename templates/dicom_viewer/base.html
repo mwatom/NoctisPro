@@ -344,7 +344,7 @@
         const val = imageCache.get(key);
         return typeof val.then === 'function' ? await val : val;
       }
-      const url = `/viewer/image/${imgMeta.id}/?ww=${ww}&wl=${wl}&invert=${inverted}`;
+      const url = `/dicom-viewer/image/${imgMeta.id}/?ww=${ww}&wl=${wl}&invert=${inverted}`;
       const promise = loadHtmlImage(url).then(im=>{ imageCache.set(key, im); return im; }).catch(err=>{ imageCache.delete(key); throw err; });
       imageCache.set(key, promise);
       return await promise;
@@ -354,7 +354,7 @@
       const imgMeta = images[i];
       const key = getImageKey(imgMeta.id, ww, wl, inverted);
       if (imageCache.has(key)) return;
-      const url = `/viewer/image/${imgMeta.id}/?ww=${ww}&wl=${wl}&invert=${inverted}`;
+      const url = `/dicom-viewer/image/${imgMeta.id}/?ww=${ww}&wl=${wl}&invert=${inverted}`;
       const promise = loadHtmlImage(url).then(im=>{ imageCache.set(key, im); return im; }).catch(()=>{ imageCache.delete(key); });
       imageCache.set(key, promise);
     }
@@ -408,7 +408,7 @@
 
     async function loadStudy(studyId){
       try {
-        const r = await fetch(`/viewer/study/${studyId}/`);
+        const r = await fetch(`/dicom-viewer/study/${studyId}/`);
         if (!r.ok) throw new Error('study fetch failed');
         const data = await r.json();
         currentStudy = data.study;
@@ -457,14 +457,14 @@
 
     async function loadSeries(seriesId){
       try {
-        const r = await fetch(`/viewer/series/${seriesId}/images/`);
+        const r = await fetch(`/dicom-viewer/series/${seriesId}/images/`);
         if (!r.ok) throw new Error('series fetch failed');
         const data = await r.json();
         currentSeries = data.series; images = data.images || []; index = 0;
         imageCache.clear();
         sliceSlider.max = Math.max(0, images.length - 1); sliceSlider.value = 0; document.getElementById('sliceVal').textContent = '1';
         if (images.length){
-          const probe = await fetch(`/viewer/api/image/${images[0].id}/display/`);
+          const probe = await fetch(`/dicom-viewer/api/image/${images[0].id}/display/`);
           if (probe.ok){
             const j = await probe.json();
             if (j && j.image_info){
@@ -545,7 +545,7 @@
           // Ensure counts and initial mid-slice indices are loaded
           if (!mprImgs.axial || !mprImgs.sagittal || !mprImgs.coronal){
             const params = new URLSearchParams(); params.set('window_width', ww); params.set('window_level', wl); params.set('inverted', inverted);
-            const r = await fetch(`/viewer/api/series/${currentSeries.id}/mpr/?${params.toString()}`);
+            const r = await fetch(`/dicom-viewer/api/series/${currentSeries.id}/mpr/?${params.toString()}`);
             const j = await r.json();
             if (j && j.mpr_views){ mprImgs = j.mpr_views; }
             if (j && j.counts){
@@ -918,7 +918,7 @@
         tasks.push(
           (async ()=>{
             try {
-              const r = await fetch(`/viewer/measurements/${imageId}/`); const j = await r.json();
+              const r = await fetch(`/dicom-viewer/measurements/${imageId}/`); const j = await r.json();
               measurements = (j.measurements||[]).map(m=>({ start: m.points[0], end: m.points[1], label: m.unit==='mm' ? `${(+m.value).toFixed(2)} mm` : `${(+m.value).toFixed(1)} px` }));
               imageIdToMeasurements.set(imageId, measurements);
             } catch(e){ measurements = []; }
@@ -931,7 +931,7 @@
         tasks.push(
           (async ()=>{
             try {
-              const r = await fetch(`/viewer/annotations/${imageId}/`); const j = await r.json();
+              const r = await fetch(`/dicom-viewer/annotations/${imageId}/`); const j = await r.json();
               annotations = (j.annotations||[]).map(a=>({ pos: {x:a.position_x, y:a.position_y}, text: a.text }));
               imageIdToAnnotations.set(imageId, annotations);
             } catch(e){ annotations = []; }
@@ -942,7 +942,7 @@
         tasks.push(
           (async ()=>{
             try {
-              const r = await fetch(`/viewer/api/image/${imageId}/data/`); const j = await r.json();
+              const r = await fetch(`/dicom-viewer/api/image/${imageId}/data/`); const j = await r.json();
               currentImageTags = {
                 patient_name: j.patient_name || j.image_info?.patient_name,
                 study_date: j.study_date || j.image_info?.study_date,
@@ -1196,7 +1196,7 @@
         q.set('mode','mpr'); q.set('series_id', currentSeries.id); q.set('plane', plane);
         q.set('slice', mprScroll[plane]||0); q.set('x', Math.floor(px)); q.set('y', Math.floor(py));
         try {
-          const resp = await fetch(`/viewer/api/hu/?${q.toString()}`);
+          const resp = await fetch(`/dicom-viewer/api/hu/?${q.toString()}`);
           const j = await resp.json();
           if (j && typeof j.hu === 'number'){
             document.getElementById('overlay').innerHTML = `HU (${plane}): ${j.hu} @ x:${Math.floor(px)} y:${Math.floor(py)} slice:${(mprScroll[plane]||0)+1}/${mprScroll.counts[plane]||0}`;
@@ -1248,7 +1248,7 @@
           qp.set('cy', Math.round(huEllipse.cy));
           qp.set('rx', Math.max(1, Math.round(huEllipse.rx)));
           qp.set('ry', Math.max(1, Math.round(huEllipse.ry)));
-          const r = await fetch(`/viewer/api/hu/?${qp.toString()}`);
+          const r = await fetch(`/dicom-viewer/api/hu/?${qp.toString()}`);
           const j = await r.json();
           if (j && j.stats){
             const s = j.stats; // mean, std, min, max, n
@@ -1365,9 +1365,9 @@
         params.set('inverted', inverted);
         let url = '';
         const type = kind || reconType.value;
-        if (type === 'mpr') url = `/viewer/api/series/${currentSeries.id}/mpr/?${params.toString()}`;
-        else if (type === 'mip') url = `/viewer/api/series/${currentSeries.id}/mip/?quality=high&${params.toString()}`;
-        else { url = `/viewer/api/series/${currentSeries.id}/bone/?threshold=${boneSlider.value}&mesh=true&quality=high`; }
+        if (type === 'mpr') url = `/dicom-viewer/api/series/${currentSeries.id}/mpr/?${params.toString()}`;
+        else if (type === 'mip') url = `/dicom-viewer/api/series/${currentSeries.id}/mip/?quality=high&${params.toString()}`;
+        else { url = `/dicom-viewer/api/series/${currentSeries.id}/bone/?threshold=${boneSlider.value}&mesh=true&quality=high`; }
         const r = await fetch(url);
         const j = await r.json();
         if (j.error) throw new Error(j.error);
@@ -1390,6 +1390,7 @@
       function returnToWorklist(e){
         try {
           const targetUrl = '{% url 'worklist:dashboard' %}';
+          if (e && typeof e.preventDefault === 'function') e.preventDefault();
           if (window.opener && !window.opener.closed) {
             try { window.opener.location.href = targetUrl; } catch(err) {}
             window.close();
@@ -1402,25 +1403,29 @@
           return false;
         } catch(_) { window.location.href = '{% url 'worklist:dashboard' %}'; return false; }
       }
+      // expose for inline onclick
+      window.returnToWorklist = returnToWorklist;
 
     // Preload MPR mid-slices after series load to avoid UI stall on first click
     function warmupMpr(){
       if (!currentSeries || !currentSeries.id) return;
       const params = new URLSearchParams(); params.set('window_width', ww); params.set('window_level', wl); params.set('inverted', inverted);
-      fetch(`/viewer/api/series/${currentSeries.id}/mpr/?${params.toString()}`)
+      fetch(`/dicom-viewer/api/series/${currentSeries.id}/mpr/?${params.toString()}`)
         .then(r=>r.json())
         .then(j=>{ if (j && j.counts) { mprScroll.counts = j.counts; mprScroll.axial = Math.floor((j.counts.axial||0)/2); mprScroll.sagittal = Math.floor((j.counts.sagittal||0)/2); mprScroll.coronal = Math.floor((j.counts.coronal||0)/2); prefetchMprSlices('axial', mprScroll.axial); prefetchMprSlices('sagittal', mprScroll.sagittal); prefetchMprSlices('coronal', mprScroll.coronal);} })
         .catch(()=>{});
     }
  
      // 3D dropdown interactions
-     btn3D.addEventListener('click', ()=>{
+     btn3D.addEventListener('click', (e)=>{
+       e.preventDefault(); e.stopPropagation();
        menu3D.style.display = (menu3D.style.display === 'flex') ? 'none' : 'flex';
        if (menu3D.style.display === '' || menu3D.style.display === 'none') menu3D.style.display = 'flex';
      });
            menu3D.addEventListener('click', (e)=>{
         const btn = e.target.closest('button[data-recon]');
         if (!btn) return;
+        e.preventDefault(); e.stopPropagation();
         const kind = btn.getAttribute('data-recon');
         menu3D.style.display = 'none';
         generateReconstruction(kind);
@@ -1455,7 +1460,7 @@
      btnShowDicom.addEventListener('click', async ()=>{
        try {
          const imageId = getCurrentImageId(); if (!imageId) return;
-         const r = await fetch(`/viewer/api/image/${imageId}/data/`); const j = await r.json();
+                   const r = await fetch(`/dicom-viewer/api/image/${imageId}/data/`); const j = await r.json();
          dicomTagsPre.textContent = JSON.stringify(j, null, 2);
          dicomModal.style.display = 'flex';
        } catch(e){}
@@ -1484,7 +1489,7 @@
         const val = mprImageCache.get(key);
         return (typeof val?.then === 'function') ? await val : val;
       }
-      const url = `/viewer/api/series/${seriesId}/mpr/?plane=${encodeURIComponent(plane)}&slice=${sliceIndex}&window_width=${Math.round(ww)}&window_level=${Math.round(wl)}&inverted=${inverted}`;
+      const url = `/dicom-viewer/api/series/${seriesId}/mpr/?plane=${encodeURIComponent(plane)}&slice=${sliceIndex}&window_width=${Math.round(ww)}&window_level=${Math.round(wl)}&inverted=${inverted}`;
       const pending = fetch(url)
         .then(r=>{ if(!r.ok) throw new Error('mpr fetch failed'); return r.json(); })
         .then(j=>{ if(!j || !j.image) throw new Error('no mpr image'); return j.image; })
