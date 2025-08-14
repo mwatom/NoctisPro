@@ -80,10 +80,10 @@
 				<td>
 					<div class="attachments">
 						{% for a in attachments_map|get_item:s.id %}
-							<span class="attachment-chip">
+							<a class="attachment-chip" href="{% url 'worklist:view_attachment' a.id %}" title="View attachment">
 								{% if a.file_type == 'dicom_study' %}<i class="fas fa-cubes"></i>{% elif a.file_type == 'pdf_document' %}<i class="fas fa-file-pdf"></i>{% elif a.file_type == 'image' %}<i class="fas fa-image"></i>{% else %}<i class="fas fa-paperclip"></i>{% endif %}
 								{{ a.name|truncatechars:24 }}
-							</span>
+							</a>
 						{% empty %}
 							<span class="text-secondary">None</span>
 						{% endfor %}
@@ -105,6 +105,9 @@
 						<a class="btn-mini" href="{% url 'worklist:study_detail' s.id %}" title="Open"><i class="fas fa-folder-open"></i></a>
 						<a class="btn-mini" href="{% url 'dicom_viewer:web_viewer' %}?study_id={{ s.id }}" title="View"><i class="fas fa-eye"></i></a>
 						<a class="btn-mini" href="{% url 'reports:write_report' s.id %}" title="Report"><i class="fas fa-file-medical"></i></a>
+						<a class="btn-mini" href="{% url 'worklist:upload_attachment' s.id %}" title="Attach files">
+							<i class="fas fa-paperclip"></i>
+						</a>
 					</div>
 				</td>
 			</tr>

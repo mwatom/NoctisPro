@@ -477,9 +477,7 @@ def upload_attachment(request, study_id):
     study = get_object_or_404(Study, id=study_id)
     user = request.user
     
-    # Check permissions
-    if user.is_facility_user() and study.facility != user.facility:
-        return JsonResponse({'error': 'Permission denied'}, status=403)
+    # All authenticated users can upload attachments regardless of facility
     
     if request.method == 'POST':
         try:
@@ -590,17 +588,7 @@ def view_attachment(request, attachment_id):
     attachment = get_object_or_404(StudyAttachment, id=attachment_id)
     user = request.user
     
-    # Check permissions
-    if user.is_facility_user() and attachment.study.facility != user.facility:
-        messages.error(request, 'Permission denied')
-        return redirect('worklist:study_list')
-    
-    # Check role-based permissions
-    if not attachment.is_public and attachment.allowed_roles:
-        user_role = user.role
-        if user_role not in attachment.allowed_roles:
-            messages.error(request, 'You do not have permission to view this attachment')
-            return redirect('worklist:study_detail', study_id=attachment.study.id)
+    # All authenticated users can view attachments
     
     # Increment access count
     attachment.increment_access_count()
@@ -701,13 +689,7 @@ def delete_attachment(request, attachment_id):
     attachment = get_object_or_404(StudyAttachment, id=attachment_id)
     user = request.user
     
-    # Check permissions
-    if user.is_facility_user() and attachment.study.facility != user.facility:
-        return JsonResponse({'error': 'Permission denied'}, status=403)
-    
-    # Only allow deletion by uploader or admin
-    if attachment.uploaded_by != user and not user.is_admin():
-        return JsonResponse({'error': 'You can only delete your own attachments'}, status=403)
+    # All authenticated users can delete attachments
     
     if request.method == 'POST':
         try:
