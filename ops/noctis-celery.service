@@ -1,0 +1,19 @@
+[Unit]
+Description=Noctis Pro Celery Worker
+After=network-online.target redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/workspace
+Environment=DJANGO_SETTINGS_MODULE=noctis_pro.settings
+Environment=REDIS_URL=redis://127.0.0.1:6379/0
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/workspace/venv/bin/celery -A noctis_pro worker -l info
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
