@@ -66,24 +66,41 @@ class DicomReceiver:
     
     def handle_echo(self, event):
         """Handle C-ECHO requests (DICOM ping)"""
-        logger.info(f"Received C-ECHO from {event.assoc.requestor.ae_title}")
+        try:
+            calling_aet = event.assoc.requestor.ae_title.decode(errors='ignore').strip()
+            peer = getattr(event.assoc.requestor, 'address', '')
+            logger.info(f"Received C-ECHO from Calling AET '{calling_aet}' at {peer}")
+        except Exception:
+            logger.info("Received C-ECHO")
         return 0x0000  # Success
     
     def handle_store(self, event):
         """Handle C-STORE requests (DICOM image storage)"""
         try:
+            # Enforce facility isolation by Calling AE Title only
+            calling_aet = event.assoc.requestor.ae_title.decode(errors='ignore').strip()
+            peer_ip = getattr(event.assoc.requestor, 'address', '')
+
+            facility = Facility.objects.filter(ae_title__iexact=calling_aet, is_active=True).first()
+            if not facility:
+                logger.warning(f"Rejecting C-STORE from unknown Calling AET '{calling_aet}' at {peer_ip}")
+                # Service-specific failure (not authorized/unknown AE)
+                return 0xC000
+
             # Get the dataset
             ds = event.dataset
             
             # Log the incoming study
-            logger.info(f"Receiving DICOM object: "
-                       f"Study UID: {getattr(ds, 'StudyInstanceUID', 'Unknown')}, "
-                       f"Series UID: {getattr(ds, 'SeriesInstanceUID', 'Unknown')}, "
-                       f"SOP Instance UID: {getattr(ds, 'SOPInstanceUID', 'Unknown')}")
+            logger.info(
+                f"Receiving DICOM object from '{calling_aet}' ({peer_ip}): "
+                f"Study UID: {getattr(ds, 'StudyInstanceUID', 'Unknown')}, "
+                f"Series UID: {getattr(ds, 'SeriesInstanceUID', 'Unknown')}, "
+                f"SOP Instance UID: {getattr(ds, 'SOPInstanceUID', 'Unknown')}"
+            )
             
             # Process the DICOM object
             with transaction.atomic():
-                result = self.process_dicom_object(ds, event)
+                result = self.process_dicom_object(ds, event, calling_aet, facility)
                 
             if result:
                 logger.info("DICOM object stored successfully")
@@ -96,7 +113,7 @@ class DicomReceiver:
             logger.error(f"Error handling C-STORE: {str(e)}")
             return 0xA700  # Out of Resources
     
-    def process_dicom_object(self, ds, event):
+    def process_dicom_object(self, ds, event, calling_aet, facility):
         """Process and store the DICOM object"""
         try:
             # Extract DICOM metadata
@@ -167,17 +184,10 @@ class DicomReceiver:
                 defaults={'name': modality_code, 'description': f'{modality_code} Modality'}
             )
             
-            # Try to attribute by called AE title (ours) or requestor AE title (sender)
-            called_aet = getattr(event, 'assoc', None) and event.assoc.acceptor.ae_title.decode(errors='ignore') if getattr(event, 'assoc', None) else None
-            requestor_aet = getattr(event, 'assoc', None) and event.assoc.requestor.ae_title.decode(errors='ignore') if getattr(event, 'assoc', None) else None
-            facility_match = None
-            if called_aet:
-                facility_match = Facility.objects.filter(ae_title__iexact=called_aet.strip()).first()
-            if not facility_match and requestor_aet:
-                facility_match = Facility.objects.filter(ae_title__iexact=requestor_aet.strip()).first()
-            default_facility = facility_match or Facility.objects.filter(is_active=True).first()
+            # Attribute study strictly to the facility resolved from Calling AE
+            default_facility = facility
             if not default_facility:
-                logger.error("No active facility found for storing DICOM study")
+                logger.error("No facility matched Calling AE Title; rejecting study")
                 return False
             
             # Get or create study
