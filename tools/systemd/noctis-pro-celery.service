@@ -1,0 +1,15 @@
+[Unit]
+Description=Noctis Pro PACS Celery Worker
+After=network-online.target
+Requires=noctis-pro.service
+
+[Service]
+Type=simple
+WorkingDirectory=/workspace
+Environment=DJANGO_SETTINGS_MODULE=noctis_pro.settings
+ExecStart=/workspace/venv/bin/celery -A noctis_pro worker -l info
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

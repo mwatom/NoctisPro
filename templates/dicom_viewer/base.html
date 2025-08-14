@@ -1211,8 +1211,8 @@
         }
       } else if (activeTool === 'annotate'){
         const pos = canvasToImageCoords(vp, e.offsetX, e.offsetY);
-        const text = '';
-        if (text){ annotations.push({ pos, text }); imageIdToAnnotations.set(getCurrentImageId(), annotations); await saveAnnotationToServer(pos, text); await draw(); }
+        const text = window.prompt('Annotation text:');
+        if (text && text.trim().length){ annotations.push({ pos, text: text.trim() }); imageIdToAnnotations.set(getCurrentImageId(), annotations); await saveAnnotationToServer(pos, text.trim()); await draw(); }
       } else if (showHuProbe && huEllipse){
         // Submit ROI to backend
         try {

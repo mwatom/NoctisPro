@@ -18,38 +18,32 @@ def login_view(request):
         username = request.POST.get('username')
         password = request.POST.get('password')
         
-        if username and password:
-            user = authenticate(request, username=username, password=password)
+        user = authenticate(request, username=username, password=password)
+        if user and user.is_active:
+            # Track login session
+            login(request, user)
             
-            if user is not None:
-                if user.is_active:
-                    # Track login session
-                    login(request, user)
-                    
-                    # Get client information
-                    user_agent = request.META.get('HTTP_USER_AGENT', '')
-                    ip_address = get_client_ip(request)
-                    
-                    # Update user login tracking
-                    user.last_login_ip = ip_address
-                    user.save()
-                    
-                    # Create session record
-                    UserSession.objects.create(
-                        user=user,
-                        session_key=request.session.session_key,
-                        ip_address=ip_address,
-                        user_agent=user_agent
-                    )
-                    
-                    # Redirect all users to the worklist dashboard after login
-                    return redirect('worklist:dashboard')
-                else:
-                    messages.error(request, 'Account is disabled. Please contact administrator.')
-            else:
-                messages.error(request, 'Invalid username or password.')
+            # Get client information
+            user_agent = request.META.get('HTTP_USER_AGENT', '')
+            ip_address = get_client_ip(request)
+            
+            # Update user login tracking
+            user.last_login_ip = ip_address
+            user.save()
+            
+            # Create session record
+            UserSession.objects.create(
+                user=user,
+                session_key=request.session.session_key,
+                ip_address=ip_address,
+                user_agent=user_agent
+            )
+            
+            # Redirect all users to the worklist dashboard after login
+            return redirect('worklist:dashboard')
         else:
-            messages.error(request, 'Please provide both username and password.')
+            # Only show a single generic error for any failure
+            messages.error(request, 'Invalid username or password.')
     
     return render(request, 'accounts/login.html', {'hide_navbar': True})
 
@@ -70,7 +64,7 @@ def logout_view(request):
         pass
     
     logout(request)
-    messages.success(request, 'You have been successfully logged out.')
+    # Do not show any success/info messages on the login page
     return redirect('accounts:login')
 
 @login_required
