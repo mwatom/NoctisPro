@@ -121,9 +121,24 @@ def _get_mpr_volume_for_series(series):
         try:
             dicom_path = _os.path.join(settings.MEDIA_ROOT, str(img.file_path))
             ds = _pydicom.dcmread(dicom_path)
-            pixel_array = ds.pixel_array.astype(_np.float32)
+            try:
+                pixel_array = ds.pixel_array.astype(_np.float32)
+            except Exception:
+                # Fallback to SimpleITK for compressed/transcoded pixel data
+                try:
+                    import SimpleITK as _sitk
+                    sitk_image = _sitk.ReadImage(dicom_path)
+                    px = _sitk.GetArrayFromImage(sitk_image)
+                    if px.ndim == 3 and px.shape[0] == 1:
+                        px = px[0]
+                    pixel_array = px.astype(_np.float32)
+                except Exception:
+                    continue
             if hasattr(ds, 'RescaleSlope') and hasattr(ds, 'RescaleIntercept'):
-                pixel_array = pixel_array * float(ds.RescaleSlope) + float(ds.RescaleIntercept)
+                try:
+                    pixel_array = pixel_array * float(ds.RescaleSlope) + float(ds.RescaleIntercept)
+                except Exception:
+                    pass
             volume_data.append(pixel_array)
         except Exception:
             continue
@@ -1693,7 +1708,19 @@ def web_dicom_image(request, image_id):
     try:
         file_path = os.path.join(settings.MEDIA_ROOT, image.file_path.name)
         ds = pydicom.dcmread(file_path)
-        pixel_array = ds.pixel_array
+        # Robust pixel decode with SimpleITK fallback
+        try:
+            pixel_array = ds.pixel_array
+        except Exception:
+            try:
+                import SimpleITK as sitk
+                sitk_image = sitk.ReadImage(file_path)
+                px = sitk.GetArrayFromImage(sitk_image)
+                if px.ndim == 3 and px.shape[0] == 1:
+                    px = px[0]
+                pixel_array = px
+            except Exception:
+                return HttpResponse(status=500)
         # Apply VOI LUT only for projection modalities (CR/DX/XA/RF/MG) to avoid CT distortion
         try:
             modality = str(getattr(ds, 'Modality', '')).upper()
