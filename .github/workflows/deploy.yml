@@ -23,6 +23,6 @@ jobs:
           script: |
             set -Eeuo pipefail
             # Discover APP_DIR from env file and run the deploy script
-            APP_DIR=$(bash -lc '. /etc/noctis/noctis.env 2>/dev/null || true; echo ${APP_DIR:-/workspace}')
+            APP_DIR=$(bash -lc '. /etc/noctis/noctis.env 2>/dev/null || true; echo ${APP_DIR:-/opt/noctis}')
             echo "Using APP_DIR=$APP_DIR"
             DEPLOY_BRANCH="main" ENV_FILE="/etc/noctis/noctis.env" bash "$APP_DIR/ops/deploy_from_git.sh" 2>&1 | sudo tee -a /var/log/noctis-deploy.log
