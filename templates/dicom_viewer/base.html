@@ -382,12 +382,12 @@
         const params = new URLSearchParams(window.location.search);
         const studyId = params.get('study_id') || (currentStudy && currentStudy.id);
         if (studyId){
-          const resp = await fetch(`/viewer/launch-desktop/${studyId}/`);
+          const resp = await fetch(`/dicom-viewer/launch-desktop/${studyId}/`);
           const j = await resp.json();
           if (j && j.fallback_url){ window.location.href = j.fallback_url; return; }
           // Desktop launched; leave page as-is
         } else {
-          const resp = await fetch('/viewer/launch-desktop/', { method:'POST', headers:{'Content-Type':'application/json'}, body: '{}' });
+          const resp = await fetch('/dicom-viewer/launch-desktop/', { method:'POST', headers:{'Content-Type':'application/json'}, body: '{}' });
           const j = await resp.json();
           if (j && j.fallback_url){ window.location.href = j.fallback_url; return; }
         }
@@ -888,7 +888,7 @@
         notes: ''
       };
       try {
-        const r = await fetch('/viewer/measurements/save/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+        const r = await fetch('/dicom-viewer/measurements/save/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
         const j = await r.json();
         if (j && j.success){
           if (dist.mm){
@@ -903,7 +903,7 @@
       const imageId = getCurrentImageId();
       if (!imageId) return;
       try {
-        await fetch('/viewer/annotations/save/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ image_id: imageId, position_x: p.x, position_y: p.y, text }) });
+        await fetch('/dicom-viewer/annotations/save/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ image_id: imageId, position_x: p.x, position_y: p.y, text }) });
       } catch(e){}
     }
 
@@ -1323,7 +1323,7 @@
         async function uploadChunk(chunk){
           const form = new FormData();
           chunk.forEach(f=> form.append('dicom_files', f));
-          const resp = await fetch('/viewer/upload/', { method:'POST', body: form });
+          const resp = await fetch('/dicom-viewer/upload/', { method:'POST', body: form });
           const data = await resp.json();
           if (!data.success){ errors++; return; }
           current += chunk.length;

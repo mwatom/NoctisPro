@@ -1487,7 +1487,7 @@ def launch_standalone_viewer(request):
             result = subprocess.run(cmd, capture_output=True, text=True)
             if wants_html:
                 # For direct navigations, always show the web viewer UI
-                web_url = '/viewer/web/viewer/'
+                web_url = '/dicom-viewer/web/viewer/'
                 if study_id:
                     web_url += f'?study_id={study_id}'
                 return redirect(web_url)
@@ -1507,7 +1507,7 @@ def launch_standalone_viewer(request):
                     'details': details[:500]
                 }, status=500)
         else:
-            web_url = '/viewer/web/viewer/'
+            web_url = '/dicom-viewer/web/viewer/'
             if study_id:
                 web_url += f'?study_id={study_id}'
             if wants_html:
@@ -1520,7 +1520,7 @@ def launch_standalone_viewer(request):
             })
 
     except Exception as e:
-        web_url = '/viewer/web/viewer/'
+        web_url = '/dicom-viewer/web/viewer/'
         if study_id:
             web_url += f'?study_id={study_id}'
         if wants_html:
@@ -1556,7 +1556,7 @@ def launch_study_in_desktop_viewer(request, study_id):
             pass
         if user.is_facility_user() and study.facility != user.facility:
             # Gracefully fall back to web viewer rather than hard 403, to match frontend behavior
-            web_url = f'/viewer/web/viewer/?study_id={study_id}'
+            web_url = f'/dicom-viewer/web/viewer/?study_id={study_id}'
             if wants_html:
                 return redirect(web_url)
             return JsonResponse({'success': True, 'fallback_url': web_url, 'message': 'Opening web-based DICOM viewer due to permissions'}, status=200)
@@ -1569,7 +1569,7 @@ def launch_study_in_desktop_viewer(request, study_id):
 
             if wants_html:
                 # For direct navigations, always show the web viewer UI
-                return redirect(f'/viewer/web/viewer/?study_id={study_id}')
+                return redirect(f'/dicom-viewer/web/viewer/?study_id={study_id}')
 
             if result.returncode == 0:
                 return JsonResponse({'success': True, 'message': f'Viewer launched for study: {study.patient.full_name} ({study.study_date})'})
