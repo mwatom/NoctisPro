@@ -411,9 +411,9 @@
                                 <button type="button" class="btn btn-secondary" onclick="exportDicomSR()">
                                     <i class="fas fa-file-medical me-2"></i>Export DICOM SR
                                 </button>
-                                <button type="button" class="btn btn-secondary" onclick="window.print()">
-                                    <i class="fas fa-print me-2"></i>Print to PDF
-                                </button>
+                                <a class="btn btn-secondary" href="{% url 'reports:print_report' study.id %}" target="_blank">
+                                    <i class="fas fa-print me-2"></i>Print/Letterhead View
+                                </a>
                                 <button type="button" class="btn btn-secondary" onclick="exportPDF()">
                                     <i class="fas fa-file-pdf me-2"></i>Export PDF
                                 </button>
@@ -464,8 +464,8 @@ async function exportDicomSR(){
     } catch(e){ alert('SR export failed'); }
 }
 
-function exportPDF(){ window.open(`/reports/export/pdf/${{{ study.id }}}/`, '_blank'); }
-function exportDOCX(){ window.open(`/reports/export/docx/${{{ study.id }}}/`, '_blank'); }
+function exportPDF(){ window.open(`/reports/export/pdf/{{ study.id }}/`, '_blank'); }
+function exportDOCX(){ window.open(`/reports/export/docx/{{ study.id }}/`, '_blank'); }
 
 // Auto-save functionality
 let autoSaveInterval;

@@ -10,6 +10,12 @@ from accounts.models import User
 import io
 from django.core.files.base import ContentFile
 from django.utils.text import slugify
+from django.urls import reverse
+from django.conf import settings
+import io
+import base64
+
+# Optional PDF/Docx libs
 try:
     import fitz  # PyMuPDF
 except Exception:
@@ -18,6 +24,37 @@ try:
     from docx import Document
 except Exception:
     Document = None
+
+# QR code support
+try:
+    import qrcode
+except Exception:
+    qrcode = None
+
+
+def _qr_png_bytes(url: str, box_size: int = 6, border: int = 2) -> bytes:
+    """Return PNG bytes for a QR code for the given URL."""
+    if not qrcode:
+        return b''
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=box_size,
+        border=border,
+    )
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color='black', back_color='white').convert('RGB')
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    return buf.getvalue()
+
+
+def _data_url_from_png(png_bytes: bytes) -> str:
+    if not png_bytes:
+        return ''
+    return 'data:image/png;base64,' + base64.b64encode(png_bytes).decode('ascii')
+
 
 @login_required
 def report_list(request):
@@ -70,6 +107,7 @@ def report_list(request):
     }
     
     return render(request, 'reports/report_list.html', context)
+
 
 @login_required
 def write_report(request, study_id):
@@ -156,42 +194,101 @@ def write_report(request, study_id):
     
     return render(request, 'reports/write_report.html', context)
 
+
 @login_required
 def print_report_stub(request, study_id):
-    """Simple printable page for facility users; if report exists include it, else show study details and clinical info."""
+    """Printable HTML that mirrors facility letterhead, includes author signature and QR/link footer."""
     study = get_object_or_404(Study, id=study_id)
     report = Report.objects.filter(study=study).first()
+
+    # Build absolute URLs
+    viewer_url = request.build_absolute_uri(reverse('dicom_viewer:web_viewer')) + f"?study_id={study.id}"
+    report_url = request.build_absolute_uri(reverse('reports:print_report', args=[study.id]))
+
+    # Generate QR codes
+    qr_viewer_b64 = _data_url_from_png(_qr_png_bytes(viewer_url))
+    qr_report_b64 = _data_url_from_png(_qr_png_bytes(report_url))
+
+    letterhead_url = study.facility.letterhead.url if getattr(study.facility, 'letterhead', None) else ''
+    author_name = ''
+    author_license = ''
+    signed_date = ''
+    if report and getattr(report, 'radiologist', None):
+        try:
+            author_name = report.radiologist.get_full_name() or report.radiologist.username
+            author_license = getattr(report.radiologist, 'license_number', '') or ''
+        except Exception:
+            pass
+    if report and report.signed_date:
+        signed_date = report.signed_date.strftime('%Y-%m-%d %H:%M')
+
+    # Optional signature image from Base64 (data URL or raw b64)
+    sig_img_html = ''
+    if report and (report.digital_signature or '').strip():
+        ds = report.digital_signature.strip()
+        if not ds.startswith('data:image'):
+            try:
+                ds = 'data:image/png;base64,' + ds
+            except Exception:
+                ds = ''
+        if ds:
+            sig_img_html = f'<img src="{ds}" alt="Signature" style="height:60px;" />'
+
     html = f"""
     <html>
       <head>
-        <title>Print Study {study.accession_number}</title>
+        <title>Report {study.accession_number}</title>
         <style>
-          body {{ font-family: Arial, sans-serif; color: #000; }}
-          .header {{ display:flex; justify-content: space-between; border-bottom:1px solid #000; padding-bottom:6px; margin-bottom:10px; }}
+          body {{ font-family: Arial, sans-serif; color: #000; margin: 24px; }}
+          .letterhead {{ text-align:center; margin-bottom: 12px; }}
+          .letterhead img {{ max-width: 100%; height: auto; }}
+          .header {{ border-bottom:1px solid #000; padding-bottom:6px; margin-bottom:10px; }}
           .section {{ margin-bottom: 12px; }}
           .label {{ font-weight:bold; }}
           pre {{ white-space: pre-wrap; font-family: inherit; }}
+          .footer {{ border-top:1px solid #000; padding-top:8px; margin-top:12px; display:flex; justify-content: space-between; align-items:center; gap: 16px; }}
+          .qr {{ text-align:center; font-size: 11px; }}
+          .sign {{ margin-top: 8px; }}
           @media print {{ .noprint {{ display:none; }} }}
         </style>
       </head>
       <body>
+        <div class="letterhead">{f'<img src="{letterhead_url}" alt="Letterhead" />' if letterhead_url else f'<h2 style="margin:0">{study.facility.name}</h2><div>{study.facility.address}</div>'}</div>
         <div class="header">
-          <div>
-            <div class="label">Facility:</div>
-            <div>{study.facility.name}</div>
-          </div>
-          <div style="text-align:right">
-            <div class="label">Accession:</div>
-            <div>{study.accession_number}</div>
+          <div style="display:flex; justify-content: space-between;">
+            <div>
+              <div class="label">Patient:</div>
+              <div>{study.patient.full_name} ({study.patient.patient_id})</div>
+            </div>
+            <div style="text-align:right">
+              <div><span class="label">Accession:</span> {study.accession_number}</div>
+              <div><span class="label">Modality:</span> {study.modality.code} &nbsp; <span class="label">Date:</span> {study.study_date}</div>
+            </div>
           </div>
         </div>
-        <div class="section"><span class="label">Patient:</span> {study.patient.full_name} ({study.patient.patient_id})</div>
-        <div class="section"><span class="label">Modality:</span> {study.modality.code} &nbsp; <span class="label">Date:</span> {study.study_date}</div>
-        <div class="section"><span class="label">Priority:</span> {study.priority.upper()}</div>
-        <div class="section"><span class="label">Clinical Information:</span><br/><pre>{(study.clinical_info or '').strip() or '-'}</pre></div>
-        {f'<div class="section"><span class="label">Findings:</span><br/><pre>{(report.findings or '').strip()}</pre></div>' if report else ''}
-        {f'<div class="section"><span class="label">Impression:</span><br/><pre>{(report.impression or '').strip()}</pre></div>' if report else ''}
-        <div class="noprint"><button onclick="window.print()">Print</button></div>
+        <div class="section"><span class="label">Clinical Information:</span><br/><pre>{(report.clinical_history if report else (study.clinical_info or '')) or '-'}</pre></div>
+        <div class="section"><span class="label">Technique:</span><br/><pre>{(report.technique if report else '') or '-'}</pre></div>
+        <div class="section"><span class="label">Comparison:</span><br/><pre>{(report.comparison if report else '') or '-'}</pre></div>
+        {f'<div class="section"><span class="label">Findings:</span><br/><pre>{(report.findings or "").strip()}</pre></div>' if report else ''}
+        {f'<div class="section"><span class="label">Impression:</span><br/><pre>{(report.impression or "").strip()}</pre></div>' if report else ''}
+        <div class="sign">
+          <div class="label">Signed by:</div>
+          <div>{author_name}{(' - ' + author_license) if author_license else ''}{(' on ' + signed_date) if signed_date else ''}</div>
+          {sig_img_html}
+        </div>
+        <div class="footer">
+          <div class="qr">
+            {f'<img src="{qr_viewer_b64}" alt="QR Images" style="height:100px;" />' if qr_viewer_b64 else ''}
+            <div>Scan to view images</div>
+            <div style="word-break: break-all; max-width: 260px;">{viewer_url}</div>
+          </div>
+          <div class="qr">
+            {f'<img src="{qr_report_b64}" alt="QR Report" style="height:100px;" />' if qr_report_b64 else ''}
+            <div>Scan to view report</div>
+            <div style="word-break: break-all; max-width: 260px;">{report_url}</div>
+          </div>
+        </div>
+        <div class="noprint" style="margin-top: 12px;"><button onclick="window.print()">Print</button></div>
       </body>
     </html>
     """
@@ -205,39 +302,141 @@ def export_report_pdf(request, study_id):
         return HttpResponse(status=403)
     study = get_object_or_404(Study, id=study_id)
     report = Report.objects.filter(study=study).first()
-    html = f"""
-    <h2 style='margin:0'>Radiology Report</h2>
-    <div><b>Patient:</b> {study.patient.full_name} ({study.patient.patient_id})</div>
-    <div><b>Accession:</b> {study.accession_number} &nbsp; <b>Modality:</b> {study.modality.code} &nbsp; <b>Date:</b> {study.study_date}</div>
-    <div><b>Priority:</b> {study.priority.upper()}</div>
-    <hr/>
-    <div><b>Clinical History</b><br/>{(report.clinical_history if report else (study.clinical_info or '')) or '-'}</div>
-    <div><b>Technique</b><br/>{(report.technique if report else '') or '-'}</div>
-    <div><b>Comparison</b><br/>{(report.comparison if report else '') or '-'}</div>
-    <div><b>Findings</b><br/>{(report.findings if report else '') or '-'}</div>
-    <div><b>Impression</b><br/>{(report.impression if report else '') or '-'}</div>
-    <div><b>Recommendations</b><br/>{(report.recommendations if report else '') or '-'}</div>
-    """
+
+    # Prepare absolute URLs
+    viewer_url = request.build_absolute_uri(reverse('dicom_viewer:web_viewer')) + f"?study_id={study.id}"
+    report_url = request.build_absolute_uri(reverse('reports:print_report', args=[study.id]))
+
     filename = f"report_{slugify(study.accession_number)}.pdf"
     if fitz is None:
         return JsonResponse({'error': 'PDF export not available (PyMuPDF missing).'}, status=500)
     try:
         doc = fitz.open()
         page = doc.new_page()
-        # Simple HTML rendering: use a text writer for robustness
-        text = fitz.TextWriter(page.rect)
-        y = 36
-        for line in html.replace('<br/>', '\n').replace('<hr/>', '\n' + '-'*80 + '\n').replace('<b>','').replace('</b>','').replace('<h2','\n<h2').split('\n'):
-            if '<h2' in line:
-                line = line.replace("</h2>", '').split('>')[-1]
-                text.append((36, y), line, fontsize=16)
-                y += 28
+        margin = 36
+        y = margin
+
+        # Insert facility letterhead image if available
+        try:
+            if getattr(study.facility, 'letterhead', None) and study.facility.letterhead.name:
+                with open(study.facility.letterhead.path, 'rb') as f:
+                    img_bytes = f.read()
+                rect = fitz.Rect(margin, y, page.rect.width - margin, y + 90)
+                page.insert_image(rect, stream=img_bytes, keep_proportion=True)
+                y = rect.y1 + 12
             else:
-                text.append((36, y), fitz.strip_html(line).strip(), fontsize=11)
+                page.insert_text((margin, y), study.facility.name, fontsize=14, fontname="helv", fill=(0, 0, 0))
+                y += 22
+                page.insert_text((margin, y), study.facility.address or '', fontsize=10, fontname="helv", fill=(0, 0, 0))
+                y += 18
+        except Exception:
+            # Fallback to text header if image fails
+            page.insert_text((margin, y), study.facility.name, fontsize=14, fontname="helv", fill=(0, 0, 0))
+            y += 22
+
+        # Horizontal rule
+        page.draw_line((margin, y), (page.rect.width - margin, y), color=(0, 0, 0), width=0.6)
+        y += 10
+
+        # Patient and study header
+        header_lines = [
+            f"Radiology Report",
+            f"Patient: {study.patient.full_name} ({study.patient.patient_id})",
+            f"Accession: {study.accession_number}    Modality: {study.modality.code}    Date: {study.study_date}",
+            f"Priority: {study.priority.upper()}",
+        ]
+        for line in header_lines:
+            page.insert_text((margin, y), line, fontsize=12 if line == 'Radiology Report' else 10, fontname="helv", fill=(0, 0, 0))
+            y += 16 if line != 'Radiology Report' else 20
+
+        y += 4
+        # Sections
+        def add_section(title: str, content: str):
+            nonlocal y, page
+            if y > page.rect.height - 180:
+                page = doc.new_page(); y = margin
+            page.insert_text((margin, y), title, fontsize=11, fontname="helv", fill=(0, 0, 0))
+            y += 14
+            # simple wrap
+            max_width = page.rect.width - margin * 2
+            words = (content or '-').split()
+            line = ''
+            while words:
+                nxt = words.pop(0)
+                test = (line + ' ' + nxt).strip()
+                # crude width estimation (6px per char at 10pt)
+                if len(test) * 6 > max_width:
+                    page.insert_text((margin, y), line, fontsize=10, fontname="helv", fill=(0, 0, 0))
+                    y += 13
+                    line = nxt
+                else:
+                    line = test
+            if line:
+                page.insert_text((margin, y), line, fontsize=10, fontname="helv", fill=(0, 0, 0))
                 y += 16
-            if y > page.rect.height - 36:
-                page = doc.new_page(); text = fitz.TextWriter(page.rect); y = 36
-        page.insert_text((0,0), "")
+            y += 2
+
+        add_section('Clinical History', (report.clinical_history if report else (study.clinical_info or '')) or '-')
+        add_section('Technique', (report.technique if report else '') or '-')
+        add_section('Comparison', (report.comparison if report else '') or '-')
+        add_section('Findings', (report.findings if report else '') or '-')
+        add_section('Impression', (report.impression if report else '') or '-')
+        add_section('Recommendations', (report.recommendations if report else '') or '-')
+
+        # Signature block
+        author_name = ''
+        author_license = ''
+        if report and getattr(report, 'radiologist', None):
+            try:
+                author_name = report.radiologist.get_full_name() or report.radiologist.username
+                author_license = getattr(report.radiologist, 'license_number', '') or ''
+            except Exception:
+                pass
+        sig_line = f"Signed by: {author_name}{(' - ' + author_license) if author_license else ''}"
+        if report and report.signed_date:
+            sig_line += f" on {report.signed_date.strftime('%Y-%m-%d %H:%M')}"
+        if y > page.rect.height - 150:
+            page = doc.new_page(); y = margin
+        page.insert_text((margin, y), sig_line, fontsize=10, fontname="helv", fill=(0, 0, 0))
+        y += 14
+        # Optional signature image
+        if report and (report.digital_signature or '').strip():
+            ds = report.digital_signature.strip()
+            try:
+                if ds.startswith('data:image'):
+                    b64 = ds.split(',', 1)[1]
+                else:
+                    b64 = ds
+                img_bytes = base64.b64decode(b64)
+                rect = fitz.Rect(margin, y, margin + 180, y + 60)
+                page.insert_image(rect, stream=img_bytes, keep_proportion=True)
+                y = rect.y1 + 8
+            except Exception:
+                pass
+
+        # Footer with QR codes
+        if y < page.rect.height - 130:
+            footer_y = page.rect.height - 130
+        else:
+            footer_y = y + 10
+        # line
+        page.draw_line((margin, footer_y), (page.rect.width - margin, footer_y), color=(0, 0, 0), width=0.6)
+        footer_y += 8
+
+        try:
+            qr1 = _qr_png_bytes(viewer_url)
+            qr2 = _qr_png_bytes(report_url)
+            left_rect = fitz.Rect(margin, footer_y, margin + 110, footer_y + 110)
+            right_rect = fitz.Rect(page.rect.width - margin - 110, footer_y, page.rect.width - margin, footer_y + 110)
+            if qr1:
+                page.insert_image(left_rect, stream=qr1, keep_proportion=True)
+                page.insert_text((left_rect.x0, left_rect.y1 + 2), 'Scan to view images', fontsize=8, fontname='helv', fill=(0,0,0))
+            if qr2:
+                page.insert_image(right_rect, stream=qr2, keep_proportion=True)
+                page.insert_text((right_rect.x0, right_rect.y1 + 2), 'Scan to view report', fontsize=8, fontname='helv', fill=(0,0,0))
+        except Exception:
+            pass
+
         buf = io.BytesIO()
         doc.save(buf)
         buf.seek(0)
@@ -258,7 +457,12 @@ def export_report_docx(request, study_id):
     study = get_object_or_404(Study, id=study_id)
     report = Report.objects.filter(study=study).first()
     doc = Document()
-    doc.add_heading('Radiology Report', 0)
+    # Letterhead as image if available
+    try:
+        if getattr(study.facility, 'letterhead', None) and study.facility.letterhead.name:
+            doc.add_picture(study.facility.letterhead.path, width=None)
+    except Exception:
+        doc.add_heading(study.facility.name, 0)
     doc.add_paragraph(f"Patient: {study.patient.full_name} ({study.patient.patient_id})")
     doc.add_paragraph(f"Accession: {study.accession_number}    Modality: {study.modality.code}    Date: {study.study_date}")
     doc.add_paragraph(f"Priority: {study.priority.upper()}")
@@ -274,6 +478,18 @@ def export_report_docx(request, study_id):
     for title, content in sections:
         doc.add_heading(title, level=2)
         doc.add_paragraph(content)
+    # Signature
+    author_name = ''
+    author_license = ''
+    if report and getattr(report, 'radiologist', None):
+        try:
+            author_name = report.radiologist.get_full_name() or report.radiologist.username
+            author_license = getattr(report.radiologist, 'license_number', '') or ''
+        except Exception:
+            pass
+    doc.add_paragraph(f"Signed by: {author_name}{(' - ' + author_license) if author_license else ''}")
+    if report and report.signed_date:
+        doc.add_paragraph(f"Signed on: {report.signed_date.strftime('%Y-%m-%d %H:%M')}")
     buf = io.BytesIO()
     doc.save(buf); buf.seek(0)
     resp = HttpResponse(buf.getvalue(), content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')

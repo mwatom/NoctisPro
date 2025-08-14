@@ -285,10 +285,10 @@
                                     <a href="{% url 'reports:write_report' report.study.id %}" class="action-btn" title="View/Edit Report">
                                         <i class="fas fa-edit"></i>
                                     </a>
-                                    <a href="#" class="action-btn" title="Print Report">
+                                    <a href="{% url 'reports:print_report' report.study.id %}" class="action-btn" title="Print Report" target="_blank">
                                         <i class="fas fa-print"></i>
                                     </a>
-                                    <a href="#" class="action-btn" title="Download PDF">
+                                    <a href="{% url 'reports:export_report_pdf' report.study.id %}" class="action-btn" title="Download PDF">
                                         <i class="fas fa-download"></i>
                                     </a>
                                 </div>
