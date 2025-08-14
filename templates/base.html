@@ -314,6 +314,16 @@
         }
         .btn-mini:hover { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); }
 
+        /* Ensure dropdown menus are visible over dark theme */
+        .dropdown-menu {
+            background: var(--card-surface);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            z-index: 2000;
+        }
+        .dropdown-item { color: var(--text-primary); }
+        .dropdown-item:hover { background: var(--accent-color); color: var(--primary-bg); }
+
         .action-btn, .worklist-btn {
             background: var(--card-surface);
             border: 1px solid var(--border-color);

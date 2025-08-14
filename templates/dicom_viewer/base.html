@@ -17,12 +17,13 @@
     .btn-primary { background: #0078d4; color: #fff; }
     .select { padding: 6px 8px; background: #3a3a3a; border: 1px solid #555; border-radius: 6px; color: #fff; min-width: 180px; font-size: 12px; }
     .viewport { grid-row: 2; grid-column: 2; background: #000; position: relative; display: flex; align-items: center; justify-content: center; }
-    .right { grid-row: 2; grid-column: 3; background: #2a2a2a; border-left: 1px solid #444; padding: 16px; overflow: auto; }
+    .right { grid-row: 2; grid-column: 3; background: linear-gradient(180deg,#262626,#232323); border-left: 1px solid #444; padding: 16px; overflow: auto; }
     .panel { margin-bottom: 18px; }
-    .panel h3 { font-size: 15px; margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid #444; }
+    .panel h3 { font-size: 15px; margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid #444; letter-spacing: .3px; color: #e8e8e8; }
     .control { margin-bottom: 12px; }
     .control .label { display: flex; justify-content: space-between; font-size: 12px; color: #ccc; margin-bottom: 6px; }
     input[type=range] { width: 100%; }
+    input[type=number] { width: 100%; padding: 6px 8px; background: #1f1f1f; border: 1px solid #555; border-radius: 6px; color: #fff; font-size: 12px; }
     .overlay { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.6); padding: 8px 10px; border-radius: 6px; font-family: monospace; font-size: 12px; }
     .zoominfo { position: absolute; bottom: 12px; left: 12px; background: rgba(0,0,0,0.6); padding: 6px 10px; border-radius: 6px; font-family: monospace; font-size: 12px; }
     canvas { max-width: 100%; max-height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
@@ -116,12 +117,18 @@
       <div class="panel">
         <h3>Window/Level</h3>
         <div class="control"><div class="label"><span>Window Width</span><span id="wwVal">400</span></div><input id="ww" type="range" min="1" max="4000" value="400"></div>
+        <div class="control"><input id="wwNum" type="number" min="1" max="4000" step="1" value="400"></div>
         <div class="control"><div class="label"><span>Window Level</span><span id="wlVal">40</span></div><input id="wl" type="range" min="-1000" max="1000" value="40"></div>
+        <div class="control"><input id="wlNum" type="number" min="-1000" max="1000" step="1" value="40"></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
           <button class="btn" data-preset="lung">Lung</button>
           <button class="btn" data-preset="bone">Bone</button>
           <button class="btn" data-preset="soft">Soft</button>
           <button class="btn" data-preset="brain">Brain</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+          <button id="btnSavePreset" class="btn"><i class="fas fa-bookmark"></i> Save Preset</button>
+          <button id="btnLoadPreset" class="btn"><i class="fas fa-list"></i> Load Preset</button>
         </div>
       </div>
       <div class="panel">
@@ -226,6 +233,8 @@
     const seriesSelect = document.getElementById('seriesSelect');
     const wwSlider = document.getElementById('ww');
     const wlSlider = document.getElementById('wl');
+    const wwNum = document.getElementById('wwNum');
+    const wlNum = document.getElementById('wlNum');
     const sliceSlider = document.getElementById('slice');
     const zoomSlider = document.getElementById('zoom');
     const btnLoadLocal = document.getElementById('btnLoadLocal');
@@ -258,6 +267,8 @@
     const dicomModal = document.getElementById('dicomModal');
     const dicomTagsPre = document.getElementById('dicomTagsPre');
     const closeDicomModal = document.getElementById('closeDicomModal');
+    const btnSavePreset = document.getElementById('btnSavePreset');
+    const btnLoadPreset = document.getElementById('btnLoadPreset');
 
     let currentStudy = null;
     let currentSeries = null;
@@ -433,6 +444,12 @@
           seriesSelect.value = data.series_list[0].id;
           await loadSeries(data.series_list[0].id);
         }
+        // Apply suggested hanging protocol
+        try {
+          const hpq = new URLSearchParams(); hpq.set('modality', currentStudy.modality||'');
+          const rhp = await fetch(`/dicom-viewer/api/hanging/?${hpq.toString()}`); const hp = await rhp.json();
+          if (hp && hp.suggested && hp.suggested.layout === 'mpr-3plane') { generateReconstruction('mpr'); }
+        } catch(e){}
       } catch (e) {
         await fallbackToDesktop();
       }
@@ -457,7 +474,7 @@
               if (j.windowing && typeof j.windowing.inverted === 'boolean') { inverted = j.windowing.inverted; }
             }
           }
-          wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl);
+          wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); wwNum.value = Math.round(ww); wlNum.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl);
         }
         // Reset view state
         zoom = 1.0; panOffset = {x:0,y:0}; activeTool = 'window'; crosshair = false; mprMode = false; mprImgs = {axial:null,sagittal:null,coronal:null}; reconMode = null; reconImgs = []; reconIndex = 0;
@@ -957,14 +974,14 @@
 
     // UI wiring
     seriesSelect.addEventListener('change', e=>{ if(e.target.value) loadSeries(e.target.value); });
-    wwSlider.addEventListener('input', e=>{ ww = +e.target.value; document.getElementById('wwVal').textContent = ww; imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw(); });
-    wlSlider.addEventListener('input', e=>{ wl = +e.target.value; document.getElementById('wlVal').textContent = wl; imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw(); });
+    wwSlider.addEventListener('input', e=>{ ww = +e.target.value; wwNum.value = Math.round(ww); document.getElementById('wwVal').textContent = ww; imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw(); });
+    wlSlider.addEventListener('input', e=>{ wl = +e.target.value; wlNum.value = Math.round(wl); document.getElementById('wlVal').textContent = wl; imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw(); });
     sliceSlider.addEventListener('input', e=>{ index = +e.target.value; document.getElementById('sliceVal').textContent = index+1; requestDraw(); debouncedLoadOverlaysForCurrentImage(); prefetchAround(index, 3); });
     zoomSlider.addEventListener('input', e=>{ zoom = (+e.target.value)/100; document.getElementById('zoomVal').textContent = `${e.target.value}%`; requestDraw(); });
     document.querySelectorAll('[data-preset]').forEach(btn=>btn.addEventListener('click', ()=>{
       const p = btn.getAttribute('data-preset');
       const map = { lung:{ww:1500,wl:-600}, bone:{ww:2000,wl:300}, soft:{ww:400,wl:40}, brain:{ww:100,wl:50} };
-      if (map[p]){ ww = map[p].ww; wl = map[p].wl; wwSlider.value = ww; wlSlider.value = wl; document.getElementById('wwVal').textContent = ww; document.getElementById('wlVal').textContent = wl; imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw(); }
+      if (map[p]){ ww = map[p].ww; wl = map[p].wl; wwSlider.value = ww; wlSlider.value = wl; wwNum.value = Math.round(ww); wlNum.value = Math.round(wl); document.getElementById('wwVal').textContent = ww; document.getElementById('wlVal').textContent = wl; imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw(); }
     }));
     document.querySelectorAll('.tool').forEach(t=>t.addEventListener('click', ()=>{
       const tool = t.getAttribute('data-tool');
@@ -1602,6 +1619,27 @@
 
      document.getElementById('mprMeasurePlane').addEventListener('change', (e)=>{ mprMeasurePlaneMode = e.target.value; });
      document.getElementById('mprMeasureType').addEventListener('change', (e)=>{ mprMeasureType = e.target.value; });
+
+     // Preset handlers
+     if (btnSavePreset) btnSavePreset.addEventListener('click', async()=>{
+       try {
+         const name = prompt('Preset name'); if (!name) return;
+         const payload = { name, modality: (currentStudy&&currentStudy.modality)||'', window_width: ww, window_level: wl, inverted };
+         await fetch('/dicom-viewer/api/presets/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+       } catch(_){}
+     });
+     if (btnLoadPreset) btnLoadPreset.addEventListener('click', async()=>{
+       try {
+         const r = await fetch(`/dicom-viewer/api/presets/?modality=${encodeURIComponent((currentStudy&&currentStudy.modality)||'')}`);
+         const j = await r.json();
+         const names = (j.presets||[]).map(p=>p.name);
+         if (!names.length) return;
+         const sel = prompt('Load preset by name:\n' + names.join('\n'));
+         const p = (j.presets||[]).find(pp=>pp.name===sel);
+         if (!p) return;
+         ww = p.window_width; wl = p.window_level; inverted = !!p.inverted; wwSlider.value=ww; wlSlider.value=wl; wwNum.value=Math.round(ww); wlNum.value=Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw();
+       } catch(_){}
+     });
    })();
   </script>
 </body>

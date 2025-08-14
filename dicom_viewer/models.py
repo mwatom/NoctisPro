@@ -87,3 +87,34 @@ class ReconstructionJob(models.Model):
 
     def get_parameters(self):
         return json.loads(self.parameters) if self.parameters else {}
+
+
+class HangingProtocol(models.Model):
+    """Simple hanging protocol definition per modality/body part.
+    Defines default layout for the web viewer (e.g., 1x1, 2x2, tri-planar).
+    """
+    modality = models.CharField(max_length=16, blank=True)  # CT, MR, XR, etc.
+    body_part = models.CharField(max_length=64, blank=True)
+    name = models.CharField(max_length=128)
+    layout = models.CharField(max_length=32, default="1x1")  # e.g., '1x1', '2x2', 'mpr-3plane'
+    is_default = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.modality or '*'} {self.body_part or '*'} - {self.name} ({self.layout})"
+
+
+class WindowLevelPreset(models.Model):
+    """Per-user window/level presets optionally scoped by modality/body part."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    name = models.CharField(max_length=64)
+    modality = models.CharField(max_length=16, blank=True)
+    body_part = models.CharField(max_length=64, blank=True)
+    window_width = models.FloatField()
+    window_level = models.FloatField()
+    inverted = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ("user", "name", "modality", "body_part")
+
+    def __str__(self):
+        return f"{self.user_id}:{self.name} ({self.modality or '*'})"

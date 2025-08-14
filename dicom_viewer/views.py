@@ -32,6 +32,7 @@ import scipy.ndimage as ndimage
 from .models import ViewerSession, Measurement, Annotation, ReconstructionJob
 from .dicom_utils import DicomProcessor
 from .reconstruction import MPRProcessor, MIPProcessor, Bone3DProcessor, MRI3DProcessor
+from .models import WindowLevelPreset, HangingProtocol
 
 # MPR volume small LRU cache (per-process)
 from threading import Lock
@@ -294,8 +295,8 @@ def api_mpr_reconstruction(request, series_id):
         return JsonResponse({'error': 'Permission denied'}, status=403)
 
     try:
-        # Load volume from cache or build once
-        volume = _get_mpr_volume_for_series(series)
+        # Load isotropically-resampled volume from cache or build once
+        volume, _spacing = _get_mpr_volume_and_spacing(series)
 
         # Windowing params
         def _derive_window(arr, fallback=(400.0, 40.0)):
@@ -392,9 +393,9 @@ def api_mip_reconstruction(request, series_id):
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
     try:
-        # Reuse MPR 3D volume cache when available (fast path)
+        # Prefer isotropic volume for higher-quality MIP
         try:
-            volume = _get_mpr_volume_for_series(series)
+            volume, _spacing = _get_mpr_volume_and_spacing(series)
             default_window_width, default_window_level = 400, 40
         except Exception:
             # Fallback: build volume from DICOMs (slower)
@@ -476,9 +477,9 @@ def api_bone_reconstruction(request, series_id):
         want_mesh = (request.GET.get('mesh','false').lower() == 'true')
         quality = (request.GET.get('quality','').lower())
         
-        # Fast path: reuse cached volume
+        # Fast path: reuse cached volume (isotropic for better quality)
         try:
-            volume = _get_mpr_volume_for_series(series)
+            volume, _sp = _get_mpr_volume_and_spacing(series)
         except Exception:
             # Fallback: construct volume
             images = series.images.all().order_by('slice_location', 'instance_number')
@@ -2198,3 +2199,312 @@ def api_hu_value(request):
             return JsonResponse({'error': 'Invalid mode'}, status=400)
     except Exception as e:
         return JsonResponse({'error': f'Failed to compute HU: {str(e)}'}, status=500)
+
+def _get_mpr_volume_and_spacing(series, force_rebuild=False):
+    """Return (volume, spacing) where spacing is (z,y,x) in mm.
+    - Sorts slices using ImageOrientationPatient/ImagePositionPatient when available
+    - Applies rescale slope/intercept
+    - Optionally resamples along Z to approximate isotropic voxels based on in-plane pixel spacing
+      to improve MPR quality without degrading in-plane resolution
+    - Uses tiny LRU cache; extends existing cache entry with spacing when available
+    """
+    import numpy as _np
+    import pydicom as _pydicom
+    import os as _os
+
+    # Try cache first
+    with _MPR_CACHE_LOCK:
+        entry = _MPR_CACHE.get(series.id)
+        if entry is not None and isinstance(entry.get('volume'), _np.ndarray) and not force_rebuild:
+            vol = entry['volume']
+            sp = entry.get('spacing')
+            if sp is not None:
+                return vol, tuple(sp)
+
+    images_qs = series.images.all().order_by('instance_number')
+    if images_qs.count() < 2:
+        raise ValueError('Not enough images for MPR')
+
+    # Gather slice data with positional sorting info
+    items = []  # (pos_along_normal, pixel_array)
+    first_ps = (1.0, 1.0)
+    st = None
+    normal = None
+    for img in images_qs:
+        try:
+            dicom_path = _os.path.join(settings.MEDIA_ROOT, str(img.file_path))
+            ds = _pydicom.dcmread(dicom_path)
+            try:
+                arr = ds.pixel_array.astype(_np.float32)
+            except Exception:
+                try:
+                    import SimpleITK as _sitk
+                    sitk_image = _sitk.ReadImage(dicom_path)
+                    px = _sitk.GetArrayFromImage(sitk_image)
+                    if px.ndim == 3 and px.shape[0] == 1:
+                        px = px[0]
+                    arr = px.astype(_np.float32)
+                except Exception:
+                    continue
+            slope = float(getattr(ds, 'RescaleSlope', 1.0) or 1.0)
+            intercept = float(getattr(ds, 'RescaleIntercept', 0.0) or 0.0)
+            arr = arr * slope + intercept
+
+            # Orientation-aware sorting
+            pos = getattr(ds, 'ImagePositionPatient', None)
+            iop = getattr(ds, 'ImageOrientationPatient', None)
+            if iop is not None and len(iop) == 6:
+                # row (x) and col (y) direction cosines
+                r = _np.array([float(iop[0]), float(iop[1]), float(iop[2])], dtype=_np.float64)
+                c = _np.array([float(iop[3]), float(iop[4]), float(iop[5])], dtype=_np.float64)
+                n = _np.cross(r, c)
+                if normal is None:
+                    normal = n / ( _np.linalg.norm(n) + 1e-8 )
+            else:
+                n = _np.array([0.0, 0.0, 1.0], dtype=_np.float64)
+                if normal is None:
+                    normal = n
+            if pos is not None and len(pos) == 3:
+                p = _np.array([float(pos[0]), float(pos[1]), float(pos[2])], dtype=_np.float64)
+                d = float(_np.dot(p, normal))
+            else:
+                # Fallback to slice_location, then instance number
+                d = float(getattr(ds, 'SliceLocation', getattr(ds, 'InstanceNumber', 0)) or 0)
+
+            # Pixel spacing & slice thickness (from first slice)
+            if st is None:
+                st = getattr(ds, 'SpacingBetweenSlices', None)
+                if st is None:
+                    st = getattr(ds, 'SliceThickness', 1.0)
+                try:
+                    st = float(st)
+                except Exception:
+                    st = 1.0
+                ps_attr = getattr(ds, 'PixelSpacing', [1.0, 1.0])
+                try:
+                    first_ps = (float(ps_attr[0]), float(ps_attr[1]))
+                except Exception:
+                    first_ps = (1.0, 1.0)
+
+            items.append((d, arr))
+        except Exception:
+            continue
+
+    if len(items) < 2:
+        raise ValueError('Could not read enough images for MPR')
+
+    # Sort by position along normal
+    items.sort(key=lambda x: x[0])
+    volume = _np.stack([a for _, a in items], axis=0)
+
+    # Interpolate along depth for thin stacks to stabilize reformats
+    if volume.shape[0] < 16:
+        factor = max(2, int(_np.ceil(16 / max(volume.shape[0], 1))))
+        volume = ndimage.zoom(volume, (factor, 1, 1), order=1)
+        st = st / max(1, factor)
+
+    # Resample along Z to approximate isotropic voxels using in-plane pixel spacing average
+    # Keep in-plane resolution; only resample depth for quality MPR
+    try:
+        py, px = float(first_ps[0]), float(first_ps[1])
+        target_xy = (py + px) / 2.0
+        if st and target_xy and st > 0 and target_xy > 0:
+            z_factor = max(1e-6, float(st) / float(target_xy))
+            # If z_factor > 1, we need to upsample Z to match XY spacing
+            # Cap the target depth to avoid memory blow-ups
+            max_depth = 2048
+            target_depth = int(min(max_depth, round(volume.shape[0] * z_factor)))
+            if target_depth > volume.shape[0] + 1 or z_factor > 1.05:
+                volume = ndimage.zoom(volume, (float(target_depth) / volume.shape[0], 1, 1), order=1)
+                st = target_xy
+    except Exception:
+        pass
+
+    spacing = (float(st or 1.0), float(first_ps[0] or 1.0), float(first_ps[1] or 1.0))
+
+    with _MPR_CACHE_LOCK:
+        # Store/refresh cache and attach spacing for future calls
+        entry = _MPR_CACHE.get(series.id)
+        if entry is None:
+            while len(_MPR_CACHE_ORDER) >= _MAX_MPR_CACHE:
+                evict_id = _MPR_CACHE_ORDER.pop(0)
+                _MPR_CACHE.pop(evict_id, None)
+            _MPR_CACHE[series.id] = { 'volume': volume, 'spacing': spacing }
+            _MPR_CACHE_ORDER.append(series.id)
+        else:
+            entry['volume'] = volume
+            entry['spacing'] = spacing
+            try:
+                _MPR_CACHE_ORDER.remove(series.id)
+            except ValueError:
+                pass
+            _MPR_CACHE_ORDER.append(series.id)
+
+    return volume, spacing
+
+@login_required
+@csrf_exempt
+def api_user_presets(request):
+    """CRUD for per-user window/level presets.
+    GET: list presets (optionally filter by modality/body_part)
+    POST: create/update {name, modality?, body_part?, window_width, window_level, inverted}
+    DELETE: ?name=...&modality=...&body_part=...
+    """
+    user = request.user
+    if request.method == 'GET':
+        modality = request.GET.get('modality')
+        body_part = request.GET.get('body_part')
+        qs = WindowLevelPreset.objects.filter(user=user)
+        if modality: qs = qs.filter(modality=modality)
+        if body_part: qs = qs.filter(body_part=body_part)
+        data = [{
+            'name': p.name,
+            'modality': p.modality,
+            'body_part': p.body_part,
+            'window_width': p.window_width,
+            'window_level': p.window_level,
+            'inverted': p.inverted,
+        } for p in qs.order_by('name')]
+        return JsonResponse({'presets': data})
+    elif request.method == 'POST':
+        try:
+            payload = json.loads(request.body or '{}')
+        except Exception:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        name = (payload.get('name') or '').strip()
+        if not name:
+            return JsonResponse({'error': 'name required'}, status=400)
+        preset, _ = WindowLevelPreset.objects.update_or_create(
+            user=user,
+            name=name,
+            modality=payload.get('modality',''),
+            body_part=payload.get('body_part',''),
+            defaults={
+                'window_width': float(payload.get('window_width', 400)),
+                'window_level': float(payload.get('window_level', 40)),
+                'inverted': bool(payload.get('inverted', False)),
+            }
+        )
+        return JsonResponse({'success': True})
+    elif request.method == 'DELETE':
+        name = (request.GET.get('name') or '').strip()
+        modality = request.GET.get('modality','')
+        body_part = request.GET.get('body_part','')
+        if not name:
+            return JsonResponse({'error': 'name required'}, status=400)
+        WindowLevelPreset.objects.filter(user=user, name=name, modality=modality, body_part=body_part).delete()
+        return JsonResponse({'success': True})
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+@login_required
+def api_hanging_protocols(request):
+    """Return available hanging protocols and a suggested default for a given modality/body_part."""
+    modality = request.GET.get('modality','')
+    body_part = request.GET.get('body_part','')
+    qs = HangingProtocol.objects.all()
+    all_protocols = [{ 'id': hp.id, 'name': hp.name, 'layout': hp.layout, 'modality': hp.modality, 'body_part': hp.body_part, 'is_default': hp.is_default } for hp in qs]
+    # suggested default
+    default = (qs.filter(modality=modality or '', body_part=body_part or '', is_default=True).first() or 
+               qs.filter(modality=modality or '', is_default=True).first() or 
+               qs.filter(is_default=True).first())
+    suggested = {'id': default.id, 'name': default.name, 'layout': default.layout} if default else None
+    return JsonResponse({'protocols': all_protocols, 'suggested': suggested})
+
+
+@login_required
+def api_export_dicom_sr(request, study_id):
+    """Export measurements/annotations of a study to a DICOM SR (TID 1500-like simplification).
+    Returns a download URL for the generated SR file.
+    """
+    try:
+        from highdicom.sr.coding import CodedConcept
+        from highdicom.sr import ValueTypeCodes, SRDocument, ObservationContext, ContentItem, RelationshipTypeValues
+        from pydicom.uid import generate_uid
+    except Exception as e:
+        return JsonResponse({'error': f'highdicom not available: {e}'}, status=500)
+
+    study = get_object_or_404(Study, id=study_id)
+    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and study.facility != request.user.facility:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    # Gather measurements linked to images in this study for current user
+    image_ids = list(study.series_set.values_list('images__id', flat=True))
+    image_ids = [i for i in image_ids if i]
+    ms = Measurement.objects.filter(user=request.user, image_id__in=image_ids).order_by('created_at')
+
+    if not ms.exists():
+        return JsonResponse({'error': 'No measurements to export'}, status=400)
+
+    # Minimal SR document with text items listing measurements
+    try:
+        now = timezone.now()
+        doc = SRDocument(
+            evidence=[],
+            series_number=1,
+            instance_number=1,
+            manufacturer='Noctis Pro',
+            manufacturer_model_name='Web Viewer',
+            series_instance_uid=generate_uid(),
+            sop_instance_uid=generate_uid(),
+            study_instance_uid=study.study_instance_uid or generate_uid(),
+            series_description='Measurements',
+            content_date=now.date(),
+            content_time=now.time(),
+            observation_context=ObservationContext(),
+            concept_name=CodedConcept('125007', 'DCM', 'Measurement Report')
+        )
+        items = []
+        for m in ms:
+            pts = m.get_points()
+            text = f"{m.measurement_type}: {m.value:.2f} {m.unit} (points={pts})"
+            items.append(ContentItem(ValueTypeCodes.TEXT, name=CodedConcept('121071','DCM','Finding'), text_value=text))
+        for it in items:
+            doc.append(ContentItem(it.value_type, name=it.name, text_value=it.text_value), relationship_type=RelationshipTypeValues.CONTAINS)
+
+        # Save DICOM SR
+        out_dir = os.path.join(settings.MEDIA_ROOT, 'sr_exports')
+        os.makedirs(out_dir, exist_ok=True)
+        filename = f"SR_{study.accession_number}_{int(time.time())}.dcm"
+        out_path = os.path.join(out_dir, filename)
+        doc.to_dataset().save_as(out_path)
+        return JsonResponse({'success': True, 'download_url': f"{settings.MEDIA_URL}sr_exports/{filename}", 'filename': filename})
+    except Exception as e:
+        return JsonResponse({'error': f'Failed to export SR: {e}'}, status=500)
+
+@login_required
+@csrf_exempt
+def api_series_volume_uint8(request, series_id):
+    """Return a downsampled uint8 volume for GPU VR with basic windowing.
+    Query: ww, wl, max_dim (e.g., 256)
+    Response: { shape:[z,y,x], spacing:[z,y,x], data: base64 of raw uint8 array (z*y*x) }
+    """
+    series = get_object_or_404(Series, id=series_id)
+    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and series.study.facility != request.user.facility:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    try:
+        volume, spacing = _get_mpr_volume_and_spacing(series)
+        ww = float(request.GET.get('ww', 400))
+        wl = float(request.GET.get('wl', 40))
+        max_dim = int(request.GET.get('max_dim', 256))
+        # Normalize via window/level
+        min_val = wl - ww/2.0; max_val = wl + ww/2.0
+        vol = np.clip(volume, min_val, max_val)
+        if max_val > min_val:
+            vol = (vol - min_val) / (max_val - min_val) * 255.0
+        vol = vol.astype(np.uint8)
+        # Downsample to fit max_dim
+        z, y, x = vol.shape
+        scale = min(1.0, float(max_dim)/max(z, y, x))
+        if scale < 0.999:
+            vol = ndimage.zoom(vol, (scale, scale, scale), order=1)
+        buf = vol.tobytes()
+        import base64
+        b64 = base64.b64encode(buf).decode('ascii')
+        return JsonResponse({
+            'shape': [int(vol.shape[0]), int(vol.shape[1]), int(vol.shape[2])],
+            'spacing': [float(spacing[0]), float(spacing[1]), float(spacing[2])],
+            'data': b64,
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
