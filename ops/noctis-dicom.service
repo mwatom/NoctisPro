@@ -7,9 +7,9 @@ Wants=network-online.target
 Type=simple
 User=root
 Group=root
-WorkingDirectory=/workspace
+EnvironmentFile=/etc/noctis/noctis.env
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/workspace/venv/bin/python /workspace/dicom_receiver.py --port 11112 --aet NOCTIS_SCP
+ExecStart=/usr/bin/bash -lc '"$VENV_DIR/bin/python" "$APP_DIR/dicom_receiver.py" --port "$DICOM_PORT" --aet "$DICOM_AET"'
 Restart=always
 RestartSec=5
 
