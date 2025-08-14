@@ -158,6 +158,19 @@
                         <option value="urgent">Urgent</option>
                     </select>
                 </div>
+                {% if facilities %}
+                <div class="meta-field">
+                    <label class="meta-label" for="facilitySelect">Target Facility</label>
+                    <select id="facilitySelect" class="meta-select">
+                        {% for fac in facilities %}
+                        <option value="{{ fac.id }}">{{ fac.name }}{% if fac.ae_title %} ({{ fac.ae_title }}){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="meta-field">
+                    <label class="meta-label" for="assignToMe"><input type="checkbox" id="assignToMe"/> Assign to my worklist</label>
+                </div>
+                {% endif %}
                 <div class="meta-field" style="grid-column: 1 / -1;">
                     <label class="meta-label" for="clinicalInfoInput">Clinical Information / Indication</label>
                     <textarea id="clinicalInfoInput" class="meta-textarea" placeholder="Enter relevant clinical history and indication (optional)"></textarea>
@@ -279,6 +292,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const estimatedStudiesCount = document.getElementById('estimatedStudies');
     const priorityInput = document.getElementById('priorityInput');
     const clinicalInfoInput = document.getElementById('clinicalInfoInput');
+    const facilitySelect = document.getElementById('facilitySelect');
+    const assignToMe = document.getElementById('assignToMe');
 
     // Click to browse - prevent multiple triggers
     chooseFilesBtn.addEventListener('click', (e) => {
@@ -547,6 +562,8 @@ document.addEventListener('DOMContentLoaded', function() {
             // New: include metadata fields
             formData.append('priority', priorityInput.value || 'normal');
             formData.append('clinical_info', clinicalInfoInput.value || '');
+            if (facilitySelect) { formData.append('facility_id', facilitySelect.value || ''); }
+            if (assignToMe) { formData.append('assign_to_me', assignToMe.checked ? '1' : '0'); }
             try {
                 const res = await fetch(url, { method: 'POST', body: formData, headers: { 'X-CSRFToken': token } });
                 const data = await res.json();
