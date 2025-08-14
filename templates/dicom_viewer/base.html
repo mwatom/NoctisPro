@@ -126,6 +126,10 @@
           <button class="btn" data-preset="soft">Soft</button>
           <button class="btn" data-preset="brain">Brain</button>
         </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+          <button id="btnSavePreset" class="btn"><i class="fas fa-bookmark"></i> Save Preset</button>
+          <button id="btnLoadPreset" class="btn"><i class="fas fa-list"></i> Load Preset</button>
+        </div>
       </div>
       <div class="panel">
         <h3>Measurement Units</h3>
@@ -263,6 +267,8 @@
     const dicomModal = document.getElementById('dicomModal');
     const dicomTagsPre = document.getElementById('dicomTagsPre');
     const closeDicomModal = document.getElementById('closeDicomModal');
+    const btnSavePreset = document.getElementById('btnSavePreset');
+    const btnLoadPreset = document.getElementById('btnLoadPreset');
 
     let currentStudy = null;
     let currentSeries = null;
@@ -438,6 +444,12 @@
           seriesSelect.value = data.series_list[0].id;
           await loadSeries(data.series_list[0].id);
         }
+        // Apply suggested hanging protocol
+        try {
+          const hpq = new URLSearchParams(); hpq.set('modality', currentStudy.modality||'');
+          const rhp = await fetch(`/dicom-viewer/api/hanging/?${hpq.toString()}`); const hp = await rhp.json();
+          if (hp && hp.suggested && hp.suggested.layout === 'mpr-3plane') { generateReconstruction('mpr'); }
+        } catch(e){}
       } catch (e) {
         await fallbackToDesktop();
       }
@@ -1607,6 +1619,27 @@
 
      document.getElementById('mprMeasurePlane').addEventListener('change', (e)=>{ mprMeasurePlaneMode = e.target.value; });
      document.getElementById('mprMeasureType').addEventListener('change', (e)=>{ mprMeasureType = e.target.value; });
+
+     // Preset handlers
+     if (btnSavePreset) btnSavePreset.addEventListener('click', async()=>{
+       try {
+         const name = prompt('Preset name'); if (!name) return;
+         const payload = { name, modality: (currentStudy&&currentStudy.modality)||'', window_width: ww, window_level: wl, inverted };
+         await fetch('/dicom-viewer/api/presets/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+       } catch(_){}
+     });
+     if (btnLoadPreset) btnLoadPreset.addEventListener('click', async()=>{
+       try {
+         const r = await fetch(`/dicom-viewer/api/presets/?modality=${encodeURIComponent((currentStudy&&currentStudy.modality)||'')}`);
+         const j = await r.json();
+         const names = (j.presets||[]).map(p=>p.name);
+         if (!names.length) return;
+         const sel = prompt('Load preset by name:\n' + names.join('\n'));
+         const p = (j.presets||[]).find(pp=>pp.name===sel);
+         if (!p) return;
+         ww = p.window_width; wl = p.window_level; inverted = !!p.inverted; wwSlider.value=ww; wlSlider.value=wl; wwNum.value=Math.round(ww); wlNum.value=Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw();
+       } catch(_){}
+     });
    })();
   </script>
 </body>

@@ -32,6 +32,7 @@ import scipy.ndimage as ndimage
 from .models import ViewerSession, Measurement, Annotation, ReconstructionJob
 from .dicom_utils import DicomProcessor
 from .reconstruction import MPRProcessor, MIPProcessor, Bone3DProcessor, MRI3DProcessor
+from .models import WindowLevelPreset, HangingProtocol
 
 # MPR volume small LRU cache (per-process)
 from threading import Lock
@@ -2340,3 +2341,133 @@ def _get_mpr_volume_and_spacing(series, force_rebuild=False):
             _MPR_CACHE_ORDER.append(series.id)
 
     return volume, spacing
+
+@login_required
+@csrf_exempt
+def api_user_presets(request):
+    """CRUD for per-user window/level presets.
+    GET: list presets (optionally filter by modality/body_part)
+    POST: create/update {name, modality?, body_part?, window_width, window_level, inverted}
+    DELETE: ?name=...&modality=...&body_part=...
+    """
+    user = request.user
+    if request.method == 'GET':
+        modality = request.GET.get('modality')
+        body_part = request.GET.get('body_part')
+        qs = WindowLevelPreset.objects.filter(user=user)
+        if modality: qs = qs.filter(modality=modality)
+        if body_part: qs = qs.filter(body_part=body_part)
+        data = [{
+            'name': p.name,
+            'modality': p.modality,
+            'body_part': p.body_part,
+            'window_width': p.window_width,
+            'window_level': p.window_level,
+            'inverted': p.inverted,
+        } for p in qs.order_by('name')]
+        return JsonResponse({'presets': data})
+    elif request.method == 'POST':
+        try:
+            payload = json.loads(request.body or '{}')
+        except Exception:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        name = (payload.get('name') or '').strip()
+        if not name:
+            return JsonResponse({'error': 'name required'}, status=400)
+        preset, _ = WindowLevelPreset.objects.update_or_create(
+            user=user,
+            name=name,
+            modality=payload.get('modality',''),
+            body_part=payload.get('body_part',''),
+            defaults={
+                'window_width': float(payload.get('window_width', 400)),
+                'window_level': float(payload.get('window_level', 40)),
+                'inverted': bool(payload.get('inverted', False)),
+            }
+        )
+        return JsonResponse({'success': True})
+    elif request.method == 'DELETE':
+        name = (request.GET.get('name') or '').strip()
+        modality = request.GET.get('modality','')
+        body_part = request.GET.get('body_part','')
+        if not name:
+            return JsonResponse({'error': 'name required'}, status=400)
+        WindowLevelPreset.objects.filter(user=user, name=name, modality=modality, body_part=body_part).delete()
+        return JsonResponse({'success': True})
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+@login_required
+def api_hanging_protocols(request):
+    """Return available hanging protocols and a suggested default for a given modality/body_part."""
+    modality = request.GET.get('modality','')
+    body_part = request.GET.get('body_part','')
+    qs = HangingProtocol.objects.all()
+    all_protocols = [{ 'id': hp.id, 'name': hp.name, 'layout': hp.layout, 'modality': hp.modality, 'body_part': hp.body_part, 'is_default': hp.is_default } for hp in qs]
+    # suggested default
+    default = (qs.filter(modality=modality or '', body_part=body_part or '', is_default=True).first() or 
+               qs.filter(modality=modality or '', is_default=True).first() or 
+               qs.filter(is_default=True).first())
+    suggested = {'id': default.id, 'name': default.name, 'layout': default.layout} if default else None
+    return JsonResponse({'protocols': all_protocols, 'suggested': suggested})
+
+
+@login_required
+def api_export_dicom_sr(request, study_id):
+    """Export measurements/annotations of a study to a DICOM SR (TID 1500-like simplification).
+    Returns a download URL for the generated SR file.
+    """
+    try:
+        from highdicom.sr.coding import CodedConcept
+        from highdicom.sr import ValueTypeCodes, SRDocument, ObservationContext, ContentItem, RelationshipTypeValues
+        from pydicom.uid import generate_uid
+    except Exception as e:
+        return JsonResponse({'error': f'highdicom not available: {e}'}, status=500)
+
+    study = get_object_or_404(Study, id=study_id)
+    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and study.facility != request.user.facility:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    # Gather measurements linked to images in this study for current user
+    image_ids = list(study.series_set.values_list('images__id', flat=True))
+    image_ids = [i for i in image_ids if i]
+    ms = Measurement.objects.filter(user=request.user, image_id__in=image_ids).order_by('created_at')
+
+    if not ms.exists():
+        return JsonResponse({'error': 'No measurements to export'}, status=400)
+
+    # Minimal SR document with text items listing measurements
+    try:
+        now = timezone.now()
+        doc = SRDocument(
+            evidence=[],
+            series_number=1,
+            instance_number=1,
+            manufacturer='Noctis Pro',
+            manufacturer_model_name='Web Viewer',
+            series_instance_uid=generate_uid(),
+            sop_instance_uid=generate_uid(),
+            study_instance_uid=study.study_instance_uid or generate_uid(),
+            series_description='Measurements',
+            content_date=now.date(),
+            content_time=now.time(),
+            observation_context=ObservationContext(),
+            concept_name=CodedConcept('125007', 'DCM', 'Measurement Report')
+        )
+        items = []
+        for m in ms:
+            pts = m.get_points()
+            text = f"{m.measurement_type}: {m.value:.2f} {m.unit} (points={pts})"
+            items.append(ContentItem(ValueTypeCodes.TEXT, name=CodedConcept('121071','DCM','Finding'), text_value=text))
+        for it in items:
+            doc.append(ContentItem(it.value_type, name=it.name, text_value=it.text_value), relationship_type=RelationshipTypeValues.CONTAINS)
+
+        # Save DICOM SR
+        out_dir = os.path.join(settings.MEDIA_ROOT, 'sr_exports')
+        os.makedirs(out_dir, exist_ok=True)
+        filename = f"SR_{study.accession_number}_{int(time.time())}.dcm"
+        out_path = os.path.join(out_dir, filename)
+        doc.to_dataset().save_as(out_path)
+        return JsonResponse({'success': True, 'download_url': f"{settings.MEDIA_URL}sr_exports/{filename}", 'filename': filename})
+    except Exception as e:
+        return JsonResponse({'error': f'Failed to export SR: {e}'}, status=500)

@@ -21,6 +21,7 @@ pylibjpeg
 pylibjpeg-libjpeg
 pylibjpeg-openjpeg
 gdcm
+highdicom
 
 # Image processing and computer vision
 opencv-python
