@@ -24,11 +24,23 @@ if [ "${EUID:-$(id -u)}" -ne 0 ]; then
 fi
 
 # Inputs
-SERVER_NAME="${1:-}"
-DUCKDNS_SUBDOMAIN="${2:-}"
-DUCKDNS_TOKEN="${3:-}"
+# Load previous DuckDNS config if available for defaults
+[ -f /etc/noctis/duckdns.env ] && source /etc/noctis/duckdns.env || true
 
-# Compute fallback domain if needed
+# Allow CLI args to override environment or persisted values
+SERVER_NAME="${1:-${SERVER_NAME:-}}"
+DUCKDNS_SUBDOMAIN="${2:-${DUCKDNS_SUBDOMAIN:-}}"
+DUCKDNS_TOKEN="${3:-${DUCKDNS_TOKEN:-}}"
+
+# Compute server name automatically if not provided
+if [ -z "$SERVER_NAME" ]; then
+	sys_fqdn="$(hostname -f 2>/dev/null || true)"
+	if [ -n "$sys_fqdn" ] && [ "$sys_fqdn" != "localhost" ] && [ "$sys_fqdn" != "localhost.localdomain" ] && [[ "$sys_fqdn" == *.* ]]; then
+		SERVER_NAME="$sys_fqdn"
+	fi
+fi
+
+# Fallback domain if still unset
 if [ -z "$SERVER_NAME" ]; then
 	IP_ADDR="$(curl -fsS4 ifconfig.me || true)"
 	if [ -z "$IP_ADDR" ]; then
@@ -41,6 +53,12 @@ fi
 
 # Optional constant URL via DuckDNS
 DUCK_DOMAIN=""
+# If token is provided but subdomain missing, auto-generate a stable name
+if [ -n "$DUCKDNS_TOKEN" ] && [ -z "$DUCKDNS_SUBDOMAIN" ]; then
+	MACHINE_ID="$( (cat /etc/machine-id 2>/dev/null || uuidgen) | tr -d '-' | cut -c1-8 )"
+	DUCKDNS_SUBDOMAIN="noctis-$MACHINE_ID"
+fi
+
 if [ -n "$DUCKDNS_SUBDOMAIN" ] && [ -n "$DUCKDNS_TOKEN" ]; then
 	DUCK_DOMAIN="$DUCKDNS_SUBDOMAIN.duckdns.org"
 fi
