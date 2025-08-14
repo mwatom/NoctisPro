@@ -294,8 +294,8 @@ def api_mpr_reconstruction(request, series_id):
         return JsonResponse({'error': 'Permission denied'}, status=403)
 
     try:
-        # Load volume from cache or build once
-        volume = _get_mpr_volume_for_series(series)
+        # Load isotropically-resampled volume from cache or build once
+        volume, _spacing = _get_mpr_volume_and_spacing(series)
 
         # Windowing params
         def _derive_window(arr, fallback=(400.0, 40.0)):
@@ -392,9 +392,9 @@ def api_mip_reconstruction(request, series_id):
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
     try:
-        # Reuse MPR 3D volume cache when available (fast path)
+        # Prefer isotropic volume for higher-quality MIP
         try:
-            volume = _get_mpr_volume_for_series(series)
+            volume, _spacing = _get_mpr_volume_and_spacing(series)
             default_window_width, default_window_level = 400, 40
         except Exception:
             # Fallback: build volume from DICOMs (slower)
@@ -476,9 +476,9 @@ def api_bone_reconstruction(request, series_id):
         want_mesh = (request.GET.get('mesh','false').lower() == 'true')
         quality = (request.GET.get('quality','').lower())
         
-        # Fast path: reuse cached volume
+        # Fast path: reuse cached volume (isotropic for better quality)
         try:
-            volume = _get_mpr_volume_for_series(series)
+            volume, _sp = _get_mpr_volume_and_spacing(series)
         except Exception:
             # Fallback: construct volume
             images = series.images.all().order_by('slice_location', 'instance_number')
@@ -2198,3 +2198,145 @@ def api_hu_value(request):
             return JsonResponse({'error': 'Invalid mode'}, status=400)
     except Exception as e:
         return JsonResponse({'error': f'Failed to compute HU: {str(e)}'}, status=500)
+
+def _get_mpr_volume_and_spacing(series, force_rebuild=False):
+    """Return (volume, spacing) where spacing is (z,y,x) in mm.
+    - Sorts slices using ImageOrientationPatient/ImagePositionPatient when available
+    - Applies rescale slope/intercept
+    - Optionally resamples along Z to approximate isotropic voxels based on in-plane pixel spacing
+      to improve MPR quality without degrading in-plane resolution
+    - Uses tiny LRU cache; extends existing cache entry with spacing when available
+    """
+    import numpy as _np
+    import pydicom as _pydicom
+    import os as _os
+
+    # Try cache first
+    with _MPR_CACHE_LOCK:
+        entry = _MPR_CACHE.get(series.id)
+        if entry is not None and isinstance(entry.get('volume'), _np.ndarray) and not force_rebuild:
+            vol = entry['volume']
+            sp = entry.get('spacing')
+            if sp is not None:
+                return vol, tuple(sp)
+
+    images_qs = series.images.all().order_by('instance_number')
+    if images_qs.count() < 2:
+        raise ValueError('Not enough images for MPR')
+
+    # Gather slice data with positional sorting info
+    items = []  # (pos_along_normal, pixel_array)
+    first_ps = (1.0, 1.0)
+    st = None
+    normal = None
+    for img in images_qs:
+        try:
+            dicom_path = _os.path.join(settings.MEDIA_ROOT, str(img.file_path))
+            ds = _pydicom.dcmread(dicom_path)
+            try:
+                arr = ds.pixel_array.astype(_np.float32)
+            except Exception:
+                try:
+                    import SimpleITK as _sitk
+                    sitk_image = _sitk.ReadImage(dicom_path)
+                    px = _sitk.GetArrayFromImage(sitk_image)
+                    if px.ndim == 3 and px.shape[0] == 1:
+                        px = px[0]
+                    arr = px.astype(_np.float32)
+                except Exception:
+                    continue
+            slope = float(getattr(ds, 'RescaleSlope', 1.0) or 1.0)
+            intercept = float(getattr(ds, 'RescaleIntercept', 0.0) or 0.0)
+            arr = arr * slope + intercept
+
+            # Orientation-aware sorting
+            pos = getattr(ds, 'ImagePositionPatient', None)
+            iop = getattr(ds, 'ImageOrientationPatient', None)
+            if iop is not None and len(iop) == 6:
+                # row (x) and col (y) direction cosines
+                r = _np.array([float(iop[0]), float(iop[1]), float(iop[2])], dtype=_np.float64)
+                c = _np.array([float(iop[3]), float(iop[4]), float(iop[5])], dtype=_np.float64)
+                n = _np.cross(r, c)
+                if normal is None:
+                    normal = n / ( _np.linalg.norm(n) + 1e-8 )
+            else:
+                n = _np.array([0.0, 0.0, 1.0], dtype=_np.float64)
+                if normal is None:
+                    normal = n
+            if pos is not None and len(pos) == 3:
+                p = _np.array([float(pos[0]), float(pos[1]), float(pos[2])], dtype=_np.float64)
+                d = float(_np.dot(p, normal))
+            else:
+                # Fallback to slice_location, then instance number
+                d = float(getattr(ds, 'SliceLocation', getattr(ds, 'InstanceNumber', 0)) or 0)
+
+            # Pixel spacing & slice thickness (from first slice)
+            if st is None:
+                st = getattr(ds, 'SpacingBetweenSlices', None)
+                if st is None:
+                    st = getattr(ds, 'SliceThickness', 1.0)
+                try:
+                    st = float(st)
+                except Exception:
+                    st = 1.0
+                ps_attr = getattr(ds, 'PixelSpacing', [1.0, 1.0])
+                try:
+                    first_ps = (float(ps_attr[0]), float(ps_attr[1]))
+                except Exception:
+                    first_ps = (1.0, 1.0)
+
+            items.append((d, arr))
+        except Exception:
+            continue
+
+    if len(items) < 2:
+        raise ValueError('Could not read enough images for MPR')
+
+    # Sort by position along normal
+    items.sort(key=lambda x: x[0])
+    volume = _np.stack([a for _, a in items], axis=0)
+
+    # Interpolate along depth for thin stacks to stabilize reformats
+    if volume.shape[0] < 16:
+        factor = max(2, int(_np.ceil(16 / max(volume.shape[0], 1))))
+        volume = ndimage.zoom(volume, (factor, 1, 1), order=1)
+        st = st / max(1, factor)
+
+    # Resample along Z to approximate isotropic voxels using in-plane pixel spacing average
+    # Keep in-plane resolution; only resample depth for quality MPR
+    try:
+        py, px = float(first_ps[0]), float(first_ps[1])
+        target_xy = (py + px) / 2.0
+        if st and target_xy and st > 0 and target_xy > 0:
+            z_factor = max(1e-6, float(st) / float(target_xy))
+            # If z_factor > 1, we need to upsample Z to match XY spacing
+            # Cap the target depth to avoid memory blow-ups
+            max_depth = 2048
+            target_depth = int(min(max_depth, round(volume.shape[0] * z_factor)))
+            if target_depth > volume.shape[0] + 1 or z_factor > 1.05:
+                volume = ndimage.zoom(volume, (float(target_depth) / volume.shape[0], 1, 1), order=1)
+                st = target_xy
+    except Exception:
+        pass
+
+    spacing = (float(st or 1.0), float(first_ps[0] or 1.0), float(first_ps[1] or 1.0))
+
+    with _MPR_CACHE_LOCK:
+        # Store/refresh cache and attach spacing for future calls
+        entry = _MPR_CACHE.get(series.id)
+        if entry is None:
+            while len(_MPR_CACHE_ORDER) >= _MAX_MPR_CACHE:
+                evict_id = _MPR_CACHE_ORDER.pop(0)
+                _MPR_CACHE.pop(evict_id, None)
+            _MPR_CACHE[series.id] = { 'volume': volume, 'spacing': spacing }
+            _MPR_CACHE_ORDER.append(series.id)
+        else:
+            entry['volume'] = volume
+            entry['spacing'] = spacing
+            try:
+                _MPR_CACHE_ORDER.remove(series.id)
+            except ValueError:
+                pass
+            _MPR_CACHE_ORDER.append(series.id)
+
+    return volume, spacing
