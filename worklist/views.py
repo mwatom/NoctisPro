@@ -145,6 +145,10 @@ def upload_study(request):
 	"""Upload new studies with enhanced folder support for CT/MRI modalities"""
 	if request.method == 'POST':
 		try:
+			# Admin/radiologist options
+			override_facility_id = (request.POST.get('facility_id', '') or '').strip()
+			assign_to_me = (request.POST.get('assign_to_me', '0') == '1')
+			
 			uploaded_files = request.FILES.getlist('dicom_files')
 			
 			if not uploaded_files:
@@ -242,8 +246,15 @@ def upload_study(request):
 				else:
 					sdt = timezone.now()
 				
-				# Facility attribution
-				facility = request.user.facility if getattr(request.user, 'facility', None) else Facility.objects.filter(is_active=True).first()
+				# Facility attribution with admin/radiologist override
+				facility = None
+				if (hasattr(request.user, 'is_admin') and request.user.is_admin()) or (hasattr(request.user, 'is_radiologist') and request.user.is_radiologist()):
+					if override_facility_id:
+						facility = Facility.objects.filter(id=override_facility_id, is_active=True).first()
+				if not facility and getattr(request.user, 'facility', None):
+					facility = request.user.facility
+				if not facility:
+					facility = Facility.objects.filter(is_active=True).first()
 				if not facility:
 					# Allow admin to upload without preconfigured facility by creating a default one
 					if hasattr(request.user, 'is_admin') and request.user.is_admin():
@@ -259,6 +270,11 @@ def upload_study(request):
 					else:
 						return JsonResponse({'success': False, 'error': 'No active facility configured'})
 				
+				# Optional: assign uploaded study to current radiologist's worklist
+				assigned_radiologist = None
+				if assign_to_me and hasattr(request.user, 'is_radiologist') and request.user.is_radiologist():
+					assigned_radiologist = request.user
+				
 				study, created = Study.objects.get_or_create(
 					study_instance_uid=study_uid,
 					defaults={
@@ -273,6 +289,7 @@ def upload_study(request):
 						'priority': request.POST.get('priority', 'normal'),
 						'clinical_info': request.POST.get('clinical_info', ''),
 						'uploaded_by': request.user,
+						'radiologist': assigned_radiologist,
 					}
 				)
 				
@@ -395,7 +412,9 @@ def upload_study(request):
 		except Exception as e:
 			return JsonResponse({'success': False, 'error': str(e)})
 	
-	return render(request, 'worklist/upload.html')
+	# Provide facilities for admin/radiologist to target uploads
+	facilities = Facility.objects.filter(is_active=True).order_by('name') if ((hasattr(request.user, 'is_admin') and request.user.is_admin()) or (hasattr(request.user, 'is_radiologist') and request.user.is_radiologist())) else []
+	return render(request, 'worklist/upload.html', {'facilities': facilities})
 
 @login_required
 def modern_worklist(request):
@@ -918,6 +937,33 @@ def api_get_upload_stats(request):
             'period': '7 days'
         }
     })
+
+@login_required
+@csrf_exempt
+def api_reassign_study_facility(request, study_id):
+	"""Reassign a study to a facility (admin/radiologist only). Useful for recovering a lost study."""
+	if request.method != 'POST':
+		return JsonResponse({'error': 'Method not allowed'}, status=405)
+	user = request.user
+	if not (user.is_admin() or user.is_radiologist()):
+		return JsonResponse({'error': 'Permission denied'}, status=403)
+	study = get_object_or_404(Study, id=study_id)
+	try:
+		payload = json.loads(request.body)
+		facility_id = str(payload.get('facility_id', '')).strip()
+		if not facility_id:
+			return JsonResponse({'error': 'facility_id is required'}, status=400)
+		target = Facility.objects.filter(id=facility_id, is_active=True).first()
+		if not target:
+			return JsonResponse({'error': 'Target facility not found or inactive'}, status=404)
+		old_fac = study.facility
+		study.facility = target
+		study.save(update_fields=['facility'])
+		return JsonResponse({'success': True, 'message': 'Study reassigned', 'old_facility': old_fac.name, 'new_facility': target.name})
+	except json.JSONDecodeError:
+		return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+	except Exception as e:
+		return JsonResponse({'error': str(e)}, status=500)
 
 def process_attachment_metadata(attachment):
     """Extract metadata from uploaded attachment"""

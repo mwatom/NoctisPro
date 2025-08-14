@@ -31,4 +31,5 @@ urlpatterns = [
     path('api/study/<int:study_id>/delete/', views.api_delete_study, name='api_delete_study'),
     path('api/refresh-worklist/', views.api_refresh_worklist, name='api_refresh_worklist'),
     path('api/upload-stats/', views.api_get_upload_stats, name='api_get_upload_stats'),
+    path('api/study/<int:study_id>/reassign-facility/', views.api_reassign_study_facility, name='api_reassign_study_facility'),
 ]
