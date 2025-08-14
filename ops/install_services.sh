@@ -130,8 +130,16 @@ cp "$APP_DIR/ops/noctis-web.service" /etc/systemd/system/noctis-web.service
 cp "$APP_DIR/ops/noctis-celery.service" /etc/systemd/system/noctis-celery.service
 cp "$APP_DIR/ops/noctis-dicom.service" /etc/systemd/system/noctis-dicom.service
 
+# Install optional webhook service
+if [ -f "$APP_DIR/ops/webhook.service" ]; then
+	cp "$APP_DIR/ops/webhook.service" /etc/systemd/system/noctis-webhook.service
+fi
+
 systemctl daemon-reload
 systemctl enable --now noctis-web.service noctis-celery.service noctis-dicom.service
+if systemctl list-unit-files | grep -q '^noctis-webhook.service'; then
+	systemctl enable --now noctis-webhook.service || true
+fi
 
 # Render nginx site from template with the resolved domain(s) and paths
 SERVER_NAMES="$SERVER_NAME"
