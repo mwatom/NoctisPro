@@ -58,3 +58,8 @@ qrcode
 
 # PyQt5 for standalone desktop applications
 PyQt5
+
+# Production dependencies
+dj-database-url
+django-redis
+psycopg2-binary
