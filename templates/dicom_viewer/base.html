@@ -648,11 +648,25 @@
       }
       if (reconMode && reconImgs.length){
         try {
+          console.log(`Drawing reconstruction mode: ${reconMode}, images: ${reconImgs.length}`);
           ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
           if (reconMode === 'mip' || reconMode === 'bone'){
+            console.log(`Drawing 3-plane ${reconMode} reconstruction`);
             // Draw 3-plane grid similar to MPR using the three recon previews
             const imgs = [];
-            for (let i=0;i<3;i++){ if (reconImgs[i]) { try { imgs[i] = await loadImage(reconImgs[i]); } catch(e){ imgs[i] = null; } } }
+            for (let i=0;i<3;i++){ 
+              if (reconImgs[i]) { 
+                try { 
+                  imgs[i] = await loadImage(reconImgs[i]); 
+                  console.log(`Loaded image ${i}: ${imgs[i].width}x${imgs[i].height}`);
+                } catch(e){ 
+                  console.error(`Failed to load image ${i}:`, e);
+                  imgs[i] = null; 
+                } 
+              } else {
+                console.warn(`No image data for index ${i}`);
+              }
+            }
             const halfW = Math.floor(canvas.width/2), halfH = Math.floor(canvas.height/2);
             const regions = [
               { x: 0, y: 0, w: halfW, h: halfH, key: 'sagittal', im: imgs[1] },
@@ -1356,7 +1370,11 @@
     // Extracted function so both dropdown and button can trigger
     async function generateReconstruction(kind){
       try {
-        if (!currentSeries || !currentSeries.id){ console.warn('Select a series first'); return; }
+        if (!currentSeries || !currentSeries.id){ 
+          console.warn('Select a series first'); 
+          reconStatus.textContent = 'Please select a series first';
+          return; 
+        }
         reconStatus.textContent = 'Generating...';
         reconMode = null; reconImgs = []; reconIndex = 0; panOffset = {x:0,y:0}; zoom = 1.0;
         const params = new URLSearchParams();
@@ -1368,21 +1386,70 @@
         if (type === 'mpr') url = `/dicom-viewer/api/series/${currentSeries.id}/mpr/?${params.toString()}`;
         else if (type === 'mip') url = `/dicom-viewer/api/series/${currentSeries.id}/mip/?quality=high&${params.toString()}`;
         else { url = `/dicom-viewer/api/series/${currentSeries.id}/bone/?threshold=${boneSlider.value}&mesh=true&quality=high`; }
+        
+        console.log(`Requesting reconstruction: ${type}, URL: ${url}`);
         const r = await fetch(url);
+        console.log(`Response status: ${r.status}`);
+        
+        if (!r.ok) {
+          const errorText = await r.text();
+          throw new Error(`HTTP ${r.status}: ${errorText}`);
+        }
+        
         const j = await r.json();
+        console.log(`Response data:`, j);
+        
         if (j.error) throw new Error(j.error);
-        if (j.mpr_views){ reconMode = 'mpr'; reconImgs = [j.mpr_views.axial, j.mpr_views.sagittal, j.mpr_views.coronal]; mprMode = true; document.getElementById('mprMeasurePanel').style.display=''; if (j.counts){ mprScroll.counts = j.counts; mprScroll.axial = Math.floor((j.counts.axial||0)/2); mprScroll.sagittal = Math.floor((j.counts.sagittal||0)/2); mprScroll.coronal = Math.floor((j.counts.coronal||0)/2); mprCross = { x: mprScroll.sagittal, y: mprScroll.coronal, z: mprScroll.axial }; prefetchMprSlices('axial', mprScroll.axial); prefetchMprSlices('sagittal', mprScroll.sagittal); prefetchMprSlices('coronal', mprScroll.coronal); } }
-                 if (j.mip_views){ reconMode = 'mip'; reconImgs = [j.mip_views.axial, j.mip_views.sagittal, j.mip_views.coronal]; document.getElementById('mprMeasurePanel').style.display='none'; mprMode = true; mprFullPlane = null; mprScroll.counts = j.counts || mprScroll.counts; }
-         if (j.bone_views){ reconMode = 'bone'; reconImgs = [j.bone_views.axial || j.bone_views.bone_axial_preview, j.bone_views.sagittal || j.bone_views.bone_sagittal_preview, j.bone_views.coronal || j.bone_views.bone_coronal_preview]; document.getElementById('mprMeasurePanel').style.display='none'; mprMode = true; mprFullPlane = null; if (j.mesh) showBone3D(j.mesh); }
-         reconImgs = reconImgs.filter(Boolean);
-         reconIndex = 0;
-         await draw();
-         reconStatus.textContent = 'Done'; setTimeout(()=> reconStatus.textContent = '', 1500);
-       } catch (err){
-         reconStatus.textContent = `Error: ${err.message}`;
-         await fallbackToDesktop();
-       }
-     }
+        
+        if (j.mpr_views){ 
+          console.log('Processing MPR views');
+          reconMode = 'mpr'; 
+          reconImgs = [j.mpr_views.axial, j.mpr_views.sagittal, j.mpr_views.coronal]; 
+          console.log('MPR images:', reconImgs.map(img => img ? 'loaded' : 'null'));
+          mprMode = true; 
+          document.getElementById('mprMeasurePanel').style.display=''; 
+          if (j.counts){ 
+            mprScroll.counts = j.counts; 
+            mprScroll.axial = Math.floor((j.counts.axial||0)/2); 
+            mprScroll.sagittal = Math.floor((j.counts.sagittal||0)/2); 
+            mprScroll.coronal = Math.floor((j.counts.coronal||0)/2); 
+            mprCross = { x: mprScroll.sagittal, y: mprScroll.coronal, z: mprScroll.axial }; 
+            prefetchMprSlices('axial', mprScroll.axial); 
+            prefetchMprSlices('sagittal', mprScroll.sagittal); 
+            prefetchMprSlices('coronal', mprScroll.coronal); 
+          } 
+        }
+        if (j.mip_views){ 
+          console.log('Processing MIP views');
+          reconMode = 'mip'; 
+          reconImgs = [j.mip_views.axial, j.mip_views.sagittal, j.mip_views.coronal]; 
+          console.log('MIP images:', reconImgs.map(img => img ? 'loaded' : 'null'));
+          document.getElementById('mprMeasurePanel').style.display='none'; 
+          mprMode = true; 
+          mprFullPlane = null; 
+          mprScroll.counts = j.counts || mprScroll.counts; 
+        }
+        if (j.bone_views){ 
+          console.log('Processing bone views');
+          reconMode = 'bone'; 
+          reconImgs = [j.bone_views.axial || j.bone_views.bone_axial_preview, j.bone_views.sagittal || j.bone_views.bone_sagittal_preview, j.bone_views.coronal || j.bone_views.bone_coronal_preview]; 
+          console.log('Bone images:', reconImgs.map(img => img ? 'loaded' : 'null'));
+          document.getElementById('mprMeasurePanel').style.display='none'; 
+          mprMode = true; 
+          mprFullPlane = null; 
+          if (j.mesh) showBone3D(j.mesh); 
+        }
+        reconImgs = reconImgs.filter(Boolean);
+        reconIndex = 0;
+        console.log(`Final reconstruction mode: ${reconMode}, images: ${reconImgs.length}`);
+        await draw();
+        reconStatus.textContent = 'Done'; setTimeout(()=> reconStatus.textContent = '', 1500);
+      } catch (err){
+        console.error('Reconstruction error:', err);
+        reconStatus.textContent = `Error: ${err.message}`;
+        await fallbackToDesktop();
+      }
+    }
  
            btnGenerateRecon.addEventListener('click', ()=>{ generateReconstruction(); });
 

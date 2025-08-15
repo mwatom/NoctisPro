@@ -19,7 +19,7 @@ def login_view(request):
         password = request.POST.get('password')
         
         user = authenticate(request, username=username, password=password)
-        if user and user.is_active:
+        if user and user.is_active and user.is_verified:
             # Track login session
             login(request, user)
             
