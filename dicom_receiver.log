@@ -1,0 +1,2 @@
+2025-08-15 09:15:22,999 - dicom_receiver - INFO - DICOM Receiver initialized - AET: NOCTIS_SCP, Port: 11112
+2025-08-15 09:15:22,999 - dicom_receiver - INFO - Starting DICOM receiver on port 11112
