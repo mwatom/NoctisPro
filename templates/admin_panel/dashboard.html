@@ -64,7 +64,7 @@
         }
 
         .logo {
-            color: var(--danger-color);
+            color: var(--accent-color);
             font-weight: bold;
             font-size: 16px;
         }
@@ -85,8 +85,8 @@
         }
 
         .nav-tab.active {
-            background: var(--danger-color);
-            color: var(--text-primary);
+            background: var(--accent-color);
+            color: var(--primary-bg);
             font-weight: bold;
         }
 
@@ -109,7 +109,7 @@
         }
 
         .user-avatar {
-            background: var(--danger-color);
+            background: var(--accent-color);
             border-radius: 50%;
             width: 24px;
             height: 24px;
@@ -117,7 +117,7 @@
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            color: var(--text-primary);
+            color: var(--primary-bg);
             font-size: 10px;
         }
 
@@ -347,7 +347,7 @@
         }
 
         .data-table tbody tr:hover {
-            background: rgba(255, 68, 68, 0.08);
+            background: rgba(0, 212, 255, 0.08);
         }
 
         .data-table tbody tr:nth-child(even) {
@@ -355,7 +355,7 @@
         }
 
         .data-table tbody tr:nth-child(even):hover {
-            background: rgba(255, 68, 68, 0.08);
+            background: rgba(0, 212, 255, 0.08);
         }
 
         /* Data Styling */
@@ -910,7 +910,7 @@
             });
             
             // Highlight selected row
-            row.style.background = 'rgba(255, 68, 68, 0.15)';
+            row.style.background = 'rgba(0, 212, 255, 0.15)';
             
             console.log('Selected item:', row.children[1].textContent);
         }

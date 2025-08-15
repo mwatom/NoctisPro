@@ -43,7 +43,7 @@ def login_view(request):
             return redirect('worklist:dashboard')
         else:
             # Only show a single generic error for any failure
-            messages.error(request, 'Invalid username or password.')
+            messages.error(request, 'invalid user')
     
     return render(request, 'accounts/login.html', {'hide_navbar': True})
 
