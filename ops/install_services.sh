@@ -167,6 +167,43 @@ if systemctl list-unit-files | grep -q '^noctis-webhook.service'; then
 	systemctl restart noctis-webhook.service || true
 fi
 
+# Install startup check script
+install -m 0755 "$APP_DIR/ops/startup_check.sh" /usr/local/bin/noctis-check
+
+# Create a post-boot verification service
+cat > /etc/systemd/system/noctis-startup-check.service <<EOF
+[Unit]
+Description=Noctis Pro Startup Verification
+After=multi-user.target noctis-web.service noctis-celery.service noctis-dicom.service
+Wants=noctis-web.service noctis-celery.service noctis-dicom.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/noctis-check check
+ExecStartPost=/usr/bin/bash -c 'echo "Noctis Pro startup check completed at \$(date)" >> /var/log/noctis-startup.log'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl enable noctis-startup-check.service
+
+# Ensure all critical services are enabled for auto-start
+systemctl enable redis-server.service || true
+systemctl enable nginx.service || true
+
+log "Verifying service auto-start configuration"
+for service in redis-server nginx noctis-web noctis-celery noctis-dicom noctis-webhook; do
+	if systemctl list-unit-files | grep -q "^${service}.service"; then
+		if systemctl is-enabled --quiet "${service}.service" 2>/dev/null; then
+			echo "✓ $service is enabled for auto-start"
+		else
+			echo "⚠ $service is not enabled for auto-start"
+		fi
+	fi
+done
+
 # Render nginx site from template with the resolved domain(s) and paths
 SERVER_NAMES="$SERVER_NAME"
 if [ -n "$DUCK_DOMAIN" ]; then

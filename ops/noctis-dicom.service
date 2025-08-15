@@ -1,6 +1,6 @@
 [Unit]
 Description=Noctis Pro DICOM Receiver (SCP)
-After=network-online.target
+After=network-online.target noctis-web.service
 Wants=network-online.target
 
 [Service]
@@ -11,7 +11,9 @@ EnvironmentFile=/etc/noctis/noctis.env
 Environment=PYTHONUNBUFFERED=1
 ExecStart=/usr/bin/bash -lc '"$VENV_DIR/bin/python" "$APP_DIR/dicom_receiver.py" --port "$DICOM_PORT" --aet "$DICOM_AET"'
 Restart=always
-RestartSec=5
+RestartSec=10
+StartLimitBurst=5
+StartLimitInterval=30
 
 [Install]
 WantedBy=multi-user.target
