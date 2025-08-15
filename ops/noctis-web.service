@@ -1,7 +1,8 @@
 [Unit]
 Description=Noctis Pro ASGI (Daphne)
-After=network-online.target redis-server.service
+After=network-online.target redis-server.service postgresql.service mysql.service
 Wants=network-online.target
+Requires=redis-server.service
 
 [Service]
 Type=simple
@@ -9,11 +10,17 @@ User=root
 Group=root
 EnvironmentFile=/etc/noctis/noctis.env
 Environment=PYTHONUNBUFFERED=1
+ExecStartPre=/usr/bin/bash -c 'until systemctl is-active --quiet redis-server; do sleep 1; done'
 ExecStartPre=/usr/bin/bash -lc '"$VENV_DIR/bin/python" "$APP_DIR/manage.py" migrate --noinput'
 ExecStartPre=/usr/bin/bash -lc '"$VENV_DIR/bin/python" "$APP_DIR/manage.py" collectstatic --noinput'
 ExecStart=/usr/bin/bash -lc '"$VENV_DIR/bin/daphne" -b "$HOST" -p "$PORT" "$ASGI_APP"'
 Restart=always
 RestartSec=5
+StartLimitBurst=5
+StartLimitInterval=30
+
+# Health check
+ExecStartPost=/usr/bin/bash -c 'sleep 10; for i in {1..12}; do if curl -f -s --max-time 5 "http://${HOST:-127.0.0.1}:${PORT:-8000}/" >/dev/null 2>&1; then exit 0; fi; sleep 5; done; exit 1'
 
 [Install]
 WantedBy=multi-user.target

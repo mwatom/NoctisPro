@@ -1,7 +1,8 @@
 [Unit]
 Description=Noctis Pro Celery Worker
-After=network-online.target redis-server.service
+After=network-online.target redis-server.service noctis-web.service
 Wants=network-online.target
+Requires=redis-server.service
 
 [Service]
 Type=simple
@@ -9,9 +10,12 @@ User=root
 Group=root
 EnvironmentFile=/etc/noctis/noctis.env
 Environment=PYTHONUNBUFFERED=1
+ExecStartPre=/usr/bin/bash -c 'until systemctl is-active --quiet redis-server; do sleep 1; done'
 ExecStart=/usr/bin/bash -lc '"$VENV_DIR/bin/celery" --workdir "$APP_DIR" -A "$CELERY_APP" worker -l "$CELERY_LOGLEVEL"'
 Restart=always
-RestartSec=5
+RestartSec=10
+StartLimitBurst=5
+StartLimitInterval=30
 
 [Install]
 WantedBy=multi-user.target
