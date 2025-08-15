@@ -93,7 +93,7 @@
     </div>
     <div class="topbar">
       <button id="btnLoadLocal" class="btn btn-primary"><i class="fas fa-folder-open"></i> Load Local DICOM</button>
-      <button id="btnBackWorklist" class="btn" onclick="returnToWorklist(event)"><i class="fas fa-arrow-left"></i> Back to Worklist</button>
+      <a id="btnBackWorklist" class="btn" href="{% url 'worklist:dashboard' %}" onclick="return returnToWorklist(event)"><i class="fas fa-arrow-left"></i> Back to Worklist</a>
       {% if user.is_authenticated and user.can_edit_reports %}
       <button id="btnWriteReport" class="btn btn-primary" style="display:none"><i class="fas fa-file-signature"></i> Write Report</button>
       {% endif %}
