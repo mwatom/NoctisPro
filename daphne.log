@@ -1,0 +1,5 @@
+2025-08-15 09:15:22,952 INFO     Starting server at tcp:port=8000:interface=0.0.0.0
+2025-08-15 09:15:22,952 INFO     HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+2025-08-15 09:15:22,953 INFO     Configuring endpoint tcp:port=8000:interface=0.0.0.0
+2025-08-15 09:15:22,953 INFO     Listening on TCP address 0.0.0.0:8000
+2025-08-15 09:15:43,285 WARNING  The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
