@@ -618,40 +618,31 @@
                 </div>
             </div>
 
-        <!-- Reports Table -->
-        <div class="reports-table-container">
-            <div class="table-header">
-                <h4 class="text-white mb-0">
-                    <i class="fas fa-list me-2"></i>Reports List
-                </h4>
-            </div>
-            
-            {% if reports %}
-            <div class="table-responsive">
-                <table class="reports-table table table-hover mb-0">
+            <!-- Data Table -->
+            <div class="data-table-container">
+                <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Patient</th>
-                            <th>Study Date</th>
-                            <th>Modality</th>
-                            <th>Body Part</th>
-                            <th>Radiologist</th>
-                            <th>Status</th>
-                            <th>Report Date</th>
-                            <th>Actions</th>
+                            <th class="sortable">PATIENT</th>
+                            <th class="sortable">STUDY DATE</th>
+                            <th class="sortable">MODALITY</th>
+                            <th class="sortable">BODY PART</th>
+                            <th class="sortable">RADIOLOGIST</th>
+                            <th class="sortable">STATUS</th>
+                            <th class="sortable">REPORT DATE</th>
+                            <th>ACTIONS</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="reportsTableBody">
+                        {% if reports %}
                         {% for report in reports %}
-                        <tr>
+                        <tr onclick="selectReport(this)" data-report-id="{{ report.id }}">
                             <td>
-                                <div class="fw-bold">{{ report.study.patient.full_name }}</div>
-                                <small class="text-muted">{{ report.study.patient.patient_id }}</small>
+                                <div class="patient-name">{{ report.study.patient.full_name }}</div>
+                                <div class="patient-id">{{ report.study.patient.patient_id }}</div>
                             </td>
-                            <td>{{ report.study.study_date|date:"M d, Y" }}</td>
-                            <td>
-                                <span class="badge bg-secondary">{{ report.study.modality.code }}</span>
-                            </td>
+                            <td class="timestamp">{{ report.study.study_date|date:"M d, Y" }}</td>
+                            <td><span class="modality-badge">{{ report.study.modality.code }}</span></td>
                             <td>{{ report.study.body_part_examined|default:"-" }}</td>
                             <td>{{ report.radiologist.get_full_name }}</td>
                             <td>
@@ -659,40 +650,68 @@
                                     {{ report.get_status_display }}
                                 </span>
                             </td>
-                            <td>{{ report.report_date|date:"M d, Y H:i" }}</td>
+                            <td class="timestamp">{{ report.report_date|date:"M d, Y H:i" }}</td>
                             <td>
                                 <div class="action-buttons">
-                                    <a href="{% url 'reports:write_report' report.study.id %}" class="action-btn" title="View/Edit Report">
-                                        <i class="fas fa-edit"></i>
+                                    <a href="{% url 'reports:write_report' report.study.id %}" class="btn-viewer" title="View/Edit Report">
+                                        <i class="fas fa-edit"></i> EDIT
                                     </a>
-                                    <a href="{% url 'reports:print_report' report.study.id %}" class="action-btn" title="Print Report" target="_blank">
-                                        <i class="fas fa-print"></i>
+                                    <a href="{% url 'reports:print_report' report.study.id %}" class="btn-viewer viewer-only" title="Print Report" target="_blank">
+                                        <i class="fas fa-print"></i> PRINT
                                     </a>
-                                    <a href="{% url 'reports:export_report_pdf' report.study.id %}" class="action-btn" title="Download PDF">
-                                        <i class="fas fa-download"></i>
+                                    <a href="{% url 'reports:export_report_pdf' report.study.id %}" class="btn-viewer viewer-only" title="Download PDF">
+                                        <i class="fas fa-download"></i> PDF
                                     </a>
                                 </div>
                             </td>
                         </tr>
                         {% endfor %}
+                        {% else %}
+                        <tr id="noDataRow">
+                            <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                                <i class="fas fa-file-medical" style="font-size: 48px; opacity: 0.3; margin-bottom: 16px; display: block;"></i>
+                                <div style="font-size: 14px; margin-bottom: 8px;">No reports found</div>
+                                <div style="font-size: 12px;">Reports will appear here when radiologists create them for studies</div>
+                            </td>
+                        </tr>
+                        {% endif %}
                     </tbody>
                 </table>
             </div>
-            {% else %}
-            <div class="empty-state">
-                <i class="fas fa-file-medical"></i>
-                <h4>No Reports Found</h4>
-                <p>Reports will appear here when radiologists create them for studies.</p>
-                <a href="{% url 'worklist:dashboard' %}" class="btn-control">
-                    <i class="fas fa-arrow-left me-2"></i>Back to Worklist
-                </a>
+        </div>
+
+        <!-- Footer Status Bar -->
+        <div class="footer-status">
+            <div class="status-left">
+                <span>Total Reports: <strong>{{ total_reports|default:0 }}</strong></span>
+                <span>Draft: <strong style="color: var(--warning-color);">{{ draft_reports|default:0 }}</strong></span>
+                <span>Pending: <strong style="color: var(--urgent-color);">{{ pending_reports|default:0 }}</strong></span>
+                <span>Final: <strong style="color: var(--completed-color);">{{ final_reports|default:0 }}</strong></span>
             </div>
-            {% endif %}
+            <div class="status-right">
+                <div class="connection-status">
+                    <div class="connection-dot"></div>
+                    <span>Reports Database Connected</span>
+                </div>
+                <span>Last Update: <strong>{{ "now"|date:"H:i:s" }}</strong></span>
+                <span>Auto-refresh: <strong>ON</strong></span>
+            </div>
         </div>
     </div>
-</div>
 
 <script>
+function selectReport(row) {
+    // Remove previous selection
+    document.querySelectorAll('.data-table tbody tr').forEach(r => {
+        r.style.background = '';
+    });
+    
+    // Highlight selected row
+    row.style.background = 'rgba(0, 212, 255, 0.15)';
+    
+    console.log('Selected report:', row.getAttribute('data-report-id'));
+}
+
 function applyFilters() {
     // Implement filtering logic here
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
@@ -703,9 +722,21 @@ function applyFilters() {
     console.log('Applying filters:', { searchTerm, statusFilter, modalityFilter });
 }
 
+function resetFilters() {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('statusFilter').value = '';
+    document.getElementById('modalityFilter').value = '';
+    applyFilters();
+}
+
 // Real-time search
 document.getElementById('searchInput').addEventListener('input', function() {
     // Implement real-time search here
+    applyFilters();
 });
+
+document.getElementById('statusFilter').addEventListener('change', applyFilters);
+document.getElementById('modalityFilter').addEventListener('change', applyFilters);
 </script>
-{% endblock %}
+</body>
+</html>
