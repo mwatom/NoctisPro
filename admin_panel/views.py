@@ -184,6 +184,7 @@ def user_create(request):
             user.phone = phone
             user.license_number = license_number
             user.specialization = specialization
+            user.is_verified = True  # Set new users as verified by default
             user.save()
             
             # Log the action
