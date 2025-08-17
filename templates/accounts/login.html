@@ -1,73 +1,235 @@
-{% extends 'base.html' %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Noctis Pro PACS</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-bg: #0a0a0a;
+            --secondary-bg: #1a1a1a;
+            --card-bg: #252525;
+            --header-bg: #333333;
+            --border-color: #404040;
+            --accent-color: #00d4ff;
+            --text-primary: #ffffff;
+            --text-secondary: #b3b3b3;
+            --text-muted: #666666;
+            --success-color: #00ff88;
+            --warning-color: #ffaa00;
+            --danger-color: #ff4444;
+        }
 
-{% block title %}Login - Noctis Pro PACS{% endblock %}
-{% block extra_css %}
-<style>
-    .login-container { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--dark-bg); }
-    .login-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 16px; padding: 2rem; width: 100%; max-width: 420px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
-    .logo { color: var(--accent-color); font-weight: 800; letter-spacing: 0.5px; display: flex; align-items: center; gap: 10px; justify-content: center; margin-bottom: 12px; }
-    .subtitle { color: var(--text-secondary); text-align: center; margin-bottom: 20px; }
-    .form-control { background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 10px; padding: 12px 14px; }
-    .form-control:focus { background: rgba(255,255,255,0.08); border-color: var(--accent-color); box-shadow: 0 0 0 3px rgba(0,212,255,0.1); color: var(--text-primary); }
-    .login-btn { width: 100%; border-radius: 10px; padding: 12px 14px; font-weight: 700; border: 1px solid var(--accent-color); background: linear-gradient(135deg, #1f1f1f 0%, #2a2a2a 100%); color: var(--text-primary); }
-    .login-btn:hover { border-color: var(--accent-color); box-shadow: 0 0 0 2px rgba(0,212,255,0.1) inset; color: var(--text-primary); }
-</style>
-{% endblock %}
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-{% block content %}
-{% with True as hide_navbar %}
-<div class="login-container">
-  <div class="login-card">
-    <div class="logo"><i class="fas fa-hospital-symbol"></i> Noctis Pro PACS</div>
-    <div class="subtitle">Sign in to continue</div>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--primary-bg);
+            color: var(--text-primary);
+            font-size: 12px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
-    {% if messages %}
-      {% for message in messages %}
-        <div class="alert alert-{{ message.tags }}-medical alert-dismissible fade show" role="alert">
-          {{ message }}
-          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        .login-container {
+            width: 100%;
+            max-width: 420px;
+            padding: 20px;
+        }
+
+        .login-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .logo {
+            color: var(--accent-color);
+            font-weight: bold;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 8px;
+        }
+
+        .logo i {
+            font-size: 24px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            text-align: center;
+            margin-bottom: 24px;
+            font-size: 12px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-control {
+            width: 100%;
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 4px;
+            padding: 10px 12px;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 1px var(--accent-color);
+            background: var(--primary-bg);
+        }
+
+        .form-control::placeholder {
+            color: var(--text-muted);
+        }
+
+        .btn-control {
+            background: var(--accent-color);
+            border: 1px solid var(--accent-color);
+            color: var(--primary-bg);
+            padding: 10px 16px;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            width: 100%;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-control:hover {
+            background: #00b8d4;
+            border-color: #00b8d4;
+        }
+
+        .btn-control:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .alert {
+            padding: 10px 12px;
+            border-radius: 4px;
+            margin-bottom: 16px;
+            font-size: 11px;
+            border: 1px solid;
+        }
+
+        .alert-danger {
+            background: rgba(255, 68, 68, 0.1);
+            border-color: var(--danger-color);
+            color: var(--danger-color);
+        }
+
+        .error-message {
+            color: var(--danger-color);
+            font-size: 11px;
+            text-align: center;
+            margin-bottom: 16px;
+            padding: 8px 12px;
+            background: rgba(255, 68, 68, 0.1);
+            border: 1px solid var(--danger-color);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-container">
+        <div class="login-card">
+            <div class="logo">
+                <i class="fas fa-hospital-symbol"></i> 
+                Noctis Pro PACS
+            </div>
+            <div class="subtitle">Sign in to continue</div>
+
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="error-message">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <form method="post" id="loginForm">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label class="form-label" for="username">Username</label>
+                    <input type="text" class="form-control" id="username" name="username" placeholder="Enter username" required autocomplete="off" inputmode="text" autocapitalize="none" autocorrect="off">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="password">Password</label>
+                    <input type="password" class="form-control" id="password" name="password" placeholder="Enter password" required autocomplete="new-password">
+                </div>
+                <button type="submit" class="btn-control" id="loginButton">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Sign In
+                </button>
+            </form>
         </div>
-      {% endfor %}
-    {% endif %}
+    </div>
 
-    <form method="post" id="loginForm">
-      {% csrf_token %}
-      <div class="mb-3">
-        <label class="form-label" for="username">Username</label>
-        <input type="text" class="form-control" id="username" name="username" placeholder="Enter username" required autocomplete="off" inputmode="text" autocapitalize="none" autocorrect="off">
-      </div>
-      <div class="mb-3">
-        <label class="form-label" for="password">Password</label>
-        <input type="password" class="form-control" id="password" name="password" placeholder="Enter password" required autocomplete="new-password">
-      </div>
-      <button type="submit" class="login-btn" id="loginButton"><i class="fas fa-sign-in-alt me-2"></i>Sign In</button>
-    </form>
-  </div>
-</div>
-{% endwith %}
-{% endblock %}
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const loginForm = document.getElementById('loginForm');
+        const loginButton = document.getElementById('loginButton');
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
 
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  const loginForm = document.getElementById('loginForm');
-  const loginButton = document.getElementById('loginButton');
-  const usernameInput = document.getElementById('username');
-  const passwordInput = document.getElementById('password');
+        // Clear any autofilled credentials
+        try { 
+            usernameInput.value = ''; 
+            passwordInput.value = ''; 
+        } catch(e){}
+        
+        loginForm.setAttribute('autocomplete', 'off');
+        usernameInput.focus();
 
-  // Clear any autofilled credentials
-  try { usernameInput.value = ''; passwordInput.value = ''; } catch(e){}
-  loginForm.setAttribute('autocomplete', 'off');
-  usernameInput.focus();
-
-  loginForm.addEventListener('submit', function(e) {
-    const username = usernameInput.value.trim();
-    const password = passwordInput.value;
-    if (!username || !password) {
-      e.preventDefault();
-      return;
-    }
-    loginButton.disabled = true;
-  });
-</script>
-{% endblock %}
+        loginForm.addEventListener('submit', function(e) {
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value;
+            
+            if (!username || !password) {
+                e.preventDefault();
+                return;
+            }
+            
+            loginButton.disabled = true;
+            loginButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing In...';
+        });
+    });
+    </script>
+</body>
+</html>
