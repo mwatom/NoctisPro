@@ -84,15 +84,29 @@ def _get_encoded_mpr_slice(series_id, volume, plane, slice_index, ww, wl, invert
     cached = _mpr_cache_get(series_id, plane, slice_index, ww, wl, inverted)
     if cached is not None:
         return cached
+    
+    # Validate slice index
     if plane == 'axial':
+        if slice_index < 0 or slice_index >= volume.shape[0]:
+            logger.warning(f"Invalid axial slice index {slice_index} for volume shape {volume.shape}")
+            slice_index = min(max(0, slice_index), volume.shape[0] - 1)
         slice_array = volume[slice_index, :, :]
     elif plane == 'sagittal':
+        if slice_index < 0 or slice_index >= volume.shape[2]:
+            logger.warning(f"Invalid sagittal slice index {slice_index} for volume shape {volume.shape}")
+            slice_index = min(max(0, slice_index), volume.shape[2] - 1)
         slice_array = volume[:, :, slice_index]
     else:  # coronal
+        if slice_index < 0 or slice_index >= volume.shape[1]:
+            logger.warning(f"Invalid coronal slice index {slice_index} for volume shape {volume.shape}")
+            slice_index = min(max(0, slice_index), volume.shape[1] - 1)
         slice_array = volume[:, slice_index, :]
+    
     img_b64 = _array_to_base64_image(slice_array, ww, wl, inverted)
     if img_b64:
         _mpr_cache_set(series_id, plane, slice_index, ww, wl, inverted, img_b64)
+    else:
+        logger.error(f"Failed to generate base64 image for MPR slice: series={series_id}, plane={plane}, slice={slice_index}")
     return img_b64
 
 def _get_mpr_volume_for_series(series):
@@ -297,6 +311,15 @@ def api_mpr_reconstruction(request, series_id):
     try:
         # Load isotropically-resampled volume from cache or build once
         volume, _spacing = _get_mpr_volume_and_spacing(series)
+        
+        # Validate volume data
+        if volume is None or volume.size == 0:
+            raise ValueError("Empty volume data")
+        if volume.ndim != 3:
+            raise ValueError(f"Volume must be 3D, got {volume.ndim}D")
+        if np.any(np.isnan(volume)) or np.any(np.isinf(volume)):
+            logger.warning(f"Volume contains NaN or inf values for series {series_id}")
+            volume = np.nan_to_num(volume, nan=0.0, posinf=0.0, neginf=0.0)
 
         # Windowing params
         def _derive_window(arr, fallback=(400.0, 40.0)):
@@ -378,6 +401,9 @@ def api_mpr_reconstruction(request, series_id):
         })
 
     except Exception as e:
+        logger.error(f"MPR reconstruction failed for series {series_id}: {str(e)}")
+        import traceback
+        logger.error(f"MPR traceback: {traceback.format_exc()}")
         return JsonResponse({'error': f'Error generating MPR: {str(e)}'}, status=500)
 
 @login_required
@@ -645,8 +671,18 @@ def api_study_progress(request, study_id):
 def _array_to_base64_image(array, window_width=None, window_level=None, inverted=False):
     """Convert numpy array to base64 encoded image with proper windowing"""
     try:
+        # Validate input
+        if array is None or array.size == 0:
+            logger.warning("_array_to_base64_image: received empty array")
+            return None
+            
         # Convert to float for calculations
         image_data = array.astype(np.float32)
+        
+        # Check for invalid data
+        if np.any(np.isnan(image_data)) or np.any(np.isinf(image_data)):
+            logger.warning("_array_to_base64_image: array contains NaN or inf values")
+            image_data = np.nan_to_num(image_data, nan=0.0, posinf=0.0, neginf=0.0)
         
         # Apply windowing if parameters provided
         if window_width is not None and window_level is not None:
@@ -662,8 +698,9 @@ def _array_to_base64_image(array, window_width=None, window_level=None, inverted
                 image_data = np.zeros_like(image_data)
         else:
             # Default normalization
-            if image_data.max() > image_data.min():
-                image_data = ((image_data - image_data.min()) / (image_data.max() - image_data.min()) * 255)
+            data_min, data_max = image_data.min(), image_data.max()
+            if data_max > data_min:
+                image_data = ((image_data - data_min) / (data_max - data_min) * 255)
             else:
                 image_data = np.zeros_like(image_data)
         
@@ -672,7 +709,7 @@ def _array_to_base64_image(array, window_width=None, window_level=None, inverted
             image_data = 255 - image_data
         
         # Convert to uint8
-        normalized = image_data.astype(np.uint8)
+        normalized = np.clip(image_data, 0, 255).astype(np.uint8)
         
         # Convert to PIL Image
         img = Image.fromarray(normalized, mode='L')
@@ -682,12 +719,15 @@ def _array_to_base64_image(array, window_width=None, window_level=None, inverted
         try:
             # Favor speed over size
             img.save(buffer, format='PNG', optimize=False, compress_level=1)
-        except Exception:
+        except Exception as save_err:
+            logger.warning(f"PNG save with optimization failed: {save_err}, trying basic save")
             img.save(buffer, format='PNG')
+        
         img_str = base64.b64encode(buffer.getvalue()).decode()
         
         return f"data:image/png;base64,{img_str}"
     except Exception as e:
+        logger.error(f"_array_to_base64_image failed: {str(e)}, array shape: {getattr(array, 'shape', 'unknown')}, dtype: {getattr(array, 'dtype', 'unknown')}")
         return None
 
 @login_required
