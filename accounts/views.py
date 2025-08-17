@@ -19,31 +19,35 @@ def login_view(request):
         password = request.POST.get('password')
         
         user = authenticate(request, username=username, password=password)
-        if user and user.is_active and user.is_verified:
-            # Track login session
-            login(request, user)
-            
-            # Get client information
-            user_agent = request.META.get('HTTP_USER_AGENT', '')
-            ip_address = get_client_ip(request)
-            
-            # Update user login tracking
-            user.last_login_ip = ip_address
-            user.save()
-            
-            # Create session record
-            UserSession.objects.create(
-                user=user,
-                session_key=request.session.session_key,
-                ip_address=ip_address,
-                user_agent=user_agent
-            )
-            
-            # Redirect all users to the worklist dashboard after login
-            return redirect('worklist:dashboard')
+        if user:
+            if not user.is_active:
+                messages.error(request, 'Account is inactive. Please contact administrator.')
+            elif not user.is_verified:
+                messages.error(request, 'Account is not verified. Please contact administrator.')
+            else:
+                # Track login session
+                login(request, user)
+                
+                # Get client information
+                user_agent = request.META.get('HTTP_USER_AGENT', '')
+                ip_address = get_client_ip(request)
+                
+                # Update user login tracking
+                user.last_login_ip = ip_address
+                user.save()
+                
+                # Create session record
+                UserSession.objects.create(
+                    user=user,
+                    session_key=request.session.session_key,
+                    ip_address=ip_address,
+                    user_agent=user_agent
+                )
+                
+                # Redirect all users to the worklist dashboard after login
+                return redirect('worklist:dashboard')
         else:
-            # Only show a single generic error for any failure
-            messages.error(request, 'invalid user')
+            messages.error(request, 'Invalid username or password.')
     
     return render(request, 'accounts/login.html', {'hide_navbar': True})
 
