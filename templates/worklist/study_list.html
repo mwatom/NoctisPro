@@ -16,8 +16,25 @@
 	.attachments, .prev-reports { display: flex; gap: 6px; flex-wrap: wrap; }
 	.attachment-chip { border: 1px solid var(--border-color); border-radius: 999px; padding: 2px 8px; font-size: 11px; color: var(--text-secondary); background: rgba(255,255,255,0.03); }
 	.attachment-chip i { margin-right: 6px; }
-	.btn-mini { padding: 4px 8px; border-radius: 2px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); font-size: 11px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
-	.btn-mini:hover { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); box-shadow: none; }
+	.btn-control {
+		background: var(--card-bg);
+		border: 1px solid var(--border-color);
+		color: var(--text-primary);
+		padding: 4px 12px;
+		font-size: 11px;
+		cursor: pointer;
+		border-radius: 2px;
+		transition: all 0.2s ease;
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		text-decoration: none;
+	}
+
+	.btn-control:hover {
+		background: var(--accent-color);
+		color: var(--primary-bg);
+	}
 	.search-input { position: relative; }
 	.search-input input { width: 100%; background: var(--secondary-bg); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; padding: 8px 12px; }
 	.empty { text-align:center; color: var(--text-secondary); padding: 24px; }
@@ -49,7 +66,7 @@
 			<option value="{{ m.code }}" {% if modality_filter == m.code %}selected{% endif %}>{{ m.code }}</option>
 			{% endfor %}
 		</select>
-		<button class="btn-mini" id="applyFilters"><i class="fas fa-filter me-1"></i>Apply</button>
+		<button class="btn-control" id="applyFilters"><i class="fas fa-filter me-1"></i>Apply</button>
 	</div>
 
 	<div class="table-card">
@@ -72,7 +89,7 @@
 				<td>
 					<div class="d-flex align-items-center justify-content-between">
 						<div class="fw-bold">{{ s.patient.full_name }}</div>
-						<a class="btn-mini" href="{% url 'worklist:upload_attachment' s.id %}" title="Attach files for {{ s.patient.full_name }}">
+						<a class="btn-control" href="{% url 'worklist:upload_attachment' s.id %}" title="Attach files for {{ s.patient.full_name }}">
 							<i class="fas fa-paperclip"></i>
 						</a>
 					</div>
@@ -107,9 +124,9 @@
 				</td>
 				<td>
 					<div class="d-flex gap-2">
-						<a class="btn-mini" href="{% url 'worklist:study_detail' s.id %}" title="Open"><i class="fas fa-folder-open"></i></a>
-						<a class="btn-mini" href="{% url 'dicom_viewer:web_viewer' %}?study_id={{ s.id }}" title="View"><i class="fas fa-eye"></i></a>
-						<a class="btn-mini" href="{% url 'reports:write_report' s.id %}" title="Report"><i class="fas fa-file-medical"></i></a>
+						<a class="btn-control" href="{% url 'worklist:study_detail' s.id %}" title="Open"><i class="fas fa-folder-open"></i></a>
+						<a class="btn-control" href="{% url 'dicom_viewer:web_viewer' %}?study_id={{ s.id }}" title="View"><i class="fas fa-eye"></i></a>
+						<a class="btn-control" href="{% url 'reports:write_report' s.id %}" title="Report"><i class="fas fa-file-medical"></i></a>
 					</div>
 				</td>
 			</tr>

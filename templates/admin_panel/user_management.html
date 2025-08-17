@@ -3,6 +3,30 @@
 
 {% block title %}User Management - Admin Panel{% endblock %}
 
+{% block extra_css %}
+<style>
+    .btn-control {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        padding: 4px 12px;
+        font-size: 11px;
+        cursor: pointer;
+        border-radius: 2px;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        text-decoration: none;
+    }
+
+    .btn-control:hover {
+        background: var(--accent-color);
+        color: var(--primary-bg);
+    }
+</style>
+{% endblock %}
+
 
 {% block content %}
 <div class="container-fluid py-4">
@@ -74,7 +98,7 @@
                         </select>
                     </div>
                     <div class="col-md-2 d-flex align-items-end">
-                        <button type="submit" class="btn btn-medical w-100">
+                        <button type="submit" class="btn-control w-100" style="background: var(--accent-color); color: var(--primary-bg);">
                             <i class="fas fa-search me-2"></i>Filter
                         </button>
                     </div>

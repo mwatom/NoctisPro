@@ -176,15 +176,17 @@ def user_create(request):
                 email=email,
                 password=password,
                 first_name=first_name,
-                last_name=last_name,
-                role=role
+                last_name=last_name
             )
+            # Set additional fields after creation
+            user.role = role
             if facility:
                 user.facility = facility
             user.phone = phone
             user.license_number = license_number
             user.specialization = specialization
             user.is_verified = True  # Set new users as verified by default
+            user.is_active = True  # Ensure user is active by default
             user.save()
             
             # Log the action
@@ -197,7 +199,7 @@ def user_create(request):
                 description=f'Created user {user.username}'
             )
             
-            messages.success(request, f'User {username} created successfully')
+            messages.success(request, f'User {username} created successfully. Username: {username}, Role: {user.get_role_display()}, Status: Active & Verified')
             return redirect('admin_panel:user_management')
             
         except Exception as e:
