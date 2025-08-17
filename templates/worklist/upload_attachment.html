@@ -11,8 +11,25 @@
 	.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
 	@media (max-width: 768px){ .form-row { grid-template-columns: 1fr; } }
 	.file-drop { border: 1px dashed var(--border-color); border-radius: 8px; padding: 20px; text-align:center; cursor:pointer; }
-	.btn-mini { padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); font-size: 12px; display:inline-flex; align-items:center; gap:6px; }
-	.btn-mini:hover { background: var(--accent-color); color: var(--primary-bg); }
+	.btn-control {
+		background: var(--card-bg);
+		border: 1px solid var(--border-color);
+		color: var(--text-primary);
+		padding: 4px 12px;
+		font-size: 11px;
+		cursor: pointer;
+		border-radius: 2px;
+		transition: all 0.2s ease;
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		text-decoration: none;
+	}
+
+	.btn-control:hover {
+		background: var(--accent-color);
+		color: var(--primary-bg);
+	}
 	.small-muted { color: var(--text-secondary); font-size: 12px; }
 	.chips { display:flex; gap:6px; flex-wrap:wrap; }
 	.chip { border: 1px solid var(--border-color); border-radius: 999px; padding: 4px 10px; font-size: 12px; color: var(--text-secondary); }

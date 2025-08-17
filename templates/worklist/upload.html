@@ -31,6 +31,31 @@
 
     .upload-actions { display: flex; gap: 1rem; margin-top: 2rem; justify-content: center; }
 
+    .btn-control {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        padding: 4px 12px;
+        font-size: 11px;
+        cursor: pointer;
+        border-radius: 2px;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        text-decoration: none;
+    }
+
+    .btn-control:hover {
+        background: var(--accent-color);
+        color: var(--primary-bg);
+    }
+
+    .btn-control:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
     .progress-section { margin-top: 2rem; display: none; }
 
     .file-list { margin-top: 2rem; }
@@ -181,7 +206,7 @@
                 <i class="fas fa-file-medical text-accent" style="font-size: 3rem; margin-bottom: 1rem;"></i>
                 <h4 class="text-light mb-3">Drop DICOM files or folders here</h4>
                 <p class="text-secondary mb-3">Supports large CT/MRI studies with multiple series in subfolders</p>
-                <button type="button" class="btn btn-medical" id="chooseFilesBtn">
+                <button type="button" class="btn-control" id="chooseFilesBtn" style="background: var(--accent-color); color: var(--primary-bg);">
                     <i class="fas fa-folder-open me-2"></i>
                     Choose Files / Folder
                 </button>
@@ -246,16 +271,16 @@
                 <h4 class="text-light mb-2">Upload Successful!</h4>
                 <p class="text-secondary mb-3">Your DICOM studies have been uploaded successfully.</p>
                 <div id="uploadSummary" class="text-light mb-3"></div>
-                <button type="button" class="btn btn-medical" onclick="redirectToDashboard()">
+                <button type="button" class="btn-control" onclick="redirectToDashboard()" style="background: var(--accent-color); color: var(--primary-bg);">
                     <i class="fas fa-arrow-left me-2"></i>Return to Worklist
                 </button>
             </div>
             
             <div class="upload-actions" id="uploadActions">
-                <a href="{% url 'worklist:dashboard' %}" class="btn btn-outline-secondary">
+                <a href="{% url 'worklist:dashboard' %}" class="btn-control">
                     <i class="fas fa-arrow-left me-2"></i>Cancel
                 </a>
-                <button type="submit" class="btn btn-medical" id="uploadBtn" disabled>
+                <button type="submit" class="btn-control" id="uploadBtn" disabled style="background: var(--accent-color); color: var(--primary-bg);">
                     <i class="fas fa-upload me-2"></i>Upload Studies
                 </button>
             </div>

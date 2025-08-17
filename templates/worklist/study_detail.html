@@ -14,8 +14,25 @@
 	.section-title { font-weight: 600; margin-top: 12px; margin-bottom: 8px; }
 	.chips { display:flex; flex-wrap:wrap; gap:6px; }
 	.chip { border: 1px solid var(--border-color); border-radius: 999px; padding: 4px 10px; font-size: 12px; color: var(--text-secondary); }
-	.btn-mini { padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); font-size: 12px; display:inline-flex; align-items:center; gap:6px; }
-	.btn-mini:hover { background: var(--accent-color); color: var(--primary-bg); }
+	.btn-control {
+		background: var(--card-bg);
+		border: 1px solid var(--border-color);
+		color: var(--text-primary);
+		padding: 4px 12px;
+		font-size: 11px;
+		cursor: pointer;
+		border-radius: 2px;
+		transition: all 0.2s ease;
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		text-decoration: none;
+	}
+
+	.btn-control:hover {
+		background: var(--accent-color);
+		color: var(--primary-bg);
+	}
 </style>
 {% endblock %}
 
@@ -28,9 +45,9 @@
 				<div class="label">{{ study.study_date|date:"Y-m-d H:i" }} • {{ study.modality.code }} • {{ study.study_description }}</div>
 			</div>
 			<div class="d-flex gap-2">
-				<a href="{% url 'worklist:study_list' %}" class="btn-mini"><i class="fas fa-arrow-left"></i> Back</a>
-				<a href="{% url 'worklist:upload_attachment' study.id %}" class="btn-mini"><i class="fas fa-paperclip"></i> Attach</a>
-				<a href="{% url 'dicom_viewer:web_viewer' %}?study_id={{ study.id }}" class="btn-mini"><i class="fas fa-eye"></i> View</a>
+				<a href="{% url 'worklist:study_list' %}" class="btn-control"><i class="fas fa-arrow-left"></i> Back</a>
+				<a href="{% url 'worklist:upload_attachment' study.id %}" class="btn-control"><i class="fas fa-paperclip"></i> Attach</a>
+				<a href="{% url 'dicom_viewer:web_viewer' %}?study_id={{ study.id }}" class="btn-control"><i class="fas fa-eye"></i> View</a>
 			</div>
 		</div>
 		<div class="card-body">
@@ -44,7 +61,7 @@
 			<div class="section-title">Clinical Information</div>
 			<div class="d-flex align-items-start justify-content-between" style="gap:8px;">
 				<div id="clinicalInfoText" class="label" style="white-space: pre-wrap;">{{ study.clinical_info|default:"No clinical information yet." }}</div>
-				<button class="btn-mini" data-bs-toggle="modal" data-bs-target="#clinicalInfoModal">
+				<button class="btn-control" data-bs-toggle="modal" data-bs-target="#clinicalInfoModal">
 					<i class="fas fa-notes-medical"></i>
 					{% if study.clinical_info %}Edit Clinical Info{% else %}Add Clinical Info{% endif %}
 				</button>
@@ -59,7 +76,7 @@
 					</a>
 					<form method="post" action="{% url 'worklist:delete_attachment' a.id %}" class="d-inline ms-1">
 						{% csrf_token %}
-						<button type="submit" class="btn-mini" title="Delete"><i class="fas fa-trash"></i></button>
+						<button type="submit" class="btn-control" title="Delete"><i class="fas fa-trash"></i></button>
 					</form>
 				{% empty %}
 					<span class="label">No attachments yet.</span>
@@ -83,8 +100,8 @@
 				<textarea id="clinicalInfoInput" class="form-control-medical" style="min-height: 140px;">{{ study.clinical_info }}</textarea>
 			</div>
 			<div class="modal-footer" style="border-top: 1px solid var(--border-color);">
-				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-				<button type="button" id="saveClinicalInfoBtn" class="btn btn-medical"><i class="fas fa-save me-2"></i>Save</button>
+				<button type="button" class="btn-control" data-bs-dismiss="modal">Cancel</button>
+				<button type="button" id="saveClinicalInfoBtn" class="btn-control" style="background: var(--accent-color); color: var(--primary-bg);"><i class="fas fa-save me-2"></i>Save</button>
 			</div>
 		</div>
 	</div>
