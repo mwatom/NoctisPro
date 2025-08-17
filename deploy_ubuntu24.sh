@@ -143,8 +143,8 @@ configure_firewall() {
 setup_postgresql() {
     if [[ "$USE_POSTGRES" == "true" ]]; then
         print_step "Setting up PostgreSQL..."
-        systemctl enable postgresql
-        systemctl start postgresql
+        systemctl enable postgresql || echo "Warning: Could not enable PostgreSQL service"
+        systemctl start postgresql || echo "Warning: Could not start PostgreSQL service"
         
         # Create database and user
         sudo -u postgres psql -c "CREATE DATABASE $POSTGRES_DB;" || true
@@ -155,15 +155,59 @@ setup_postgresql() {
         sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $POSTGRES_DB TO $POSTGRES_USER;"
         
         # Configure PostgreSQL for production
-        PG_VERSION=$(sudo -u postgres psql -c "SHOW server_version;" | grep -oP '\d+\.\d+' | head -1)
-        PG_CONFIG_DIR="/etc/postgresql/$PG_VERSION/main"
+        # Find the correct PostgreSQL version and config directory
+        PG_VERSION=$(sudo -u postgres psql -t -c "SHOW server_version;" | grep -oE '[0-9]+' | head -1)
+        
+        # Try multiple possible config directory locations
+        PG_CONFIG_DIR=""
+        
+        # First try exact version match
+        if [ -d "/etc/postgresql/$PG_VERSION/main" ] && [ -f "/etc/postgresql/$PG_VERSION/main/postgresql.conf" ]; then
+            PG_CONFIG_DIR="/etc/postgresql/$PG_VERSION/main"
+        else
+            # Try version with patch number (e.g., 16.9)
+            for possible_dir in /etc/postgresql/$PG_VERSION.*/main; do
+                if [ -d "$possible_dir" ] && [ -f "$possible_dir/postgresql.conf" ]; then
+                    PG_CONFIG_DIR="$possible_dir"
+                    break
+                fi
+            done
+            
+            # If still not found, try any version
+            if [ -z "$PG_CONFIG_DIR" ]; then
+                for possible_dir in /etc/postgresql/*/main; do
+                    if [ -d "$possible_dir" ] && [ -f "$possible_dir/postgresql.conf" ]; then
+                        PG_CONFIG_DIR="$possible_dir"
+                        break
+                    fi
+                done
+            fi
+        fi
+        
+        # If we still can't find it, try to locate it using find
+        if [ -z "$PG_CONFIG_DIR" ]; then
+            PG_CONFIG_DIR=$(find /etc/postgresql -name "postgresql.conf" -type f | head -1 | xargs dirname 2>/dev/null)
+        fi
+        
+        # If we still can't find it, get it from PostgreSQL itself
+        if [ -z "$PG_CONFIG_DIR" ] || [ ! -f "$PG_CONFIG_DIR/postgresql.conf" ]; then
+            CONF_FILE=$(sudo -u postgres psql -t -c "SHOW config_file;" | tr -d ' ')
+            PG_CONFIG_DIR=$(dirname "$CONF_FILE")
+        fi
+        
+        echo "Using PostgreSQL config directory: $PG_CONFIG_DIR"
         
         # Backup original configs
-        cp "$PG_CONFIG_DIR/postgresql.conf" "$PG_CONFIG_DIR/postgresql.conf.backup" || true
-        cp "$PG_CONFIG_DIR/pg_hba.conf" "$PG_CONFIG_DIR/pg_hba.conf.backup" || true
+        if [ -f "$PG_CONFIG_DIR/postgresql.conf" ]; then
+            cp "$PG_CONFIG_DIR/postgresql.conf" "$PG_CONFIG_DIR/postgresql.conf.backup" || true
+        fi
+        if [ -f "$PG_CONFIG_DIR/pg_hba.conf" ]; then
+            cp "$PG_CONFIG_DIR/pg_hba.conf" "$PG_CONFIG_DIR/pg_hba.conf.backup" || true
+        fi
         
         # Optimize PostgreSQL configuration
-        cat >> "$PG_CONFIG_DIR/postgresql.conf" << EOF
+        if [ -f "$PG_CONFIG_DIR/postgresql.conf" ]; then
+            cat >> "$PG_CONFIG_DIR/postgresql.conf" << EOF
 
 # Noctis Pro optimizations
 shared_buffers = 256MB
@@ -173,25 +217,28 @@ checkpoint_completion_target = 0.9
 wal_buffers = 16MB
 default_statistics_target = 100
 EOF
+        else
+            echo "Warning: Could not find PostgreSQL configuration file to optimize"
+        fi
         
-        systemctl restart postgresql
+        systemctl restart postgresql || echo "Warning: Could not restart PostgreSQL service"
     fi
 }
 
 # Setup Redis
 setup_redis() {
     print_step "Setting up Redis..."
-    systemctl enable redis-server
-    systemctl start redis-server
+    systemctl enable redis-server || echo "Warning: Could not enable Redis service"
+    systemctl start redis-server || echo "Warning: Could not start Redis service"
     
     # Configure Redis for production
-    cp /etc/redis/redis.conf /etc/redis/redis.conf.backup
+    cp /etc/redis/redis.conf /etc/redis/redis.conf.backup || echo "Warning: Could not backup Redis config"
     
     # Basic Redis hardening
-    sed -i 's/^# maxmemory <bytes>/maxmemory 512mb/' /etc/redis/redis.conf
-    sed -i 's/^# maxmemory-policy noeviction/maxmemory-policy allkeys-lru/' /etc/redis/redis.conf
+    sed -i 's/^# maxmemory <bytes>/maxmemory 512mb/' /etc/redis/redis.conf || echo "Warning: Could not set Redis maxmemory"
+    sed -i 's/^# maxmemory-policy noeviction/maxmemory-policy allkeys-lru/' /etc/redis/redis.conf || echo "Warning: Could not set Redis maxmemory-policy"
     
-    systemctl restart redis-server
+    systemctl restart redis-server || echo "Warning: Could not restart Redis service"
 }
 
 # Create application user and directories
@@ -481,8 +528,8 @@ EOF
     
     # Test and restart Nginx
     nginx -t
-    systemctl enable nginx
-    systemctl restart nginx
+    systemctl enable nginx || echo "Warning: Could not enable Nginx service"
+    systemctl restart nginx || echo "Warning: Could not restart Nginx service"
 }
 
 # Setup SSL with Let's Encrypt (if domain provided)
@@ -492,7 +539,7 @@ setup_ssl() {
         
         # Update Nginx config with domain
         sed -i "s/server_name _;/server_name $DOMAIN_NAME;/" /etc/nginx/sites-available/noctis
-        systemctl reload nginx
+        systemctl reload nginx || echo "Warning: Could not reload Nginx service"
         
         # Get SSL certificate
         certbot --nginx -d $DOMAIN_NAME --non-interactive --agree-tos --email $ADMIN_EMAIL --redirect
