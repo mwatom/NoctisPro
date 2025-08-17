@@ -267,3 +267,5 @@ Traceback (most recent call last):
 django.template.exceptions.TemplateSyntaxError: 'block' tag with name 'extra_css' appears more than once
 [35;1mHTTP GET /admin-panel/users/ 500 [0.05, 127.0.0.1:55578][0m
 [mHTTP GET /admin-panel/users/create/ 200 [0.01, 127.0.0.1:55584][0m
+Watching for file changes with StatReloader
+[32mHTTP GET / 302 [0.01, 127.0.0.1:47966][0m
