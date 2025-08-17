@@ -90,7 +90,10 @@ def user_management(request):
             Q(username__icontains=search_query) |
             Q(first_name__icontains=search_query) |
             Q(last_name__icontains=search_query) |
-            Q(email__icontains=search_query)
+            Q(email__icontains=search_query) |
+            Q(phone__icontains=search_query) |
+            Q(license_number__icontains=search_query) |
+            Q(specialization__icontains=search_query)
         )
     
     # Role filtering
@@ -102,6 +105,22 @@ def user_management(request):
     facility_filter = request.GET.get('facility', '')
     if facility_filter:
         users = users.filter(facility_id=facility_filter)
+    
+    # Status filtering
+    status_filter = request.GET.get('status', '')
+    if status_filter == 'active':
+        users = users.filter(is_active=True)
+    elif status_filter == 'inactive':
+        users = users.filter(is_active=False)
+    elif status_filter == 'verified':
+        users = users.filter(is_verified=True)
+    elif status_filter == 'unverified':
+        users = users.filter(is_verified=False)
+    
+    # Export functionality
+    export_format = request.GET.get('export', '')
+    if export_format:
+        return export_users(users, export_format)
     
     # Pagination
     paginator = Paginator(users, 20)
@@ -304,7 +323,7 @@ def user_delete(request, user_id):
 @login_required
 @user_passes_test(is_admin)
 def facility_management(request):
-    """Facility management interface"""
+    """Enhanced facility management interface"""
     facilities = Facility.objects.all()
     
     # Search functionality
@@ -313,7 +332,10 @@ def facility_management(request):
         facilities = facilities.filter(
             Q(name__icontains=search_query) |
             Q(address__icontains=search_query) |
-            Q(license_number__icontains=search_query)
+            Q(license_number__icontains=search_query) |
+            Q(email__icontains=search_query) |
+            Q(phone__icontains=search_query) |
+            Q(ae_title__icontains=search_query)
         )
     
     # Status filtering
@@ -323,18 +345,268 @@ def facility_management(request):
     elif status_filter == 'inactive':
         facilities = facilities.filter(is_active=False)
     
+    # Sorting
+    sort_by = request.GET.get('sort', 'name')
+    if sort_by == 'name':
+        facilities = facilities.order_by('name')
+    elif sort_by == 'created_at':
+        facilities = facilities.order_by('-created_at')
+    elif sort_by == 'user_count':
+        facilities = facilities.annotate(user_count=Count('user')).order_by('-user_count')
+    elif sort_by == 'study_count':
+        facilities = facilities.annotate(study_count=Count('study')).order_by('-study_count')
+    
+    # Export functionality
+    export_format = request.GET.get('export', '')
+    selected_ids = request.GET.get('selected', '')
+    if export_format:
+        if selected_ids:
+            facility_ids = [int(id) for id in selected_ids.split(',')]
+            export_facilities = facilities.filter(id__in=facility_ids)
+        else:
+            export_facilities = facilities
+        return export_facilities_data(export_facilities, export_format)
+    
     # Pagination
-    paginator = Paginator(facilities, 20)
+    paginator = Paginator(facilities, 12)  # 12 per page for grid view
     page_number = request.GET.get('page')
     facilities_page = paginator.get_page(page_number)
+    
+    # Statistics
+    total_users = User.objects.count()
+    total_studies = Study.objects.count() if hasattr(facilities.first(), 'study_set') else 0
     
     context = {
         'facilities': facilities_page,
         'search_query': search_query,
-        'status_filter': status_filter,
+        'total_users': total_users,
+        'total_studies': total_studies,
     }
     
     return render(request, 'admin_panel/facility_management.html', context)
+
+def export_users(users, format):
+    """Export users data in various formats"""
+    import csv
+    from django.http import HttpResponse
+    import io
+    
+    if format == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="users_export.csv"'
+        
+        writer = csv.writer(response)
+        writer.writerow([
+            'Username', 'First Name', 'Last Name', 'Email', 'Phone', 
+            'Role', 'Facility', 'License Number', 'Specialization', 
+            'Active', 'Verified', 'Date Joined', 'Last Login'
+        ])
+        
+        for user in users:
+            writer.writerow([
+                user.username,
+                user.first_name,
+                user.last_name,
+                user.email,
+                user.phone,
+                user.get_role_display(),
+                user.facility.name if user.facility else '',
+                user.license_number,
+                user.specialization,
+                'Yes' if user.is_active else 'No',
+                'Yes' if user.is_verified else 'No',
+                user.date_joined.strftime('%Y-%m-%d %H:%M:%S'),
+                user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else 'Never'
+            ])
+        
+        return response
+    
+    elif format == 'excel':
+        try:
+            import openpyxl
+            from openpyxl.utils.dataframe import dataframe_to_rows
+            import pandas as pd
+            
+            # Create DataFrame
+            data = []
+            for user in users:
+                data.append({
+                    'Username': user.username,
+                    'First Name': user.first_name,
+                    'Last Name': user.last_name,
+                    'Email': user.email,
+                    'Phone': user.phone,
+                    'Role': user.get_role_display(),
+                    'Facility': user.facility.name if user.facility else '',
+                    'License Number': user.license_number,
+                    'Specialization': user.specialization,
+                    'Active': 'Yes' if user.is_active else 'No',
+                    'Verified': 'Yes' if user.is_verified else 'No',
+                    'Date Joined': user.date_joined.strftime('%Y-%m-%d %H:%M:%S'),
+                    'Last Login': user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else 'Never'
+                })
+            
+            df = pd.DataFrame(data)
+            
+            # Create Excel response
+            response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            response['Content-Disposition'] = 'attachment; filename="users_export.xlsx"'
+            
+            with pd.ExcelWriter(response, engine='openpyxl') as writer:
+                df.to_excel(writer, sheet_name='Users', index=False)
+            
+            return response
+            
+        except ImportError:
+            # Fallback to CSV if pandas/openpyxl not available
+            return export_users(users, 'csv')
+    
+    # Default to CSV
+    return export_users(users, 'csv')
+
+def export_facilities_data(facilities, format):
+    """Export facilities data in various formats"""
+    import csv
+    from django.http import HttpResponse
+    
+    if format == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="facilities_export.csv"'
+        
+        writer = csv.writer(response)
+        writer.writerow([
+            'Name', 'Address', 'Phone', 'Email', 'License Number', 
+            'AE Title', 'Active', 'User Count', 'Study Count', 'Created Date'
+        ])
+        
+        for facility in facilities:
+            writer.writerow([
+                facility.name,
+                facility.address,
+                facility.phone,
+                facility.email,
+                facility.license_number,
+                facility.ae_title,
+                'Yes' if facility.is_active else 'No',
+                facility.user_set.count(),
+                facility.study_set.count() if hasattr(facility, 'study_set') else 0,
+                facility.created_at.strftime('%Y-%m-%d %H:%M:%S') if facility.created_at else ''
+            ])
+        
+        return response
+    
+    elif format == 'excel':
+        try:
+            import pandas as pd
+            
+            # Create DataFrame
+            data = []
+            for facility in facilities:
+                data.append({
+                    'Name': facility.name,
+                    'Address': facility.address,
+                    'Phone': facility.phone,
+                    'Email': facility.email,
+                    'License Number': facility.license_number,
+                    'AE Title': facility.ae_title,
+                    'Active': 'Yes' if facility.is_active else 'No',
+                    'User Count': facility.user_set.count(),
+                    'Study Count': facility.study_set.count() if hasattr(facility, 'study_set') else 0,
+                    'Created Date': facility.created_at.strftime('%Y-%m-%d %H:%M:%S') if facility.created_at else ''
+                })
+            
+            df = pd.DataFrame(data)
+            
+            # Create Excel response
+            response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            response['Content-Disposition'] = 'attachment; filename="facilities_export.xlsx"'
+            
+            with pd.ExcelWriter(response, engine='openpyxl') as writer:
+                df.to_excel(writer, sheet_name='Facilities', index=False)
+            
+            return response
+            
+        except ImportError:
+            # Fallback to CSV if pandas not available
+            return export_facilities_data(facilities, 'csv')
+    
+    # Default to CSV
+    return export_facilities_data(facilities, 'csv')
+
+@csrf_exempt
+@login_required
+@user_passes_test(is_admin)
+def bulk_user_action(request):
+    """Handle bulk user actions"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        action = data.get('action')
+        user_ids = data.get('user_ids', [])
+        
+        if not user_ids:
+            return JsonResponse({'error': 'No users selected'}, status=400)
+        
+        users = User.objects.filter(id__in=user_ids)
+        
+        if action == 'activate':
+            users.update(is_active=True)
+            message = f'Activated {users.count()} users'
+        elif action == 'deactivate':
+            users.update(is_active=False)
+            message = f'Deactivated {users.count()} users'
+        elif action == 'verify':
+            users.update(is_verified=True)
+            message = f'Verified {users.count()} users'
+        elif action == 'delete':
+            count = users.count()
+            users.delete()
+            message = f'Deleted {count} users'
+        else:
+            return JsonResponse({'error': 'Invalid action'}, status=400)
+        
+        return JsonResponse({'success': True, 'message': message})
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@login_required
+@user_passes_test(is_admin)
+def bulk_facility_action(request):
+    """Handle bulk facility actions"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        action = data.get('action')
+        facility_ids = data.get('facility_ids', [])
+        
+        if not facility_ids:
+            return JsonResponse({'error': 'No facilities selected'}, status=400)
+        
+        facilities = Facility.objects.filter(id__in=facility_ids)
+        
+        if action == 'activate':
+            facilities.update(is_active=True)
+            message = f'Activated {facilities.count()} facilities'
+        elif action == 'deactivate':
+            facilities.update(is_active=False)
+            message = f'Deactivated {facilities.count()} facilities'
+        elif action == 'delete':
+            count = facilities.count()
+            facilities.delete()
+            message = f'Deleted {count} facilities'
+        else:
+            return JsonResponse({'error': 'Invalid action'}, status=400)
+        
+        return JsonResponse({'success': True, 'message': message})
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 @login_required
 @user_passes_test(is_admin)
