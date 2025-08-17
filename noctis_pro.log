@@ -269,3 +269,4 @@ django.template.exceptions.TemplateSyntaxError: 'block' tag with name 'extra_css
 [mHTTP GET /admin-panel/users/create/ 200 [0.01, 127.0.0.1:55584][0m
 Watching for file changes with StatReloader
 [32mHTTP GET / 302 [0.01, 127.0.0.1:47966][0m
+[32mHTTP HEAD / 302 [0.01, 127.0.0.1:54882][0m
