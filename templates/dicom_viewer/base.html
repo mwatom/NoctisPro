@@ -570,9 +570,9 @@
               }
               // Immediately request exact mid slices for all planes
               await Promise.all([
-                getMprImage(currentSeries.id, 'axial', mprScroll.axial).then(img=>{ mprImgs.axial = img; }).catch(()=>{}),
-                getMprImage(currentSeries.id, 'sagittal', mprScroll.sagittal).then(img=>{ mprImgs.sagittal = img; }).catch(()=>{}),
-                getMprImage(currentSeries.id, 'coronal', mprScroll.coronal).then(img=>{ mprImgs.coronal = img; }).catch(()=>{})
+                getMprImage(currentSeries.id, 'axial', mprScroll.axial).then(img=>{ mprImgs.axial = img; }).catch(err=>{ console.error('Failed to load axial MPR image:', err); }),
+                getMprImage(currentSeries.id, 'sagittal', mprScroll.sagittal).then(img=>{ mprImgs.sagittal = img; }).catch(err=>{ console.error('Failed to load sagittal MPR image:', err); }),
+                getMprImage(currentSeries.id, 'coronal', mprScroll.coronal).then(img=>{ mprImgs.coronal = img; }).catch(err=>{ console.error('Failed to load coronal MPR image:', err); })
               ]);
               prefetchMprSlices('axial', mprScroll.axial);
               prefetchMprSlices('sagittal', mprScroll.sagittal);
@@ -646,7 +646,7 @@
               try {
                 const img = await getMprImage(currentSeries.id, reg.key, mprScroll[reg.key] || 0);
                 mprImgs[reg.key] = img; requestAnimationFrame(()=>draw());
-              } catch(e){}
+              } catch(e){ console.error('Failed to load MPR image for plane', reg.key, ':', e); }
             })();
           }
           document.getElementById('overlay').innerHTML = `MPR | WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}`;
@@ -1584,7 +1584,7 @@
         const key = mprKey(currentSeries.id, plane, s, ww, wl, inverted);
         if (mprImageCache.has(key)) continue;
         // Fire-and-forget; cache will store promise/result
-        getMprImage(currentSeries.id, plane, s).catch(()=>{});
+        getMprImage(currentSeries.id, plane, s).catch(err=>{ console.error('Failed to prefetch MPR image:', plane, s, err); });
       }
     }
     
