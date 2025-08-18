@@ -235,17 +235,26 @@ def user_create(request):
         except Exception as e:
             messages.error(request, f'Error creating user: {str(e)}')
     
-    facilities = Facility.objects.filter(is_active=True)
+    # Get all active facilities, ordered by name for consistent display
+    facilities = Facility.objects.filter(is_active=True).order_by('name')
     
     # Get pre-fill values from URL parameters
     preset_role = request.GET.get('role', '')
     preset_facility = request.GET.get('facility', '')
+    
+    # Debug logging for facility count
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"User create view: Found {facilities.count()} active facilities")
+    for facility in facilities:
+        logger.info(f"  - Facility ID: {facility.id}, Name: {facility.name}")
     
     context = {
         'facilities': facilities,
         'user_roles': User.USER_ROLES,
         'preset_role': preset_role,
         'preset_facility': preset_facility,
+        'facilities_count': facilities.count(),  # Add count for debugging
     }
     
     return render(request, 'admin_panel/user_form.html', context)
@@ -300,12 +309,20 @@ def user_edit(request, user_id):
         except Exception as e:
             messages.error(request, f'Error updating user: {str(e)}')
     
-    facilities = Facility.objects.filter(is_active=True)
+    # Get all active facilities, ordered by name for consistent display
+    facilities = Facility.objects.filter(is_active=True).order_by('name')
+    
+    # Debug logging for facility count
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"User edit view: Found {facilities.count()} active facilities")
+    
     context = {
         'user_obj': user,
         'facilities': facilities,
         'user_roles': User.USER_ROLES,
         'edit_mode': True,
+        'facilities_count': facilities.count(),  # Add count for debugging
     }
     
     return render(request, 'admin_panel/user_form.html', context)
