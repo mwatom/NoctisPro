@@ -774,33 +774,36 @@
 
     function drawMprCrosshairOverlay(planeKey, dx, dy, scale, imgW, imgH){
       if (mprCross.x === null || mprCross.y === null || mprCross.z === null) return;
+      
+      // Pre-calculate common values for efficiency
+      const endX = dx + imgW * scale;
+      const endY = dy + imgH * scale;
+      
       ctx.save();
       ctx.strokeStyle = 'rgba(255,255,0,0.9)';
       ctx.lineWidth = 1;
+      ctx.beginPath();
+      
+      // Optimized crosshair drawing with single path
       if (planeKey === 'axial'){
         const cx = dx + mprCross.x * scale;
         const cy = dy + mprCross.y * scale;
-        ctx.beginPath();
-        ctx.moveTo(cx, dy); ctx.lineTo(cx, dy + imgH * scale);
-        ctx.moveTo(dx, cy); ctx.lineTo(dx + imgW * scale, cy);
-        ctx.stroke();
+        ctx.moveTo(cx, dy); ctx.lineTo(cx, endY);
+        ctx.moveTo(dx, cy); ctx.lineTo(endX, cy);
       } else if (planeKey === 'sagittal'){
         // sagittal image axes: x=height(y), y=depth(z)
         const cx = dx + mprCross.y * scale; // height index across width
         const cy = dy + mprCross.z * scale; // depth index across height
-        ctx.beginPath();
-        ctx.moveTo(cx, dy); ctx.lineTo(cx, dy + imgH * scale);
-        ctx.moveTo(dx, cy); ctx.lineTo(dx + imgW * scale, cy);
-        ctx.stroke();
+        ctx.moveTo(cx, dy); ctx.lineTo(cx, endY);
+        ctx.moveTo(dx, cy); ctx.lineTo(endX, cy);
       } else if (planeKey === 'coronal'){
         // coronal image axes: x=width(x), y=depth(z)
         const cx = dx + mprCross.x * scale;
         const cy = dy + mprCross.z * scale;
-        ctx.beginPath();
-        ctx.moveTo(cx, dy); ctx.lineTo(cx, dy + imgH * scale);
-        ctx.moveTo(dx, cy); ctx.lineTo(dx + imgW * scale, cy);
-        ctx.stroke();
+        ctx.moveTo(cx, dy); ctx.lineTo(cx, endY);
+        ctx.moveTo(dx, cy); ctx.lineTo(endX, cy);
       }
+      ctx.stroke();
       ctx.restore();
     }
 
@@ -1084,29 +1087,48 @@
             return;
           }
           const imgPt = canvasToImageCoords(vpR, mx, my);
-          // Update crosshair global coordinates and plane slices
+          // Update crosshair global coordinates and plane slices (optimized)
+          const newCross = {...mprCross};
+          let needsUpdate = false;
+          
           if (plane === 'axial'){
-            mprCross.x = Math.round(imgPt.x);
-            mprCross.y = Math.round(imgPt.y);
-            // Update orthogonal planes to intersect this point
-            mprScroll.sagittal = Math.max(0, Math.min((mprScroll.counts.sagittal||1)-1, mprCross.x));
-            mprScroll.coronal = Math.max(0, Math.min((mprScroll.counts.coronal||1)-1, mprCross.y));
+            const newX = Math.round(imgPt.x);
+            const newY = Math.round(imgPt.y);
+            if (newCross.x !== newX || newCross.y !== newY) {
+              newCross.x = newX;
+              newCross.y = newY;
+              mprScroll.sagittal = Math.max(0, Math.min((mprScroll.counts.sagittal||1)-1, newX));
+              mprScroll.coronal = Math.max(0, Math.min((mprScroll.counts.coronal||1)-1, newY));
+              needsUpdate = true;
+            }
           } else if (plane === 'sagittal'){
             // sagittal image: x->height(y), y->depth(z)
-            mprCross.y = Math.round(imgPt.x);
-            mprCross.z = Math.round(imgPt.y);
-            mprScroll.axial = Math.max(0, Math.min((mprScroll.counts.axial||1)-1, mprCross.z));
-            // coronal slice corresponds to height index
-            mprScroll.coronal = Math.max(0, Math.min((mprScroll.counts.coronal||1)-1, mprCross.y));
+            const newY = Math.round(imgPt.x);
+            const newZ = Math.round(imgPt.y);
+            if (newCross.y !== newY || newCross.z !== newZ) {
+              newCross.y = newY;
+              newCross.z = newZ;
+              mprScroll.axial = Math.max(0, Math.min((mprScroll.counts.axial||1)-1, newZ));
+              mprScroll.coronal = Math.max(0, Math.min((mprScroll.counts.coronal||1)-1, newY));
+              needsUpdate = true;
+            }
           } else if (plane === 'coronal'){
             // coronal image: x->width(x), y->depth(z)
-            mprCross.x = Math.round(imgPt.x);
-            mprCross.z = Math.round(imgPt.y);
-            mprScroll.axial = Math.max(0, Math.min((mprScroll.counts.axial||1)-1, mprCross.z));
-            // sagittal slice corresponds to width index
-            mprScroll.sagittal = Math.max(0, Math.min((mprScroll.counts.sagittal||1)-1, mprCross.x));
+            const newX = Math.round(imgPt.x);
+            const newZ = Math.round(imgPt.y);
+            if (newCross.x !== newX || newCross.z !== newZ) {
+              newCross.x = newX;
+              newCross.z = newZ;
+              mprScroll.axial = Math.max(0, Math.min((mprScroll.counts.axial||1)-1, newZ));
+              mprScroll.sagittal = Math.max(0, Math.min((mprScroll.counts.sagittal||1)-1, newX));
+              needsUpdate = true;
+            }
           }
-          draw();
+          
+          if (needsUpdate) {
+            mprCross = newCross;
+            draw();
+          }
         }
       }
       if (showHuProbe){

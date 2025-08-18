@@ -38,13 +38,14 @@ from .models import WindowLevelPreset, HangingProtocol
 # Initialize logger
 logger = logging.getLogger(__name__)
 
-# MPR volume small LRU cache (per-process)
+# MPR volume small LRU cache (per-process) - optimized for 3D performance
 from threading import Lock
+import gc
 
 _MPR_CACHE_LOCK = Lock()
-_MPR_CACHE = {}  # series_id -> { 'volume': np.ndarray }
+_MPR_CACHE = {}  # series_id -> { 'volume': np.ndarray, 'spacing': tuple, 'timestamp': float }
 _MPR_CACHE_ORDER = []
-_MAX_MPR_CACHE = 4
+_MAX_MPR_CACHE = 6  # Increased cache size for better performance
 
 # Encoded MPR slice cache (LRU) to avoid repeated windowing+encoding per slice/plane/WW/WL
 _MPR_IMG_CACHE_LOCK = Lock()
