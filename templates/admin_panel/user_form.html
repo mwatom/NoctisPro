@@ -109,7 +109,17 @@
               {% for facility in facilities %}
               <option value="{{ facility.id }}" {% if preset_facility == facility.id|stringformat:'s' %}selected{% endif %}>{{ facility.name }}</option>
               {% endfor %}
-                    </select>
+            </select>
+            <!-- Debug info (remove in production) -->
+            {% if facilities_count %}
+            <div class="form-text text-info mt-1">
+              <small><i class="fas fa-info-circle me-1"></i>{{ facilities_count }} active facilit{{ facilities_count|pluralize:"y,ies" }} available</small>
+            </div>
+            {% else %}
+            <div class="form-text text-warning mt-1">
+              <small><i class="fas fa-exclamation-triangle me-1"></i>No active facilities found. Please contact an administrator to add facilities.</small>
+            </div>
+            {% endif %}
             <div class="form-text text-muted">
               <small id="facilityHelp">
                 <span class="facility-required" style="display: none;">
