@@ -606,7 +606,7 @@ function toggleUserStatus(userId, activate) {
 // Delete user function
 function deleteUser(userId, username) {
     if (confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
-        window.location.href = `/admin/users/delete/${userId}/`;
+        window.location.href = `{% url 'admin_panel:user_delete' 0 %}`.replace('0', userId);
     }
 }
 

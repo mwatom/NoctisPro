@@ -383,6 +383,16 @@
     const facilityHelp = document.getElementById('facilityHelp');
     const password = document.getElementById('password');
     const passwordConfirm = document.getElementById('password_confirm');
+    
+    // Multi-step form elements
+    const nextBtn = document.getElementById('nextBtn');
+    const prevBtn = document.getElementById('prevBtn');
+    const submitBtn = document.getElementById('submitBtn');
+    const formSteps = document.querySelectorAll('.form-step');
+    const stepIndicators = document.querySelectorAll('.step');
+    
+    let currentStep = 1;
+    const totalSteps = formSteps.length;
 
     function updateFacilityRequirement() {
       const selectedRole = roleSelect.value;
@@ -399,11 +409,86 @@
       }
     }
 
+    function showStep(step) {
+      // Hide all steps
+      formSteps.forEach(formStep => {
+        formStep.classList.remove('active');
+      });
+      
+      // Show current step
+      const currentFormStep = document.querySelector(`.form-step[data-step="${step}"]`);
+      if (currentFormStep) {
+        currentFormStep.classList.add('active');
+      }
+      
+      // Update step indicators
+      stepIndicators.forEach((indicator, index) => {
+        indicator.classList.remove('active', 'completed');
+        if (index + 1 < step) {
+          indicator.classList.add('completed');
+        } else if (index + 1 === step) {
+          indicator.classList.add('active');
+        }
+      });
+      
+      // Update navigation buttons
+      prevBtn.style.display = step > 1 ? 'block' : 'none';
+      nextBtn.style.display = step < totalSteps ? 'block' : 'none';
+      submitBtn.style.display = step === totalSteps ? 'block' : 'none';
+    }
+
+    function validateCurrentStep() {
+      const currentFormStep = document.querySelector(`.form-step[data-step="${currentStep}"]`);
+      const requiredFields = currentFormStep.querySelectorAll('[required]');
+      
+      for (let field of requiredFields) {
+        if (!field.value.trim()) {
+          field.focus();
+          field.reportValidity();
+          return false;
+        }
+      }
+      
+      // Additional validation for step 2 (passwords)
+      if (currentStep === 2) {
+        if (password.value !== passwordConfirm.value) {
+          passwordConfirm.focus();
+          passwordConfirm.reportValidity();
+          return false;
+        }
+        
+        if (roleSelect.value === 'facility' && !facilitySelect.value) {
+          facilitySelect.focus();
+          facilitySelect.reportValidity();
+          return false;
+        }
+      }
+      
+      return true;
+    }
+
+    // Event listeners
     roleSelect.addEventListener('change', updateFacilityRequirement);
     password.addEventListener('input', validatePasswordMatch);
     passwordConfirm.addEventListener('input', validatePasswordMatch);
 
+    nextBtn.addEventListener('click', function() {
+      if (validateCurrentStep()) {
+        currentStep++;
+        showStep(currentStep);
+      }
+    });
+
+    prevBtn.addEventListener('click', function() {
+      if (currentStep > 1) {
+        currentStep--;
+        showStep(currentStep);
+      }
+    });
+
+    // Initialize
     updateFacilityRequirement();
+    showStep(currentStep);
   })
 </script>
 {% endblock %}
