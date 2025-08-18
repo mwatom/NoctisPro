@@ -906,40 +906,80 @@
             return icons[status] || '<i class="fas fa-circle"></i>';
         }
 
-        // CSRF helper
+        // CSRF helper - improved to check multiple sources
         function getCSRFToken(){
+            // First try to get from cookie
             const name = 'csrftoken=';
             const cookies = document.cookie.split(';');
             for (let c of cookies){
                 c = c.trim();
                 if (c.startsWith(name)) return c.substring(name.length);
             }
+            
+            // Fallback: try to get from meta tag
+            const metaTag = document.querySelector('meta[name="csrf-token"]');
+            if (metaTag) return metaTag.getAttribute('content');
+            
+            // Fallback: try to get from hidden input
+            const hiddenInput = document.querySelector('input[name="csrfmiddlewaretoken"]');
+            if (hiddenInput) return hiddenInput.value;
+            
             return '';
         }
 
         async function deleteStudy(studyId, accession){
             try{
-                const proceed = true; // silent, non-blocking (no confirm dialog)
+                // Show confirmation dialog
+                const proceed = confirm(`Are you sure you want to delete study ${accession}?\n\nThis action cannot be undone and will permanently remove all study data including images, attachments, and reports.`);
                 if(!proceed) return;
+                
+                // Get CSRF token
+                const csrfToken = getCSRFToken();
+                if (!csrfToken) {
+                    throw new Error('CSRF token not found. Please refresh the page and try again.');
+                }
+                
+                // Show loading state
+                const deleteButton = document.querySelector(`button[onclick*="deleteStudy('${studyId}'"]`);
+                if (deleteButton) {
+                    deleteButton.disabled = true;
+                    deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> DELETING...';
+                }
+                
                 const resp = await fetch(`/worklist/api/study/${studyId}/delete/`, {
                     method: 'DELETE',
-                    headers: { 'X-CSRFToken': getCSRFToken() },
+                    headers: { 'X-CSRFToken': csrfToken },
                     credentials: 'same-origin'
                 }).catch(()=> fetch(`/worklist/api/study/${studyId}/delete/`, {
                     method: 'POST',
-                    headers: { 'X-CSRFToken': getCSRFToken() },
+                    headers: { 'X-CSRFToken': csrfToken },
                     credentials: 'same-origin'
                 }));
+                
                 const data = await resp.json();
                 if(!resp.ok || data.error){
-                    throw new Error(data.error || 'Failed to delete study');
+                    throw new Error(data.error || `HTTP ${resp.status}: Failed to delete study`);
                 }
-                // Optimistically remove from table and local arrays
+                
+                // Success - remove from table and local arrays
                 studiesData = studiesData.filter(s => String(s.id) !== String(studyId));
                 filteredData = filteredData.filter(s => String(s.id) !== String(studyId));
                 renderStudiesTable();
+                updateStatusCounts();
+                
+                // Show success message
+                alert(`Study ${accession} deleted successfully.`);
+                
             }catch(err){
-                console.warn('Delete failed:', err);
+                console.error('Delete failed:', err);
+                alert(`Failed to delete study: ${err.message}`);
+                
+                // Reset button state
+                const deleteButton = document.querySelector(`button[onclick*="deleteStudy('${studyId}'"]`);
+                if (deleteButton) {
+                    deleteButton.disabled = false;
+                    deleteButton.innerHTML = '<i class="fas fa-trash"></i> DELETE';
+                }
             }
         }
         
