@@ -536,15 +536,29 @@
             ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
             const imgSrc = mprImgs[mprFullPlane];
             if (imgSrc){
-                             const im = await loadImage(imgSrc);
-               const scale = Math.min(canvas.width / im.width, canvas.height / im.height);
-               const dw = im.width * scale, dh = im.height * scale;
-               const dx = (canvas.width - dw)/2, dy = (canvas.height - dh)/2;
-               if (ctx.imageSmoothingEnabled !== false) ctx.imageSmoothingEnabled = false; ctx.drawImage(im, dx, dy, dw, dh);
-               mprRegionVps[mprFullPlane] = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height, rect: {x:0,y:0,w:canvas.width,h:canvas.height} };
-               if (huEllipse && huEllipse.mode==='mpr' && huEllipse.plane===mprFullPlane){ drawEllipseOverlay(mprFullPlane); }
-               // Draw linked crosshair on enlarged plane (only if enabled)
-               if (crosshair) { drawMprCrosshairOverlay(mprFullPlane, dx, dy, scale, im.width, im.height); }
+              try {
+                const im = await loadImage(imgSrc);
+                const scale = Math.min(canvas.width / im.width, canvas.height / im.height);
+                const dw = im.width * scale, dh = im.height * scale;
+                const dx = (canvas.width - dw)/2, dy = (canvas.height - dh)/2;
+                if (ctx.imageSmoothingEnabled !== false) ctx.imageSmoothingEnabled = false; 
+                ctx.drawImage(im, dx, dy, dw, dh);
+                mprRegionVps[mprFullPlane] = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height, rect: {x:0,y:0,w:canvas.width,h:canvas.height} };
+                if (huEllipse && huEllipse.mode==='mpr' && huEllipse.plane===mprFullPlane){ drawEllipseOverlay(mprFullPlane); }
+                // Draw linked crosshair on enlarged plane (only if enabled)
+                if (crosshair) { drawMprCrosshairOverlay(mprFullPlane, dx, dy, scale, im.width, im.height); }
+              } catch (e) {
+                console.error(`Failed to load full plane ${mprFullPlane} image:`, e);
+                // Draw placeholder
+                ctx.save();
+                ctx.fillStyle = '#333';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#666';
+                ctx.font = '24px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('Loading 3D View...', canvas.width/2, canvas.height/2);
+                ctx.restore();
+              }
             }
             document.getElementById('overlay').innerHTML = `MPR (${mprFullPlane.toUpperCase()}) | WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}`;
             document.getElementById('zoominfo').textContent = `MPR`;
@@ -600,38 +614,64 @@
             if (reg.key === 'empty') continue;
             const imgSrc = mprImgs[reg.key];
             if (imgSrc){
-                         const im = await loadImage(imgSrc);
-               const scale = Math.min(reg.w / im.width, reg.h / im.height);
-               const dw = im.width * scale, dh = im.height * scale;
-               const dx = reg.x + (reg.w - dw)/2, dy = reg.y + (reg.h - dh)/2;
-               // Hint to use low quality interpolation for speed
-               if (ctx.imageSmoothingEnabled !== false) ctx.imageSmoothingEnabled = false;
-               ctx.drawImage(im, dx, dy, dw, dh);
-              // Save mapping for tools
-              mprRegionVps[reg.key] = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height, rect: reg };
-              // Draw plane label and slice index
+              try {
+                const im = await loadImage(imgSrc);
+                const scale = Math.min(reg.w / im.width, reg.h / im.height);
+                const dw = im.width * scale, dh = im.height * scale;
+                const dx = reg.x + (reg.w - dw)/2, dy = reg.y + (reg.h - dh)/2;
+                // Hint to use low quality interpolation for speed
+                if (ctx.imageSmoothingEnabled !== false) ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(im, dx, dy, dw, dh);
+                // Save mapping for tools
+                mprRegionVps[reg.key] = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height, rect: reg };
+              } catch (e) {
+                console.error(`Failed to load ${reg.key} image:`, e);
+                // Draw placeholder for failed image but keep trying
+                ctx.save();
+                ctx.fillStyle = '#333';
+                ctx.fillRect(reg.x, reg.y, reg.w, reg.h);
+                ctx.fillStyle = '#666';
+                ctx.font = '12px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('Loading...', reg.x + reg.w/2, reg.y + reg.h/2);
+                ctx.restore();
+              }
+              // Draw plane label and slice index (use region coordinates if image failed)
+              const labelX = (mprRegionVps[reg.key] ? mprRegionVps[reg.key].x : reg.x) + 8;
+              const labelY = (mprRegionVps[reg.key] ? mprRegionVps[reg.key].y : reg.y) + 8;
               ctx.save();
               ctx.fillStyle = 'rgba(0,0,0,0.5)';
-              ctx.fillRect(dx + 8, dy + 8, 150, 22);
+              ctx.fillRect(labelX, labelY, 180, 22);
               ctx.fillStyle = '#0ff';
               ctx.font = '12px monospace';
-              ctx.fillText(`${reg.key.toUpperCase()} ${ (mprScroll[reg.key]||0) + 1 }/${ mprScroll.counts[reg.key]||0 }`, dx + 12, dy + 24);
+              // Enhanced plane label with crosshair coordinates
+              const crossInfo = `${reg.key.toUpperCase()} ${ (mprScroll[reg.key]||0) + 1 }/${ mprScroll.counts[reg.key]||0 }`;
+              let coordInfo = '';
+              if (mprCross.x !== null && mprCross.y !== null && mprCross.z !== null) {
+                if (reg.key === 'axial') coordInfo = ` [${mprCross.x},${mprCross.y}]`;
+                else if (reg.key === 'sagittal') coordInfo = ` [${mprCross.y},${mprCross.z}]`;
+                else if (reg.key === 'coronal') coordInfo = ` [${mprCross.x},${mprCross.z}]`;
+              }
+              ctx.fillText(crossInfo + coordInfo, labelX + 4, labelY + 16);
               ctx.restore();
               // Draw measurement overlays for this plane
               ctx.save();
               ctx.strokeStyle = 'yellow'; ctx.fillStyle = 'yellow'; ctx.lineWidth = 2;
               const planeMeasures = mprMeasurements[reg.key] || [];
-              for (const m of planeMeasures){
-                const x1 = dx + m.start.x * scale, y1 = dy + m.start.y * scale;
-                const x2 = dx + m.end.x * scale, y2 = dy + m.end.y * scale;
-                ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-                if (m.label){ ctx.font='12px monospace'; ctx.fillText(m.label, x2 + 6, y2 - 6); }
-              }
-              // Draft line if belongs to this plane
-              if (measureDraft && measureDraft.plane === reg.key && measureDraft.start && measureDraft.end){
-                const x1 = dx + measureDraft.start.x * scale, y1 = dy + measureDraft.start.y * scale;
-                const x2 = dx + measureDraft.end.x * scale, y2 = dy + measureDraft.end.y * scale;
-                ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+              if (mprRegionVps[reg.key]) {
+                const vp = mprRegionVps[reg.key];
+                for (const m of planeMeasures){
+                  const x1 = vp.x + m.start.x * vp.scale, y1 = vp.y + m.start.y * vp.scale;
+                  const x2 = vp.x + m.end.x * vp.scale, y2 = vp.y + m.end.y * vp.scale;
+                  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+                  if (m.label){ ctx.font='12px monospace'; ctx.fillText(m.label, x2 + 6, y2 - 6); }
+                }
+                // Draft line if belongs to this plane
+                if (measureDraft && measureDraft.plane === reg.key && measureDraft.start && measureDraft.end){
+                  const x1 = vp.x + measureDraft.start.x * vp.scale, y1 = vp.y + measureDraft.start.y * vp.scale;
+                  const x2 = vp.x + measureDraft.end.x * vp.scale, y2 = vp.y + measureDraft.end.y * vp.scale;
+                  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+                }
               }
               ctx.restore();
               // Draw HU ellipse overlay if belongs to this plane
@@ -639,7 +679,10 @@
                 drawEllipseOverlay(reg.key);
               }
               // Draw linked crosshair overlay for this plane (only if enabled)
-              if (crosshair) { drawMprCrosshairOverlay(reg.key, dx, dy, scale, im.width, im.height); }
+              if (crosshair && mprRegionVps[reg.key]) { 
+                const vp = mprRegionVps[reg.key];
+                drawMprCrosshairOverlay(reg.key, vp.x, vp.y, vp.scale, vp.imgW, vp.imgH); 
+              }
             }
             // Fetch updated slice without blocking draw
             (async ()=>{
@@ -774,31 +817,40 @@
 
     function drawMprCrosshairOverlay(planeKey, dx, dy, scale, imgW, imgH){
       if (mprCross.x === null || mprCross.y === null || mprCross.z === null) return;
+      
       ctx.save();
       ctx.strokeStyle = 'rgba(255,255,0,0.9)';
       ctx.lineWidth = 1;
+      
+      // Optimized crosshair drawing - ensure coordinates are valid
       if (planeKey === 'axial'){
-        const cx = dx + mprCross.x * scale;
-        const cy = dy + mprCross.y * scale;
+        const cx = dx + Math.max(0, Math.min(imgW - 1, mprCross.x)) * scale;
+        const cy = dy + Math.max(0, Math.min(imgH - 1, mprCross.y)) * scale;
         ctx.beginPath();
-        ctx.moveTo(cx, dy); ctx.lineTo(cx, dy + imgH * scale);
-        ctx.moveTo(dx, cy); ctx.lineTo(dx + imgW * scale, cy);
+        ctx.moveTo(cx, dy); 
+        ctx.lineTo(cx, dy + imgH * scale);
+        ctx.moveTo(dx, cy); 
+        ctx.lineTo(dx + imgW * scale, cy);
         ctx.stroke();
       } else if (planeKey === 'sagittal'){
         // sagittal image axes: x=height(y), y=depth(z)
-        const cx = dx + mprCross.y * scale; // height index across width
-        const cy = dy + mprCross.z * scale; // depth index across height
+        const cx = dx + Math.max(0, Math.min(imgW - 1, mprCross.y)) * scale;
+        const cy = dy + Math.max(0, Math.min(imgH - 1, mprCross.z)) * scale;
         ctx.beginPath();
-        ctx.moveTo(cx, dy); ctx.lineTo(cx, dy + imgH * scale);
-        ctx.moveTo(dx, cy); ctx.lineTo(dx + imgW * scale, cy);
+        ctx.moveTo(cx, dy); 
+        ctx.lineTo(cx, dy + imgH * scale);
+        ctx.moveTo(dx, cy); 
+        ctx.lineTo(dx + imgW * scale, cy);
         ctx.stroke();
       } else if (planeKey === 'coronal'){
         // coronal image axes: x=width(x), y=depth(z)
-        const cx = dx + mprCross.x * scale;
-        const cy = dy + mprCross.z * scale;
+        const cx = dx + Math.max(0, Math.min(imgW - 1, mprCross.x)) * scale;
+        const cy = dy + Math.max(0, Math.min(imgH - 1, mprCross.z)) * scale;
         ctx.beginPath();
-        ctx.moveTo(cx, dy); ctx.lineTo(cx, dy + imgH * scale);
-        ctx.moveTo(dx, cy); ctx.lineTo(dx + imgW * scale, cy);
+        ctx.moveTo(cx, dy); 
+        ctx.lineTo(cx, dy + imgH * scale);
+        ctx.moveTo(dx, cy); 
+        ctx.lineTo(dx + imgW * scale, cy);
         ctx.stroke();
       }
       ctx.restore();
@@ -1084,29 +1136,55 @@
             return;
           }
           const imgPt = canvasToImageCoords(vpR, mx, my);
-          // Update crosshair global coordinates and plane slices
+          // Update crosshair global coordinates and synchronize all planes
+          const oldCross = {...mprCross};
+          let needsUpdate = false;
+          
           if (plane === 'axial'){
-            mprCross.x = Math.round(imgPt.x);
-            mprCross.y = Math.round(imgPt.y);
-            // Update orthogonal planes to intersect this point
-            mprScroll.sagittal = Math.max(0, Math.min((mprScroll.counts.sagittal||1)-1, mprCross.x));
-            mprScroll.coronal = Math.max(0, Math.min((mprScroll.counts.coronal||1)-1, mprCross.y));
+            const newX = Math.round(imgPt.x);
+            const newY = Math.round(imgPt.y);
+            if (mprCross.x !== newX || mprCross.y !== newY) {
+              mprCross.x = newX;
+              mprCross.y = newY;
+              mprScroll.sagittal = Math.max(0, Math.min((mprScroll.counts.sagittal||1)-1, newX));
+              mprScroll.coronal = Math.max(0, Math.min((mprScroll.counts.coronal||1)-1, newY));
+              needsUpdate = true;
+            }
           } else if (plane === 'sagittal'){
             // sagittal image: x->height(y), y->depth(z)
-            mprCross.y = Math.round(imgPt.x);
-            mprCross.z = Math.round(imgPt.y);
-            mprScroll.axial = Math.max(0, Math.min((mprScroll.counts.axial||1)-1, mprCross.z));
-            // coronal slice corresponds to height index
-            mprScroll.coronal = Math.max(0, Math.min((mprScroll.counts.coronal||1)-1, mprCross.y));
+            const newY = Math.round(imgPt.x);
+            const newZ = Math.round(imgPt.y);
+            if (mprCross.y !== newY || mprCross.z !== newZ) {
+              mprCross.y = newY;
+              mprCross.z = newZ;
+              mprScroll.axial = Math.max(0, Math.min((mprScroll.counts.axial||1)-1, newZ));
+              mprScroll.coronal = Math.max(0, Math.min((mprScroll.counts.coronal||1)-1, newY));
+              needsUpdate = true;
+            }
           } else if (plane === 'coronal'){
             // coronal image: x->width(x), y->depth(z)
-            mprCross.x = Math.round(imgPt.x);
-            mprCross.z = Math.round(imgPt.y);
-            mprScroll.axial = Math.max(0, Math.min((mprScroll.counts.axial||1)-1, mprCross.z));
-            // sagittal slice corresponds to width index
-            mprScroll.sagittal = Math.max(0, Math.min((mprScroll.counts.sagittal||1)-1, mprCross.x));
+            const newX = Math.round(imgPt.x);
+            const newZ = Math.round(imgPt.y);
+            if (mprCross.x !== newX || mprCross.z !== newZ) {
+              mprCross.x = newX;
+              mprCross.z = newZ;
+              mprScroll.axial = Math.max(0, Math.min((mprScroll.counts.axial||1)-1, newZ));
+              mprScroll.sagittal = Math.max(0, Math.min((mprScroll.counts.sagittal||1)-1, newX));
+              needsUpdate = true;
+            }
           }
-          draw();
+          
+          if (needsUpdate) {
+            // Force refresh of all plane images when crosshair moves
+            mprImgs = { axial: null, sagittal: null, coronal: null };
+            
+            // Prefetch the new slice positions for smooth interaction
+            prefetchMprSlices('axial', mprScroll.axial, 2);
+            prefetchMprSlices('sagittal', mprScroll.sagittal, 2);
+            prefetchMprSlices('coronal', mprScroll.coronal, 2);
+            
+            draw();
+          }
         }
       }
       if (showHuProbe){
@@ -1160,7 +1238,10 @@
             return;
           }
           const imgPt = canvasToImageCoords(vpR, mx, my);
-          // Update crosshair global coordinates and plane slices
+          
+          // Update crosshair global coordinates and synchronize all planes
+          const oldCross = {...mprCross};
+          
           if (plane === 'axial'){
             mprCross.x = Math.round(imgPt.x);
             mprCross.y = Math.round(imgPt.y);
@@ -1172,16 +1253,26 @@
             mprCross.y = Math.round(imgPt.x);
             mprCross.z = Math.round(imgPt.y);
             mprScroll.axial = Math.max(0, Math.min((mprScroll.counts.axial||1)-1, mprCross.z));
-            // coronal slice corresponds to height index
             mprScroll.coronal = Math.max(0, Math.min((mprScroll.counts.coronal||1)-1, mprCross.y));
           } else if (plane === 'coronal'){
             // coronal image: x->width(x), y->depth(z)
             mprCross.x = Math.round(imgPt.x);
             mprCross.z = Math.round(imgPt.y);
             mprScroll.axial = Math.max(0, Math.min((mprScroll.counts.axial||1)-1, mprCross.z));
-            // sagittal slice corresponds to width index
             mprScroll.sagittal = Math.max(0, Math.min((mprScroll.counts.sagittal||1)-1, mprCross.x));
           }
+          
+          // Force refresh of all plane images when crosshair moves significantly
+          if (Math.abs(oldCross.x - mprCross.x) > 1 || Math.abs(oldCross.y - mprCross.y) > 1 || Math.abs(oldCross.z - mprCross.z) > 1) {
+            // Clear images to force reload with new slice positions
+            mprImgs = { axial: null, sagittal: null, coronal: null };
+            
+            // Prefetch the new slice positions for smooth interaction
+            prefetchMprSlices('axial', mprScroll.axial, 2);
+            prefetchMprSlices('sagittal', mprScroll.sagittal, 2);
+            prefetchMprSlices('coronal', mprScroll.coronal, 2);
+          }
+          
           requestDraw();
         }
       } else if (showHuProbe && huEllipse){
@@ -1319,8 +1410,23 @@
         const ni = Math.max(0, Math.min(count-1, cur + d));
                  if (ni !== cur){
            mprScroll[plane] = ni;
-           // keep crosshair in sync with the scrolled plane axis
-           if (plane === 'axial') mprCross.z = ni; else if (plane === 'sagittal') mprCross.x = ni; else if (plane === 'coronal') mprCross.y = ni;
+           
+           // Keep crosshair in sync with the scrolled plane axis and update other planes
+           if (plane === 'axial') {
+             mprCross.z = ni;
+           } else if (plane === 'sagittal') {
+             mprCross.x = ni;
+             // Update coronal slice to intersect at this sagittal position
+             mprScroll.coronal = Math.max(0, Math.min((mprScroll.counts.coronal||1)-1, mprCross.y));
+           } else if (plane === 'coronal') {
+             mprCross.y = ni;
+             // Update sagittal slice to intersect at this coronal position  
+             mprScroll.sagittal = Math.max(0, Math.min((mprScroll.counts.sagittal||1)-1, mprCross.x));
+           }
+           
+           // Clear images to force refresh with new slice positions
+           mprImgs = { axial: null, sagittal: null, coronal: null };
+           
            prefetchMprSlices(plane, ni);
            await draw();
          }
@@ -1553,7 +1659,22 @@
 
     // Utils
     function loadImage(src){
-      return new Promise((res, rej)=>{ const im = new Image(); im.decoding='async'; im.onload=()=>res(im); im.onerror=rej; im.src=src; });
+      return new Promise((res, rej)=>{ 
+        const im = new Image(); 
+        im.decoding='async'; 
+        im.onload=()=>{
+          if (im.width > 0 && im.height > 0) {
+            res(im);
+          } else {
+            rej(new Error('Invalid image dimensions'));
+          }
+        }; 
+        im.onerror=(e)=>{
+          console.error('Image load error:', e, 'src:', src);
+          rej(e);
+        }; 
+        im.src=src; 
+      });
     }
     function mprKey(seriesId, plane, sliceIndex, wwVal, wlVal, inv){
       return `${seriesId}|${plane}|${sliceIndex}|${Math.round(wwVal)}|${Math.round(wlVal)}|${inv?1:0}`;
@@ -1630,14 +1751,22 @@
         } else {
           disposeSceneObjects();
         }
-        // build geometry
+        // build geometry with enhanced quality
         const vertices = new Float32Array(meshData.vertices.flat());
         const indices = new Uint32Array(meshData.faces.flat());
         const geom = new THREE.BufferGeometry();
         geom.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
         geom.setIndex(new THREE.BufferAttribute(indices, 1));
         geom.computeVertexNormals();
-        const material = new THREE.MeshPhongMaterial({ color: 0xdddddd, specular: 0x111111, shininess: 30 });
+        
+        // Enhanced material for better bone visualization
+        const material = new THREE.MeshPhongMaterial({ 
+          color: 0xf5f5dc,  // Bone color
+          specular: 0x222222, 
+          shininess: 50,
+          transparent: false,
+          side: THREE.DoubleSide  // Show both sides for better visibility
+        });
         const mesh = new THREE.Mesh(geom, material);
         // center & scale
         geom.computeBoundingSphere();
@@ -1656,7 +1785,21 @@
       } catch(e){ console.warn('3D setup failed', e); }
     }
  
-     // Init
+     // Debug function for 3D troubleshooting
+    window.debug3D = function() {
+      console.log('=== 3D Debug Info ===');
+      console.log('MPR Mode:', mprMode);
+      console.log('MPR Images:', mprImgs);
+      console.log('MPR Cross:', mprCross);
+      console.log('MPR Scroll:', mprScroll);
+      console.log('MPR Region VPs:', mprRegionVps);
+      console.log('Current Series:', currentSeries);
+      console.log('Reconstruction Mode:', reconMode);
+      console.log('Reconstruction Images:', reconImgs);
+      console.log('===================');
+    };
+
+    // Init
      setCanvasSize();
      const studyId = q('study_id');
      if (studyId) loadStudy(studyId);
