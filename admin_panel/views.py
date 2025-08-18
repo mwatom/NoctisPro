@@ -181,13 +181,24 @@ def user_create(request):
                 messages.error(request, 'Email already exists')
                 return redirect('admin_panel:user_create')
             
-            # Facility role must have a facility assigned
+            # Handle facility assignment based on role
             facility = None
             if role == 'facility':
+                # Facility users must have a facility assigned
                 if not facility_id:
                     messages.error(request, 'Facility is required for Facility User role')
                     return redirect('admin_panel:user_create')
                 facility = get_object_or_404(Facility, id=facility_id)
+            elif role == 'radiologist' and facility_id:
+                # Radiologists can optionally have a facility assigned
+                try:
+                    facility = Facility.objects.get(id=facility_id)
+                except Facility.DoesNotExist:
+                    messages.warning(request, 'Selected facility not found, radiologist will be created without facility assignment')
+                    facility = None
+            elif role == 'admin':
+                # Admins don't need facility assignment
+                facility = None
 
             # Create user
             user = User.objects.create_user(

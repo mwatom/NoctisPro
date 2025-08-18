@@ -28,11 +28,15 @@ from PIL import Image
 import base64
 from pydicom.pixel_data_handlers.util import apply_voi_lut
 import scipy.ndimage as ndimage
+import logging
 
 from .models import ViewerSession, Measurement, Annotation, ReconstructionJob
 from .dicom_utils import DicomProcessor
 from .reconstruction import MPRProcessor, MIPProcessor, Bone3DProcessor, MRI3DProcessor
 from .models import WindowLevelPreset, HangingProtocol
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 # MPR volume small LRU cache (per-process)
 from threading import Lock
@@ -1020,25 +1024,61 @@ def api_hounsfield_units(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            x = data.get('x')
-            y = data.get('y')
+            x = int(data.get('x', 0))
+            y = int(data.get('y', 0))
             image_id = data.get('image_id')
             
-            # This would calculate actual HU values from DICOM data
-            # For demonstration, we'll return simulated values
-            hu_value = -800 + (x + y) % 1600  # Simulated HU value
+            if not image_id:
+                return JsonResponse({'error': 'Image ID is required'}, status=400)
             
-            result = {
-                'hu_value': hu_value,
-                'position': {'x': x, 'y': y},
-                'image_id': image_id,
-                'timestamp': '2024-01-01T12:00:00Z'
-            }
+            # Get the DICOM image
+            try:
+                dicom_image = DicomImage.objects.get(id=image_id)
+                user = request.user
+                
+                # Check permissions
+                if user.is_facility_user() and getattr(user, 'facility', None) and dicom_image.series.study.facility != user.facility:
+                    return JsonResponse({'error': 'Permission denied'}, status=403)
+                
+                # Load DICOM file and calculate actual HU value
+                dicom_path = os.path.join(settings.MEDIA_ROOT, str(dicom_image.file_path))
+                ds = pydicom.dcmread(dicom_path)
+                
+                # Get pixel data
+                pixel_array = ds.pixel_array
+                
+                # Validate coordinates
+                if y >= pixel_array.shape[0] or x >= pixel_array.shape[1] or x < 0 or y < 0:
+                    return JsonResponse({'error': 'Coordinates out of bounds'}, status=400)
+                
+                # Get raw pixel value
+                raw_value = int(pixel_array[y, x])
+                
+                # Apply rescale slope and intercept to get Hounsfield units
+                slope = float(getattr(ds, 'RescaleSlope', 1.0))
+                intercept = float(getattr(ds, 'RescaleIntercept', 0.0))
+                hu_value = raw_value * slope + intercept
+                
+                result = {
+                    'hu_value': round(float(hu_value), 1),
+                    'raw_value': raw_value,
+                    'position': {'x': x, 'y': y},
+                    'image_id': image_id,
+                    'rescale_slope': slope,
+                    'rescale_intercept': intercept,
+                    'timestamp': timezone.now().isoformat()
+                }
+                
+                return JsonResponse(result)
+                
+            except DicomImage.DoesNotExist:
+                return JsonResponse({'error': 'Image not found'}, status=404)
+            except Exception as e:
+                logger.error(f"Error calculating HU value: {str(e)}")
+                return JsonResponse({'error': f'Error calculating HU value: {str(e)}'}, status=500)
             
-            return JsonResponse(result)
-            
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+        except (json.JSONDecodeError, ValueError) as e:
+            return JsonResponse({'error': f'Invalid data: {str(e)}'}, status=400)
     
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
