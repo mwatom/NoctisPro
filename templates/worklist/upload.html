@@ -205,7 +205,7 @@
             <div class="drop-zone" id="dropZone">
                 <i class="fas fa-file-medical text-accent" style="font-size: 3rem; margin-bottom: 1rem;"></i>
                 <h4 class="text-light mb-3">Drop DICOM files or folders here</h4>
-                <p class="text-secondary mb-3">Supports large CT/MRI studies with multiple series in subfolders</p>
+                <p class="text-secondary mb-3">Files will be uploaded automatically once selected<br>Supports large CT/MRI studies with multiple series in subfolders</p>
                 <button type="button" class="btn-control" id="chooseFilesBtn" style="background: var(--accent-color); color: var(--primary-bg);">
                     <i class="fas fa-folder-open me-2"></i>
                     Choose Files / Folder
@@ -276,13 +276,20 @@
                 </button>
             </div>
             
-            <div class="upload-actions" id="uploadActions">
+            <div class="upload-actions" id="uploadActions" style="display: none;">
                 <a href="{% url 'worklist:dashboard' %}" class="btn-control">
                     <i class="fas fa-arrow-left me-2"></i>Cancel
                 </a>
                 <button type="submit" class="btn-control" id="uploadBtn" disabled style="background: var(--accent-color); color: var(--primary-bg);">
                     <i class="fas fa-upload me-2"></i>Upload Studies
                 </button>
+            </div>
+            
+            <!-- Initial cancel button -->
+            <div class="upload-actions" id="initialActions">
+                <a href="{% url 'worklist:dashboard' %}" class="btn-control">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Worklist
+                </a>
             </div>
         </form>
     </div>
@@ -413,9 +420,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
         selectedFiles = [...selectedFiles, ...dicomFiles];
         updateUploadStats();
-        updateFileList();
-        updateUploadButton();
+        // Skip showing file list and immediately start upload
         analyzeFolderStructure();
+        
+        // Hide initial actions and show upload in progress
+        document.getElementById('initialActions').style.display = 'none';
+        
+        // Auto-start upload after a brief delay to show stats
+        setTimeout(() => {
+            if (selectedFiles.length > 0 && !isUploading) {
+                uploadFilesInChunks();
+            }
+        }, 1000);
     }
 
     function updateUploadStats() {
@@ -487,26 +503,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateFileList() {
-        if (selectedFiles.length === 0) {
-            fileList.style.display = 'none';
-            return;
-        }
-
-        fileList.style.display = 'block';
-        selectedFilesDiv.innerHTML = selectedFiles.map((file, index) => `
-            <div class="file-item">
-                <div class="file-info">
-                    <i class="fas fa-file-medical file-icon"></i>
-                    <div class="file-details">
-                        <h6>${file.name}</h6>
-                        <div class="file-size">${formatFileSize(file.size)}</div>
-                    </div>
-                </div>
-                <button type="button" class="remove-file" onclick="removeFile(${index})">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-        `).join('');
+        // Hide file list since we're auto-uploading
+        fileList.style.display = 'none';
+        return;
     }
 
     function updateUploadButton() { 
