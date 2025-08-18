@@ -15,71 +15,177 @@
   </div>
 
   <div class="card-medical p-4">
-    <form method="post" class="row g-3">
-      {% csrf_token %}
-      <div class="col-md-6">
-        <label class="form-label text-white" for="username">Username</label>
-        <input type="text" class="form-control form-control-medical" id="username" name="username" required />
-      </div>
-      <div class="col-md-6">
-        <label class="form-label text-white" for="email">Email</label>
-        <input type="email" class="form-control form-control-medical" id="email" name="email" />
-      </div>
-      <div class="col-md-6">
-        <label class="form-label text-white" for="first_name">First Name</label>
-        <input type="text" class="form-control form-control-medical" id="first_name" name="first_name" />
-      </div>
-      <div class="col-md-6">
-        <label class="form-label text-white" for="last_name">Last Name</label>
-        <input type="text" class="form-control form-control-medical" id="last_name" name="last_name" />
-      </div>
-      <div class="col-md-6">
-        <label class="form-label text-white" for="role">Role</label>
-        <select class="form-select form-control-medical" id="role" name="role" required>
-          {% for role_code, role_name in user_roles %}
-          <option value="{{ role_code }}" {% if preset_role == role_code %}selected{% endif %}>{{ role_name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-md-6">
-        <label class="form-label text-white" for="facility">Facility</label>
-        <select class="form-select form-control-medical" id="facility" name="facility">
-          <option value="">-- None --</option>
-          {% for facility in facilities %}
-          <option value="{{ facility.id }}" {% if preset_facility == facility.id|stringformat:'s' %}selected{% endif %}>{{ facility.name }}</option>
-          {% endfor %}
-        </select>
-        <div class="form-text text-secondary">
-          <small id="facilityHelp">Assign user to a specific facility (required for Facility Users)</small>
+    <!-- Progress indicator -->
+    <div class="progress-indicator mb-4">
+      <div class="step-indicator">
+        <div class="step active" data-step="1">
+          <div class="step-number">1</div>
+          <div class="step-label">Basic Info</div>
+        </div>
+        <div class="step" data-step="2">
+          <div class="step-number">2</div>
+          <div class="step-label">Role & Access</div>
+        </div>
+        <div class="step" data-step="3">
+          <div class="step-number">3</div>
+          <div class="step-label">Professional Details</div>
         </div>
       </div>
-      <div class="col-md-6">
-        <label class="form-label text-white" for="password">Password</label>
-        <input type="password" class="form-control form-control-medical" id="password" name="password" required />
-      </div>
-      <div class="col-md-6">
-        <label class="form-label text-white" for="password_confirm">Confirm Password</label>
-        <input type="password" class="form-control form-control-medical" id="password_confirm" name="password_confirm" required />
+    </div>
+
+    <form method="post" class="multi-step-form">
+      {% csrf_token %}
+      
+      <!-- Step 1: Basic Information -->
+      <div class="form-step active" data-step="1">
+        <h3 class="text-white mb-4"><i class="fas fa-user me-2"></i>Basic Information</h3>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label text-white" for="username">
+              <i class="fas fa-user-tag me-2"></i>Username <span class="text-danger">*</span>
+            </label>
+            <input type="text" class="form-control form-control-medical" id="username" name="username" required 
+                   placeholder="Enter unique username" />
+            <div class="form-text text-muted">Username must be unique and will be used for login</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label text-white" for="email">
+              <i class="fas fa-envelope me-2"></i>Email Address
+            </label>
+            <input type="email" class="form-control form-control-medical" id="email" name="email" 
+                   placeholder="user@example.com" />
+            <div class="form-text text-muted">Used for notifications and password recovery</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label text-white" for="first_name">
+              <i class="fas fa-id-card me-2"></i>First Name
+            </label>
+            <input type="text" class="form-control form-control-medical" id="first_name" name="first_name" 
+                   placeholder="First name" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label text-white" for="last_name">
+              <i class="fas fa-id-card me-2"></i>Last Name
+            </label>
+            <input type="text" class="form-control form-control-medical" id="last_name" name="last_name" 
+                   placeholder="Last name" />
+          </div>
+        </div>
       </div>
 
-      <!-- Optional fields for radiologists -->
-      <div class="col-md-6">
-        <label class="form-label text-white" for="phone">Phone (optional)</label>
-        <input type="text" class="form-control form-control-medical" id="phone" name="phone" />
-      </div>
-      <div class="col-md-6">
-        <label class="form-label text-white" for="license_number">License Number (optional)</label>
-        <input type="text" class="form-control form-control-medical" id="license_number" name="license_number" />
-      </div>
-      <div class="col-md-12">
-        <label class="form-label text-white" for="specialization">Specialization (optional)</label>
-        <input type="text" class="form-control form-control-medical" id="specialization" name="specialization" placeholder="e.g., Neuroradiology" />
+      <!-- Step 2: Role & Access -->
+      <div class="form-step" data-step="2">
+        <h3 class="text-white mb-4"><i class="fas fa-key me-2"></i>Role & Access</h3>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label text-white" for="role">
+              <i class="fas fa-user-shield me-2"></i>User Role <span class="text-danger">*</span>
+            </label>
+            <select class="form-select form-control-medical" id="role" name="role" required>
+              {% for role_code, role_name in user_roles %}
+              <option value="{{ role_code }}" {% if preset_role == role_code %}selected{% endif %}>{{ role_name }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text text-muted">
+              <div class="role-descriptions mt-2">
+                <div class="role-desc" data-role="admin">
+                  <strong>Administrator:</strong> Full system access, user management, system configuration
+                </div>
+                <div class="role-desc" data-role="radiologist">
+                  <strong>Radiologist:</strong> DICOM viewing, reporting, measurements. Can work independently or with facilities
+                </div>
+                <div class="role-desc" data-role="facility">
+                  <strong>Facility User:</strong> Access limited to assigned facility's studies and data
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label text-white" for="facility">
+              <i class="fas fa-hospital me-2"></i>Facility Assignment
+            </label>
+            <select class="form-select form-control-medical" id="facility" name="facility">
+              <option value="">-- No Facility Assignment --</option>
+              {% for facility in facilities %}
+              <option value="{{ facility.id }}" {% if preset_facility == facility.id|stringformat:'s' %}selected{% endif %}>{{ facility.name }}</option>
+              {% endfor %}
+                    </select>
+            <div class="form-text text-muted">
+              <small id="facilityHelp">
+                <span class="facility-required" style="display: none;">
+                  <i class="fas fa-exclamation-triangle text-warning me-1"></i>Facility assignment is required for Facility Users
+                </span>
+                <span class="facility-optional">
+                  <i class="fas fa-info-circle text-info me-1"></i>Optional for Radiologists, required for Facility Users
+                </span>
+              </small>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label text-white" for="password">
+              <i class="fas fa-lock me-2"></i>Password <span class="text-danger">*</span>
+            </label>
+            <input type="password" class="form-control form-control-medical" id="password" name="password" required 
+                   placeholder="Minimum 8 characters" minlength="8" />
+            <div class="form-text text-muted">Password must be at least 8 characters long</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label text-white" for="password_confirm">
+              <i class="fas fa-lock me-2"></i>Confirm Password <span class="text-danger">*</span>
+            </label>
+            <input type="password" class="form-control form-control-medical" id="password_confirm" name="password_confirm" required 
+                   placeholder="Re-enter password" />
+            <div class="invalid-feedback" id="passwordMismatch" style="display: none;">
+              Passwords do not match
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="col-12 d-flex justify-content-end mt-3">
-        <button type="submit" class="btn-control" style="background: var(--accent-color); color: var(--primary-bg);">
-          <i class="fas fa-save me-2"></i>Create User
-        </button>
+      <!-- Step 3: Professional Details -->
+      <div class="form-step" data-step="3">
+        <h3 class="text-white mb-4"><i class="fas fa-stethoscope me-2"></i>Professional Details</h3>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label text-white" for="phone">
+              <i class="fas fa-phone me-2"></i>Phone Number
+            </label>
+            <input type="tel" class="form-control form-control-medical" id="phone" name="phone" 
+                   placeholder="+1 (555) 123-4567" />
+            <div class="form-text text-muted">Contact number for professional communication</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label text-white" for="license_number">
+              <i class="fas fa-certificate me-2"></i>License Number
+            </label>
+            <input type="text" class="form-control form-control-medical" id="license_number" name="license_number" 
+                   placeholder="Professional license number" />
+            <div class="form-text text-muted">Medical or professional license identifier</div>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label text-white" for="specialization">
+              <i class="fas fa-user-md me-2"></i>Specialization
+            </label>
+            <input type="text" class="form-control form-control-medical" id="specialization" name="specialization" 
+                   placeholder="e.g., Neuroradiology, Cardiac Imaging, General Radiology" />
+            <div class="form-text text-muted">Area of medical specialization or expertise</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Form Navigation -->
+      <div class="form-navigation mt-4">
+        <div class="d-flex justify-content-between">
+          <button type="button" class="btn btn-outline-secondary" id="prevBtn" style="display: none;">
+            <i class="fas fa-arrow-left me-2"></i>Previous
+          </button>
+          <button type="button" class="btn-control" id="nextBtn">
+            Next <i class="fas fa-arrow-right ms-2"></i>
+          </button>
+          <button type="submit" class="btn-control" id="submitBtn" style="display: none; background: var(--accent-color); color: var(--primary-bg);">
+            <i class="fas fa-save me-2"></i>Create User
+          </button>
+        </div>
       </div>
     </form>
   </div>
@@ -97,15 +203,147 @@
         background: var(--card-bg);
         border: 1px solid var(--border-color);
         color: var(--text-primary);
-        padding: 4px 12px;
-        font-size: 11px;
+        padding: 8px 16px;
+        font-size: 14px;
         cursor: pointer;
-        border-radius: 2px;
+        border-radius: 4px;
         transition: all 0.2s ease;
         display: inline-flex;
         align-items: center;
-        gap: 4px;
+        gap: 6px;
         text-decoration: none;
+    }
+
+    /* Multi-step form styles */
+    .progress-indicator {
+        margin-bottom: 2rem;
+    }
+
+    .step-indicator {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 2rem;
+        position: relative;
+    }
+
+    .step-indicator::before {
+        content: '';
+        position: absolute;
+        top: 20px;
+        left: 20%;
+        right: 20%;
+        height: 2px;
+        background: var(--border-color);
+        z-index: 1;
+    }
+
+    .step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        position: relative;
+        z-index: 2;
+    }
+
+    .step-number {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--card-bg);
+        border: 2px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        color: var(--text-secondary);
+        transition: all 0.3s ease;
+    }
+
+    .step-label {
+        font-size: 12px;
+        color: var(--text-secondary);
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+
+    .step.active .step-number {
+        background: var(--accent-color);
+        border-color: var(--accent-color);
+        color: var(--primary-bg);
+    }
+
+    .step.active .step-label {
+        color: var(--accent-color);
+        font-weight: bold;
+    }
+
+    .step.completed .step-number {
+        background: var(--success-color, #28a745);
+        border-color: var(--success-color, #28a745);
+        color: white;
+    }
+
+    .step.completed .step-label {
+        color: var(--success-color, #28a745);
+    }
+
+    /* Form step styles */
+    .form-step {
+        display: none;
+        animation: fadeIn 0.3s ease-in;
+    }
+
+    .form-step.active {
+        display: block;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateX(20px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+
+    /* Role descriptions */
+    .role-descriptions {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 4px;
+        padding: 0.75rem;
+        margin-top: 0.5rem;
+    }
+
+    .role-desc {
+        display: none;
+        color: var(--text-secondary);
+        font-size: 13px;
+        line-height: 1.4;
+    }
+
+    .role-desc.active {
+        display: block;
+    }
+
+    /* Form enhancements */
+    .form-control-medical:focus {
+        border-color: var(--accent-color);
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+
+    .form-text.text-muted {
+        color: var(--text-secondary) !important;
+        font-size: 12px;
+    }
+
+    .text-danger {
+        color: #dc3545 !important;
+    }
+
+    .text-warning {
+        color: #ffc107 !important;
+    }
+
+    .text-info {
+        color: #17a2b8 !important;
     }
 
     .btn-control:hover {
