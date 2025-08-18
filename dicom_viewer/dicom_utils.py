@@ -5,6 +5,7 @@ import os
 import json
 import logging
 from django.conf import settings
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,30 @@ class DicomProcessor:
             'abdomen': {'ww': 350, 'wl': 50},
             'liver': {'ww': 150, 'wl': 30},
             'mediastinum': {'ww': 350, 'wl': 50},
+        }
+        
+        # Standard Hounsfield Unit reference values (NIST recommendations)
+        self.hu_reference_values = {
+            'air': -1000,
+            'lung': -500,
+            'fat': -100,
+            'water': 0,
+            'blood': 40,
+            'muscle': 50,
+            'grey_matter': 40,
+            'white_matter': 25,
+            'liver': 60,
+            'bone_spongy': 300,
+            'bone_cortical': 1000,
+            'metal': 3000
+        }
+        
+        # Quality assurance thresholds
+        self.qa_thresholds = {
+            'water_tolerance': 5,  # HU units
+            'air_tolerance': 50,   # HU units
+            'linearity_tolerance': 0.02,  # 2%
+            'noise_threshold': 10  # HU units standard deviation
         }
 
     def apply_windowing(self, pixel_array, window_width, window_level, invert=False):
@@ -110,6 +135,201 @@ class DicomProcessor:
         cos_angle = np.dot(v1, v2) / denom
         angle = np.arccos(np.clip(cos_angle, -1.0, 1.0))
         return float(np.degrees(angle))
+
+    def convert_to_hounsfield_units(self, pixel_array, dicom_data):
+        """Convert pixel values to Hounsfield Units using DICOM rescale parameters"""
+        try:
+            # Get rescale parameters
+            slope = float(getattr(dicom_data, 'RescaleSlope', 1.0))
+            intercept = float(getattr(dicom_data, 'RescaleIntercept', 0.0))
+            
+            # Convert to HU
+            hu_array = pixel_array.astype(np.float32) * slope + intercept
+            
+            return hu_array
+        except Exception as e:
+            logger.error(f"Error converting to Hounsfield units: {str(e)}")
+            return pixel_array.astype(np.float32)
+
+    def validate_hounsfield_calibration(self, dicom_data, pixel_array=None):
+        """Validate Hounsfield unit calibration according to international standards"""
+        validation_results = {
+            'is_valid': True,
+            'issues': [],
+            'warnings': [],
+            'calibration_status': 'unknown',
+            'water_hu': None,
+            'air_hu': None,
+            'noise_level': None
+        }
+        
+        try:
+            # Check if CT modality
+            modality = getattr(dicom_data, 'Modality', '')
+            if modality != 'CT':
+                validation_results['calibration_status'] = 'not_applicable'
+                validation_results['warnings'].append('Hounsfield units only applicable to CT images')
+                return validation_results
+            
+            # Check rescale parameters
+            slope = getattr(dicom_data, 'RescaleSlope', None)
+            intercept = getattr(dicom_data, 'RescaleIntercept', None)
+            
+            if slope is None or intercept is None:
+                validation_results['is_valid'] = False
+                validation_results['issues'].append('Missing rescale parameters (slope/intercept)')
+                validation_results['calibration_status'] = 'invalid'
+                return validation_results
+            
+            # Validate rescale parameters
+            slope = float(slope)
+            intercept = float(intercept)
+            
+            if abs(slope - 1.0) > 0.01:  # Slope should typically be 1.0 for CT
+                validation_results['warnings'].append(f'Unusual rescale slope: {slope}')
+            
+            # Check rescale type
+            rescale_type = getattr(dicom_data, 'RescaleType', '')
+            if rescale_type and rescale_type != 'HU':
+                validation_results['warnings'].append(f'Rescale type is "{rescale_type}", not "HU"')
+            
+            # If pixel array provided, perform phantom validation
+            if pixel_array is not None:
+                hu_array = self.convert_to_hounsfield_units(pixel_array, dicom_data)
+                
+                # Estimate water and air HU values (simplified approach)
+                # This would need actual phantom ROI coordinates in practice
+                water_hu = self._estimate_water_hu(hu_array)
+                air_hu = self._estimate_air_hu(hu_array)
+                noise_level = self._calculate_noise_level(hu_array)
+                
+                validation_results['water_hu'] = water_hu
+                validation_results['air_hu'] = air_hu
+                validation_results['noise_level'] = noise_level
+                
+                # Validate against reference values
+                if water_hu is not None:
+                    water_deviation = abs(water_hu - self.hu_reference_values['water'])
+                    if water_deviation > self.qa_thresholds['water_tolerance']:
+                        validation_results['is_valid'] = False
+                        validation_results['issues'].append(
+                            f'Water HU deviation too high: {water_deviation:.1f} HU '
+                            f'(expected: 0 ± {self.qa_thresholds["water_tolerance"]} HU)'
+                        )
+                
+                if air_hu is not None:
+                    air_deviation = abs(air_hu - self.hu_reference_values['air'])
+                    if air_deviation > self.qa_thresholds['air_tolerance']:
+                        validation_results['is_valid'] = False
+                        validation_results['issues'].append(
+                            f'Air HU deviation too high: {air_deviation:.1f} HU '
+                            f'(expected: -1000 ± {self.qa_thresholds["air_tolerance"]} HU)'
+                        )
+                
+                if noise_level is not None and noise_level > self.qa_thresholds['noise_threshold']:
+                    validation_results['warnings'].append(
+                        f'High noise level detected: {noise_level:.1f} HU std dev'
+                    )
+            
+            # Set calibration status
+            if validation_results['is_valid']:
+                validation_results['calibration_status'] = 'valid'
+            else:
+                validation_results['calibration_status'] = 'invalid'
+                
+        except Exception as e:
+            logger.error(f"Error validating Hounsfield calibration: {str(e)}")
+            validation_results['is_valid'] = False
+            validation_results['issues'].append(f'Validation error: {str(e)}')
+            validation_results['calibration_status'] = 'error'
+        
+        return validation_results
+
+    def _estimate_water_hu(self, hu_array):
+        """Estimate water HU value from image (simplified approach)"""
+        try:
+            # Look for values near water HU (0)
+            water_candidates = hu_array[(hu_array > -50) & (hu_array < 50)]
+            if len(water_candidates) > 100:  # Need sufficient samples
+                return float(np.median(water_candidates))
+        except:
+            pass
+        return None
+
+    def _estimate_air_hu(self, hu_array):
+        """Estimate air HU value from image (simplified approach)"""
+        try:
+            # Look for values near air HU (-1000)
+            air_candidates = hu_array[hu_array < -900]
+            if len(air_candidates) > 100:  # Need sufficient samples
+                return float(np.median(air_candidates))
+        except:
+            pass
+        return None
+
+    def _calculate_noise_level(self, hu_array):
+        """Calculate noise level in Hounsfield units"""
+        try:
+            # Use standard deviation of a uniform region (simplified)
+            # In practice, this would use a specific phantom ROI
+            center_region = self._get_center_region(hu_array)
+            if center_region is not None and len(center_region) > 100:
+                return float(np.std(center_region))
+        except:
+            pass
+        return None
+
+    def _get_center_region(self, hu_array, fraction=0.1):
+        """Get center region of image for noise analysis"""
+        try:
+            h, w = hu_array.shape[:2]
+            center_h, center_w = h // 2, w // 2
+            region_h, region_w = int(h * fraction), int(w * fraction)
+            
+            start_h = center_h - region_h // 2
+            end_h = center_h + region_h // 2
+            start_w = center_w - region_w // 2
+            end_w = center_w + region_w // 2
+            
+            return hu_array[start_h:end_h, start_w:end_w].flatten()
+        except:
+            return None
+
+    def generate_hu_calibration_report(self, dicom_data, pixel_array=None):
+        """Generate comprehensive HU calibration report"""
+        validation = self.validate_hounsfield_calibration(dicom_data, pixel_array)
+        
+        report = {
+            'timestamp': timezone.now().isoformat(),
+            'modality': getattr(dicom_data, 'Modality', 'Unknown'),
+            'manufacturer': getattr(dicom_data, 'Manufacturer', 'Unknown'),
+            'model': getattr(dicom_data, 'ManufacturerModelName', 'Unknown'),
+            'station_name': getattr(dicom_data, 'StationName', 'Unknown'),
+            'calibration_date': getattr(dicom_data, 'CalibrationDate', 'Unknown'),
+            'validation_results': validation,
+            'recommendations': []
+        }
+        
+        # Add recommendations based on validation results
+        if not validation['is_valid']:
+            report['recommendations'].append(
+                'Recalibrate CT scanner using appropriate phantom'
+            )
+            report['recommendations'].append(
+                'Contact service engineer for calibration verification'
+            )
+        
+        if validation['warnings']:
+            report['recommendations'].append(
+                'Monitor calibration stability with regular QA measurements'
+            )
+        
+        if validation['noise_level'] and validation['noise_level'] > self.qa_thresholds['noise_threshold']:
+            report['recommendations'].append(
+                'Consider increasing reconstruction parameters to reduce noise'
+            )
+        
+        return report
 
 
 class DicomFileHandler:

@@ -2588,3 +2588,202 @@ def api_series_volume_uint8(request, series_id):
         })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+@user_passes_test(lambda u: u.is_admin() or u.is_technician())
+def hu_calibration_dashboard(request):
+    """Hounsfield Unit calibration dashboard"""
+    from .models import HounsfieldCalibration, HounsfieldQAPhantom
+    from .dicom_utils import DicomProcessor
+    
+    # Get recent calibrations
+    recent_calibrations = HounsfieldCalibration.objects.all()[:20]
+    
+    # Get calibration statistics
+    total_calibrations = HounsfieldCalibration.objects.count()
+    valid_calibrations = HounsfieldCalibration.objects.filter(is_valid=True).count()
+    invalid_calibrations = HounsfieldCalibration.objects.filter(is_valid=False).count()
+    
+    # Get scanner statistics
+    scanner_stats = {}
+    for calibration in HounsfieldCalibration.objects.all():
+        scanner_key = f"{calibration.manufacturer} {calibration.model}"
+        if scanner_key not in scanner_stats:
+            scanner_stats[scanner_key] = {
+                'total': 0,
+                'valid': 0,
+                'invalid': 0,
+                'latest_date': None
+            }
+        
+        scanner_stats[scanner_key]['total'] += 1
+        if calibration.is_valid:
+            scanner_stats[scanner_key]['valid'] += 1
+        else:
+            scanner_stats[scanner_key]['invalid'] += 1
+        
+        if not scanner_stats[scanner_key]['latest_date'] or calibration.created_at.date() > scanner_stats[scanner_key]['latest_date']:
+            scanner_stats[scanner_key]['latest_date'] = calibration.created_at.date()
+    
+    # Get available phantoms
+    available_phantoms = HounsfieldQAPhantom.objects.filter(is_active=True)
+    
+    context = {
+        'recent_calibrations': recent_calibrations,
+        'total_calibrations': total_calibrations,
+        'valid_calibrations': valid_calibrations,
+        'invalid_calibrations': invalid_calibrations,
+        'success_rate': (valid_calibrations / total_calibrations * 100) if total_calibrations > 0 else 0,
+        'scanner_stats': scanner_stats,
+        'available_phantoms': available_phantoms,
+    }
+    
+    return render(request, 'dicom_viewer/hu_calibration_dashboard.html', context)
+
+@login_required
+@user_passes_test(lambda u: u.is_admin() or u.is_technician())
+@csrf_exempt
+def validate_hu_calibration(request, study_id):
+    """Validate Hounsfield unit calibration for a study"""
+    from .models import HounsfieldCalibration
+    from .dicom_utils import DicomProcessor
+    
+    study = get_object_or_404(Study, id=study_id)
+    
+    # Check permissions
+    if request.user.is_facility_user() and study.facility != request.user.facility:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    
+    if request.method == 'POST':
+        try:
+            processor = DicomProcessor()
+            
+            # Get first CT series for validation
+            ct_series = study.series.filter(modality='CT').first()
+            if not ct_series:
+                return JsonResponse({'error': 'No CT series found in study'}, status=400)
+            
+            # Get first image for validation
+            first_image = ct_series.images.first()
+            if not first_image:
+                return JsonResponse({'error': 'No images found in CT series'}, status=400)
+            
+            # Load DICOM data
+            dicom_path = os.path.join(settings.MEDIA_ROOT, str(first_image.file_path))
+            ds = pydicom.dcmread(dicom_path)
+            pixel_array = ds.pixel_array
+            
+            # Validate calibration
+            validation_result = processor.validate_hounsfield_calibration(ds, pixel_array)
+            
+            # Create calibration record
+            calibration = HounsfieldCalibration.objects.create(
+                manufacturer=getattr(ds, 'Manufacturer', ''),
+                model=getattr(ds, 'ManufacturerModelName', ''),
+                station_name=getattr(ds, 'StationName', ''),
+                device_serial_number=getattr(ds, 'DeviceSerialNumber', ''),
+                study=study,
+                series=ct_series,
+                rescale_slope=float(getattr(ds, 'RescaleSlope', 1.0)),
+                rescale_intercept=float(getattr(ds, 'RescaleIntercept', 0.0)),
+                rescale_type=getattr(ds, 'RescaleType', ''),
+                water_hu=validation_result.get('water_hu'),
+                air_hu=validation_result.get('air_hu'),
+                noise_level=validation_result.get('noise_level'),
+                calibration_status=validation_result['calibration_status'],
+                is_valid=validation_result['is_valid'],
+                validation_issues=validation_result['issues'],
+                validation_warnings=validation_result['warnings'],
+                calibration_date=getattr(ds, 'CalibrationDate', None),
+                validated_by=request.user
+            )
+            
+            # Calculate deviations
+            calibration.calculate_deviations()
+            calibration.save()
+            
+            # Generate comprehensive report
+            report = processor.generate_hu_calibration_report(ds, pixel_array)
+            
+            return JsonResponse({
+                'success': True,
+                'calibration_id': calibration.id,
+                'validation_result': validation_result,
+                'report': report,
+                'message': f'Calibration validation completed with status: {validation_result["calibration_status"]}'
+            })
+            
+        except Exception as e:
+            logger.error(f"Error validating HU calibration: {str(e)}")
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@login_required
+@user_passes_test(lambda u: u.is_admin() or u.is_technician())
+def hu_calibration_report(request, calibration_id):
+    """Generate detailed HU calibration report"""
+    from .models import HounsfieldCalibration
+    
+    calibration = get_object_or_404(HounsfieldCalibration, id=calibration_id)
+    
+    # Check permissions
+    if request.user.is_facility_user() and calibration.study.facility != request.user.facility:
+        messages.error(request, 'Permission denied')
+        return redirect('dicom_viewer:hu_calibration_dashboard')
+    
+    context = {
+        'calibration': calibration,
+        'study': calibration.study,
+        'series': calibration.series,
+    }
+    
+    return render(request, 'dicom_viewer/hu_calibration_report.html', context)
+
+@login_required
+@user_passes_test(lambda u: u.is_admin())
+def manage_qa_phantoms(request):
+    """Manage QA phantoms for HU calibration"""
+    from .models import HounsfieldQAPhantom
+    
+    phantoms = HounsfieldQAPhantom.objects.all().order_by('-created_at')
+    
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        
+        if action == 'create':
+            try:
+                phantom = HounsfieldQAPhantom.objects.create(
+                    name=request.POST.get('name'),
+                    manufacturer=request.POST.get('manufacturer'),
+                    model=request.POST.get('model'),
+                    description=request.POST.get('description', ''),
+                    water_roi_coordinates=json.loads(request.POST.get('water_roi', '{}')),
+                    air_roi_coordinates=json.loads(request.POST.get('air_roi', '{}')),
+                    expected_water_hu=float(request.POST.get('expected_water_hu', 0.0)),
+                    expected_air_hu=float(request.POST.get('expected_air_hu', -1000.0)),
+                    water_tolerance=float(request.POST.get('water_tolerance', 5.0)),
+                    air_tolerance=float(request.POST.get('air_tolerance', 50.0))
+                )
+                messages.success(request, f'QA phantom "{phantom.name}" created successfully')
+            except Exception as e:
+                messages.error(request, f'Error creating phantom: {str(e)}')
+        
+        elif action == 'toggle_active':
+            phantom_id = request.POST.get('phantom_id')
+            try:
+                phantom = HounsfieldQAPhantom.objects.get(id=phantom_id)
+                phantom.is_active = not phantom.is_active
+                phantom.save()
+                status = 'activated' if phantom.is_active else 'deactivated'
+                messages.success(request, f'Phantom "{phantom.name}" {status}')
+            except HounsfieldQAPhantom.DoesNotExist:
+                messages.error(request, 'Phantom not found')
+        
+        return redirect('dicom_viewer:manage_qa_phantoms')
+    
+    context = {
+        'phantoms': phantoms,
+    }
+    
+    return render(request, 'dicom_viewer/manage_qa_phantoms.html', context)
