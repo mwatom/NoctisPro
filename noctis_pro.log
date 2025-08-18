@@ -274,3 +274,5 @@ Not Found: /admin_panel/users/create/
 Watching for file changes with StatReloader
 /workspace/admin_panel/views.py changed, reloading.
 Watching for file changes with StatReloader
+Not Found: /worklist/api/study/999999/delete/
+Internal Server Error: /worklist/api/study/5/delete/
