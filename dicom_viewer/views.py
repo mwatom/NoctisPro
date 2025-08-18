@@ -455,11 +455,16 @@ def api_mip_reconstruction(request, series_id):
                 return JsonResponse({'error': 'Could not read enough images for MIP'}, status=400)
             volume = np.stack(volume_data, axis=0)
         
-        # If very thin stack, interpolate along depth to stabilize MIP unless high quality requested
+        # Enhanced interpolation for thin stacks - always use high quality for better MIP
         quality = request.GET.get('quality', '').lower()
-        if quality != 'high' and volume.shape[0] < 16:
-            factor = max(2, int(np.ceil(16 / max(volume.shape[0], 1))))
-            volume = ndimage.zoom(volume, (factor, 1, 1), order=1)
+        if volume.shape[0] < 32:  # More aggressive threshold for better MIP quality
+            # Use optimal interpolation factor for minimal images
+            target_slices = max(32, volume.shape[0] * 3)  # Better interpolation ratio
+            factor = target_slices / volume.shape[0]
+            
+            # Use high-quality interpolation for better MIP results
+            volume = ndimage.zoom(volume, (factor, 1, 1), order=3, prefilter=True)
+            logger.info(f"MIP enhanced interpolation: {volume.shape[0]} slices (factor: {factor:.2f})")
         
         # Get windowing parameters from request
         window_width = float(request.GET.get('window_width', default_window_width))
@@ -531,10 +536,15 @@ def api_bone_reconstruction(request, series_id):
                 return JsonResponse({'error': 'Could not read enough images for bone reconstruction'}, status=400)
             volume = np.stack(volume_data, axis=0)
         
-        # Stabilize thin stacks
-        if volume.shape[0] < 16:
-            factor = max(2, int(np.ceil(16 / max(volume.shape[0], 1))))
-            volume = ndimage.zoom(volume, (factor, 1, 1), order=1)
+        # Enhanced stabilization for thin stacks - optimized for bone reconstruction
+        if volume.shape[0] < 32:  # More aggressive for better bone quality
+            # Calculate optimal factor for bone reconstruction
+            target_slices = max(32, volume.shape[0] * 3)
+            factor = target_slices / volume.shape[0]
+            
+            # Use high-quality interpolation for better bone surface detection
+            volume = ndimage.zoom(volume, (factor, 1, 1), order=3, prefilter=True)
+            logger.info(f"Bone enhanced interpolation: {volume.shape[0]} slices (factor: {factor:.2f})")
         
         # Threshold to bone
         bone_mask = volume >= threshold
@@ -680,6 +690,19 @@ def _array_to_base64_image(array, window_width=None, window_level=None, inverted
         if array is None or array.size == 0:
             logger.warning("_array_to_base64_image: received empty array")
             return None
+        
+        # Ensure array is at least 2D
+        if array.ndim == 1:
+            # Convert 1D to 2D square array
+            size = int(np.sqrt(array.size))
+            if size * size == array.size:
+                array = array.reshape(size, size)
+            else:
+                logger.warning("_array_to_base64_image: cannot reshape 1D array to square")
+                return None
+        elif array.ndim > 2:
+            logger.warning(f"_array_to_base64_image: array has {array.ndim} dimensions, using first 2D slice")
+            array = array[0] if array.ndim == 3 else array.reshape(array.shape[-2:])
             
         # Convert to float for calculations
         image_data = array.astype(np.float32)
@@ -2378,11 +2401,17 @@ def _get_mpr_volume_and_spacing(series, force_rebuild=False):
     items.sort(key=lambda x: x[0])
     volume = _np.stack([a for _, a in items], axis=0)
 
-    # Interpolate along depth for thin stacks to stabilize reformats
-    if volume.shape[0] < 16:
-        factor = max(2, int(_np.ceil(16 / max(volume.shape[0], 1))))
-        volume = ndimage.zoom(volume, (factor, 1, 1), order=1)
-        st = st / max(1, factor)
+    # Enhanced interpolation for thin stacks - optimized for minimal images
+    # Use high-quality interpolation for better 3D reconstruction
+    if volume.shape[0] < 32:  # Increased threshold for better quality
+        # Calculate optimal interpolation factor for minimal images
+        target_slices = max(32, volume.shape[0] * 4)  # More aggressive interpolation
+        factor = target_slices / volume.shape[0]
+        
+        # Use high-quality spline interpolation for better results
+        volume = ndimage.zoom(volume, (factor, 1, 1), order=3, prefilter=True)
+        st = st / factor
+        logger.info(f"Enhanced interpolation applied: {volume.shape[0]} slices (factor: {factor:.2f})")
 
     # Resample along Z to approximate isotropic voxels using in-plane pixel spacing average
     # Keep in-plane resolution; only resample depth for quality MPR

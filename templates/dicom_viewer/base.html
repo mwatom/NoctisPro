@@ -775,35 +775,41 @@
     function drawMprCrosshairOverlay(planeKey, dx, dy, scale, imgW, imgH){
       if (mprCross.x === null || mprCross.y === null || mprCross.z === null) return;
       
-      // Pre-calculate common values for efficiency
-      const endX = dx + imgW * scale;
-      const endY = dy + imgH * scale;
-      
       ctx.save();
       ctx.strokeStyle = 'rgba(255,255,0,0.9)';
       ctx.lineWidth = 1;
-      ctx.beginPath();
       
-      // Optimized crosshair drawing with single path
+      // Optimized crosshair drawing - ensure coordinates are valid
       if (planeKey === 'axial'){
-        const cx = dx + mprCross.x * scale;
-        const cy = dy + mprCross.y * scale;
-        ctx.moveTo(cx, dy); ctx.lineTo(cx, endY);
-        ctx.moveTo(dx, cy); ctx.lineTo(endX, cy);
+        const cx = dx + Math.max(0, Math.min(imgW - 1, mprCross.x)) * scale;
+        const cy = dy + Math.max(0, Math.min(imgH - 1, mprCross.y)) * scale;
+        ctx.beginPath();
+        ctx.moveTo(cx, dy); 
+        ctx.lineTo(cx, dy + imgH * scale);
+        ctx.moveTo(dx, cy); 
+        ctx.lineTo(dx + imgW * scale, cy);
+        ctx.stroke();
       } else if (planeKey === 'sagittal'){
         // sagittal image axes: x=height(y), y=depth(z)
-        const cx = dx + mprCross.y * scale; // height index across width
-        const cy = dy + mprCross.z * scale; // depth index across height
-        ctx.moveTo(cx, dy); ctx.lineTo(cx, endY);
-        ctx.moveTo(dx, cy); ctx.lineTo(endX, cy);
+        const cx = dx + Math.max(0, Math.min(imgW - 1, mprCross.y)) * scale;
+        const cy = dy + Math.max(0, Math.min(imgH - 1, mprCross.z)) * scale;
+        ctx.beginPath();
+        ctx.moveTo(cx, dy); 
+        ctx.lineTo(cx, dy + imgH * scale);
+        ctx.moveTo(dx, cy); 
+        ctx.lineTo(dx + imgW * scale, cy);
+        ctx.stroke();
       } else if (planeKey === 'coronal'){
         // coronal image axes: x=width(x), y=depth(z)
-        const cx = dx + mprCross.x * scale;
-        const cy = dy + mprCross.z * scale;
-        ctx.moveTo(cx, dy); ctx.lineTo(cx, endY);
-        ctx.moveTo(dx, cy); ctx.lineTo(endX, cy);
+        const cx = dx + Math.max(0, Math.min(imgW - 1, mprCross.x)) * scale;
+        const cy = dy + Math.max(0, Math.min(imgH - 1, mprCross.z)) * scale;
+        ctx.beginPath();
+        ctx.moveTo(cx, dy); 
+        ctx.lineTo(cx, dy + imgH * scale);
+        ctx.moveTo(dx, cy); 
+        ctx.lineTo(dx + imgW * scale, cy);
+        ctx.stroke();
       }
-      ctx.stroke();
       ctx.restore();
     }
 
@@ -1652,14 +1658,22 @@
         } else {
           disposeSceneObjects();
         }
-        // build geometry
+        // build geometry with enhanced quality
         const vertices = new Float32Array(meshData.vertices.flat());
         const indices = new Uint32Array(meshData.faces.flat());
         const geom = new THREE.BufferGeometry();
         geom.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
         geom.setIndex(new THREE.BufferAttribute(indices, 1));
         geom.computeVertexNormals();
-        const material = new THREE.MeshPhongMaterial({ color: 0xdddddd, specular: 0x111111, shininess: 30 });
+        
+        // Enhanced material for better bone visualization
+        const material = new THREE.MeshPhongMaterial({ 
+          color: 0xf5f5dc,  // Bone color
+          specular: 0x222222, 
+          shininess: 50,
+          transparent: false,
+          side: THREE.DoubleSide  // Show both sides for better visibility
+        });
         const mesh = new THREE.Mesh(geom, material);
         // center & scale
         geom.computeBoundingSphere();
