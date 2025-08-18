@@ -24,6 +24,12 @@ urlpatterns = [
     path('api/series/<int:series_id>/bone/', views.api_bone_reconstruction, name='api_bone_reconstruction'),
     path('api/hu/', views.api_hu_value, name='api_hu_value'),
     
+    # Hounsfield Unit Calibration
+    path('hu-calibration/', views.hu_calibration_dashboard, name='hu_calibration_dashboard'),
+    path('hu-calibration/validate/<int:study_id>/', views.validate_hu_calibration, name='validate_hu_calibration'),
+    path('hu-calibration/report/<int:calibration_id>/', views.hu_calibration_report, name='hu_calibration_report'),
+    path('hu-calibration/phantoms/', views.manage_qa_phantoms, name='manage_qa_phantoms'),
+    
     # Real-time features
     path('api/realtime/studies/', views.api_realtime_studies, name='api_realtime_studies'),
     path('api/study/<int:study_id>/progress/', views.api_study_progress, name='api_study_progress'),

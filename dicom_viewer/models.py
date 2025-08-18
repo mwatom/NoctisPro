@@ -118,3 +118,110 @@ class WindowLevelPreset(models.Model):
 
     def __str__(self):
         return f"{self.user_id}:{self.name} ({self.modality or '*'})"
+
+
+class HounsfieldCalibration(models.Model):
+    """Track Hounsfield Unit calibration for CT scanners"""
+    CALIBRATION_STATUS = [
+        ('valid', 'Valid'),
+        ('invalid', 'Invalid'),
+        ('warning', 'Warning'),
+        ('not_applicable', 'Not Applicable'),
+        ('error', 'Error'),
+    ]
+    
+    # Scanner identification
+    manufacturer = models.CharField(max_length=100, blank=True)
+    model = models.CharField(max_length=100, blank=True)
+    station_name = models.CharField(max_length=100, blank=True)
+    device_serial_number = models.CharField(max_length=100, blank=True)
+    
+    # Study reference
+    study = models.ForeignKey(Study, on_delete=models.CASCADE, related_name='hu_calibrations')
+    series = models.ForeignKey(Series, on_delete=models.CASCADE, null=True, blank=True)
+    
+    # Calibration parameters
+    rescale_slope = models.FloatField()
+    rescale_intercept = models.FloatField()
+    rescale_type = models.CharField(max_length=20, blank=True)
+    
+    # Measured values
+    water_hu = models.FloatField(null=True, blank=True)
+    air_hu = models.FloatField(null=True, blank=True)
+    noise_level = models.FloatField(null=True, blank=True)
+    
+    # Validation results
+    calibration_status = models.CharField(max_length=20, choices=CALIBRATION_STATUS)
+    is_valid = models.BooleanField(default=False)
+    validation_issues = models.JSONField(default=list, blank=True)
+    validation_warnings = models.JSONField(default=list, blank=True)
+    
+    # Quality metrics
+    water_deviation = models.FloatField(null=True, blank=True)
+    air_deviation = models.FloatField(null=True, blank=True)
+    linearity_check = models.FloatField(null=True, blank=True)
+    
+    # Metadata
+    calibration_date = models.DateField(null=True, blank=True)
+    phantom_type = models.CharField(max_length=100, blank=True)
+    notes = models.TextField(blank=True)
+    
+    # Tracking
+    validated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"HU Calibration for {self.station_name or 'Unknown'} - {self.calibration_status}"
+    
+    def get_status_color(self):
+        """Get color for status display"""
+        status_colors = {
+            'valid': 'success',
+            'invalid': 'danger',
+            'warning': 'warning',
+            'not_applicable': 'secondary',
+            'error': 'danger'
+        }
+        return status_colors.get(self.calibration_status, 'secondary')
+    
+    def calculate_deviations(self):
+        """Calculate deviations from reference values"""
+        if self.water_hu is not None:
+            self.water_deviation = abs(self.water_hu - 0.0)  # Water reference is 0 HU
+        
+        if self.air_hu is not None:
+            self.air_deviation = abs(self.air_hu - (-1000.0))  # Air reference is -1000 HU
+
+
+class HounsfieldQAPhantom(models.Model):
+    """Define QA phantoms for Hounsfield unit calibration"""
+    name = models.CharField(max_length=100)
+    manufacturer = models.CharField(max_length=100)
+    model = models.CharField(max_length=100)
+    
+    # Phantom specifications
+    water_roi_coordinates = models.JSONField(help_text="ROI coordinates for water measurement")
+    air_roi_coordinates = models.JSONField(help_text="ROI coordinates for air measurement")
+    material_rois = models.JSONField(default=dict, help_text="Additional material ROI coordinates")
+    
+    # Reference values
+    expected_water_hu = models.FloatField(default=0.0)
+    expected_air_hu = models.FloatField(default=-1000.0)
+    expected_materials = models.JSONField(default=dict, help_text="Expected HU values for materials")
+    
+    # Tolerances
+    water_tolerance = models.FloatField(default=5.0)
+    air_tolerance = models.FloatField(default=50.0)
+    material_tolerances = models.JSONField(default=dict)
+    
+    # Metadata
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"{self.name} ({self.manufacturer})"
