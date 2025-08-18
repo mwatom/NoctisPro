@@ -536,15 +536,29 @@
             ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
             const imgSrc = mprImgs[mprFullPlane];
             if (imgSrc){
-                             const im = await loadImage(imgSrc);
-               const scale = Math.min(canvas.width / im.width, canvas.height / im.height);
-               const dw = im.width * scale, dh = im.height * scale;
-               const dx = (canvas.width - dw)/2, dy = (canvas.height - dh)/2;
-               if (ctx.imageSmoothingEnabled !== false) ctx.imageSmoothingEnabled = false; ctx.drawImage(im, dx, dy, dw, dh);
-               mprRegionVps[mprFullPlane] = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height, rect: {x:0,y:0,w:canvas.width,h:canvas.height} };
-               if (huEllipse && huEllipse.mode==='mpr' && huEllipse.plane===mprFullPlane){ drawEllipseOverlay(mprFullPlane); }
-               // Draw linked crosshair on enlarged plane (only if enabled)
-               if (crosshair) { drawMprCrosshairOverlay(mprFullPlane, dx, dy, scale, im.width, im.height); }
+              try {
+                const im = await loadImage(imgSrc);
+                const scale = Math.min(canvas.width / im.width, canvas.height / im.height);
+                const dw = im.width * scale, dh = im.height * scale;
+                const dx = (canvas.width - dw)/2, dy = (canvas.height - dh)/2;
+                if (ctx.imageSmoothingEnabled !== false) ctx.imageSmoothingEnabled = false; 
+                ctx.drawImage(im, dx, dy, dw, dh);
+                mprRegionVps[mprFullPlane] = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height, rect: {x:0,y:0,w:canvas.width,h:canvas.height} };
+                if (huEllipse && huEllipse.mode==='mpr' && huEllipse.plane===mprFullPlane){ drawEllipseOverlay(mprFullPlane); }
+                // Draw linked crosshair on enlarged plane (only if enabled)
+                if (crosshair) { drawMprCrosshairOverlay(mprFullPlane, dx, dy, scale, im.width, im.height); }
+              } catch (e) {
+                console.error(`Failed to load full plane ${mprFullPlane} image:`, e);
+                // Draw placeholder
+                ctx.save();
+                ctx.fillStyle = '#333';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#666';
+                ctx.font = '24px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('Loading 3D View...', canvas.width/2, canvas.height/2);
+                ctx.restore();
+              }
             }
             document.getElementById('overlay').innerHTML = `MPR (${mprFullPlane.toUpperCase()}) | WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}`;
             document.getElementById('zoominfo').textContent = `MPR`;
@@ -602,44 +616,32 @@
             if (imgSrc){
               try {
                 const im = await loadImage(imgSrc);
-                if (im && im.width > 0 && im.height > 0) {
-                  const scale = Math.min(reg.w / im.width, reg.h / im.height);
-                  const dw = im.width * scale, dh = im.height * scale;
-                  const dx = reg.x + (reg.w - dw)/2, dy = reg.y + (reg.h - dh)/2;
-                  // Hint to use low quality interpolation for speed
-                  if (ctx.imageSmoothingEnabled !== false) ctx.imageSmoothingEnabled = false;
-                  ctx.drawImage(im, dx, dy, dw, dh);
-                } else {
-                  // Draw placeholder for invalid image
-                  ctx.save();
-                  ctx.fillStyle = '#333';
-                  ctx.fillRect(reg.x, reg.y, reg.w, reg.h);
-                  ctx.fillStyle = '#666';
-                  ctx.font = '14px monospace';
-                  ctx.textAlign = 'center';
-                  ctx.fillText('Loading...', reg.x + reg.w/2, reg.y + reg.h/2);
-                  ctx.restore();
-                  // Clear mapping for loading images
-                  delete mprRegionVps[reg.key];
-                }
+                const scale = Math.min(reg.w / im.width, reg.h / im.height);
+                const dw = im.width * scale, dh = im.height * scale;
+                const dx = reg.x + (reg.w - dw)/2, dy = reg.y + (reg.h - dh)/2;
+                // Hint to use low quality interpolation for speed
+                if (ctx.imageSmoothingEnabled !== false) ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(im, dx, dy, dw, dh);
+                // Save mapping for tools
+                mprRegionVps[reg.key] = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height, rect: reg };
               } catch (e) {
                 console.error(`Failed to load ${reg.key} image:`, e);
-                // Draw error placeholder
+                // Draw placeholder for failed image but keep trying
                 ctx.save();
-                ctx.fillStyle = '#400';
+                ctx.fillStyle = '#333';
                 ctx.fillRect(reg.x, reg.y, reg.w, reg.h);
-                ctx.fillStyle = '#f44';
+                ctx.fillStyle = '#666';
                 ctx.font = '12px monospace';
                 ctx.textAlign = 'center';
-                ctx.fillText('Image Error', reg.x + reg.w/2, reg.y + reg.h/2);
+                ctx.fillText('Loading...', reg.x + reg.w/2, reg.y + reg.h/2);
                 ctx.restore();
-                // Clear mapping for failed images
-                delete mprRegionVps[reg.key];
               }
-              // Draw plane label and slice index
+              // Draw plane label and slice index (use region coordinates if image failed)
+              const labelX = (mprRegionVps[reg.key] ? mprRegionVps[reg.key].x : reg.x) + 8;
+              const labelY = (mprRegionVps[reg.key] ? mprRegionVps[reg.key].y : reg.y) + 8;
               ctx.save();
               ctx.fillStyle = 'rgba(0,0,0,0.5)';
-              ctx.fillRect(dx + 8, dy + 8, 150, 22);
+              ctx.fillRect(labelX, labelY, 180, 22);
               ctx.fillStyle = '#0ff';
               ctx.font = '12px monospace';
               // Enhanced plane label with crosshair coordinates
@@ -650,23 +652,26 @@
                 else if (reg.key === 'sagittal') coordInfo = ` [${mprCross.y},${mprCross.z}]`;
                 else if (reg.key === 'coronal') coordInfo = ` [${mprCross.x},${mprCross.z}]`;
               }
-              ctx.fillText(crossInfo + coordInfo, dx + 12, dy + 24);
+              ctx.fillText(crossInfo + coordInfo, labelX + 4, labelY + 16);
               ctx.restore();
               // Draw measurement overlays for this plane
               ctx.save();
               ctx.strokeStyle = 'yellow'; ctx.fillStyle = 'yellow'; ctx.lineWidth = 2;
               const planeMeasures = mprMeasurements[reg.key] || [];
-              for (const m of planeMeasures){
-                const x1 = dx + m.start.x * scale, y1 = dy + m.start.y * scale;
-                const x2 = dx + m.end.x * scale, y2 = dy + m.end.y * scale;
-                ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-                if (m.label){ ctx.font='12px monospace'; ctx.fillText(m.label, x2 + 6, y2 - 6); }
-              }
-              // Draft line if belongs to this plane
-              if (measureDraft && measureDraft.plane === reg.key && measureDraft.start && measureDraft.end){
-                const x1 = dx + measureDraft.start.x * scale, y1 = dy + measureDraft.start.y * scale;
-                const x2 = dx + measureDraft.end.x * scale, y2 = dy + measureDraft.end.y * scale;
-                ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+              if (mprRegionVps[reg.key]) {
+                const vp = mprRegionVps[reg.key];
+                for (const m of planeMeasures){
+                  const x1 = vp.x + m.start.x * vp.scale, y1 = vp.y + m.start.y * vp.scale;
+                  const x2 = vp.x + m.end.x * vp.scale, y2 = vp.y + m.end.y * vp.scale;
+                  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+                  if (m.label){ ctx.font='12px monospace'; ctx.fillText(m.label, x2 + 6, y2 - 6); }
+                }
+                // Draft line if belongs to this plane
+                if (measureDraft && measureDraft.plane === reg.key && measureDraft.start && measureDraft.end){
+                  const x1 = vp.x + measureDraft.start.x * vp.scale, y1 = vp.y + measureDraft.start.y * vp.scale;
+                  const x2 = vp.x + measureDraft.end.x * vp.scale, y2 = vp.y + measureDraft.end.y * vp.scale;
+                  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+                }
               }
               ctx.restore();
               // Draw HU ellipse overlay if belongs to this plane
@@ -674,7 +679,10 @@
                 drawEllipseOverlay(reg.key);
               }
               // Draw linked crosshair overlay for this plane (only if enabled)
-              if (crosshair) { drawMprCrosshairOverlay(reg.key, dx, dy, scale, im.width, im.height); }
+              if (crosshair && mprRegionVps[reg.key]) { 
+                const vp = mprRegionVps[reg.key];
+                drawMprCrosshairOverlay(reg.key, vp.x, vp.y, vp.scale, vp.imgW, vp.imgH); 
+              }
             }
             // Fetch updated slice without blocking draw
             (async ()=>{
@@ -1651,7 +1659,22 @@
 
     // Utils
     function loadImage(src){
-      return new Promise((res, rej)=>{ const im = new Image(); im.decoding='async'; im.onload=()=>res(im); im.onerror=rej; im.src=src; });
+      return new Promise((res, rej)=>{ 
+        const im = new Image(); 
+        im.decoding='async'; 
+        im.onload=()=>{
+          if (im.width > 0 && im.height > 0) {
+            res(im);
+          } else {
+            rej(new Error('Invalid image dimensions'));
+          }
+        }; 
+        im.onerror=(e)=>{
+          console.error('Image load error:', e, 'src:', src);
+          rej(e);
+        }; 
+        im.src=src; 
+      });
     }
     function mprKey(seriesId, plane, sliceIndex, wwVal, wlVal, inv){
       return `${seriesId}|${plane}|${sliceIndex}|${Math.round(wwVal)}|${Math.round(wlVal)}|${inv?1:0}`;
@@ -1762,7 +1785,21 @@
       } catch(e){ console.warn('3D setup failed', e); }
     }
  
-     // Init
+     // Debug function for 3D troubleshooting
+    window.debug3D = function() {
+      console.log('=== 3D Debug Info ===');
+      console.log('MPR Mode:', mprMode);
+      console.log('MPR Images:', mprImgs);
+      console.log('MPR Cross:', mprCross);
+      console.log('MPR Scroll:', mprScroll);
+      console.log('MPR Region VPs:', mprRegionVps);
+      console.log('Current Series:', currentSeries);
+      console.log('Reconstruction Mode:', reconMode);
+      console.log('Reconstruction Images:', reconImgs);
+      console.log('===================');
+    };
+
+    // Init
      setCanvasSize();
      const studyId = q('study_id');
      if (studyId) loadStudy(studyId);

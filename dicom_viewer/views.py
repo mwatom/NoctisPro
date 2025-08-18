@@ -2403,15 +2403,28 @@ def _get_mpr_volume_and_spacing(series, force_rebuild=False):
 
     # Enhanced interpolation for thin stacks - optimized for minimal images
     # Use high-quality interpolation for better 3D reconstruction
+    original_depth = volume.shape[0]
     if volume.shape[0] < 32:  # Increased threshold for better quality
         # Calculate optimal interpolation factor for minimal images
-        target_slices = max(32, volume.shape[0] * 4)  # More aggressive interpolation
+        if volume.shape[0] < 8:
+            # Very few images - use maximum interpolation
+            target_slices = max(64, volume.shape[0] * 8)
+        else:
+            # Moderate number of images
+            target_slices = max(32, volume.shape[0] * 4)
+        
         factor = target_slices / volume.shape[0]
         
         # Use high-quality spline interpolation for better results
-        volume = ndimage.zoom(volume, (factor, 1, 1), order=3, prefilter=True)
-        st = st / factor
-        logger.info(f"Enhanced interpolation applied: {volume.shape[0]} slices (factor: {factor:.2f})")
+        try:
+            volume = ndimage.zoom(volume, (factor, 1, 1), order=3, prefilter=True)
+            st = st / factor
+            logger.info(f"Enhanced interpolation: {original_depth} -> {volume.shape[0]} slices (factor: {factor:.2f})")
+        except Exception as e:
+            logger.warning(f"High-quality interpolation failed, using linear: {e}")
+            # Fallback to linear interpolation
+            volume = ndimage.zoom(volume, (factor, 1, 1), order=1)
+            st = st / factor
 
     # Resample along Z to approximate isotropic voxels using in-plane pixel spacing average
     # Keep in-plane resolution; only resample depth for quality MPR
