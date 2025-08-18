@@ -28,11 +28,15 @@ from PIL import Image
 import base64
 from pydicom.pixel_data_handlers.util import apply_voi_lut
 import scipy.ndimage as ndimage
+import logging
 
 from .models import ViewerSession, Measurement, Annotation, ReconstructionJob
 from .dicom_utils import DicomProcessor
 from .reconstruction import MPRProcessor, MIPProcessor, Bone3DProcessor, MRI3DProcessor
 from .models import WindowLevelPreset, HangingProtocol
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 # MPR volume small LRU cache (per-process)
 from threading import Lock
