@@ -27,7 +27,11 @@ from reports.models import Report
 @login_required
 def dashboard(request):
 	"""Render the exact provided dashboard UI template"""
-	return render(request, 'worklist/dashboard.html', {'user': request.user})
+	from django.middleware.csrf import get_token
+	return render(request, 'worklist/dashboard.html', {
+		'user': request.user,
+		'csrf_token': get_token(request)
+	})
 
 @login_required
 def study_list(request):
