@@ -1,13 +1,19 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Create User - Admin Panel{% endblock %}
+{% block title %}{% if edit_mode %}Edit User{% else %}Create User{% endif %} - Admin Panel{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
   <div class="row mb-4">
     <div class="col-12 d-flex justify-content-between align-items-center">
-      <h1 class="text-white mb-0"><i class="fas fa-user-plus me-3"></i>Create User</h1>
+      <h1 class="text-white mb-0">
+        {% if edit_mode %}
+          <i class="fas fa-user-edit me-3"></i>Edit User: {{ user_obj.username }}
+        {% else %}
+          <i class="fas fa-user-plus me-3"></i>Create User
+        {% endif %}
+      </h1>
       <a href="{% url 'admin_panel:user_management' %}" class="btn-control">
         <i class="fas fa-arrow-left me-2"></i>Back to Users
       </a>
@@ -45,7 +51,7 @@
               <i class="fas fa-user-tag me-2"></i>Username <span class="text-danger">*</span>
             </label>
             <input type="text" class="form-control form-control-medical" id="username" name="username" required 
-                   placeholder="Enter unique username" />
+                   placeholder="Enter unique username" value="{% if edit_mode %}{{ user_obj.username }}{% endif %}" />
             <div class="form-text text-muted">Username must be unique and will be used for login</div>
           </div>
           <div class="col-md-6">
@@ -53,7 +59,7 @@
               <i class="fas fa-envelope me-2"></i>Email Address
             </label>
             <input type="email" class="form-control form-control-medical" id="email" name="email" 
-                   placeholder="user@example.com" />
+                   placeholder="user@example.com" value="{% if edit_mode %}{{ user_obj.email }}{% endif %}" />
             <div class="form-text text-muted">Used for notifications and password recovery</div>
           </div>
           <div class="col-md-6">
@@ -61,14 +67,14 @@
               <i class="fas fa-id-card me-2"></i>First Name
             </label>
             <input type="text" class="form-control form-control-medical" id="first_name" name="first_name" 
-                   placeholder="First name" />
+                   placeholder="First name" value="{% if edit_mode %}{{ user_obj.first_name }}{% endif %}" />
           </div>
           <div class="col-md-6">
             <label class="form-label text-white" for="last_name">
               <i class="fas fa-id-card me-2"></i>Last Name
             </label>
             <input type="text" class="form-control form-control-medical" id="last_name" name="last_name" 
-                   placeholder="Last name" />
+                   placeholder="Last name" value="{% if edit_mode %}{{ user_obj.last_name }}{% endif %}" />
           </div>
         </div>
       </div>
@@ -83,7 +89,7 @@
             </label>
             <select class="form-select form-control-medical" id="role" name="role" required>
               {% for role_code, role_name in user_roles %}
-              <option value="{{ role_code }}" {% if preset_role == role_code %}selected{% endif %}>{{ role_name }}</option>
+              <option value="{{ role_code }}" {% if edit_mode and user_obj.role == role_code %}selected{% elif not edit_mode and preset_role == role_code %}selected{% endif %}>{{ role_name }}</option>
               {% endfor %}
             </select>
             <div class="form-text text-muted">
@@ -111,7 +117,7 @@
               <select class="form-select form-control-medical" id="facility" name="facility">
                 <option value="">-- No Facility Assignment --</option>
                 {% for facility in facilities %}
-                <option value="{{ facility.id }}" {% if preset_facility == facility.id|stringformat:'s' %}selected{% endif %}>{{ facility.name }}</option>
+                <option value="{{ facility.id }}" {% if edit_mode and user_obj.facility_id == facility.id %}selected{% elif not edit_mode and preset_facility == facility.id|stringformat:'s' %}selected{% endif %}>{{ facility.name }}</option>
                 {% endfor %}
               </select>
               <button type="button" class="btn btn-outline-secondary" onclick="window.open('{% url 'admin_panel:facility_create' %}', '_blank')" title="Add new facility">
@@ -144,16 +150,16 @@
             <label class="form-label text-white" for="password">
               <i class="fas fa-lock me-2"></i>Password <span class="text-danger">*</span>
             </label>
-            <input type="password" class="form-control form-control-medical" id="password" name="password" required 
-                   placeholder="Minimum 8 characters" minlength="8" />
+            <input type="password" class="form-control form-control-medical" id="password" name="password" {% if not edit_mode %}required{% endif %}
+                   placeholder="{% if edit_mode %}Leave blank to keep current password{% else %}Minimum 8 characters{% endif %}" {% if not edit_mode %}minlength="8"{% endif %} />
             <div class="form-text text-muted">Password must be at least 8 characters long</div>
           </div>
           <div class="col-md-6">
             <label class="form-label text-white" for="password_confirm">
               <i class="fas fa-lock me-2"></i>Confirm Password <span class="text-danger">*</span>
             </label>
-            <input type="password" class="form-control form-control-medical" id="password_confirm" name="password_confirm" required 
-                   placeholder="Re-enter password" />
+            <input type="password" class="form-control form-control-medical" id="password_confirm" name="password_confirm" {% if not edit_mode %}required{% endif %}
+                   placeholder="{% if edit_mode %}Confirm new password (if changing){% else %}Re-enter password{% endif %}" />
             <div class="invalid-feedback" id="passwordMismatch" style="display: none;">
               Passwords do not match
             </div>
@@ -170,7 +176,7 @@
               <i class="fas fa-phone me-2"></i>Phone Number
             </label>
             <input type="tel" class="form-control form-control-medical" id="phone" name="phone" 
-                   placeholder="+1 (555) 123-4567" />
+                   placeholder="+1 (555) 123-4567" value="{% if edit_mode %}{{ user_obj.phone }}{% endif %}" />
             <div class="form-text text-muted">Contact number for professional communication</div>
           </div>
           <div class="col-md-6">
@@ -178,7 +184,7 @@
               <i class="fas fa-certificate me-2"></i>License Number
             </label>
             <input type="text" class="form-control form-control-medical" id="license_number" name="license_number" 
-                   placeholder="Professional license number" />
+                   placeholder="Professional license number" value="{% if edit_mode %}{{ user_obj.license_number }}{% endif %}" />
             <div class="form-text text-muted">Medical or professional license identifier</div>
           </div>
           <div class="col-md-12">
@@ -186,9 +192,36 @@
               <i class="fas fa-user-md me-2"></i>Specialization
             </label>
             <input type="text" class="form-control form-control-medical" id="specialization" name="specialization" 
-                   placeholder="e.g., Neuroradiology, Cardiac Imaging, General Radiology" />
+                   placeholder="e.g., Neuroradiology, Cardiac Imaging, General Radiology" value="{% if edit_mode %}{{ user_obj.specialization }}{% endif %}" />
             <div class="form-text text-muted">Area of medical specialization or expertise</div>
           </div>
+          
+          {% if edit_mode %}
+          <!-- User Status Controls (Edit Mode Only) -->
+          <div class="col-md-12 mt-4">
+            <h5 class="text-white mb-3"><i class="fas fa-toggle-on me-2"></i>User Status</h5>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="is_active" name="is_active" {% if user_obj.is_active %}checked{% endif %}>
+                  <label class="form-check-label text-white" for="is_active">
+                    <i class="fas fa-user-check me-2"></i>Active User
+                  </label>
+                  <div class="form-text text-muted">User can log in and access the system</div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="is_verified" name="is_verified" {% if user_obj.is_verified %}checked{% endif %}>
+                  <label class="form-check-label text-white" for="is_verified">
+                    <i class="fas fa-user-shield me-2"></i>Verified User
+                  </label>
+                  <div class="form-text text-muted">User has been verified by an administrator</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endif %}
         </div>
       </div>
 
@@ -202,7 +235,7 @@
             Next <i class="fas fa-arrow-right ms-2"></i>
           </button>
           <button type="submit" class="btn-control" id="submitBtn" style="display: none; background: var(--accent-color); color: var(--primary-bg);">
-            <i class="fas fa-save me-2"></i>Create User
+            <i class="fas fa-save me-2"></i>{% if edit_mode %}Update User{% else %}Create User{% endif %}
           </button>
         </div>
       </div>
@@ -587,6 +620,12 @@
       if (activeDesc) {
         activeDesc.classList.add('active');
       }
+    }
+    
+    // Debug facility count for troubleshooting
+    console.log('Facility dropdown options:', facilitySelect.options.length);
+    for (let i = 0; i < facilitySelect.options.length; i++) {
+      console.log(`  Option ${i}: value="${facilitySelect.options[i].value}", text="${facilitySelect.options[i].text}"`);
     }
   })
 </script>
