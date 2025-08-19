@@ -1462,13 +1462,33 @@
       else { const d = e.deltaY>0?1:-1; const ni = Math.max(0, Math.min(images.length-1, index+d)); if (ni !== index){ index = ni; sliceSlider.value = index; document.getElementById('sliceVal').textContent = index+1; requestDraw(); debouncedLoadOverlaysForCurrentImage(); prefetchAround(index, 3); } }
     }, { passive:false });
 
-    // Local DICOM upload
-    btnLoadLocal.addEventListener('click', ()=> inputLocal.click());
+    // Local DICOM upload with debounce protection
+    let uploadInProgress = false;
+    
+    btnLoadLocal.addEventListener('click', ()=> {
+      if (uploadInProgress) {
+        console.warn('Upload already in progress');
+        return;
+      }
+      inputLocal.click();
+    });
+    
     inputLocal.addEventListener('change', async (e)=>{
       try {
+        if (uploadInProgress) {
+          console.warn('Upload already in progress');
+          return;
+        }
+        
         const files = e.target.files ? Array.from(e.target.files) : [];
         if (!files.length) return;
+        
+        // Set upload state immediately
+        uploadInProgress = true;
+        btnLoadLocal.disabled = true;
+        btnLoadLocal.style.pointerEvents = 'none';
         reconStatus.textContent = 'Uploading DICOM files...';
+        
         const CHUNK_SIZE = 80;
         const MAX_PARALLEL = 2;
         const chunks = [];
@@ -1497,6 +1517,10 @@
         reconStatus.textContent = `Error: ${err.message}`;
         await fallbackToDesktop();
       } finally {
+        // Reset upload state
+        uploadInProgress = false;
+        btnLoadLocal.disabled = false;
+        btnLoadLocal.style.pointerEvents = '';
         e.target.value = '';
       }
     });
@@ -1507,15 +1531,33 @@
     });
     boneSlider.addEventListener('input', e=> boneVal.textContent = e.target.value);
 
+    // Debounce mechanism for reconstruction buttons to prevent multiple clicks
+    let reconstructionInProgress = false;
+    let reconstructionTimeout = null;
+
     // Extracted function so both dropdown and button can trigger
     async function generateReconstruction(kind){
       try {
+        // Prevent multiple simultaneous reconstruction requests
+        if (reconstructionInProgress) {
+          console.warn('Reconstruction already in progress');
+          return;
+        }
+        
         if (!currentSeries || !currentSeries.id){ 
           console.warn('Select a series first'); 
           reconStatus.textContent = 'Please select a series first';
           return; 
         }
+        
+        // Set loading state immediately to prevent UI freezing
+        reconstructionInProgress = true;
         reconStatus.textContent = 'Generating...';
+        
+        // Disable reconstruction buttons during processing
+        const reconButtons = document.querySelectorAll('[data-recon], #btnGenerateRecon');
+        reconButtons.forEach(btn => btn.style.pointerEvents = 'none');
+        
         reconMode = null; reconImgs = []; reconIndex = 0; panOffset = {x:0,y:0}; zoom = 1.0;
         const params = new URLSearchParams();
         params.set('window_width', ww);
@@ -1588,6 +1630,11 @@
         console.error('Reconstruction error:', err);
         reconStatus.textContent = `Error: ${err.message}`;
         await fallbackToDesktop();
+      } finally {
+        // Re-enable reconstruction buttons and reset state
+        reconstructionInProgress = false;
+        const reconButtons = document.querySelectorAll('[data-recon], #btnGenerateRecon');
+        reconButtons.forEach(btn => btn.style.pointerEvents = '');
       }
     }
  
