@@ -114,8 +114,11 @@
 	function getCookie(name){
 		const value = `; ${document.cookie}`;
 		const parts = value.split(`; ${name}=`);
-		if (parts.length === 2) return parts.pop().split(';').shift();
-		return '';
+		if (parts.length === 2) {
+			const token = parts.pop().split(';').shift();
+			return token && token.trim() ? token : null;
+		}
+		return null;
 	}
 	const saveBtn = document.getElementById('saveClinicalInfoBtn');
 	const inputEl = document.getElementById('clinicalInfoInput');
@@ -127,12 +130,14 @@
 			saveBtn.disabled = true;
 			saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
 			try {
+				const headers = { 'Content-Type': 'application/json' };
+				const csrfToken = getCookie('csrftoken');
+				if (csrfToken) {
+					headers['X-CSRFToken'] = csrfToken;
+				}
 				const res = await fetch('{% url "worklist:api_update_clinical_info" study.id %}', {
 					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						'X-CSRFToken': getCookie('csrftoken')
-					},
+					headers: headers,
 					credentials: 'same-origin',
 					body: JSON.stringify({ clinical_info: newText })
 				});

@@ -913,18 +913,27 @@
             const cookies = document.cookie.split(';');
             for (let c of cookies){
                 c = c.trim();
-                if (c.startsWith(name)) return c.substring(name.length);
+                if (c.startsWith(name)) {
+                    const token = c.substring(name.length);
+                    if (token && token.trim()) return token;
+                }
             }
             
             // Fallback: try to get from meta tag
             const metaTag = document.querySelector('meta[name="csrf-token"]');
-            if (metaTag) return metaTag.getAttribute('content');
+            if (metaTag) {
+                const token = metaTag.getAttribute('content');
+                if (token && token.trim()) return token;
+            }
             
             // Fallback: try to get from hidden input
             const hiddenInput = document.querySelector('input[name="csrfmiddlewaretoken"]');
-            if (hiddenInput) return hiddenInput.value;
+            if (hiddenInput) {
+                const token = hiddenInput.value;
+                if (token && token.trim()) return token;
+            }
             
-            return '';
+            return null; // Return null instead of empty string to make falsy check work properly
         }
 
         async function deleteStudy(studyId, accession){
@@ -933,11 +942,8 @@
                 const proceed = confirm(`Are you sure you want to delete study ${accession}?\n\nThis action cannot be undone and will permanently remove all study data including images, attachments, and reports.`);
                 if(!proceed) return;
                 
-                // Get CSRF token
+                // Get CSRF token (optional since API is CSRF exempt)
                 const csrfToken = getCSRFToken();
-                if (!csrfToken) {
-                    throw new Error('CSRF token not found. Please refresh the page and try again.');
-                }
                 
                 // Show loading state
                 const deleteButton = document.querySelector(`button[onclick*="deleteStudy('${studyId}'"]`);
@@ -946,13 +952,19 @@
                     deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> DELETING...';
                 }
                 
+                // Prepare headers - only include CSRF token if available
+                const headers = {};
+                if (csrfToken) {
+                    headers['X-CSRFToken'] = csrfToken;
+                }
+                
                 const resp = await fetch(`/worklist/api/study/${studyId}/delete/`, {
                     method: 'DELETE',
-                    headers: { 'X-CSRFToken': csrfToken },
+                    headers: headers,
                     credentials: 'same-origin'
                 }).catch(()=> fetch(`/worklist/api/study/${studyId}/delete/`, {
                     method: 'POST',
-                    headers: { 'X-CSRFToken': csrfToken },
+                    headers: headers,
                     credentials: 'same-origin'
                 }));
                 
