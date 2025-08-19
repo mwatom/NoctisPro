@@ -278,3 +278,7 @@ Not Found: /worklist/api/study/999999/delete/
 Internal Server Error: /worklist/api/study/5/delete/
 Watching for file changes with StatReloader
 [32mHTTP DELETE /worklist/api/study/1/delete/ 302 [0.01, 127.0.0.1:47966][0m
+WARNING 2025-08-19 13:13:53,070 misc 4172 140253271040256 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+WARNING 2025-08-19 13:13:53,251 log 4172 140253271040256 Not Found: /accounts/login/
+WARNING 2025-08-19 13:13:53,529 log 4172 140253271040256 Not Found: /api/users/
+WARNING 2025-08-19 13:13:53,529 log 4172 140253271040256 Not Found: /api/facilities/
