@@ -14,6 +14,11 @@ def login_view(request):
     if request.user.is_authenticated:
         return redirect('worklist:dashboard')
     
+    # Clear any existing messages on GET request to prevent accumulation
+    if request.method == 'GET':
+        # Clear any existing messages
+        list(messages.get_messages(request))
+    
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
@@ -42,8 +47,10 @@ def login_view(request):
             # Redirect all users to the worklist dashboard after login
             return redirect('worklist:dashboard')
         else:
+            # Clear any existing messages before adding error
+            list(messages.get_messages(request))
             # Only show a single generic error for any failure
-            messages.error(request, 'invalid user')
+            messages.error(request, 'Invalid username or password')
     
     return render(request, 'accounts/login.html', {'hide_navbar': True})
 
