@@ -92,11 +92,10 @@
                         {% endif %}
                     </div>
 
-                    {% if facility is not None %}
                     <div class="col-12 mt-2">
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="is_active" name="is_active" 
-                                   {% if facility.is_active %}checked{% endif %}>
+                                   {% if facility %}{% if facility.is_active %}checked{% endif %}{% else %}checked{% endif %}>
                             <label class="form-check-label text-white" for="is_active">
                                 Facility Active
                             </label>
@@ -105,7 +104,6 @@
                             <small>Inactive facilities cannot receive new studies</small>
                         </div>
                     </div>
-                    {% endif %}
 
                     <!-- Optional Facility Login -->
                     <div class="col-12 mt-4">
