@@ -103,23 +103,32 @@
           <div class="col-md-6">
             <label class="form-label text-white" for="facility">
               <i class="fas fa-hospital me-2"></i>Facility Assignment
+              <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="refreshFacilities" title="Refresh facility list">
+                <i class="fas fa-sync-alt"></i>
+              </button>
             </label>
-            <select class="form-select form-control-medical" id="facility" name="facility">
-              <option value="">-- No Facility Assignment --</option>
-              {% for facility in facilities %}
-              <option value="{{ facility.id }}" {% if preset_facility == facility.id|stringformat:'s' %}selected{% endif %}>{{ facility.name }}</option>
-              {% endfor %}
-            </select>
-            <!-- Debug info (remove in production) -->
+            <div class="input-group">
+              <select class="form-select form-control-medical" id="facility" name="facility">
+                <option value="">-- No Facility Assignment --</option>
+                {% for facility in facilities %}
+                <option value="{{ facility.id }}" {% if preset_facility == facility.id|stringformat:'s' %}selected{% endif %}>{{ facility.name }}</option>
+                {% endfor %}
+              </select>
+              <button type="button" class="btn btn-outline-secondary" onclick="window.open('{% url 'admin_panel:facility_create' %}', '_blank')" title="Add new facility">
+                <i class="fas fa-plus"></i>
+              </button>
+            </div>
+            <!-- Facility status info -->
             {% if facilities_count %}
             <div class="form-text text-info mt-1">
               <small><i class="fas fa-info-circle me-1"></i>{{ facilities_count }} active facilit{{ facilities_count|pluralize:"y,ies" }} available</small>
             </div>
             {% else %}
             <div class="form-text text-warning mt-1">
-              <small><i class="fas fa-exclamation-triangle me-1"></i>No active facilities found. Please contact an administrator to add facilities.</small>
+              <small><i class="fas fa-exclamation-triangle me-1"></i>No active facilities found. Please <a href="{% url 'admin_panel:facility_create' %}" class="text-warning">add facilities first</a>.</small>
             </div>
             {% endif %}
+          </div>
             <div class="form-text text-muted">
               <small id="facilityHelp">
                 <span class="facility-required" style="display: none;">
@@ -320,6 +329,8 @@
         border-radius: 4px;
         padding: 0.75rem;
         margin-top: 0.5rem;
+        min-height: 60px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
     }
 
     .role-desc {
@@ -327,10 +338,18 @@
         color: var(--text-secondary);
         font-size: 13px;
         line-height: 1.4;
+        animation: fadeIn 0.3s ease-in;
     }
 
     .role-desc.active {
         display: block;
+    }
+    
+    .role-descriptions:empty::after {
+        content: "Select a role to see description";
+        color: var(--text-muted);
+        font-style: italic;
+        font-size: 12px;
     }
 
     /* Form enhancements */
@@ -359,6 +378,25 @@
     .btn-control:hover {
         background: var(--accent-color);
         color: var(--primary-bg);
+    }
+    
+    .btn-outline-secondary {
+        border-color: var(--border-color);
+        color: var(--text-secondary);
+    }
+    
+    .btn-outline-secondary:hover {
+        background-color: var(--accent-color);
+        border-color: var(--accent-color);
+        color: var(--primary-bg);
+    }
+    
+    .input-group .btn {
+        border-radius: 0 4px 4px 0;
+    }
+    
+    .input-group .form-select {
+        border-radius: 4px 0 0 4px;
     }
 
     .form-select {
@@ -393,6 +431,7 @@
     const facilityHelp = document.getElementById('facilityHelp');
     const password = document.getElementById('password');
     const passwordConfirm = document.getElementById('password_confirm');
+    const refreshFacilitiesBtn = document.getElementById('refreshFacilities');
     
     // Multi-step form elements
     const nextBtn = document.getElementById('nextBtn');
@@ -409,6 +448,19 @@
       const required = selectedRole === 'facility';
       facilitySelect.required = required;
       facilityHelp.innerText = required ? 'Facility is required for Facility Users' : 'Assign user to a specific facility (required for Facility Users)';
+      
+      // Show/hide role descriptions
+      const roleDescriptions = document.querySelectorAll('.role-desc');
+      roleDescriptions.forEach(desc => {
+        desc.classList.remove('active');
+      });
+      
+      if (selectedRole) {
+        const activeDesc = document.querySelector(`.role-desc[data-role="${selectedRole}"]`);
+        if (activeDesc) {
+          activeDesc.classList.add('active');
+        }
+      }
     }
 
     function validatePasswordMatch() {
@@ -477,10 +529,39 @@
       return true;
     }
 
+    // Refresh facilities function
+    function refreshFacilities() {
+      refreshFacilitiesBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+      refreshFacilitiesBtn.disabled = true;
+      
+      fetch(window.location.href)
+        .then(response => response.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          const newFacilitySelect = doc.getElementById('facility');
+          
+          if (newFacilitySelect) {
+            const currentValue = facilitySelect.value;
+            facilitySelect.innerHTML = newFacilitySelect.innerHTML;
+            facilitySelect.value = currentValue; // Restore selection if it still exists
+          }
+          
+          refreshFacilitiesBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+          refreshFacilitiesBtn.disabled = false;
+        })
+        .catch(error => {
+          console.error('Error refreshing facilities:', error);
+          refreshFacilitiesBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+          refreshFacilitiesBtn.disabled = false;
+        });
+    }
+
     // Event listeners
     roleSelect.addEventListener('change', updateFacilityRequirement);
     password.addEventListener('input', validatePasswordMatch);
     passwordConfirm.addEventListener('input', validatePasswordMatch);
+    refreshFacilitiesBtn.addEventListener('click', refreshFacilities);
 
     nextBtn.addEventListener('click', function() {
       if (validateCurrentStep()) {
@@ -499,6 +580,14 @@
     // Initialize
     updateFacilityRequirement();
     showStep(currentStep);
+    
+    // Show default role description if a role is pre-selected
+    if (roleSelect.value) {
+      const activeDesc = document.querySelector(`.role-desc[data-role="${roleSelect.value}"]`);
+      if (activeDesc) {
+        activeDesc.classList.add('active');
+      }
+    }
   })
 </script>
 {% endblock %}
