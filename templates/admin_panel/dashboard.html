@@ -565,14 +565,17 @@
                         <div style="color: var(--text-muted); font-size: 10px;">Administrator</div>
                     </div>
                 </div>
-                <button class="worklist-btn" onclick="window.location.href='{% url 'admin_panel:facility_create' %}'" title="Add Facility">
-                    <i class="fas fa-hospital"></i> ADD FACILITY
-                </button>
-                <button class="worklist-btn" onclick="window.location.href='{% url 'admin_panel:user_create' %}?role=radiologist'" title="Add Radiologist">
-                    <i class="fas fa-user-md"></i> ADD RADIOLOGIST
-                </button>
-                <button class="worklist-btn" onclick="window.location.href='{% url 'worklist:dashboard' %}'">
+                <button class="worklist-btn" onclick="window.location.href='{% url 'worklist:dashboard' %}'" title="Go to Worklist Dashboard">
                     <i class="fas fa-home"></i> WORKLIST
+                </button>
+                <button class="worklist-btn" onclick="window.location.href='{% url 'admin_panel:facility_management' %}'" title="Manage Facilities">
+                    <i class="fas fa-hospital"></i> FACILITIES
+                </button>
+                <button class="worklist-btn" onclick="window.location.href='{% url 'admin_panel:user_management' %}'" title="Manage Users">
+                    <i class="fas fa-users"></i> USERS
+                </button>
+                <button class="worklist-btn" onclick="window.open('{% url 'dicom_viewer:launch_standalone_viewer' %}', '_blank')" title="Open DICOM Viewer">
+                    <i class="fas fa-external-link-alt"></i> DICOM VIEWER
                 </button>
             </div>
         </nav>
@@ -616,13 +619,7 @@
             <button class="btn-control danger" onclick="systemBackup()">
                 <i class="fas fa-database"></i> BACKUP
             </button>
-            <!-- Added to match Worklist buttons -->
-            <button class="btn-control" onclick="window.open('{% url 'dicom_viewer:launch_standalone_viewer' %}', '_blank')">
-                <i class="fas fa-external-link-alt"></i> DICOM VIEWER
-            </button>
-            <button class="btn-control" onclick="window.location.href='{% url 'worklist:upload_study' %}'">
-                <i class="fas fa-upload"></i> UPLOAD
-            </button>
+
         </div>
 
         <!-- Main Content -->

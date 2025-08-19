@@ -1,46 +1,378 @@
-{% extends 'base.html' %}
-{% block title %}Notifications - Noctis Pro PACS{% endblock %}
-{% block extra_css %}
-<style>
-.container-narrow { max-width: 900px; margin: 0 auto; padding: 2rem 1rem; }
-.notification-item { background: var(--card-bg); border: 1px solid var(--border-color); border-left: 4px solid var(--accent-color); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; display: flex; align-items: start; gap: 12px; }
-.notification-item.unread { border-left-color: var(--warning-color); background: rgba(255,255,255,0.03); }
-.notification-meta { color: var(--text-secondary); font-size: 0.85rem; }
-.notification-actions a { font-size: 0.85rem; }
-.badge-priority { font-size: 0.7rem; padding: 0.25rem 0.5rem; border-radius: 6px; }
-.badge-priority.high, .badge-priority.urgent { background: var(--danger-color); color: #fff; }
-</style>
-{% endblock %}
-{% block content %}
-<div class="container-narrow">
-  <h3 class="text-light mb-3"><i class="fas fa-bell me-2"></i>Notifications</h3>
-  {% if notifications %}
-    {% for n in notifications %}
-      <div class="notification-item{% if not n.is_read %} unread{% endif %}">
-        <div style="flex:1">
-          <div class="d-flex justify-content-between align-items-start">
-            <div class="text-light fw-semibold">{{ n.title }}</div>
-            <div class="notification-actions">
-              {% if not n.is_read %}
-              <a href="{% url 'notifications:mark_read' n.id %}"><i class="fas fa-check me-1"></i>Mark as read</a>
-              {% endif %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notifications - Noctis Pro PACS</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-bg: #0a0a0a;
+            --secondary-bg: #1a1a1a;
+            --card-bg: #252525;
+            --header-bg: #333333;
+            --border-color: #404040;
+            --accent-color: #00d4ff;
+            --text-primary: #ffffff;
+            --text-secondary: #b3b3b3;
+            --text-muted: #666666;
+            --success-color: #00ff88;
+            --warning-color: #ffaa00;
+            --danger-color: #ff4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--primary-bg);
+            color: var(--text-primary);
+            font-size: 12px;
+            overflow: hidden;
+        }
+
+        .dashboard-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Navigation */
+        .top-navbar {
+            background: var(--header-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 50px;
+        }
+
+        .nav-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo {
+            color: var(--accent-color);
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 2px;
+        }
+
+        .nav-tab {
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 6px 12px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+
+        .nav-tab.active {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+            font-weight: bold;
+        }
+
+        .nav-tab:hover:not(.active) {
+            background: var(--card-bg);
+            color: var(--text-primary);
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            font-size: 11px;
+        }
+
+        .user-avatar {
+            width: 24px;
+            height: 24px;
+            background: var(--accent-color);
+            color: var(--primary-bg);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 9px;
+        }
+
+        .worklist-btn {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 6px 12px;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            text-decoration: none;
+        }
+
+        .worklist-btn:hover {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+            border-color: var(--accent-color);
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: auto;
+            padding: 16px;
+        }
+
+        .content-header {
+            margin-bottom: 16px;
+        }
+
+        .page-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .page-subtitle {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .notification-item {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--accent-color);
+            border-radius: 4px;
+            padding: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: start;
+            gap: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .notification-item:hover {
+            border-color: var(--accent-color);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .notification-item.unread {
+            border-left-color: var(--warning-color);
+            background: rgba(255, 170, 0, 0.05);
+        }
+
+        .notification-icon {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .notification-content {
+            flex: 1;
+        }
+
+        .notification-title {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
+
+        .notification-message {
+            color: var(--text-secondary);
+            font-size: 11px;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .notification-meta {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            color: var(--text-muted);
+            font-size: 10px;
+        }
+
+        .notification-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .btn-control {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 4px 8px;
+            font-size: 10px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn-control:hover {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+            border-color: var(--accent-color);
+        }
+
+        .badge-priority {
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-priority.high, .badge-priority.urgent {
+            background: var(--danger-color);
+            color: #fff;
+        }
+
+        .badge-priority.normal {
+            background: var(--success-color);
+            color: var(--primary-bg);
+        }
+
+        .badge-priority.low {
+            background: var(--text-muted);
+            color: #fff;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Top Navigation -->
+        <nav class="top-navbar">
+            <div class="nav-left">
+                <div class="logo">NOCTIS PRO</div>
+                <div class="nav-tabs">
+                    <a href="{% url 'worklist:dashboard' %}" class="nav-tab">WORKLIST</a>
+                    <a href="{% url 'reports:report_list' %}" class="nav-tab">REPORTS</a>
+                    <a href="{% url 'notifications:list' %}" class="nav-tab active">NOTIFICATIONS</a>
+                    {% if user.is_admin %}
+                    <a href="{% url 'admin_panel:dashboard' %}" class="nav-tab">ADMIN</a>
+                    {% endif %}
+                </div>
             </div>
-          </div>
-          <div class="text-secondary mt-1">{{ n.message }}</div>
-          <div class="d-flex gap-3 mt-2 notification-meta">
-            <div><i class="fas fa-clock me-1"></i>{{ n.created_at|date:'Y-m-d H:i' }}</div>
-            {% if n.facility %}<div><i class="fas fa-hospital me-1"></i>{{ n.facility.name }}</div>{% endif %}
-            {% if n.study_id %}<div><i class="fas fa-file-medical me-1"></i>Study #{{ n.study_id }}</div>{% endif %}
-            <span class="badge-priority {{ n.priority }}">{{ n.get_priority_display }}</span>
-          </div>
+            <div class="nav-right">
+                <div class="user-info">
+                    <div class="user-avatar">{{ user.get_full_name|default:user.username|slice:":2"|upper }}</div>
+                    <div>
+                        <div>{{ user.get_full_name|default:user.username }}</div>
+                        <div style="color: var(--text-muted); font-size: 10px;">{{ user.role|title }}</div>
+                    </div>
+                </div>
+                <a href="{% url 'worklist:dashboard' %}" class="worklist-btn" title="Back to Dashboard">
+                    <i class="fas fa-arrow-left"></i> BACK
+                </a>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="content-header">
+                <div class="page-title">
+                    <i class="fas fa-bell"></i> Notifications
+                </div>
+                <div class="page-subtitle">Stay updated with important system messages</div>
+            </div>
+
+            {% if notifications %}
+                {% for n in notifications %}
+                <div class="notification-item{% if not n.is_read %} unread{% endif %}">
+                    <div class="notification-icon">
+                        {% if n.priority == 'urgent' or n.priority == 'high' %}
+                            <i class="fas fa-exclamation"></i>
+                        {% elif n.study_id %}
+                            <i class="fas fa-file-medical"></i>
+                        {% elif n.facility %}
+                            <i class="fas fa-hospital"></i>
+                        {% else %}
+                            <i class="fas fa-bell"></i>
+                        {% endif %}
+                    </div>
+                    <div class="notification-content">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div class="notification-title">{{ n.title }}</div>
+                            <div class="notification-actions">
+                                {% if not n.is_read %}
+                                <a href="{% url 'notifications:mark_read' n.id %}" class="btn-control">
+                                    <i class="fas fa-check"></i> Mark as read
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="notification-message">{{ n.message }}</div>
+                        <div class="notification-meta">
+                            <div><i class="fas fa-clock"></i> {{ n.created_at|date:'Y-m-d H:i' }}</div>
+                            {% if n.facility %}<div><i class="fas fa-hospital"></i> {{ n.facility.name }}</div>{% endif %}
+                            {% if n.study_id %}<div><i class="fas fa-file-medical"></i> Study #{{ n.study_id }}</div>{% endif %}
+                            <span class="badge-priority {{ n.priority }}">{{ n.get_priority_display }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-bell"></i>
+                    <div style="font-size: 14px; margin-bottom: 8px;">No Notifications</div>
+                    <div style="font-size: 12px;">You're all caught up! New notifications will appear here.</div>
+                </div>
+            {% endif %}
         </div>
-      </div>
-    {% endfor %}
-  {% else %}
-    <div class="text-center text-secondary py-5">
-      <i class="fas fa-bell fa-3x mb-3" style="opacity:.3"></i>
-      <div>No notifications yet</div>
     </div>
-  {% endif %}
-</div>
-{% endblock %}
+</body>
+</html>
