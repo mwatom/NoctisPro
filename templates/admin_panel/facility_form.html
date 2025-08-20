@@ -143,7 +143,7 @@
                             </a>
                             <div>
                                 {% if not facility %}
-                                <button type="button" class="btn btn-outline-secondary me-2" onclick="resetForm()">
+                                <button class="btn btn-outline-secondary me-2" onclick="resetForm()" type="button"  >
                                     <i class="fas fa-undo me-2"></i>Reset
                                 </button>
                                 {% endif %}
@@ -163,6 +163,21 @@
 
 {% block extra_css %}
 <style>
+        :root {
+            --primary-bg: #0a0a0a;
+            --secondary-bg: #1a1a1a;
+            --card-surface: #252525;
+            --header-bg: #333333;
+            --border-color: #404040;
+            --accent-color: #00d4ff;
+            --text-primary: #ffffff;
+            --text-secondary: #b3b3b3;
+            --text-muted: #666666;
+            --success-color: #00ff88;
+            --warning-color: #ffaa00;
+            --danger-color: #ff4444;
+        }
+
     .navbar-medical {
         background: var(--gradient-primary);
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);

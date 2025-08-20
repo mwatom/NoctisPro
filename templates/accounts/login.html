@@ -7,15 +7,15 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
-            --primary-bg: #0a0a0a;
-            --secondary-bg: #1a1a1a;
-            --card-bg: #252525;
-            --header-bg: #333333;
-            --border-color: #404040;
-            --accent-color: #00d4ff;
-            --text-primary: #ffffff;
-            --text-secondary: #b3b3b3;
-            --text-muted: #666666;
+            --primary-bg: var(--primary-bg);
+            --secondary-bg: var(--secondary-bg);
+            --card-bg: var(--card-surface);
+            --header-bg: var(--header-bg);
+            --border-color: var(--border-color);
+            --accent-color: var(--accent-color);
+            --text-primary: var(--text-primary);
+            --text-secondary: var(--text-secondary);
+            --text-muted: var(--text-muted);
             --success-color: #00ff88;
             --warning-color: #ffaa00;
             --danger-color: #ff4444;
@@ -187,11 +187,11 @@
                 {% csrf_token %}
                 <div class="form-group">
                     <label class="form-label" for="username">Username</label>
-                    <input type="text" class="form-control" id="username" name="username" placeholder="Enter username" required autocomplete="off" inputmode="text" autocapitalize="none" autocorrect="off">
+                    <input type="text" class="form-control-medical" id="username" name="username" placeholder="Enter username" required autocomplete="off" inputmode="text" autocapitalize="none" autocorrect="off">
                 </div>
                 <div class="form-group">
                     <label class="form-label" for="password">Password</label>
-                    <input type="password" class="form-control" id="password" name="password" placeholder="Enter password" required autocomplete="new-password">
+                    <input type="password" class="form-control-medical" id="password" name="password" placeholder="Enter password" required autocomplete="new-password">
                 </div>
                 <button type="submit" class="btn-control" id="loginButton">
                     <i class="fas fa-sign-in-alt"></i>

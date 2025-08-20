@@ -35,12 +35,12 @@
           </ul>
 
           <div class="d-flex justify-content-between">
-            <a href="{% url 'admin_panel:user_management' %}" class="btn btn-secondary">
+            <a href="{% url 'admin_panel:user_management' %}" class="btn-control">
               <i class="fas fa-arrow-left me-2"></i>Cancel
             </a>
             <form method="post">
               {% csrf_token %}
-              <button type="submit" class="btn btn-danger">
+              <button type="submit" class="btn-control">
                 <i class="fas fa-trash me-2"></i>Delete User
               </button>
             </form>
