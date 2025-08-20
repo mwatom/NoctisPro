@@ -19,7 +19,7 @@ PROJECT_USER="noctis"
 PROJECT_DIR="/opt/noctis_pro"
 DOMAIN_NAME="noctis-server.local"  # Change this to your actual domain
 SERVER_IP="192.168.100.15"
-GITHUB_REPO="https://github.com/YOUR_USERNAME/YOUR_REPO.git"  # Update with your repo
+GITHUB_REPO="https://github.com/mwatom/NoctisPro.git"
 
 # Database configuration
 DB_NAME="noctis_pro"
