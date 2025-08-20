@@ -1,0 +1,132 @@
+/* NoctisPro Styles - Matching Dashboard.html exactly */
+
+        :root {
+            --primary-bg: #0a0a0a;
+            --secondary-bg: #1a1a1a;
+            --card-bg: #252525;
+            --header-bg: #333333;
+            --border-color: #404040;
+            --accent-color: #00d4ff;
+            --text-primary: #ffffff;
+            --text-secondary: #b3b3b3;
+            --text-muted: #666666;
+            --success-color: #00ff88;
+            --warning-color: #ffaa00;
+            --danger-color: #ff4444;
+            --urgent-color: #ff0066;
+            --scheduled-color: #4a90e2;
+            --in-progress-color: #f5a623;
+            --completed-color: #7ed321;
+            --cancelled-color: #d0021b;
+        }
+
+/* Global reset matching dashboard */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--primary-bg);
+    color: var(--text-primary);
+    font-size: 12px;
+}
+
+/* Button styles exactly from dashboard.html */
+.btn-control {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 4px 12px;
+    border-radius: 2px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-control:hover {
+    background: var(--accent-color);
+    color: var(--primary-bg);
+}
+
+.btn-control.reset {
+    background: var(--accent-color);
+    color: var(--primary-bg);
+}
+
+.btn-viewer {
+    background: var(--accent-color);
+    border: none;
+    color: var(--primary-bg);
+    padding: 4px 8px;
+    border-radius: 2px;
+    font-size: 9px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-viewer:hover {
+    background: #00b8d4;
+}
+
+.btn-viewer.viewer-only {
+    background: var(--card-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.btn-viewer.viewer-only:hover {
+    background: var(--text-secondary);
+    color: var(--primary-bg);
+}
+
+.btn-upload {
+    background: var(--accent-color);
+    color: var(--primary-bg);
+    border: none;
+    padding: 12px 24px;
+    border-radius: 2px;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.btn-upload:hover {
+    background: #00b8d4;
+}
+
+/* Navigation styles from dashboard */
+.nav-tab {
+    background: var(--secondary-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.nav-tab.active {
+    background: var(--accent-color);
+    color: var(--primary-bg);
+    font-weight: bold;
+}
+
+.nav-tab:hover:not(.active) {
+    background: var(--card-bg);
+    color: var(--text-primary);
+}
+
+/* Responsive adjustments from dashboard */
+@media (max-width: 768px) {
+    .btn-viewer {
+        font-size: 8px;
+        padding: 3px 6px;
+    }
+}

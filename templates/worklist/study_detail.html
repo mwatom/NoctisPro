@@ -53,7 +53,7 @@
 
 {% block content %}
 <div class="detail-container">
-	<div class="card-medical">
+	<div class="card">
 		<div class="card-header">
 			<div>
 				<div class="value">{{ study.patient.full_name }} • {{ study.accession_number }}</div>
@@ -112,7 +112,7 @@
 			<div class="modal-body">
 				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
 				<label class="label mb-2">Enter clinical history / indication</label>
-				<textarea id="clinicalInfoInput" class="form-control-medical" style="min-height: 140px;">{{ study.clinical_info }}</textarea>
+				<textarea id="clinicalInfoInput" class="form-control" style="min-height: 140px;">{{ study.clinical_info }}</textarea>
 			</div>
 			<div class="modal-footer" style="border-top: 1px solid var(--border-color);">
 				<button type="button" class="btn-control" data-bs-dismiss="modal">Cancel</button>

@@ -13,7 +13,7 @@
     
     {% load static %}
     {% load dicts %}
-    <link rel="stylesheet" href="{% static 'css/noctis-global.css' %}">
+    <link rel="stylesheet" href="{% static 'css/noctis-dashboard-style.css' %}">
     <style>
         :root {
             /* Unified dark theme palette */
@@ -72,17 +72,7 @@
             backdrop-filter: blur(10px);
         }
 
-        .btn-medical {
-            background: var(--gradient-accent);
-            border: none;
-            border-radius: 2px;
-            color: white;
-            font-weight: 500;
-            padding: 12px 24px;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+        
 
         .btn-medical:hover {
             /* reduce transform for snappier response */

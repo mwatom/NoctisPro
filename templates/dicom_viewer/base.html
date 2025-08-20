@@ -111,10 +111,10 @@
       </div>
     </div>
     <div class="topbar">
-      <button id="btnLoadLocal" class="btn-medical"><i class="fas fa-folder-open"></i> Load Local DICOM</button>
+      <button id="btnLoadLocal" class="btn-control"><i class="fas fa-folder-open"></i> Load Local DICOM</button>
       <a id="btnBackWorklist" class="btn" href="{% url 'worklist:dashboard' %}" onclick="return returnToWorklist(event)"><i class="fas fa-arrow-left"></i> Back to Worklist</a>
       {% if user.is_authenticated and user.can_edit_reports %}
-      <button id="btnWriteReport" class="btn-medical" style="display:none"><i class="fas fa-file-signature"></i> Write Report</button>
+      <button id="btnWriteReport" class="btn-control" style="display:none"><i class="fas fa-file-signature"></i> Write Report</button>
       {% endif %}
       <input id="localDicom" type="file" multiple webkitdirectory directory accept=".dcm,.dicom,application/dicom" style="display:none" />
       <select id="seriesSelect" class="select"><option value="">Select Series</option></select>
@@ -201,7 +201,7 @@
           <input id="boneThreshold" type="range" min="100" max="1500" value="300">
         </div>
         <div class="control">
-          <button id="btnGenerateRecon" class="btn-medical"><i class="fas fa-cogs"></i> Generate</button>
+          <button id="btnGenerateRecon" class="btn-control"><i class="fas fa-cogs"></i> Generate</button>
         </div>
         <div class="muted" id="reconStatus"></div>
         <div class="row-3" id="reconViews" style="margin-top:8px; display:none;">
