@@ -120,7 +120,7 @@
                 <option value="{{ facility.id }}" {% if edit_mode and user_obj.facility_id == facility.id %}selected{% elif not edit_mode and preset_facility == facility.id|stringformat:'s' %}selected{% endif %}>{{ facility.name }}</option>
                 {% endfor %}
               </select>
-              <button type="button" class="btn btn-outline-secondary" onclick="window.open('{% url 'admin_panel:facility_create' %}', '_blank')" title="Add new facility">
+              <button class="btn-control" onclick="window.open('{% url 'admin_panel:facility_create' %}', '_blank')" type="button"   title="Add new facility">
                 <i class="fas fa-plus"></i>
               </button>
             </div>
@@ -228,7 +228,7 @@
       <!-- Form Navigation -->
       <div class="form-navigation mt-4">
         <div class="d-flex justify-content-between">
-          <button type="button" class="btn btn-outline-secondary" id="prevBtn" style="display: none;">
+          <button type="button" class="btn-control" id="prevBtn" style="display: none;">
             <i class="fas fa-arrow-left me-2"></i>Previous
           </button>
           <button type="button" class="btn-control" id="nextBtn">
@@ -246,6 +246,21 @@
 
 {% block extra_css %}
 <style>
+        :root {
+            --primary-bg: #0a0a0a;
+            --secondary-bg: #1a1a1a;
+            --card-surface: #252525;
+            --header-bg: #333333;
+            --border-color: #404040;
+            --accent-color: #00d4ff;
+            --text-primary: #ffffff;
+            --text-secondary: #b3b3b3;
+            --text-muted: #666666;
+            --success-color: #00ff88;
+            --warning-color: #ffaa00;
+            --danger-color: #ff4444;
+        }
+
     .navbar-medical {
         background: var(--gradient-primary);
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);

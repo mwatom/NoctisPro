@@ -7,15 +7,15 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
-            --primary-bg: #0a0a0a;
-            --secondary-bg: #1a1a1a;
-            --card-bg: #252525;
-            --header-bg: #333333;
-            --border-color: #404040;
-            --accent-color: #00d4ff;
-            --text-primary: #ffffff;
-            --text-secondary: #b3b3b3;
-            --text-muted: #666666;
+            --primary-bg: var(--primary-bg);
+            --secondary-bg: var(--secondary-bg);
+            --card-bg: var(--card-surface);
+            --header-bg: var(--header-bg);
+            --border-color: var(--border-color);
+            --accent-color: var(--accent-color);
+            --text-primary: var(--text-primary);
+            --text-secondary: var(--text-secondary);
+            --text-muted: var(--text-muted);
             --success-color: #00ff88;
             --warning-color: #ffaa00;
             --danger-color: #ff4444;
@@ -565,16 +565,16 @@
                         <div style="color: var(--text-muted); font-size: 10px;">Administrator</div>
                     </div>
                 </div>
-                <button class="worklist-btn" onclick="window.location.href='{% url 'worklist:dashboard' %}'" title="Go to Worklist Dashboard">
+                <button class="worklist-btn" onclick="window.location.href='{% url 'worklist:dashboard' %}'"   title="Go to Worklist Dashboard">
                     <i class="fas fa-home"></i> WORKLIST
                 </button>
-                <button class="worklist-btn" onclick="window.location.href='{% url 'admin_panel:facility_management' %}'" title="Manage Facilities">
+                <button class="worklist-btn" onclick="window.location.href='{% url 'admin_panel:facility_management' %}'"   title="Manage Facilities">
                     <i class="fas fa-hospital"></i> FACILITIES
                 </button>
-                <button class="worklist-btn" onclick="window.location.href='{% url 'admin_panel:user_management' %}'" title="Manage Users">
+                <button class="worklist-btn" onclick="window.location.href='{% url 'admin_panel:user_management' %}'"   title="Manage Users">
                     <i class="fas fa-users"></i> USERS
                 </button>
-                <button class="worklist-btn" onclick="window.open('{% url 'dicom_viewer:launch_standalone_viewer' %}', '_blank')" title="Open DICOM Viewer">
+                <button class="worklist-btn" onclick="window.open('{% url 'dicom_viewer:launch_standalone_viewer' %}', '_blank')"   title="Open DICOM Viewer">
                     <i class="fas fa-external-link-alt"></i> DICOM VIEWER
                 </button>
             </div>
@@ -609,14 +609,14 @@
                     <option value="technologist">Technologist</option>
                 </select>
             </div>
-            <button class="btn-control reset" onclick="resetFilters()">RESET</button>
-            <button class="btn-control" onclick="refreshData()">
+            <button class="btn-control reset" onclick="resetFilters()"  >RESET</button>
+            <button class="btn-control" onclick="refreshData()"  >
                 <i class="fas fa-sync-alt"></i> REFRESH
             </button>
-            <button class="btn-control" onclick="exportData()">
+            <button class="btn-control" onclick="exportData()"  >
                 <i class="fas fa-download"></i> EXPORT
             </button>
-            <button class="btn-control danger" onclick="systemBackup()">
+            <button class="btn-control danger" onclick="systemBackup()"  >
                 <i class="fas fa-database"></i> BACKUP
             </button>
 
@@ -766,10 +766,10 @@
                     <td class="timestamp">${formatTime(item.created)}</td>
                     <td>
                         <div class="action-buttons">
-                            <button class="btn-action edit" onclick="editItem('${item.id}')" title="Edit item">
+                            <button class="btn-action edit" onclick="editItem('${item.id}')"   title="Edit item">
                                 <i class="fas fa-edit"></i> EDIT
                             </button>
-                            <button class="btn-action delete" onclick="deleteItem('${item.id}')" title="Delete item">
+                            <button class="btn-action delete" onclick="deleteItem('${item.id}')"   title="Delete item">
                                 <i class="fas fa-trash"></i> DEL
                             </button>
                         </div>

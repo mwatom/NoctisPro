@@ -1,208 +1,411 @@
-# Improved Python DICOM Viewer
+# NoctisPro - Enterprise Medical Imaging Platform
 
-This is an enhanced version of the original DICOM viewer that fixes major display issues and adds robust error handling, improved performance, and better user experience.
+[![Deploy Status](https://img.shields.io/badge/deploy-ready-green.svg)](https://github.com/mwatom/NoctisPro)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://python.org)
+[![Django](https://img.shields.io/badge/django-5.2.5-green.svg)](https://djangoproject.com)
 
-## Key Improvements Made
+NoctisPro is a comprehensive, production-ready medical imaging platform designed for healthcare professionals to manage, view, and analyze DICOM medical images with advanced AI-powered features and enterprise-grade security.
 
-### ✅ Fixed Image Display Issues
-- **Proper pixel data handling**: Improved pixel array access with comprehensive error checking
-- **Enhanced windowing algorithm**: Fixed windowing calculations with better normalization
-- **Better data type conversion**: Handles different pixel data formats (16-bit, RGB, multi-dimensional)
-- **Improved matplotlib integration**: Fixed figure configuration and rendering
+## 🚀 Features
 
-### ✅ Enhanced Error Handling
-- **Comprehensive exception handling**: All major functions now have try-catch blocks
-- **Detailed logging**: Added debug logging throughout the application
-- **User-friendly error messages**: Clear error dialogs for users
-- **Graceful degradation**: App continues working even when some files fail to load
+### Core Functionality
+- **DICOM Viewer**: High-performance medical image viewer with advanced visualization tools
+- **Worklist Management**: Complete study and patient management system
+- **Multi-format Support**: DICOM, JPEG, PNG, TIFF, and other medical imaging formats
+- **Real-time Collaboration**: Live chat and collaboration tools for medical teams
+- **Report Generation**: Comprehensive reporting system with PDF export
 
-### ✅ Performance Optimizations
-- **Smart image caching**: Avoids unnecessary re-processing of images
-- **Optimized rendering**: Uses `draw_idle()` for smoother interactions
-- **Efficient windowing**: Real-time windowing with slider synchronization
-- **Memory management**: Better handling of large datasets
+### Advanced Features
+- **AI-Powered Analysis**: Automated image analysis and anomaly detection
+- **3D Reconstruction**: Advanced 3D visualization and reconstruction capabilities
+- **PACS Integration**: Seamless integration with existing PACS systems
+- **Quality Assurance**: Built-in QA tools for image quality assessment
+- **Mobile Support**: Responsive design for mobile and tablet devices
 
-### ✅ Improved User Interface
-- **Better overlay styling**: Semi-transparent overlays with improved readability
-- **Enhanced metadata display**: More detailed image information
-- **Directory loading**: Added "Load DICOM Directory" functionality
-- **Improved measurements**: Better measurement display with physical units
-- **Info button**: Detailed DICOM tag viewer
+### Enterprise Features
+- **Multi-tenant Architecture**: Support for multiple facilities and departments
+- **Role-based Access Control**: Granular permissions and user management
+- **Audit Logging**: Complete audit trail for compliance
+- **High Availability**: Load balancing and failover support
+- **Scalable Storage**: Support for cloud and distributed storage
 
-### ✅ Robust DICOM Support
-- **Multiple file format support**: Handles various DICOM file types
-- **Better metadata parsing**: Improved patient info extraction
-- **Sorting by instance number**: Automatic slice ordering
-- **Handles edge cases**: Deals with missing or malformed DICOM tags
+## 🛠️ Technology Stack
 
-## Installation
+- **Backend**: Django 5.2.5, Python 3.11+
+- **Frontend**: HTML5, CSS3, JavaScript, Bootstrap 5
+- **Database**: PostgreSQL 13+ (Production)
+- **Cache & Queue**: Redis 6.0+
+- **WebSockets**: Django Channels with Redis
+- **Image Processing**: OpenCV, SimpleITK, PyDICOM, GDCM
+- **AI/ML**: PyTorch, scikit-learn, transformers
+- **Deployment**: Gunicorn, Daphne, Nginx, Systemd
+- **Security**: SSL/TLS, UFW Firewall, Fail2ban
 
-### Required Dependencies
+## 📋 System Requirements
+
+### Minimum Requirements
+- **OS**: Ubuntu 20.04+ or Ubuntu 22.04+ LTS
+- **CPU**: 4 cores (8 cores recommended)
+- **RAM**: 8GB (16GB recommended)
+- **Storage**: 100GB SSD (500GB+ recommended)
+- **Network**: Stable internet connection for updates
+
+### Production Requirements
+- **OS**: Ubuntu 22.04 LTS Server
+- **CPU**: 8+ cores
+- **RAM**: 16GB+ 
+- **Storage**: 1TB+ NVMe SSD
+- **Network**: Dedicated IP, Domain name (optional)
+- **SSL**: Valid SSL certificate for HTTPS
+
+## 🚀 Complete Deployment Guide
+
+### Step 1: Server Preparation
+
+1. **Set up your Ubuntu server** (22.04 LTS recommended)
+2. **Update system packages**:
+   ```bash
+   sudo apt update && sudo apt upgrade -y
+   ```
+3. **Set server hostname**:
+   ```bash
+   sudo hostnamectl set-hostname noctis-server
+   ```
+
+### Step 2: Clone Repository
+
 ```bash
-pip install numpy pydicom PyQt5 matplotlib
+# Clone the repository
+git clone https://github.com/mwatom/NoctisPro.git
+cd NoctisPro
+
+# Make deployment scripts executable
+chmod +x deploy_noctis_production.sh
+chmod +x setup_secure_access.sh
+chmod +x setup_ssl.sh
 ```
 
-### Or using system packages (Ubuntu/Debian):
+### Step 3: Configure Domain (Optional but Recommended)
+
+If you have a domain name, update the deployment script:
+
 ```bash
-sudo apt install python3-numpy python3-pydicom python3-pyqt5 python3-matplotlib
+# Edit the deployment script
+nano deploy_noctis_production.sh
+
+# Update this line with your domain:
+DOMAIN_NAME="your-domain.com"  # Change from noctis-server.local
 ```
 
-## Usage
+### Step 4: Run Production Deployment
 
-### Running the Improved Viewer
+Execute the main deployment script:
+
 ```bash
-python3 improved_dicom_viewer.py
+sudo ./deploy_noctis_production.sh
 ```
 
-### Testing with Sample Data
+This comprehensive script will:
+- ✅ Install all required system packages (PostgreSQL, Redis, Nginx, etc.)
+- ✅ Create dedicated system user and secure directory structure
+- ✅ Set up PostgreSQL with production-optimized configuration
+- ✅ Configure Redis with authentication and security
+- ✅ Create Python virtual environment and install dependencies
+- ✅ Generate secure passwords and Django secret key
+- ✅ Configure Django with production settings
+- ✅ Set up Gunicorn with optimal worker configuration
+- ✅ Configure Daphne for WebSocket support
+- ✅ Set up Celery for background tasks
+- ✅ Configure Nginx with security headers and optimizations
+- ✅ Set up UFW firewall with secure rules
+- ✅ Configure Fail2ban for intrusion prevention
+- ✅ Create systemd services for all components
+- ✅ Set up GitHub webhook for automatic deployments
+- ✅ Configure automatic backups with 30-day retention
+- ✅ Create monitoring and status check scripts
+
+### Step 5: Configure Secure Access
+
+Choose your preferred access method:
+
 ```bash
-# Create sample DICOM files for testing
-python3 test_dicom_viewer.py create-samples sample_dicoms 10
-
-# Run viewer with test data automatically loaded
-python3 test_dicom_viewer.py test
+sudo ./setup_secure_access.sh
 ```
 
-## Features
+**Access Options:**
 
-### Image Display
-- **Window/Level adjustment**: Use sliders or mouse drag (windowing tool)
-- **Zoom and Pan**: Mouse wheel zoom (Ctrl+wheel) and pan tool
-- **Image inversion**: Toggle between normal and inverted display
-- **Crosshair overlay**: Optional crosshair display
-- **Reset view**: Return to original zoom and position
+1. **Domain with SSL Certificate** (Recommended)
+   - Requires a registered domain name
+   - Automatic SSL certificate via Let's Encrypt
+   - HTTPS access: `https://your-domain.com`
+   - No IP exposure
 
-### Navigation
-- **Slice navigation**: Mouse wheel or slider to navigate through series
-- **Keyboard shortcuts**: Arrow keys for slice navigation
-- **Series info**: Current slice indicator
+2. **Cloudflare Tunnel** (Zero Trust)
+   - No open ports on your server
+   - Access via Cloudflare's network
+   - Enhanced DDoS protection
+   - Global CDN acceleration
 
-### Measurements and Annotations
-- **Distance measurements**: Click and drag to measure distances
-- **Physical units**: Automatic conversion to mm when pixel spacing available
-- **Text annotations**: Add custom text annotations to images
-- **Measurement list**: View all measurements in the sidebar
+3. **VPN Access Only**
+   - WireGuard VPN setup
+   - Private network access only
+   - Maximum security for internal use
 
-### DICOM Information
-- **Patient metadata**: Patient name, study date, modality
-- **Image properties**: Dimensions, pixel spacing, data type
-- **Detailed info**: Click "Info" button for complete DICOM tag listing
+4. **Reverse Proxy**
+   - For use with existing proxy infrastructure
+   - Custom domain support
+   - Load balancing capability
 
-### Window/Level Presets
-- **Lung**: WW=1500, WL=-600
-- **Bone**: WW=2000, WL=300  
-- **Soft tissue**: WW=400, WL=40
-- **Brain**: WW=100, WL=50
+5. **Local Network Only**
+   - Restricted to private IP ranges
+   - No internet exposure
+   - Perfect for internal deployments
 
-## File Structure
+### Step 6: GitHub Integration Setup
 
+1. **Go to your GitHub repository settings**
+2. **Navigate to Webhooks**
+3. **Add webhook with these settings**:
+   - **URL**: `https://your-domain.com/webhook` (or `http://192.168.100.15/webhook`)
+   - **Content Type**: `application/json`
+   - **Events**: Push events
+   - **Active**: ✅ Checked
+
+Now any push to the main branch will automatically deploy to your server!
+
+## 🔧 Post-Deployment Configuration
+
+### Access Your Installation
+
+- **Main Application**: `https://your-domain.com` or `http://192.168.100.15`
+- **Admin Panel**: `https://your-domain.com/admin`
+- **Default Admin Credentials**: 
+  - Username: `admin`
+  - Password: `admin123` (⚠️ Change immediately!)
+
+### Change Default Password
+
+```bash
+cd /opt/noctis_pro
+sudo -u noctis ./venv/bin/python manage.py changepassword admin --settings=noctis_pro.settings_production
 ```
-/workspace/
-├── improved_dicom_viewer.py    # Main viewer application (improved)
-├── test_dicom_viewer.py        # Test script and sample data generator
-├── sample_dicoms/              # Sample DICOM files for testing
-└── README.md                   # This file
+
+### Configure Email (Optional)
+
+Edit the environment file:
+```bash
+sudo nano /opt/noctis_pro/.env
+
+# Add your email configuration
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=your-email@gmail.com
+EMAIL_HOST_PASSWORD=your-app-password
+DEFAULT_FROM_EMAIL=noctis@your-domain.com
 ```
 
-## Key Fixes from Original Code
+## 📊 System Management
 
-### 1. Image Display Problems
-**Original Issue**: Images not displaying properly or at all
-**Fix**: 
-- Added proper pixel data validation
-- Fixed matplotlib figure configuration
-- Improved windowing algorithm with safety checks
-- Better handling of different pixel data formats
+### Check System Status
+```bash
+sudo /usr/local/bin/noctis-status.sh
+```
 
-### 2. Error Handling
-**Original Issue**: Crashes when loading invalid files
-**Fix**:
-- Comprehensive try-catch blocks around all file operations
-- Graceful handling of missing DICOM tags
-- User-friendly error messages instead of crashes
+### View Service Logs
+```bash
+# All services
+sudo journalctl -u noctis-django -u noctis-daphne -u noctis-celery -f
 
-### 3. Performance Issues
-**Original Issue**: Slow rendering and UI freezing
-**Fix**:
-- Implemented smart caching system
-- Optimized matplotlib rendering
-- Separated overlay updates from full redraws
-- Better memory management
+# Specific service
+sudo journalctl -u noctis-django -f
+```
 
-### 4. User Experience
-**Original Issue**: Poor feedback and limited functionality
-**Fix**:
-- Added progress indicators and status messages
-- Improved metadata display
-- Better tool selection and visual feedback
-- Enhanced measurement tools
+### Restart Services
+```bash
+sudo systemctl restart noctis-django noctis-daphne noctis-celery
+```
 
-## Sample DICOM Files
+### Create Manual Backup
+```bash
+sudo /usr/local/bin/noctis-backup.sh
+```
 
-The test script can generate synthetic DICOM files with different patterns:
-- **Gradient**: Smooth intensity gradient
-- **Checkerboard**: Geometric pattern for testing
-- **Circles**: Concentric circles pattern
-- **Noise**: Random noise pattern
+### Update Application
+```bash
+cd /opt/noctis_pro
+sudo -u noctis git pull origin main
+sudo systemctl restart noctis-django noctis-daphne noctis-celery
+```
 
-These are useful for testing viewer functionality without requiring real medical data.
+## 🔐 Security Features
 
-## Troubleshooting
+### Built-in Security
+- **SSL/TLS Encryption**: Automatic HTTPS with Let's Encrypt
+- **Firewall Protection**: UFW with minimal open ports
+- **Intrusion Prevention**: Fail2ban with custom rules
+- **Database Security**: Dedicated users with strong passwords
+- **Session Security**: Secure cookies and CSRF protection
+- **Security Headers**: Comprehensive HTTP security headers
+
+### Security Best Practices
+- Change default admin password immediately
+- Regular security updates via automatic deployment
+- Monitor access logs regularly
+- Use strong passwords for all accounts
+- Enable two-factor authentication (configure manually)
+- Regular backup verification
+
+## 📈 Performance & Scaling
+
+### Built-in Optimizations
+- **Database**: PostgreSQL with production tuning
+- **Caching**: Redis for sessions and application cache
+- **Static Files**: Nginx with compression and long-term caching
+- **Process Management**: Gunicorn with optimal worker count
+- **Background Tasks**: Celery for async processing
+- **WebSockets**: Daphne for real-time features
+
+### Scaling Options
+- **Horizontal Scaling**: Multiple app servers behind load balancer
+- **Database Scaling**: Read replicas and connection pooling
+- **Storage Scaling**: Network-attached storage or cloud storage
+- **CDN Integration**: Static file delivery via CDN
+- **Monitoring**: Integration with monitoring services
+
+## 🔄 Automatic Updates & CI/CD
+
+The system includes built-in continuous deployment:
+
+1. **Push code** to the main branch
+2. **GitHub webhook** triggers deployment
+3. **Server automatically**:
+   - Pulls latest code
+   - Installs new dependencies
+   - Runs database migrations
+   - Collects static files
+   - Restarts services with zero downtime
+
+### Manual Deployment Control
+```bash
+# Disable auto-deployment
+sudo systemctl stop noctis-webhook
+
+# Enable auto-deployment
+sudo systemctl start noctis-webhook
+```
+
+## 🛡️ Backup & Recovery
+
+### Automatic Backups
+- **Daily database dumps** at 2:00 AM
+- **Media file backups** with compression
+- **30-day retention** policy
+- **Storage location**: `/opt/backups/noctis_pro/`
+
+### Manual Recovery
+```bash
+# Restore database from backup
+sudo -u postgres psql -d noctis_pro < /opt/backups/noctis_pro/database_YYYYMMDD_HHMMSS.sql
+
+# Restore media files
+sudo tar -xzf /opt/backups/noctis_pro/media_YYYYMMDD_HHMMSS.tar.gz -C /opt/noctis_pro/
+```
+
+## 🆘 Troubleshooting
 
 ### Common Issues
 
-1. **ModuleNotFoundError**: Install required dependencies
-2. **Display issues**: Ensure you have a GUI environment (X11)
-3. **File loading errors**: Check DICOM file validity
-4. **Performance issues**: Try with smaller datasets first
-
-### Debug Mode
-The improved viewer includes comprehensive logging. Check console output for detailed error information.
-
-### System Requirements
-- Python 3.7+
-- PyQt5 with GUI support
-- 4GB+ RAM for large datasets
-- Graphics display (X11, Wayland, etc.)
-
-## Development Notes
-
-This improved version maintains compatibility with the original interface while adding significant robustness and functionality. The code is well-documented and includes extensive error handling for production use.
-
-Key architectural improvements:
-- Separation of concerns (display logic, file handling, UI)
-- Event-driven architecture with proper signal handling
-- Defensive programming with input validation
-- Modular design for easy extension
-
-## Auto-reload on Ubuntu 24.04 (Development Mode)
-
-For rapid iteration on a server, you can enable auto-reload so code changes restart Django, Celery, and the DICOM receiver.
-
-1) Install and run using the deploy script with `AUTO_RELOAD=1`:
-
+**Services not starting:**
 ```bash
-# From project root
-chmod +x deploy.sh
-AUTO_RELOAD=1 ./deploy.sh
+sudo systemctl status noctis-django noctis-daphne noctis-celery
+sudo journalctl -u noctis-django --since "1 hour ago"
 ```
 
-This will:
-- Run `python manage.py runserver 0.0.0.0:8000` with Django’s reloader
-- Install `watchdog` and use `watchmedo auto-restart` for Celery and `dicom_receiver.py`
-- Automatically restart workers on `*.py` file changes
-
-2) To stop background processes (if needed):
-
+**Database connection issues:**
 ```bash
-pkill -f "manage.py runserver" || true
-pkill -f "watchmedo .* celery" || true
-pkill -f "watchmedo .* dicom_receiver.py" || true
-pkill -f "dicom_receiver.py" || true
+sudo -u postgres psql -d noctis_pro -c "SELECT version();"
 ```
 
-3) For production (no auto-reload), run normally:
-
+**Redis connection issues:**
 ```bash
-./deploy.sh
+redis-cli -a $(grep REDIS_PASSWORD /opt/noctis_pro/.env | cut -d= -f2) ping
 ```
+
+**Nginx configuration issues:**
+```bash
+sudo nginx -t
+sudo systemctl status nginx
+```
+
+**SSL certificate issues:**
+```bash
+sudo certbot certificates
+sudo certbot renew --dry-run
+```
+
+### Support Resources
+- **System logs**: `/opt/noctis_pro/logs/`
+- **Status script**: `/usr/local/bin/noctis-status.sh`
+- **Configuration**: `/opt/noctis_pro/.env`
+- **Backup location**: `/opt/backups/noctis_pro/`
+
+## 🏥 Use Cases
+
+### Healthcare Facilities
+- **Hospitals**: Primary diagnostic workstation for radiology departments
+- **Clinics**: Specialized imaging for orthopedics, cardiology, oncology
+- **Teleradiology**: Remote diagnostic services
+- **Teaching Hospitals**: Medical education and training
+
+### Research Institutions
+- **Clinical Trials**: Medical image analysis and data collection
+- **AI Research**: Machine learning model development and testing
+- **Academic Research**: Image processing and analysis studies
+- **Collaborative Research**: Multi-site research coordination
+
+## 📞 Support & Maintenance
+
+### Professional Support
+- **Documentation**: Comprehensive deployment and user guides
+- **Community Support**: GitHub issues and discussions
+- **Enterprise Support**: Available for production deployments
+- **Training**: User and administrator training available
+
+### Maintenance Schedule
+- **Security Updates**: Automatic via CI/CD pipeline
+- **System Updates**: Monthly maintenance windows
+- **Backup Verification**: Weekly automated tests
+- **Performance Monitoring**: 24/7 system monitoring
+
+## 🚀 Roadmap
+
+### Version 2.0 (Q2 2024)
+- [ ] Multi-tenant architecture
+- [ ] Cloud storage integration (AWS S3, Azure Blob)
+- [ ] Mobile applications (iOS/Android)
+- [ ] Advanced AI models for specialized imaging
+- [ ] Integration with major EHR systems
+
+### Version 1.5 (Current)
+- [x] Production-ready deployment automation
+- [x] Enterprise security features
+- [x] Comprehensive monitoring and logging
+- [x] Automatic backup and recovery
+- [x] GitHub integration and CI/CD
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🎯 Quick Start Summary
+
+1. **Clone**: `git clone https://github.com/mwatom/NoctisPro.git`
+2. **Deploy**: `sudo ./deploy_noctis_production.sh`
+3. **Secure**: `sudo ./setup_secure_access.sh`
+4. **Access**: `https://your-domain.com` or `http://192.168.100.15`
+5. **GitHub**: Set up webhook for automatic updates
+
+**NoctisPro** - Enterprise-Ready Medical Imaging Platform for the Modern Healthcare Environment

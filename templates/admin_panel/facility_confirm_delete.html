@@ -71,18 +71,18 @@
           {% endif %}
 
           <div class="d-flex justify-content-between">
-            <a href="{% url 'admin_panel:facility_management' %}" class="btn btn-secondary">
+            <a href="{% url 'admin_panel:facility_management' %}" class="btn-control">
               <i class="fas fa-arrow-left me-2"></i>Cancel
             </a>
             {% if not facility.user_set.exists %}
             <form method="post" class="d-inline">
               {% csrf_token %}
-              <button type="submit" class="btn btn-danger">
+              <button type="submit" class="btn-control">
                 <i class="fas fa-trash me-2"></i>Delete Facility
               </button>
             </form>
             {% else %}
-            <a href="{% url 'admin_panel:user_management' %}?facility={{ facility.id }}" class="btn btn-warning">
+            <a href="{% url 'admin_panel:user_management' %}?facility={{ facility.id }}" class="btn-control">
               <i class="fas fa-users me-2"></i>Manage Users First
             </a>
             {% endif %}

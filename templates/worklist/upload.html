@@ -4,6 +4,21 @@
 
 {% block extra_css %}
 <style>
+        :root {
+            --primary-bg: #0a0a0a;
+            --secondary-bg: #1a1a1a;
+            --card-surface: #252525;
+            --header-bg: #333333;
+            --border-color: #404040;
+            --accent-color: #00d4ff;
+            --text-primary: #ffffff;
+            --text-secondary: #b3b3b3;
+            --text-muted: #666666;
+            --success-color: #00ff88;
+            --warning-color: #ffaa00;
+            --danger-color: #ff4444;
+        }
+
     .upload-container {
         background: var(--dark-bg);
         min-height: 100vh;
@@ -271,7 +286,7 @@
                 <h4 class="text-light mb-2">Upload Successful!</h4>
                 <p class="text-secondary mb-3">Your DICOM studies have been uploaded successfully.</p>
                 <div id="uploadSummary" class="text-light mb-3"></div>
-                <button type="button" class="btn-control" onclick="redirectToDashboard()" class="btn-control primary">
+                <button class="btn-control" onclick="redirectToDashboard()" type="button"   class="btn-control primary">
                     <i class="fas fa-arrow-left me-2"></i>Return to Worklist
                 </button>
             </div>
