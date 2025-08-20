@@ -13,8 +13,8 @@ $ErrorActionPreference = 'Continue'  # Continue on errors to complete as much as
 $ProgressPreference = 'SilentlyContinue'
 
 # Generate secure random passwords
-$AdminPassword = -join ((1..16) | ForEach {Get-Random -InputObject (@('a'..'z') + @('A'..'Z') + @('0'..'9'))})
-$DBPassword = -join ((1..20) | ForEach {Get-Random -InputObject (@('a'..'z') + @('A'..'Z') + @('0'..'9') + @('!','@','#','$','%'))})
+$AdminPassword = -join ((1..16) | ForEach {Get-Random -InputObject ([char[]](97..122) + [char[]](65..90) + [char[]](48..57))})
+$DBPassword = -join ((1..20) | ForEach {Get-Random -InputObject ([char[]](97..122) + [char[]](65..90) + [char[]](48..57) + @('!','@','#','$','%'))})
 
 Write-Host "🚀 NOCTISPRO COMPLETE AUTO-DEPLOYMENT STARTING..." -ForegroundColor Green -BackgroundColor Black
 Write-Host "=" * 80 -ForegroundColor Green
@@ -223,7 +223,7 @@ DB_PASSWORD=$DBPassword
 DB_HOST=localhost
 DB_PORT=5432
 
-SECRET_KEY=$(-join ((1..50) | ForEach {Get-Random -InputObject (@('a'..'z') + @('A'..'Z') + @('0'..'9') + @('!','@','#','$','%','^','&','*'))}))
+SECRET_KEY=$(-join ((1..50) | ForEach {Get-Random -InputObject ([char[]](97..122) + [char[]](65..90) + [char[]](48..57) + @('!','@','#','$','%','^','&','*'))}))
 DEBUG=False
 ALLOWED_HOSTS=*
 
@@ -283,12 +283,12 @@ from django.contrib.auth.hashers import make_password
 
 # Create facility with AE title
 facility, created = Facility.objects.get_or_create(
-    ae_title='$AETitle',
+    ae_title="$AETitle",
     defaults={
         'name': 'Auto-Deployed Medical Center',
         'address': '123 Healthcare Boulevard, Medical District',
         'phone': '+1-555-MEDICAL',
-        'email': '$AdminEmail',
+        'email': "$AdminEmail",
         'license_number': 'AUTO-DEPLOY-2024',
         'is_active': True
     }
@@ -297,9 +297,9 @@ print(f'✅ Facility configured: {facility.name} (AE: {facility.ae_title})')
 
 # Create admin user
 user, created = User.objects.get_or_create(
-    username='$AdminUsername',
+    username="$AdminUsername",
     defaults={
-        'email': '$AdminEmail',
+        'email': "$AdminEmail",
         'first_name': 'System',
         'last_name': 'Administrator',
         'role': 'admin',
@@ -311,7 +311,7 @@ user, created = User.objects.get_or_create(
     }
 )
 
-user.set_password('$AdminPassword')
+user.set_password("$AdminPassword")
 user.save()
 print(f'✅ Admin user created: {user.username}')
 print(f'   Password: $AdminPassword')
