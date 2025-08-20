@@ -1,28 +1,27 @@
-name: Deploy
+name: Deploy to Production
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
   workflow_dispatch:
-
-concurrency:
-  group: deploy-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Run remote deploy
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          script: |
-            set -Eeuo pipefail
-            # Discover APP_DIR from env file and run the deploy script
-            APP_DIR=$(bash -lc '. /etc/noctis/noctis.env 2>/dev/null || true; echo ${APP_DIR:-/opt/noctis}')
-            echo "Using APP_DIR=$APP_DIR"
-            DEPLOY_BRANCH="main" ENV_FILE="/etc/noctis/noctis.env" bash "$APP_DIR/ops/deploy_from_git.sh" 2>&1 | sudo tee -a /var/log/noctis-deploy.log
+    - name: Deploy to server
+      uses: appleboy/ssh-action@v0.1.7
+      with:
+        host: 192.168.100.15
+        username: noctis
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          cd /opt/noctis_pro
+          git pull origin main
+          source venv/bin/activate
+          pip install -r requirements.txt
+          python manage.py migrate --settings=noctis_pro.settings_production
+          python manage.py collectstatic --noinput --settings=noctis_pro.settings_production
+          sudo systemctl restart noctis-django noctis-daphne noctis-celery
+          echo "Deployment completed successfully"
