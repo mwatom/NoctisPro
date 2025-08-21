@@ -191,6 +191,7 @@ class EnhancedDicomReceiver:
         self.refresh_facility_cache()
         
         logger.info(f"Enhanced DICOM Receiver initialized - AET: {aet}, Port: {port}, External: {external_access}")
+        logger.info("Ready to receive DICOM images from configured facilities")
     
     def refresh_facility_cache(self):
         """Refresh facility AE titles cache"""

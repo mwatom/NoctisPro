@@ -189,55 +189,69 @@ def facility_dicom_config(request, facility_id):
         return JsonResponse({'error': str(e)}, status=500)
 
 @login_required
-def facility_management_test(request):
-    """Test facility management functionality"""
+def facility_management_status(request):
+    """Check facility management functionality status with actual data"""
     
     if not request.user.is_admin():
         return JsonResponse({'error': 'Admin access required'}, status=403)
     
     try:
-        # Test facility creation functionality
-        from admin_panel.views import _standardize_aetitle
-        
-        test_results = {
-            'facility_model': True,
-            'ae_title_generation': True,
-            'facility_count': Facility.objects.count(),
+        # Get actual facility and user statistics
+        facility_stats = {
+            'total_facilities': Facility.objects.count(),
             'active_facilities': Facility.objects.filter(is_active=True).count(),
-            'user_count': User.objects.count(),
-            'admin_count': User.objects.filter(role='admin').count(),
-            'facility_users': User.objects.filter(role='facility').count(),
-            'radiologists': User.objects.filter(role='radiologist').count(),
+            'inactive_facilities': Facility.objects.filter(is_active=False).count(),
+            'facilities_with_ae_titles': Facility.objects.exclude(ae_title='').count(),
+            'facilities_without_ae_titles': Facility.objects.filter(ae_title='').count(),
         }
         
-        # Test AE title generation
-        test_names = ['Test Hospital', 'Regional Medical Center', 'City Clinic']
-        ae_title_tests = {}
-        for name in test_names:
-            ae_title_tests[name] = _standardize_aetitle(name)
+        user_stats = {
+            'total_users': User.objects.count(),
+            'admin_users': User.objects.filter(role='admin').count(),
+            'facility_users': User.objects.filter(role='facility').count(),
+            'radiologists': User.objects.filter(role='radiologist').count(),
+            'active_users': User.objects.filter(is_active=True).count(),
+            'verified_users': User.objects.filter(is_verified=True).count(),
+        }
         
-        test_results['ae_title_examples'] = ae_title_tests
-        
-        # Recent facility activities
+        # Recent activity (actual data)
         recent_facilities = Facility.objects.order_by('-created_at')[:5]
-        test_results['recent_facilities'] = [
-            {
-                'name': f.name,
-                'ae_title': f.ae_title,
-                'created_at': f.created_at.isoformat() if f.created_at else None,
-                'is_active': f.is_active
-            }
-            for f in recent_facilities
-        ]
+        recent_users = User.objects.order_by('-date_joined')[:5]
+        
+        # Check for facilities without proper AE titles
+        facilities_needing_attention = Facility.objects.filter(
+            Q(ae_title='') | Q(ae_title__isnull=True)
+        ).values('id', 'name', 'is_active')
         
         return JsonResponse({
             'status': 'success',
-            'test_results': test_results,
-            'message': 'Facility management is working correctly'
+            'facility_stats': facility_stats,
+            'user_stats': user_stats,
+            'recent_facilities': [
+                {
+                    'name': f.name,
+                    'ae_title': f.ae_title,
+                    'created_at': f.created_at.isoformat() if f.created_at else None,
+                    'is_active': f.is_active
+                }
+                for f in recent_facilities
+            ],
+            'recent_users': [
+                {
+                    'username': u.username,
+                    'role': u.get_role_display(),
+                    'facility': u.facility.name if u.facility else None,
+                    'date_joined': u.date_joined.isoformat() if u.date_joined else None,
+                    'is_active': u.is_active
+                }
+                for u in recent_users
+            ],
+            'facilities_needing_attention': list(facilities_needing_attention),
+            'message': 'Facility and user management is operational'
         })
         
     except Exception as e:
-        logger.error(f"Error testing facility management: {e}")
+        logger.error(f"Error checking facility management status: {e}")
         return JsonResponse({
             'status': 'error',
             'error': str(e)

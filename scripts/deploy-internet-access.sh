@@ -480,16 +480,13 @@ EOF
     log "Facility setup guide created: $NOCTIS_DIR/FACILITY_SETUP_GUIDE.md"
 }
 
-# Test facility and user management
-test_facility_management() {
-    log "Testing facility and user management functionality..."
+# Verify facility and user management functionality
+verify_facility_management() {
+    log "Verifying facility and user management functionality..."
     
     cd "$NOCTIS_DIR"
     
-    # Test Django management commands
-    log "Testing Django functionality..."
-    
-    # Check if we can connect to database
+    # Check Django system
     if docker compose -f docker-compose.internet.yml exec -T web python manage.py check >/dev/null 2>&1; then
         log "✅ Django system check passed"
     else
@@ -497,22 +494,47 @@ test_facility_management() {
         return 1
     fi
     
-    # Test facility model
-    if docker compose -f docker-compose.internet.yml exec -T web python manage.py shell -c "
-from accounts.models import Facility
-print(f'Facility model accessible: {Facility.objects.count()} facilities')
-from accounts.models import User  
-print(f'User model accessible: {User.objects.count()} users')
+    # Check actual facility and user data
+    facility_check=$(docker compose -f docker-compose.internet.yml exec -T web python manage.py shell -c "
+from accounts.models import Facility, User
 from admin_panel.views import _standardize_aetitle
-print(f'AE title function working: {_standardize_aetitle(\"Test Hospital\")}')
-" 2>/dev/null; then
-        log "✅ Facility and user models working"
+
+# Get actual counts
+facility_count = Facility.objects.count()
+active_facilities = Facility.objects.filter(is_active=True).count()
+user_count = User.objects.count()
+admin_count = User.objects.filter(role='admin', is_active=True).count()
+
+print(f'FACILITIES:{facility_count}')
+print(f'ACTIVE_FACILITIES:{active_facilities}')
+print(f'USERS:{user_count}')
+print(f'ADMINS:{admin_count}')
+
+# Test AE title function
+ae_test = _standardize_aetitle('Regional Medical Center')
+print(f'AE_FUNCTION:WORKING:{ae_test}')
+" 2>/dev/null)
+
+    if [ $? -eq 0 ]; then
+        facility_count=$(echo "$facility_check" | grep "FACILITIES:" | cut -d: -f2)
+        active_facilities=$(echo "$facility_check" | grep "ACTIVE_FACILITIES:" | cut -d: -f2)
+        user_count=$(echo "$facility_check" | grep "USERS:" | cut -d: -f2)
+        admin_count=$(echo "$facility_check" | grep "ADMINS:" | cut -d: -f2)
+        
+        log "✅ Facility and user management verified"
+        log "   Total facilities: $facility_count"
+        log "   Active facilities: $active_facilities"
+        log "   Total users: $user_count"
+        log "   Admin users: $admin_count"
+        
+        if [ "$admin_count" -eq 0 ]; then
+            warn "No admin users found. Create one with:"
+            warn "docker compose -f docker-compose.internet.yml exec web python manage.py createsuperuser"
+        fi
     else
-        error "❌ Facility and user models not accessible"
+        error "❌ Facility and user management verification failed"
         return 1
     fi
-    
-    log "Facility and user management test completed"
 }
 
 # Display deployment status
@@ -641,7 +663,7 @@ main() {
     setup_dicom_fail2ban
     setup_ssl_certificates
     deploy_internet_services
-    test_facility_management
+    verify_facility_management
     test_dicom_connectivity
     create_facility_guide
     show_deployment_status
