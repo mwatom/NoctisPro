@@ -178,13 +178,38 @@ sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;
 
 # Configure PostgreSQL for production
 log_info "Configuring PostgreSQL for production..."
-PG_VERSION=$(sudo -u postgres psql -c "SELECT version();" | grep -oE '[0-9]+\.[0-9]+' | head -1)
-PG_CONFIG="/etc/postgresql/$PG_VERSION/main/postgresql.conf"
-PG_HBA="/etc/postgresql/$PG_VERSION/main/pg_hba.conf"
+
+# Get PostgreSQL major version only (e.g., "16" instead of "16.6")
+PG_VERSION=$(sudo -u postgres psql -c "SELECT version();" | grep -oE '[0-9]+' | head -1)
+log_info "Detected PostgreSQL version: $PG_VERSION"
+
+# Find the actual config directory (handles different version formats)
+PG_CONFIG_DIR="/etc/postgresql/$PG_VERSION/main"
+if [ ! -d "$PG_CONFIG_DIR" ]; then
+    # Fallback: find any PostgreSQL config directory
+    PG_CONFIG_DIR=$(find /etc/postgresql -type d -name "main" | head -1)
+    if [ -z "$PG_CONFIG_DIR" ]; then
+        log_error "Could not find PostgreSQL configuration directory"
+        exit 1
+    fi
+    log_warning "Using config directory: $PG_CONFIG_DIR"
+fi
+
+PG_CONFIG="$PG_CONFIG_DIR/postgresql.conf"
+PG_HBA="$PG_CONFIG_DIR/pg_hba.conf"
+
+# Verify config files exist before backing up
+if [ ! -f "$PG_CONFIG" ]; then
+    log_error "PostgreSQL config file not found: $PG_CONFIG"
+    log_info "Available PostgreSQL directories:"
+    ls -la /etc/postgresql/ 2>/dev/null || echo "No PostgreSQL config directory found"
+    exit 1
+fi
 
 # Backup original configs
-cp $PG_CONFIG $PG_CONFIG.backup
-cp $PG_HBA $PG_HBA.backup
+log_info "Backing up PostgreSQL configuration files..."
+cp "$PG_CONFIG" "$PG_CONFIG.backup"
+cp "$PG_HBA" "$PG_HBA.backup"
 
 # Configure PostgreSQL settings
 cat >> $PG_CONFIG << EOF
