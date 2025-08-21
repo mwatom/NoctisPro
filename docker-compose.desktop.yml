@@ -1,10 +1,10 @@
-version: '3.8'
+# Docker Compose file for Noctis Pro Medical Imaging System - Production Deployment
 
 services:
   # PostgreSQL Database - Development Configuration
   db:
     image: postgres:15-alpine
-    container_name: noctis_db_dev
+    container_name: noctis_db_prod
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-noctis_pro}
       POSTGRES_USER: ${POSTGRES_USER:-noctis_user}
@@ -24,7 +24,7 @@ services:
   # Redis for caching and message broker - Development
   redis:
     image: redis:7-alpine
-    container_name: noctis_redis_dev
+    container_name: noctis_redis_prod
     command: redis-server --appendonly yes
     volumes:
       - ./data/redis:/data
@@ -37,16 +37,16 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # Django Web Application - Development
+  # Django Web Application - Production
   web:
     build:
       context: .
       dockerfile: Dockerfile
-      target: development
-    container_name: noctis_web_dev
+      target: production
+    container_name: noctis_web_prod
     environment:
-      - DEBUG=True
-      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY:-noctis-pro-production-secret-key-$(date +%s)}
       - DJANGO_SETTINGS_MODULE=noctis_pro.settings
       - POSTGRES_DB=${POSTGRES_DB:-noctis_pro}
       - POSTGRES_USER=${POSTGRES_USER:-noctis_user}
@@ -81,16 +81,16 @@ services:
              python manage.py collectstatic --noinput &&
              python manage.py runserver 0.0.0.0:8000"
 
-  # Celery Worker for background tasks - Development
+  # Celery Worker for background tasks - Production
   celery:
     build:
       context: .
       dockerfile: Dockerfile
-      target: development
-    container_name: noctis_celery_dev
+      target: production
+    container_name: noctis_celery_prod
     environment:
-      - DEBUG=True
-      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY:-noctis-pro-production-secret-key-$(date +%s)}
       - DJANGO_SETTINGS_MODULE=noctis_pro.settings
       - POSTGRES_DB=${POSTGRES_DB:-noctis_pro}
       - POSTGRES_USER=${POSTGRES_USER:-noctis_user}
@@ -111,16 +111,16 @@ services:
     restart: unless-stopped
     command: celery -A noctis_pro worker --loglevel=info --reload
 
-  # DICOM Receiver Service - Development
+  # DICOM Receiver Service - Production
   dicom_receiver:
     build:
       context: .
       dockerfile: Dockerfile
-      target: development
-    container_name: noctis_dicom_dev
+      target: production
+    container_name: noctis_dicom_prod
     environment:
-      - DEBUG=True
-      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY:-noctis-pro-production-secret-key-$(date +%s)}
       - DJANGO_SETTINGS_MODULE=noctis_pro.settings
       - POSTGRES_DB=${POSTGRES_DB:-noctis_pro}
       - POSTGRES_USER=${POSTGRES_USER:-noctis_user}

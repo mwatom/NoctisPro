@@ -62,10 +62,6 @@ FROM base as production
 # Copy application code
 COPY --chown=app:app . .
 
-# Collect static files
-USER app
-RUN python manage.py collectstatic --noinput
-
 # Switch to app user
 USER app
 
