@@ -56,6 +56,72 @@ log_info "Starting NoctisPro Production Deployment..."
 log_info "Updating system packages..."
 apt update && apt upgrade -y
 
+# Install Docker
+install_docker() {
+    log_info "Installing Docker..."
+    
+    # Check if Docker is already installed
+    if command -v docker &> /dev/null; then
+        log_warning "Docker is already installed"
+        docker --version
+        return 0
+    fi
+    
+    # Remove old Docker versions
+    log_info "Removing old Docker versions..."
+    apt remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
+    
+    # Install prerequisites
+    log_info "Installing Docker prerequisites..."
+    apt install -y \
+        ca-certificates \
+        curl \
+        gnupg \
+        lsb-release \
+        apt-transport-https \
+        software-properties-common
+    
+    # Add Docker's official GPG key
+    log_info "Adding Docker GPG key..."
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+    
+    # Add Docker repository
+    log_info "Adding Docker repository..."
+    echo \
+        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+        $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    
+    # Update package index
+    apt update
+    
+    # Install Docker Engine
+    log_info "Installing Docker Engine..."
+    apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    
+    # Start and enable Docker
+    systemctl start docker
+    systemctl enable docker
+    
+    # Add project user to docker group
+    usermod -aG docker $PROJECT_USER
+    
+    # Test Docker installation
+    log_info "Testing Docker installation..."
+    if docker --version && docker compose version; then
+        log_success "Docker installed successfully"
+        docker --version
+        docker compose version
+    else
+        log_error "Docker installation failed"
+        exit 1
+    fi
+}
+
+# Install Docker
+install_docker
+
 # Install required packages
 log_info "Installing required packages..."
 apt install -y \

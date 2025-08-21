@@ -29,33 +29,65 @@ error() {
     echo -e "${RED}[$(date +'%Y-%m-%d %H:%M:%S')] ERROR: $1${NC}"
 }
 
-# Check if Docker is installed
-check_docker() {
+# Install Docker if not present
+install_docker() {
     log "Checking Docker installation..."
     
+    # Check if Docker is already installed and working
+    if command -v docker &> /dev/null && docker compose version &> /dev/null && groups | grep -q docker; then
+        log "Docker installation verified"
+        return 0
+    fi
+    
+    # Install Docker if not present
     if ! command -v docker &> /dev/null; then
-        error "Docker is not installed. Please install Docker first:"
-        echo "  curl -fsSL https://get.docker.com -o get-docker.sh"
-        echo "  sudo sh get-docker.sh"
-        echo "  sudo usermod -aG docker \$USER"
-        echo "  # Log out and back in, then run this script again"
-        exit 1
+        log "Docker not found. Installing Docker..."
+        
+        # Download and install Docker
+        log "Downloading Docker installation script..."
+        curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+        
+        log "Installing Docker (this may take a few minutes)..."
+        sudo sh /tmp/get-docker.sh
+        
+        # Clean up
+        rm -f /tmp/get-docker.sh
+        
+        log "Docker installation completed"
     fi
     
+    # Install Docker Compose plugin if not present
     if ! docker compose version &> /dev/null; then
-        error "Docker Compose is not installed or not available as a plugin"
-        exit 1
+        log "Installing Docker Compose plugin..."
+        sudo apt update
+        sudo apt install -y docker-compose-plugin
     fi
     
-    # Check if user is in docker group
+    # Add user to docker group if not already
     if ! groups | grep -q docker; then
-        error "Current user is not in the docker group. Please run:"
-        echo "  sudo usermod -aG docker \$USER"
-        echo "  # Log out and back in, then run this script again"
-        exit 1
+        log "Adding user to docker group..."
+        sudo usermod -aG docker $USER
+        
+        warn "User added to docker group. You need to log out and back in for changes to take effect."
+        warn "Alternatively, you can run: newgrp docker"
+        
+        # Try to use newgrp to activate docker group for current session
+        log "Attempting to activate docker group for current session..."
+        if command -v newgrp &> /dev/null; then
+            warn "If you see a permission error below, please log out and back in, then run this script again."
+        fi
     fi
     
-    log "Docker installation verified"
+    # Final verification
+    log "Verifying Docker installation..."
+    if command -v docker &> /dev/null; then
+        log "Docker installation verified successfully"
+        docker --version
+        docker compose version 2>/dev/null || warn "Docker Compose plugin may need session restart"
+    else
+        error "Docker installation failed. Please install Docker manually and run this script again."
+        exit 1
+    fi
 }
 
 # Check if compose file exists
@@ -276,7 +308,7 @@ main() {
     echo "=============================================="
     echo ""
     
-    check_docker
+    install_docker
     check_compose_file
     setup_environment
     create_directories
