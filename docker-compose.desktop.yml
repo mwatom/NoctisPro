@@ -1,0 +1,186 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database - Development Configuration
+  db:
+    image: postgres:15-alpine
+    container_name: noctis_db_dev
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-noctis_pro}
+      POSTGRES_USER: ${POSTGRES_USER:-noctis_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-noctis_dev_password}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./backups:/backups
+    ports:
+      - "5432:5432"  # Exposed for development tools
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-noctis_user} -d ${POSTGRES_DB:-noctis_pro}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis for caching and message broker - Development
+  redis:
+    image: redis:7-alpine
+    container_name: noctis_redis_dev
+    command: redis-server --appendonly yes
+    volumes:
+      - ./data/redis:/data
+    ports:
+      - "6379:6379"  # Exposed for development tools
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Django Web Application - Development
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: noctis_web_dev
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      - DJANGO_SETTINGS_MODULE=noctis_pro.settings
+      - POSTGRES_DB=${POSTGRES_DB:-noctis_pro}
+      - POSTGRES_USER=${POSTGRES_USER:-noctis_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-noctis_dev_password}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+    volumes:
+      - .:/app  # Mount source code for hot reload
+      - ./data/media:/app/media
+      - ./data/static:/app/staticfiles
+    ports:
+      - "8000:8000"   # Main web interface
+      - "11112:11112" # DICOM receiver port
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+
+  # Celery Worker for background tasks - Development
+  celery:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: noctis_celery_dev
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      - DJANGO_SETTINGS_MODULE=noctis_pro.settings
+      - POSTGRES_DB=${POSTGRES_DB:-noctis_pro}
+      - POSTGRES_USER=${POSTGRES_USER:-noctis_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-noctis_dev_password}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - .:/app
+      - ./data/media:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    command: celery -A noctis_pro worker --loglevel=info --reload
+
+  # DICOM Receiver Service - Development
+  dicom_receiver:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: noctis_dicom_dev
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      - DJANGO_SETTINGS_MODULE=noctis_pro.settings
+      - POSTGRES_DB=${POSTGRES_DB:-noctis_pro}
+      - POSTGRES_USER=${POSTGRES_USER:-noctis_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-noctis_dev_password}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - .:/app
+      - ./data/media:/app/media
+      - ./data/dicom_storage:/app/dicom_storage
+    ports:
+      - "11112:11112"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    command: python dicom_receiver.py --port 11112 --aet NOCTIS_SCP --bind 0.0.0.0
+
+  # Optional: Adminer for database management (Development only)
+  adminer:
+    image: adminer:latest
+    container_name: noctis_adminer_dev
+    ports:
+      - "8080:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=db
+    depends_on:
+      - db
+    restart: unless-stopped
+    profiles:
+      - tools
+
+  # Optional: Redis Commander for Redis management (Development only)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: noctis_redis_commander_dev
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    depends_on:
+      - redis
+    restart: unless-stopped
+    profiles:
+      - tools
+
+volumes:
+  # Using bind mounts for development to persist data locally
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  media_files:
+    driver: local
+  static_files:
+    driver: local
+
+networks:
+  default:
+    name: noctis_dev_network
