@@ -1,69 +1,69 @@
 # Core Django
-Django==5.2.5
-Pillow==10.4.0
-django-widget-tweaks==1.5.0
-python-dotenv==1.0.1
+Django
+Pillow
+django-widget-tweaks
+python-dotenv
 
 # Production server
-gunicorn==21.2.0
-whitenoise==6.6.0
+gunicorn
+whitenoise
 
 # Database
-psycopg2-binary==2.9.9
-dj-database-url==2.1.0
+psycopg2-binary
+dj-database-url
 
 # Redis and caching
-redis==5.0.1
-django-redis==5.4.0
+redis
+django-redis
 
 # Background tasks
-celery==5.3.4
+celery
 
 # API and WebSockets
-djangorestframework==3.14.0
-django-cors-headers==4.3.1
-channels==4.0.0
-channels-redis==4.2.0
-daphne==4.0.0
+djangorestframework
+django-cors-headers
+channels
+channels-redis
+daphne
 
 # DICOM processing
-pydicom==2.4.4
-pynetdicom==2.0.2
-SimpleITK==2.3.1
-pylibjpeg==1.4.0
-pylibjpeg-libjpeg==1.3.4
-pylibjpeg-openjpeg==1.3.2
-gdcm==1.1
-highdicom==0.21.0
+pydicom
+pynetdicom
+SimpleITK
+pylibjpeg
+pylibjpeg-libjpeg
+pylibjpeg-openjpeg
+gdcm
+highdicom
 
 # Image processing
-opencv-python==4.9.0.80
-scikit-image==0.22.0
-matplotlib==3.8.2
+opencv-python
+scikit-image
+matplotlib
 
 # AI and machine learning
-numpy==1.26.2
-scipy==1.11.4
-pandas==2.1.4
-torch==2.1.2
-torchvision==0.16.2
-scikit-learn==1.3.2
-transformers==4.36.2
+numpy
+scipy
+pandas
+torch
+torchvision
+scikit-learn
+transformers
 
 # Document processing
-PyMuPDF==1.23.14
-python-docx==1.1.0
-openpyxl==3.1.2
+PyMuPDF
+python-docx
+openpyxl
 
 # Security and authentication
-cryptography==41.0.8
-PyJWT==2.8.0
+cryptography
+PyJWT
 
 # Utilities
-python-magic==0.4.27
-requests==2.31.0
-urllib3==2.1.0
-qrcode==7.4.2
+python-magic
+requests
+urllib3
+qrcode
 
 # Extensions
-django-extensions==3.2.3
+django-extensions
