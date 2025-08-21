@@ -59,6 +59,35 @@ NoctisPro is a comprehensive, production-ready medical imaging platform designed
 - **Network**: Dedicated IP, Domain name (optional)
 - **SSL**: Valid SSL certificate for HTTPS
 
+## 🚀 Quick Setup Options
+
+### 🖥️ Desktop Development Setup (Easiest)
+
+Perfect for testing, development, or small clinic use on Ubuntu Desktop:
+
+```bash
+# Clone the repository
+git clone https://github.com/mwatom/NoctisPro.git
+cd NoctisPro
+
+# Option 1: Complete automated setup (installs Docker + NoctisPro)
+chmod +x scripts/complete-desktop-setup.sh
+./scripts/complete-desktop-setup.sh
+
+# Option 2: If you already have Docker installed
+chmod +x scripts/quick-start-desktop.sh
+./scripts/quick-start-desktop.sh
+```
+
+**What this does:**
+- ✅ Automatically installs Docker if not present
+- ✅ Sets up PostgreSQL database
+- ✅ Sets up Redis cache
+- ✅ Creates admin user (admin/admin123)
+- ✅ Starts web interface on http://localhost:8000
+
+### 🏥 Production Server Deployment
+
 ## 🚀 Complete Deployment Guide
 
 ### Step 1: Server Preparation
