@@ -146,22 +146,36 @@ class DeploymentValidator:
                     if line.strip():
                         print(f"  {line}")
                         
-                # Test printer API endpoint
-                try:
-                    response = requests.get(f"{self.base_url}/dicom-viewer/print/printers/", timeout=10)
-                    if response.status_code == 200:
-                        data = response.json()
-                        if data.get('success') and data.get('printers'):
-                            log_success(f"Printer API working - {len(data['printers'])} printer(s) available")
-                        else:
-                            log_warning("Printer API working but no printers available")
-                            self.warnings.append("No printers available via API")
-                    else:
-                        log_error(f"Printer API returned status {response.status_code}")
-                        self.errors.append(f"Printer API status: {response.status_code}")
-                except requests.exceptions.RequestException as e:
-                    log_error(f"Cannot access printer API: {str(e)}")
-                    self.errors.append(f"Printer API error: {str(e)}")
+                                 # Test printer API endpoint
+                 try:
+                     response = requests.get(f"{self.base_url}/dicom-viewer/print/printers/", timeout=10)
+                     if response.status_code == 200:
+                         data = response.json()
+                         if data.get('success') and data.get('printers'):
+                             log_success(f"Printer API working - {len(data['printers'])} printer(s) available")
+                         else:
+                             log_warning("Printer API working but no printers available")
+                             self.warnings.append("No printers available via API")
+                     else:
+                         log_error(f"Printer API returned status {response.status_code}")
+                         self.errors.append(f"Printer API status: {response.status_code}")
+                         
+                     # Test layout API endpoint
+                     layout_response = requests.get(f"{self.base_url}/dicom-viewer/print/layouts/?modality=CT", timeout=10)
+                     if layout_response.status_code == 200:
+                         layout_data = layout_response.json()
+                         if layout_data.get('success') and layout_data.get('layouts'):
+                             log_success(f"Print layouts API working - {len(layout_data['layouts'])} layout(s) available for CT")
+                         else:
+                             log_warning("Print layouts API working but no layouts available")
+                             self.warnings.append("No print layouts available")
+                     else:
+                         log_error(f"Print layouts API returned status {layout_response.status_code}")
+                         self.errors.append(f"Print layouts API status: {layout_response.status_code}")
+                         
+                 except requests.exceptions.RequestException as e:
+                     log_error(f"Cannot access printer API: {str(e)}")
+                     self.errors.append(f"Printer API error: {str(e)}")
                     
             else:
                 log_warning("No printers configured")
@@ -300,11 +314,47 @@ class DeploymentValidator:
         except Exception as e:
             log_warning(f"Could not check fail2ban: {str(e)}")
 
+    def check_ubuntu_version(self):
+        """Check Ubuntu version and compatibility"""
+        log_header("🐧 Checking Ubuntu Version")
+        
+        try:
+            stdout, stderr, returncode = self.run_command("lsb_release -rs")
+            if returncode == 0:
+                version = stdout.strip()
+                log_success(f"Ubuntu version: {version}")
+                
+                # Check if it's a supported version
+                major_version = float(version.split('.')[0])
+                if major_version >= 20:
+                    log_success("Ubuntu version is supported")
+                    
+                    if major_version >= 24:
+                        log_success("Ubuntu 24.04+ detected - enhanced features available")
+                        # Check Ubuntu 24.04 specific fixes
+                        stdout, stderr, returncode = self.run_command("update-alternatives --display iptables | grep legacy", check_return=False)
+                        if returncode == 0:
+                            log_success("Ubuntu 24.04 iptables compatibility configured")
+                        else:
+                            log_warning("Ubuntu 24.04 iptables compatibility may need configuration")
+                            self.warnings.append("Ubuntu 24.04 iptables legacy not configured")
+                else:
+                    log_warning(f"Ubuntu {version} is older than recommended (20.04+)")
+                    self.warnings.append(f"Ubuntu version {version} is older than recommended")
+            else:
+                log_error("Could not determine Ubuntu version")
+                self.errors.append("Ubuntu version check failed")
+        except Exception as e:
+            log_error(f"Ubuntu version check error: {str(e)}")
+            self.errors.append(f"Ubuntu version error: {str(e)}")
+
     def run_validation(self):
         """Run complete validation"""
-        log_header("🚀 NoctisPro Deployment Validation with Printing Support")
+        log_header("🚀 NoctisPro Deployment Validation with Enhanced Printing Support")
         print()
         
+        self.check_ubuntu_version()
+        print()
         self.check_system_services()
         print()
         self.check_web_interface()
@@ -332,12 +382,14 @@ class DeploymentValidator:
             log_success("🎉 All checks passed! Deployment is successful.")
             log_success("✅ NoctisPro is ready for production use with DICOM printing support")
             print()
-            print("🖨️ To test printing:")
-            print("1. Open the DICOM viewer")
-            print("2. Load a DICOM study") 
-            print("3. Click the Print button")
-            print("4. Select glossy photo paper")
-            print("5. Print a test image")
+                         print("🖨️ To test enhanced printing:")
+             print("1. Open the DICOM viewer")
+             print("2. Load a DICOM study") 
+             print("3. Click the Print button")
+             print("4. Select print medium (Paper/Film)")
+             print("5. Choose modality-specific layout")
+             print("6. Select glossy paper or medical film")
+             print("7. Print test image with selected layout")
             return True
             
         elif self.errors:

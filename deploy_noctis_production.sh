@@ -52,6 +52,30 @@ fi
 
 log_info "Starting NoctisPro Production Deployment..."
 
+# Detect Ubuntu version
+UBUNTU_VERSION=$(lsb_release -rs)
+UBUNTU_MAJOR=$(echo $UBUNTU_VERSION | cut -d. -f1)
+
+log_info "Detected Ubuntu version: $UBUNTU_VERSION"
+
+# Handle Ubuntu 24.04 specific requirements
+if [[ "$UBUNTU_MAJOR" == "24" ]]; then
+    log_info "Applying Ubuntu 24.04 compatibility fixes..."
+    
+    # Install iptables-legacy for Docker compatibility
+    apt update
+    apt install -y iptables-persistent
+    
+    # Switch to iptables-legacy
+    update-alternatives --set iptables /usr/sbin/iptables-legacy
+    update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
+    
+    # Install additional packages for Ubuntu 24.04
+    apt install -y fuse-overlayfs
+    
+    log_success "Ubuntu 24.04 compatibility fixes applied"
+fi
+
 # Update system
 log_info "Updating system packages..."
 apt update && apt upgrade -y
@@ -99,6 +123,24 @@ install_docker() {
     # Install Docker Engine
     log_info "Installing Docker Engine..."
     apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    
+    # Configure Docker for Ubuntu 24.04 if needed
+    if [[ "$UBUNTU_MAJOR" == "24" ]]; then
+        log_info "Configuring Docker for Ubuntu 24.04..."
+        mkdir -p /etc/docker
+        cat > /etc/docker/daemon.json << EOF
+{
+    "storage-driver": "overlay2",
+    "iptables": true,
+    "ip-forward": true,
+    "log-driver": "json-file",
+    "log-opts": {
+        "max-size": "10m",
+        "max-file": "3"
+    }
+}
+EOF
+    fi
     
     # Start and enable Docker
     systemctl start docker

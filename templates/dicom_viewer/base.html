@@ -266,24 +266,44 @@
       </div>
       <form id="printForm">
         <div class="form-group">
+          <label for="printMedium">Print Medium:</label>
+          <select id="printMedium" name="print_medium">
+            <option value="paper">📄 Paper</option>
+            <option value="film">🎞️ Medical Film</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="layoutType">Layout:</label>
+          <select id="layoutType" name="layout_type">
+            <option value="single">Single Image</option>
+            <option value="quad">Quad Layout (4 images)</option>
+            <option value="comparison">Side-by-Side Comparison</option>
+            <option value="film_standard">Film Standard (minimal text)</option>
+          </select>
+          <div class="form-text" id="layoutDescription">One image per page with full details</div>
+        </div>
+        <div class="form-group">
           <label for="printerSelect">Printer:</label>
           <select id="printerSelect" name="printer_name">
             <option value="">Loading printers...</option>
           </select>
         </div>
         <div class="form-group">
-          <label for="paperSize">Paper Size:</label>
+          <label for="paperSize">Paper/Film Size:</label>
           <select id="paperSize" name="paper_size">
-            <option value="A4">A4</option>
-            <option value="Letter">Letter</option>
+            <option value="A4">A4 (210 × 297 mm)</option>
+            <option value="Letter">Letter (8.5 × 11 in)</option>
+            <option value="FILM_14X17">Film 14" × 17"</option>
+            <option value="FILM_11X14">Film 11" × 14"</option>
           </select>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="paperTypeGroup">
           <label for="paperType">Paper Type:</label>
           <select id="paperType" name="paper_type">
-            <option value="glossy">Glossy Photo Paper</option>
+            <option value="glossy">🌟 Glossy Photo Paper</option>
             <option value="matte">Matte Paper</option>
             <option value="plain">Plain Paper</option>
+            <option value="film">Medical Film</option>
           </select>
         </div>
         <div class="form-group">
@@ -1801,19 +1821,19 @@
      const printForm = document.getElementById('printForm');
      const printerSelect = document.getElementById('printerSelect');
 
-     // Load available printers when modal opens
+     // Load available printers and layouts when modal opens
      btnPrint.addEventListener('click', async ()=>{
        try {
          // Load available printers
-         const response = await fetch('/dicom-viewer/print/printers/');
-         const data = await response.json();
+         const printersResponse = await fetch('/dicom-viewer/print/printers/');
+         const printersData = await printersResponse.json();
          
-         if (data.success) {
+         if (printersData.success) {
            printerSelect.innerHTML = '';
-           if (data.printers.length === 0) {
+           if (printersData.printers.length === 0) {
              printerSelect.innerHTML = '<option value="">No printers available</option>';
            } else {
-             data.printers.forEach(printer => {
+             printersData.printers.forEach(printer => {
                const option = document.createElement('option');
                option.value = printer.name;
                option.textContent = `${printer.name} - ${printer.description}`;
@@ -1822,11 +1842,93 @@
            }
          }
          
+         // Load modality-specific layouts
+         const currentModality = getCurrentModality();
+         if (currentModality) {
+           const layoutsResponse = await fetch(`/dicom-viewer/print/layouts/?modality=${currentModality}`);
+           const layoutsData = await layoutsResponse.json();
+           
+           if (layoutsData.success) {
+             const layoutSelect = document.getElementById('layoutType');
+             layoutSelect.innerHTML = '';
+             
+             layoutsData.layouts.forEach(layout => {
+               const option = document.createElement('option');
+               option.value = layout.value;
+               option.textContent = layout.name;
+               option.setAttribute('data-description', layout.description);
+               layoutSelect.appendChild(option);
+             });
+             
+             // Update description
+             updateLayoutDescription();
+           }
+         }
+         
          printModal.style.display = 'flex';
        } catch(e) {
-         alert('Error loading printers: ' + e.message);
+         alert('Error loading print options: ' + e.message);
        }
      });
+
+     // Handle print medium changes
+     const printMedium = document.getElementById('printMedium');
+     const paperTypeGroup = document.getElementById('paperTypeGroup');
+     const paperSize = document.getElementById('paperSize');
+     const paperType = document.getElementById('paperType');
+     
+     printMedium.addEventListener('change', function() {
+       if (this.value === 'film') {
+         // Show film-specific options
+         paperType.innerHTML = `
+           <option value="film">Medical Film</option>
+           <option value="film_blue">Blue-Base Film</option>
+           <option value="film_clear">Clear-Base Film</option>
+         `;
+         
+         // Show film sizes
+         paperSize.innerHTML = `
+           <option value="FILM_14X17">Film 14" × 17" (Standard)</option>
+           <option value="FILM_11X14">Film 11" × 14"</option>
+           <option value="FILM_10X12">Film 10" × 12"</option>
+           <option value="FILM_8X10">Film 8" × 10"</option>
+         `;
+         
+         paperTypeGroup.querySelector('label').textContent = 'Film Type:';
+       } else {
+         // Show paper-specific options
+         paperType.innerHTML = `
+           <option value="glossy">🌟 Glossy Photo Paper</option>
+           <option value="matte">Matte Paper</option>
+           <option value="plain">Plain Paper</option>
+         `;
+         
+         // Show paper sizes
+         paperSize.innerHTML = `
+           <option value="A4">A4 (210 × 297 mm)</option>
+           <option value="Letter">Letter (8.5 × 11 in)</option>
+         `;
+         
+         paperTypeGroup.querySelector('label').textContent = 'Paper Type:';
+       }
+     });
+
+     // Handle layout type changes
+     const layoutType = document.getElementById('layoutType');
+     layoutType.addEventListener('change', updateLayoutDescription);
+     
+     function updateLayoutDescription() {
+       const selectedOption = layoutType.options[layoutType.selectedIndex];
+       const description = selectedOption.getAttribute('data-description') || selectedOption.textContent;
+       document.getElementById('layoutDescription').textContent = description;
+     }
+     
+     function getCurrentModality() {
+       // Extract modality from patient info
+       const patientInfo = document.getElementById('patientInfo').textContent;
+       const modalityMatch = patientInfo.match(/Modality: ([^|]+)/);
+       return modalityMatch ? modalityMatch[1].trim() : '';
+     }
 
      // Close print modal
      closePrintModal.addEventListener('click', ()=>{ printModal.style.display = 'none'; });
@@ -1847,17 +1949,20 @@
          const dateMatch = patientInfo.match(/Study Date: ([^|]+)/);
          const modalityMatch = patientInfo.match(/Modality: ([^|]+)/);
          
-         const formData = new FormData();
-         formData.append('image_data', imageData);
-         formData.append('printer_name', document.getElementById('printerSelect').value);
-         formData.append('paper_size', document.getElementById('paperSize').value);
-         formData.append('paper_type', document.getElementById('paperType').value);
-         formData.append('print_quality', document.getElementById('printQuality').value);
-         formData.append('copies', document.getElementById('copies').value);
-         formData.append('patient_name', patientMatch ? patientMatch[1].trim() : 'Unknown Patient');
-         formData.append('study_date', dateMatch ? dateMatch[1].trim() : '');
-         formData.append('modality', modalityMatch ? modalityMatch[1].trim() : '');
-         formData.append('series_description', currentSeries ? currentSeries.description || '' : '');
+                   const formData = new FormData();
+          formData.append('image_data', imageData);
+          formData.append('printer_name', document.getElementById('printerSelect').value);
+          formData.append('paper_size', document.getElementById('paperSize').value);
+          formData.append('paper_type', document.getElementById('paperType').value);
+          formData.append('print_quality', document.getElementById('printQuality').value);
+          formData.append('copies', document.getElementById('copies').value);
+          formData.append('layout_type', document.getElementById('layoutType').value);
+          formData.append('print_medium', document.getElementById('printMedium').value);
+          formData.append('patient_name', patientMatch ? patientMatch[1].trim() : 'Unknown Patient');
+          formData.append('study_date', dateMatch ? dateMatch[1].trim() : '');
+          formData.append('modality', modalityMatch ? modalityMatch[1].trim() : '');
+          formData.append('series_description', currentSeries ? currentSeries.description || '' : '');
+          formData.append('institution_name', 'Medical Facility'); // You can make this dynamic
          
          // Add CSRF token
          const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 

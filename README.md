@@ -47,32 +47,34 @@ NoctisPro is a comprehensive, production-ready medical imaging platform designed
 ## 📋 System Requirements
 
 ### Minimum Requirements
-- **OS**: Ubuntu 20.04+ or Ubuntu 22.04+ LTS
+- **OS**: Ubuntu 20.04+, Ubuntu 22.04+, or **Ubuntu 24.04+ LTS** ✨
 - **CPU**: 4 cores (8 cores recommended)
 - **RAM**: 8GB (16GB recommended)
 - **Storage**: 100GB SSD (500GB+ recommended)
 - **Network**: Stable internet connection for updates
-- **🖨️ Printer**: Any CUPS-compatible printer (Photo printers recommended for glossy paper)
+- **🖨️ Printer**: Any CUPS-compatible printer (Photo printers + film printers recommended)
 
 ### Production Requirements
-- **OS**: Ubuntu 22.04 LTS Server
+- **OS**: Ubuntu 22.04 LTS or **Ubuntu 24.04 LTS Server** ✨
 - **CPU**: 8+ cores
 - **RAM**: 16GB+ 
 - **Storage**: 1TB+ NVMe SSD
 - **Network**: Dedicated IP, Domain name (optional)
 - **SSL**: Valid SSL certificate for HTTPS
-- **🖨️ Printer**: Professional photo printer with glossy paper support (Canon, Epson, HP recommended)
+- **🖨️ Printer**: Professional photo/film printer with multiple media support
 
 ## 🏥 COMPLETE DEPLOYMENT GUIDE FOR TECHNICIANS
 
+> 📖 **Ubuntu 24.04 Users**: See [UBUNTU_24_DEPLOYMENT_GUIDE.md](UBUNTU_24_DEPLOYMENT_GUIDE.md) for Ubuntu 24.04 specific instructions with enhanced features.
+
 ### Prerequisites Checklist
 Before starting deployment, ensure you have:
-- [ ] Ubuntu 22.04 LTS Server installed and updated
+- [ ] **Ubuntu 22.04 LTS or Ubuntu 24.04 LTS** Server installed and updated ✨
 - [ ] Root or sudo access to the server
 - [ ] Network connectivity for package downloads
 - [ ] Domain name (optional but recommended)
-- [ ] Photo printer connected and configured (for DICOM printing)
-- [ ] Glossy photo paper loaded in printer
+- [ ] Photo/film printer connected and configured (for DICOM printing)
+- [ ] Glossy photo paper and/or medical film loaded in printer
 
 ### Step 1: Initial Server Setup
 
@@ -169,13 +171,15 @@ sudo ./deploy_noctis_production.sh
 ```
 
 **This script will automatically:**
-- ✅ Install Docker and Docker Compose
+- ✅ **Detect Ubuntu version** (20.04, 22.04, or 24.04) and apply compatibility fixes
+- ✅ Install Docker and Docker Compose (with Ubuntu 24.04 optimizations)
 - ✅ Install PostgreSQL with production configuration
 - ✅ Install Redis with authentication
 - ✅ Install Nginx with security headers
 - ✅ Install Python 3.11+ and create virtual environment
-- ✅ Install all Python dependencies (including printing libraries)
-- ✅ Install CUPS printing system and drivers
+- ✅ Install all Python dependencies (including enhanced printing libraries)
+- ✅ Install CUPS printing system with film and paper support
+- ✅ Install printer drivers for all major brands
 - ✅ Create secure system user and directories
 - ✅ Generate secure passwords and keys
 - ✅ Configure Django with production settings
@@ -496,13 +500,24 @@ lp -d MedicalPrinter -o media-type=photographic-glossy -o print-quality=5 /etc/p
 - **Paper Size**: A4 or Letter
 - **Orientation**: Portrait
 
-**Print Settings in NoctisPro:**
+**Enhanced Print Settings in NoctisPro:**
 1. Open DICOM image in viewer
 2. Click **Print** button
-3. Select printer and "Glossy Photo Paper"
-4. Choose "High Quality (1200 DPI)"
-5. Set number of copies
-6. Click "Print Image"
+3. **Select Print Medium**: Paper or Medical Film
+4. **Choose Layout**: Single, Quad, Comparison, or modality-specific layouts
+5. **Select Printer** and media type (Glossy Paper/Medical Film)
+6. **Set Quality**: High Quality (1200 DPI) recommended
+7. Set number of copies
+8. Click "Print Image"
+
+**Available Print Layouts by Modality:**
+- **CT Scans**: Single, Quad, CT Axial Grid (16 slices), CT MPR Trio (3 planes)
+- **MRI**: Single, Quad, MRI Sequences, MRI MPR Trio (3 planes)
+- **X-Ray (CR/DX/DR)**: Single, Quad, PA & Lateral views
+- **Ultrasound**: Single, Quad, US with Measurements
+- **Mammography**: Single, Quad, CC & MLO Views
+- **PET**: Single, Quad, PET Fusion
+- **All Modalities**: Comparison (side-by-side), Film Standard (minimal text)
 
 ## 🚨 TROUBLESHOOTING GUIDE
 
@@ -515,6 +530,25 @@ sudo apt remove -y docker docker-engine docker.io containerd runc
 sudo apt autoremove -y
 sudo apt autoclean
 ./deploy_noctis_production.sh  # Re-run deployment
+```
+
+**Issue: Ubuntu 24.04 Docker compatibility problems**
+```bash
+# The deployment script automatically handles Ubuntu 24.04, but if issues persist:
+
+# Fix iptables for Ubuntu 24.04
+sudo apt install -y iptables-persistent
+sudo update-alternatives --set iptables /usr/sbin/iptables-legacy
+sudo update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
+
+# Install additional packages
+sudo apt install -y fuse-overlayfs
+
+# Restart Docker
+sudo systemctl restart docker
+
+# Re-run deployment
+sudo ./deploy_noctis_production.sh
 ```
 
 **Issue: PostgreSQL connection fails**
@@ -829,7 +863,7 @@ sudo lpadmin -p MedicalPrinter -o media-type=photographic-glossy -o print-qualit
 
 ## 🏥 Facility User Instructions
 
-### Printing DICOM Images on Glossy Paper
+### Enhanced DICOM Image Printing (Paper & Film)
 
 1. **Open DICOM Study:**
    - Login to NoctisPro
@@ -841,25 +875,50 @@ sudo lpadmin -p MedicalPrinter -o media-type=photographic-glossy -o print-qualit
    - Use measurement tools if needed
    - Add annotations if required
 
-3. **Print High-Quality Image:**
+3. **Configure Print Options:**
    - Click **Print** button in toolbar
-   - Select your photo printer
-   - Choose **"Glossy Photo Paper"**
-   - Set quality to **"High Quality (1200 DPI)"**
+   - **Select Print Medium**:
+     - 📄 **Paper**: For reports, consultations, patient records
+     - 🎞️ **Film**: For diagnostic viewing, archival storage
+   - **Choose Layout** (automatically adapts to modality):
+     - **Single Image**: Full-page detailed view
+     - **Quad Layout**: 4 images for comparison
+     - **Side-by-Side**: Before/after comparison
+     - **Modality-Specific**: CT grids, MRI sequences, X-ray views
+   - **Select Printer** and media type
+   - **Set Quality**: High Quality (1200 DPI) recommended
+
+4. **Print High-Quality Output:**
+   - **For Paper**: Choose "Glossy Photo Paper" for best results
+   - **For Film**: Select appropriate film type (blue-base, clear-base)
    - Enter number of copies
    - Click **"Print Image"**
 
-4. **Verify Print Quality:**
+5. **Verify Print Quality:**
    - Check for proper contrast and detail
    - Ensure patient information is clearly printed
-   - Verify timestamp and facility information
+   - Verify layout matches selected option
+   - Confirm modality-specific formatting
 
 ### Print Quality Tips
-- Always use **glossy photo paper** for medical images
+
+**For Paper Printing:**
+- Use **glossy photo paper** (200-300 GSM) for medical images
 - Set printer to **highest quality** (1200 DPI)
-- Ensure adequate ink/toner levels
+- Ensure adequate ink levels for color accuracy
 - Clean printer heads regularly for optimal output
-- Store printed images in protective sleeves
+
+**For Film Printing:**
+- Use **medical-grade film** (blue-base or clear-base)
+- Configure printer for **film media type**
+- Ensure proper film handling and storage
+- Use **film standard layout** for minimal text overlay
+
+**General Tips:**
+- Choose **modality-specific layouts** for optimal presentation
+- **Quad layouts** ideal for comparison studies
+- Store printed materials in protective sleeves
+- Label films with patient information externally
 
 ## 📋 DEPLOYMENT VALIDATION
 
@@ -888,12 +947,16 @@ python3 validate_production_simple.py
 - [ ] Window/level adjustments work
 - [ ] Measurements and annotations function
 
-**3. 🖨️ Printing Functionality:**
+**3. 🖨️ Enhanced Printing Functionality:**
 - [ ] Print button appears in viewer
-- [ ] Print dialog opens correctly
-- [ ] Printers are detected
+- [ ] Print dialog opens with all options
+- [ ] Print medium selection (Paper/Film) works
+- [ ] Layout options load based on modality
+- [ ] Printers are detected correctly
 - [ ] Test print on glossy paper succeeds
-- [ ] Print quality is medical-grade
+- [ ] Test print on medical film succeeds (if available)
+- [ ] Modality-specific layouts render correctly
+- [ ] Print quality is medical-grade for all layouts
 
 **4. System Services:**
 - [ ] All systemd services running

@@ -89,5 +89,6 @@ urlpatterns += [
     # Printing functionality
     path('print/image/', views.print_dicom_image, name='print_dicom_image'),
     path('print/printers/', views.get_available_printers, name='get_available_printers'),
+    path('print/layouts/', views.get_print_layouts, name='get_print_layouts'),
     path('print/settings/', views.print_settings_view, name='print_settings'),
 ]
