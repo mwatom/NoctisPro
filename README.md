@@ -73,7 +73,7 @@ NoctisPro is a comprehensive, production-ready medical imaging platform designed
 
 > 🎯 **Designed for Autonomous Deployment**: This guide enables technicians to deploy the system independently without requiring the developer's presence.
 
-> 🚀 **Quick Demo Deployment**: For Ubuntu 24.04 customer demonstrations, see [UBUNTU_24_DEMO_DEPLOYMENT.md](UBUNTU_24_DEMO_DEPLOYMENT.md) for rapid online deployment with HTTPS.
+> 🏥 **Ubuntu 24.04 Production**: For complete production deployment on Ubuntu 24.04, see [UBUNTU_24_PRODUCTION_DEPLOYMENT.md](UBUNTU_24_PRODUCTION_DEPLOYMENT.md) for full system with HTTPS and all features.
 
 > 📖 **Ubuntu 24.04 Users**: See [UBUNTU_24_DEPLOYMENT_GUIDE.md](UBUNTU_24_DEPLOYMENT_GUIDE.md) for Ubuntu 24.04 specific instructions with enhanced features.
 
