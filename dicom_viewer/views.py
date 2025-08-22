@@ -2869,12 +2869,15 @@ def print_dicom_image(request):
         print_quality = request.POST.get('print_quality', 'high')
         copies = int(request.POST.get('copies', 1))
         printer_name = request.POST.get('printer_name', '')
+        layout_type = request.POST.get('layout_type', 'single')
+        print_medium = request.POST.get('print_medium', 'paper')  # paper or film
         
         # Get patient and study information
         patient_name = request.POST.get('patient_name', 'Unknown Patient')
         study_date = request.POST.get('study_date', '')
         modality = request.POST.get('modality', '')
         series_description = request.POST.get('series_description', '')
+        institution_name = request.POST.get('institution_name', request.user.facility.name if hasattr(request.user, 'facility') and request.user.facility else 'Medical Facility')
         
         # Create temporary files
         with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as img_temp:
@@ -2885,10 +2888,11 @@ def print_dicom_image(request):
             pdf_temp_path = pdf_temp.name
         
         try:
-            # Create PDF with medical image and metadata
-            create_medical_print_pdf(
-                img_temp_path, pdf_temp_path, paper_size,
-                patient_name, study_date, modality, series_description
+            # Create PDF with medical image and metadata using selected layout
+            create_medical_print_pdf_enhanced(
+                img_temp_path, pdf_temp_path, paper_size, layout_type, 
+                print_medium, modality, patient_name, study_date, 
+                series_description, institution_name
             )
             
             # Print the PDF
