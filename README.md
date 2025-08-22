@@ -73,8 +73,10 @@ Before starting deployment, ensure you have:
 - [ ] Root or sudo access to the server
 - [ ] Network connectivity for package downloads
 - [ ] Domain name (optional but recommended)
-- [ ] Photo/film printer connected and configured (for DICOM printing)
-- [ ] Glossy photo paper and/or medical film loaded in printer
+
+**Optional (for DICOM printing):**
+- [ ] Any CUPS-compatible printer of your facility's choice
+- [ ] Print media as preferred by your facility (paper, film, etc.)
 
 ### Step 1: Initial Server Setup
 
@@ -123,9 +125,9 @@ DOMAIN_NAME="your-actual-domain.com"  # Replace with your domain
 DOMAIN_NAME="noctis-server.local"
 ```
 
-### Step 4: 🖨️ Printer Setup (ESSENTIAL FOR DICOM PRINTING)
+### Step 4: 🖨️ Printer Setup (OPTIONAL - Configure After Deployment)
 
-**IMPORTANT**: Set up printing BEFORE running the main deployment to avoid errors.
+**NOTE**: Printer setup is **optional** and can be done **after deployment**. Each facility can choose their preferred printers and configure them as needed.
 
 ```bash
 # Install CUPS printing system
@@ -164,7 +166,7 @@ lp -d YourPrinterName /etc/passwd  # Test print
 
 ### Step 5: Run Main Production Deployment
 
-**CRITICAL**: Run this command exactly as shown:
+**The deployment script will install CUPS printing support automatically. Your facility can configure specific printers later.**
 
 ```bash
 sudo ./deploy_noctis_production.sh
@@ -252,15 +254,17 @@ sudo /usr/local/bin/noctis-status.sh
    sudo -u noctis ./venv/bin/python manage.py changepassword admin --settings=noctis_pro.settings_production
    ```
 
-3. **Configure printer settings:**
+3. **Configure facility-specific settings:**
    - Login to admin panel: `/admin`
-   - Go to DICOM Viewer settings
-   - Test printer connectivity
-   - Set default glossy paper settings
+   - Configure facility information
+   - Set up users and permissions
+   - **Optionally configure printers** (if your facility uses DICOM printing)
 
-### Step 9: 🖨️ Configure DICOM Image Printing
+### Step 9: 🖨️ Configure DICOM Image Printing (Optional)
 
-**Test Printer Setup:**
+**This step is only needed if your facility wants to use DICOM printing. Skip if not needed.**
+
+**Facility Printer Setup:**
 
 ```bash
 # Verify printer is detected
@@ -417,98 +421,122 @@ sudo certbot renew --force-renewal
 
 ## 🖨️ DICOM IMAGE PRINTING SETUP
 
-### Supported Printers
-NoctisPro supports any CUPS-compatible printer. **Recommended printers for medical imaging:**
+> 🏥 **Important**: Each facility chooses their own printers based on their needs, budget, and preferences. NoctisPro adapts to work with any CUPS-compatible printer.
 
-**Professional Photo Printers:**
-- Canon PIXMA Pro series (Pro-200, Pro-300)
-- Epson SureColor series (P400, P600, P800)
-- HP DesignJet series
-- Brother MFC-J series with photo capabilities
+### Printer Compatibility
+NoctisPro supports **any CUPS-compatible printer** that your facility chooses. The system is designed to work with:
 
-**Paper Recommendations:**
-- **Glossy Photo Paper**: 4"x6", 8.5"x11", A4 glossy
-- **Weight**: 200-300 GSM for durability
-- **Brands**: Canon Pro Platinum, Epson Premium Glossy, HP Advanced Photo Paper
+**Any Brand/Model That Supports:**
+- CUPS printing system (Linux standard)
+- Standard paper sizes (A4, Letter, Custom)
+- Various media types (paper, photo paper, film)
+- Network or USB connectivity
 
-### Printer Installation Steps
+**Facility Choice Examples:**
+- **Budget Options**: Any basic inkjet or laser printer
+- **Photo Quality**: Canon PIXMA, Epson SureColor, HP PhotoSmart series
+- **Medical Film**: Agfa DryPix, Kodak DryView, Fuji DryPix
+- **Large Format**: HP DesignJet, Epson SureColor wide-format
+- **Existing Printers**: Any printer already used by your facility
+
+**Print Media (Facility's Choice):**
+- **Standard Paper**: Any weight and finish preferred by facility
+- **Photo Paper**: Glossy, matte, or satin as preferred
+- **Medical Film**: Blue-base, clear-base, or standard medical film
+- **Custom Sizes**: Any size supported by your facility's printer
+
+### Printer Installation Steps (For Facilities)
+
+**Each facility configures their own chosen printer:**
 
 **1. Physical Setup:**
 ```bash
-# Connect printer via USB or network
-# Load glossy photo paper in correct tray
+# Connect your facility's printer via USB or network
+# Load your preferred print media (paper, photo paper, film)
 # Power on printer and ensure ready status
 ```
 
-**2. Install Printer Drivers:**
+**2. Install Drivers for Your Facility's Printer:**
 ```bash
-# For Canon printers
+# The deployment script installs common drivers, but you may need specific ones:
+
+# For Canon printers (if your facility uses Canon)
 sudo apt install -y printer-driver-canon
 
-# For Epson printers  
+# For Epson printers (if your facility uses Epson)
 sudo apt install -y printer-driver-epson
 
-# For HP printers
+# For HP printers (if your facility uses HP)
 sudo apt install -y printer-driver-hplip hplip-gui
 
-# For Brother printers
+# For Brother printers (if your facility uses Brother)
 sudo apt install -y printer-driver-brlaser
+
+# For other brands, check: apt search printer-driver-[brand]
 ```
 
-**3. Add Printer to System:**
+**3. Add Your Facility's Printer to System:**
 ```bash
-# Method 1: Web interface (easiest)
+# Method 1: Web interface (easiest for any printer)
 # Open: http://localhost:631
 # Administration > Add Printer
-# Follow wizard, select your printer
-# Set default options for photo/glossy paper
+# Follow wizard, select your facility's printer
+# Configure with your preferred media settings
 
-# Method 2: Command line
-# USB printer:
-sudo lpadmin -p MedicalPrinter -E -v "usb://Canon/PIXMA%20Pro-200" -m everywhere
+# Method 2: Command line (for any printer brand/model)
+# USB printer (auto-detect any brand):
+sudo lpadmin -p YourFacilityPrinter -E -v "usb://auto" -m everywhere
 
-# Network printer:
-sudo lpadmin -p MedicalPrinter -E -v "ipp://192.168.1.100/ipp/print" -m everywhere
+# Network printer (any brand with IP):
+sudo lpadmin -p YourFacilityPrinter -E -v "ipp://YOUR-PRINTER-IP/ipp/print" -m everywhere
 
-# Set as default
-sudo lpadmin -d MedicalPrinter
+# Set as default (optional)
+sudo lpadmin -d YourFacilityPrinter
 ```
 
-**4. Configure for Medical Imaging:**
+**4. Configure for Your Facility's Needs:**
 ```bash
-# Set optimal defaults for medical images
-sudo lpadmin -p MedicalPrinter -o media=A4 -o print-quality=5 -o ColorModel=RGB
-sudo lpadmin -p MedicalPrinter -o media-type=photographic-glossy -o Resolution=1200dpi
+# Configure your printer with your facility's preferred settings
+# Example for high-quality paper printing:
+sudo lpadmin -p YourFacilityPrinter -o media=A4 -o print-quality=5 -o ColorModel=RGB
+
+# Example for film printing (if your facility uses film):
+sudo lpadmin -p YourFacilityPrinter -o media-type=film -o Resolution=600dpi
+
+# Use whatever settings work best for your facility's printer and media
 ```
 
-**5. Test Printing:**
+**5. Test Your Facility's Printer:**
 ```bash
-# Test basic printing
-echo "NoctisPro Printer Test" | lp -d MedicalPrinter
+# Test basic printing with your printer
+echo "NoctisPro Printer Test - $(date)" | lp -d YourFacilityPrinter
 
-# Test photo quality
-lp -d MedicalPrinter -o media-type=photographic-glossy -o print-quality=5 /etc/passwd
+# Test with your facility's preferred media settings
+lp -d YourFacilityPrinter -o print-quality=5 /etc/passwd
 ```
 
-### Print Quality Settings
+### Print Quality Settings (Facility Configurable)
 
-**For Glossy Paper (Recommended):**
-- **Resolution**: 1200 DPI minimum
-- **Color Mode**: RGB Color
-- **Media Type**: Photographic Glossy
-- **Quality**: Best/High (Level 5)
-- **Paper Size**: A4 or Letter
-- **Orientation**: Portrait
+**Settings are flexible based on your facility's preferences:**
 
-**Enhanced Print Settings in NoctisPro:**
+**For High-Quality Paper Printing:**
+- **Resolution**: 600-1200 DPI (as supported by your printer)
+- **Color Mode**: RGB Color or Grayscale (facility choice)
+- **Media Type**: Photo, Glossy, Matte, or Plain (as preferred)
+- **Quality**: High/Best available on your printer
+- **Paper Size**: A4, Letter, or custom sizes
+- **Orientation**: Portrait or Landscape (layout dependent)
+
+**Print Settings in NoctisPro (Adapts to Your Facility's Printer):**
 1. Open DICOM image in viewer
 2. Click **Print** button
-3. **Select Print Medium**: Paper or Medical Film
+3. **Select Print Medium**: Paper or Film (based on your facility's capabilities)
 4. **Choose Layout**: Single, Quad, Comparison, or modality-specific layouts
-5. **Select Printer** and media type (Glossy Paper/Medical Film)
-6. **Set Quality**: High Quality (1200 DPI) recommended
-7. Set number of copies
-8. Click "Print Image"
+5. **Select Your Facility's Printer** from detected printers
+6. **Choose Media Type**: Whatever your facility has loaded (paper/film/etc.)
+7. **Set Quality**: Best available on your facility's printer
+8. Set number of copies
+9. Click "Print Image"
 
 **Available Print Layouts by Modality:**
 - **CT Scans**: Single, Quad, CT Axial Grid (16 slices), CT MPR Trio (3 planes)
@@ -850,12 +878,12 @@ sudo lpadmin -p MedicalPrinter -o media-type=photographic-glossy -o print-qualit
 - [ ] All services started successfully
 - [ ] Secure access configured
 - [ ] Admin password changed
-- [ ] Printer configured for glossy paper
+- [ ] Printing system installed (printer configuration optional)
 
 **Post-Deployment:**
 - [ ] Web interface accessible
 - [ ] DICOM viewer loads correctly
-- [ ] Print functionality tested with glossy paper
+- [ ] Print functionality available (configure printers as needed by facility)
 - [ ] GitHub webhook configured (if using auto-deployment)
 - [ ] Backup system verified
 - [ ] Security scan completed
@@ -900,25 +928,25 @@ sudo lpadmin -p MedicalPrinter -o media-type=photographic-glossy -o print-qualit
    - Verify layout matches selected option
    - Confirm modality-specific formatting
 
-### Print Quality Tips
+### Print Quality Tips (For Any Facility Printer)
 
-**For Paper Printing:**
-- Use **glossy photo paper** (200-300 GSM) for medical images
-- Set printer to **highest quality** (1200 DPI)
-- Ensure adequate ink levels for color accuracy
-- Clean printer heads regularly for optimal output
+**General Printing Guidelines:**
+- Use **highest quality setting** available on your facility's printer
+- Choose **appropriate media type** based on your facility's preference
+- Ensure adequate **ink/toner levels** for consistent output
+- **Clean printer regularly** according to manufacturer instructions
 
-**For Film Printing:**
-- Use **medical-grade film** (blue-base or clear-base)
-- Configure printer for **film media type**
-- Ensure proper film handling and storage
-- Use **film standard layout** for minimal text overlay
+**Layout Selection Tips:**
+- **Single Image**: Best for detailed diagnostic viewing
+- **Quad Layout**: Ideal for comparison studies
+- **Modality-Specific Layouts**: Optimized for each imaging type
+- **Film Standard**: Minimal text for diagnostic film viewing
 
-**General Tips:**
-- Choose **modality-specific layouts** for optimal presentation
-- **Quad layouts** ideal for comparison studies
-- Store printed materials in protective sleeves
-- Label films with patient information externally
+**Facility-Specific Recommendations:**
+- **Paper Choice**: Use whatever paper type your facility prefers
+- **Film Choice**: Use medical film if your facility has film printers
+- **Quality Settings**: Configure based on your facility's standards
+- **Storage**: Follow your facility's protocols for printed materials
 
 ## 📋 DEPLOYMENT VALIDATION
 

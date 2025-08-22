@@ -16,8 +16,8 @@ This guide provides step-by-step instructions for deploying NoctisPro on **Ubunt
 - [ ] **Ubuntu 24.04 LTS Server** installed and updated
 - [ ] **Root access** or sudo privileges
 - [ ] **Network connectivity** for package downloads
-- [ ] **Printer(s)** connected (photo printer and/or film printer)
-- [ ] **Print media** loaded (glossy paper and/or medical film)
+- [ ] **Printer(s)** of your facility's choice (optional, can be configured later)
+- [ ] **Print media** as preferred by your facility (optional)
 - [ ] **Domain name** (optional but recommended)
 
 ## 🔧 Step-by-Step Deployment
@@ -52,19 +52,21 @@ chmod +x scripts/*.sh
 ls -la deploy_noctis_production.sh setup_printer.sh
 ```
 
-### Step 3: 🖨️ Pre-Configure Printing (Recommended)
+### Step 3: 🖨️ Printer Setup (Optional - Can Be Done Later)
 
-**For optimal results, set up printing before main deployment:**
+**Printing setup is optional and can be configured after deployment based on your facility's printer choices:**
 
 ```bash
-# Run the dedicated printer setup script
+# Only run if your facility wants to configure printing now
 sudo ./setup_printer.sh
 
 # This will:
-# ✅ Install CUPS and all printer drivers
-# ✅ Detect and configure your printers
-# ✅ Set up glossy paper and film settings
-# ✅ Test printing functionality
+# ✅ Install CUPS and printer drivers
+# ✅ Help detect and configure your facility's chosen printers
+# ✅ Set up media settings based on your facility's preferences
+# ✅ Test printing with your facility's equipment
+
+# You can skip this step and configure printing later if preferred
 ```
 
 ### Step 4: Main Deployment
@@ -149,11 +151,11 @@ sudo python3 validate_deployment_with_printing.py
 
 ### Film Printing Configuration
 
-**Recommended Film Printers:**
-- **Agfa DryPix series**
-- **Kodak DryView series** 
-- **Fuji DryPix series**
-- **Generic DICOM film printers**
+**Film Printer Compatibility (Facility Choice):**
+- **Any DICOM-compatible film printer** your facility chooses
+- **Examples**: Agfa DryPix, Kodak DryView, Fuji DryPix series
+- **Network or USB connected** film printers
+- **Existing facility equipment** can be integrated
 
 **Film Setup in CUPS:**
 ```bash

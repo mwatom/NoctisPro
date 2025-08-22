@@ -39,9 +39,10 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-log_header "🖨️  NoctisPro Printer Setup for Medical Image Printing"
+log_header "🖨️  NoctisPro Printer Setup for Your Facility"
 echo
-log_info "This script will configure your printer for high-quality DICOM image printing on glossy paper"
+log_info "This script helps configure YOUR FACILITY'S chosen printer(s) for DICOM image printing"
+log_info "It supports any CUPS-compatible printer with your preferred media (paper, film, etc.)"
 echo
 
 # Check if CUPS is installed
@@ -92,10 +93,10 @@ log_header "🔧 Printer Setup Options"
 echo
 echo "Choose an option:"
 echo "1) Auto-detect and add USB printer"
-echo "2) Add network printer (IP address)"
+echo "2) Add network printer (IP address)"  
 echo "3) Open CUPS web interface for manual setup"
 echo "4) Test existing printer"
-echo "5) Configure printer for glossy paper"
+echo "5) Configure printer for your facility's media preferences"
 echo "6) Skip printer setup"
 echo
 
@@ -111,10 +112,10 @@ case $choice in
             lsusb | grep -i "printer\|canon\|epson\|hp\|brother"
             
             echo
-            read -p "Enter printer name (e.g., MedicalPrinter): " printer_name
+            read -p "Enter name for your facility's printer (e.g., FacilityPrinter): " printer_name
             
             if [ -z "$printer_name" ]; then
-                printer_name="MedicalPrinter"
+                printer_name="FacilityPrinter"
             fi
             
             # Try to add USB printer automatically
@@ -143,11 +144,11 @@ case $choice in
         log_info "Setting up network printer..."
         echo
         read -p "Enter printer IP address: " printer_ip
-        read -p "Enter printer name (e.g., MedicalPrinter): " printer_name
-        
-        if [ -z "$printer_name" ]; then
-            printer_name="MedicalPrinter"
-        fi
+                 read -p "Enter name for your facility's printer (e.g., FacilityPrinter): " printer_name
+         
+         if [ -z "$printer_name" ]; then
+             printer_name="FacilityPrinter"
+         fi
         
         if [ ! -z "$printer_ip" ]; then
             log_info "Adding network printer: $printer_name at $printer_ip"
