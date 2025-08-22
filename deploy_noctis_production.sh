@@ -52,6 +52,30 @@ fi
 
 log_info "Starting NoctisPro Production Deployment..."
 
+# Detect Ubuntu version
+UBUNTU_VERSION=$(lsb_release -rs)
+UBUNTU_MAJOR=$(echo $UBUNTU_VERSION | cut -d. -f1)
+
+log_info "Detected Ubuntu version: $UBUNTU_VERSION"
+
+# Handle Ubuntu 24.04 specific requirements
+if [[ "$UBUNTU_MAJOR" == "24" ]]; then
+    log_info "Applying Ubuntu 24.04 compatibility fixes..."
+    
+    # Install iptables-legacy for Docker compatibility
+    apt update
+    apt install -y iptables-persistent
+    
+    # Switch to iptables-legacy
+    update-alternatives --set iptables /usr/sbin/iptables-legacy
+    update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
+    
+    # Install additional packages for Ubuntu 24.04
+    apt install -y fuse-overlayfs
+    
+    log_success "Ubuntu 24.04 compatibility fixes applied"
+fi
+
 # Update system
 log_info "Updating system packages..."
 apt update && apt upgrade -y
@@ -100,6 +124,24 @@ install_docker() {
     log_info "Installing Docker Engine..."
     apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     
+    # Configure Docker for Ubuntu 24.04 if needed
+    if [[ "$UBUNTU_MAJOR" == "24" ]]; then
+        log_info "Configuring Docker for Ubuntu 24.04..."
+        mkdir -p /etc/docker
+        cat > /etc/docker/daemon.json << EOF
+{
+    "storage-driver": "overlay2",
+    "iptables": true,
+    "ip-forward": true,
+    "log-driver": "json-file",
+    "log-opts": {
+        "max-size": "10m",
+        "max-file": "3"
+    }
+}
+EOF
+    fi
+    
     # Start and enable Docker
     systemctl start docker
     systemctl enable docker
@@ -147,7 +189,15 @@ apt install -y \
     libpq-dev \
     libjpeg-dev \
     libpng-dev \
-    libgdcm-dev
+    libgdcm-dev \
+    cups \
+    cups-client \
+    cups-filters \
+    printer-driver-all \
+    printer-driver-canon \
+    printer-driver-epson \
+    printer-driver-hplip \
+    printer-driver-brlaser
 
 # Create project user
 log_info "Creating project user..."
@@ -240,6 +290,34 @@ sed -i "s/# requirepass foobared/requirepass $REDIS_PASSWORD/" /etc/redis/redis.
 sed -i "s/bind 127.0.0.1 ::1/bind 127.0.0.1/" /etc/redis/redis.conf
 systemctl enable redis-server
 systemctl restart redis-server
+
+# Configure CUPS printing system
+log_info "Configuring CUPS printing system..."
+systemctl enable cups
+systemctl start cups
+
+# Add project user to lpadmin group for printer management
+usermod -a -G lpadmin $PROJECT_USER
+
+# Configure CUPS for local network access
+cupsctl --remote-any
+
+# Create CUPS configuration backup
+cp /etc/cups/cupsd.conf /etc/cups/cupsd.conf.backup
+
+# Optimize CUPS for medical imaging printing
+cat >> /etc/cups/cupsd.conf << EOF
+
+# NoctisPro Medical Imaging Optimizations
+MaxJobs 100
+MaxJobsPerPrinter 10
+MaxJobsPerUser 10
+PreserveJobHistory On
+PreserveJobFiles On
+AutoPurgeJobs Yes
+EOF
+
+systemctl restart cups
 
 # Clone or update project
 log_info "Setting up project code..."
@@ -506,8 +584,8 @@ EOF
 # Enable and start services
 log_info "Starting services..."
 systemctl daemon-reload
-systemctl enable noctis-django noctis-daphne noctis-celery nginx fail2ban
-systemctl start noctis-django noctis-daphne noctis-celery nginx fail2ban
+systemctl enable noctis-django noctis-daphne noctis-celery nginx fail2ban cups
+systemctl start noctis-django noctis-daphne noctis-celery nginx fail2ban cups
 
 # Create GitHub webhook handler
 log_info "Setting up GitHub webhook handler..."
@@ -632,13 +710,16 @@ cat > /usr/local/bin/noctis-status.sh << EOF
 echo "=== NoctisPro System Status ==="
 echo
 echo "Services:"
-systemctl is-active noctis-django noctis-daphne noctis-celery noctis-webhook nginx postgresql redis-server
+systemctl is-active noctis-django noctis-daphne noctis-celery noctis-webhook nginx postgresql redis-server cups
 echo
 echo "Disk Usage:"
 df -h $PROJECT_DIR
 echo
 echo "Memory Usage:"
 free -h
+echo
+echo "Printer Status:"
+lpstat -p -d 2>/dev/null || echo "No printers configured"
 echo
 echo "Recent Logs:"
 journalctl -u noctis-django --since "1 hour ago" --no-pager -n 10
@@ -676,14 +757,29 @@ echo
 echo "=== Useful Commands ==="
 echo "Check status: /usr/local/bin/noctis-status.sh"
 echo "Create backup: /usr/local/bin/noctis-backup.sh"
+echo "Setup printer: ./setup_printer.sh"
+echo "Validate deployment: python3 validate_deployment_with_printing.py"
 echo "View logs: journalctl -u noctis-django -f"
 echo "Restart services: systemctl restart noctis-django noctis-daphne noctis-celery"
 echo
+echo "=== ACCESS INFORMATION ==="
+echo "🌐 Local Access: http://$SERVER_IP"
+echo "🔧 Admin Panel: http://$SERVER_IP/admin"
+echo "🔗 Local Webhook: http://$SERVER_IP/webhook"
+echo
+echo "=== INTERNET ACCESS SETUP ==="
+echo "To enable internet access, run: sudo ./setup_secure_access.sh"
+echo "Available options:"
+echo "  1) Domain with HTTPS (https://your-domain.com)"
+echo "  2) Cloudflare Tunnel (secure, no open ports)"
+echo "  3) VPN Access (private network)"
+echo "  4) Reverse Proxy (custom domain)"
+echo
 echo "=== Next Steps ==="
-echo "1. Update GITHUB_REPO variable in this script with your actual repository URL"
-echo "2. Configure SSL certificate: certbot --nginx -d $DOMAIN_NAME"
-echo "3. Set up GitHub webhook: http://$SERVER_IP/webhook"
-echo "4. Change default admin password"
+echo "1. Configure internet access: sudo ./setup_secure_access.sh"
+echo "2. Change default admin password"
+echo "3. Configure your facility's printer (optional): sudo ./setup_printer.sh"
+echo "4. Set up GitHub webhook for auto-updates"
 echo
 log_warning "Please save the database password and Django secret key in a secure location!"
 echo "Database Password: $DB_PASSWORD"

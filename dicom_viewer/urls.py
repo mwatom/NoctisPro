@@ -85,4 +85,10 @@ urlpatterns += [
     path('reconstruction/start/', views.web_start_reconstruction, name='web_start_reconstruction'),
     path('reconstruction/status/<int:job_id>/', views.web_reconstruction_status, name='web_reconstruction_status'),
     path('reconstruction/result/<int:job_id>/', views.web_reconstruction_result, name='web_reconstruction_result'),
+    
+    # Printing functionality
+    path('print/image/', views.print_dicom_image, name='print_dicom_image'),
+    path('print/printers/', views.get_available_printers, name='get_available_printers'),
+    path('print/layouts/', views.get_print_layouts, name='get_print_layouts'),
+    path('print/settings/', views.print_settings_view, name='print_settings'),
 ]
