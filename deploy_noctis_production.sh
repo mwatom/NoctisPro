@@ -147,7 +147,15 @@ apt install -y \
     libpq-dev \
     libjpeg-dev \
     libpng-dev \
-    libgdcm-dev
+    libgdcm-dev \
+    cups \
+    cups-client \
+    cups-filters \
+    printer-driver-all \
+    printer-driver-canon \
+    printer-driver-epson \
+    printer-driver-hplip \
+    printer-driver-brlaser
 
 # Create project user
 log_info "Creating project user..."
@@ -240,6 +248,34 @@ sed -i "s/# requirepass foobared/requirepass $REDIS_PASSWORD/" /etc/redis/redis.
 sed -i "s/bind 127.0.0.1 ::1/bind 127.0.0.1/" /etc/redis/redis.conf
 systemctl enable redis-server
 systemctl restart redis-server
+
+# Configure CUPS printing system
+log_info "Configuring CUPS printing system..."
+systemctl enable cups
+systemctl start cups
+
+# Add project user to lpadmin group for printer management
+usermod -a -G lpadmin $PROJECT_USER
+
+# Configure CUPS for local network access
+cupsctl --remote-any
+
+# Create CUPS configuration backup
+cp /etc/cups/cupsd.conf /etc/cups/cupsd.conf.backup
+
+# Optimize CUPS for medical imaging printing
+cat >> /etc/cups/cupsd.conf << EOF
+
+# NoctisPro Medical Imaging Optimizations
+MaxJobs 100
+MaxJobsPerPrinter 10
+MaxJobsPerUser 10
+PreserveJobHistory On
+PreserveJobFiles On
+AutoPurgeJobs Yes
+EOF
+
+systemctl restart cups
 
 # Clone or update project
 log_info "Setting up project code..."
@@ -506,8 +542,8 @@ EOF
 # Enable and start services
 log_info "Starting services..."
 systemctl daemon-reload
-systemctl enable noctis-django noctis-daphne noctis-celery nginx fail2ban
-systemctl start noctis-django noctis-daphne noctis-celery nginx fail2ban
+systemctl enable noctis-django noctis-daphne noctis-celery nginx fail2ban cups
+systemctl start noctis-django noctis-daphne noctis-celery nginx fail2ban cups
 
 # Create GitHub webhook handler
 log_info "Setting up GitHub webhook handler..."
@@ -632,13 +668,16 @@ cat > /usr/local/bin/noctis-status.sh << EOF
 echo "=== NoctisPro System Status ==="
 echo
 echo "Services:"
-systemctl is-active noctis-django noctis-daphne noctis-celery noctis-webhook nginx postgresql redis-server
+systemctl is-active noctis-django noctis-daphne noctis-celery noctis-webhook nginx postgresql redis-server cups
 echo
 echo "Disk Usage:"
 df -h $PROJECT_DIR
 echo
 echo "Memory Usage:"
 free -h
+echo
+echo "Printer Status:"
+lpstat -p -d 2>/dev/null || echo "No printers configured"
 echo
 echo "Recent Logs:"
 journalctl -u noctis-django --since "1 hour ago" --no-pager -n 10
@@ -676,6 +715,8 @@ echo
 echo "=== Useful Commands ==="
 echo "Check status: /usr/local/bin/noctis-status.sh"
 echo "Create backup: /usr/local/bin/noctis-backup.sh"
+echo "Setup printer: ./setup_printer.sh"
+echo "Validate deployment: python3 validate_deployment_with_printing.py"
 echo "View logs: journalctl -u noctis-django -f"
 echo "Restart services: systemctl restart noctis-django noctis-daphne noctis-celery"
 echo

@@ -63,6 +63,17 @@
     #dicomModal .modal-header { display:flex; justify-content: space-between; align-items:center; margin-bottom:12px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; }
     #dicomModal h3 { color: var(--accent-color); font-weight: 600; margin: 0; text-transform: uppercase; font-size: 12px; }
     #dicomModal #dicomTagsPre { background: var(--secondary-bg); border: 1px solid var(--border-color); border-radius: 4px; padding: 12px; color: var(--text-secondary); font-family: 'Courier New', monospace; font-size: 11px; }
+    
+    /* Print modal */
+    #printModal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); z-index: 1300; }
+    #printModal .modal-card { background:var(--card-surface); border:1px solid var(--border-color); padding:20px; width:500px; max-height:80%; overflow:auto; border-radius:8px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+    #printModal .modal-header { display:flex; justify-content: space-between; align-items:center; margin-bottom:16px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; }
+    #printModal h3 { color: var(--accent-color); font-weight: 600; margin: 0; text-transform: uppercase; font-size: 12px; }
+    #printModal .form-group { margin-bottom: 16px; }
+    #printModal .form-group label { display: block; margin-bottom: 6px; font-size: 11px; color: var(--text-secondary); font-weight: 500; }
+    #printModal .form-group select, #printModal .form-group input { width: 100%; padding: 8px; background: var(--secondary-bg); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-size: 11px; }
+    #printModal .form-group select:focus, #printModal .form-group input:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 1px var(--accent-color); }
+    #printModal .btn-group { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
   </style>
   
   <!-- Import map to resolve bare specifier used by OrbitControls -->
@@ -125,6 +136,7 @@
       <button id="btnToggleTags" class="btn"><i class="fas fa-tags"></i> Tags</button>
       <button id="btnShowDicom" class="btn"><i class="fas fa-info-circle"></i> Show DICOM</button>
       <button id="btnCapture" class="btn"><i class="fas fa-camera"></i> Capture</button>
+      <button id="btnPrint" class="btn"><i class="fas fa-print"></i> Print</button>
       <div id="patientInfo" style="margin-left:auto;color:#ccc;font-size:13px;">Patient: - | Study Date: - | Modality: -</div>
     </div>
     <div class="viewport" id="viewport">
@@ -242,6 +254,57 @@
         <button id="closeDicomModal" class="btn">Close</button>
       </div>
       <pre id="dicomTagsPre" style="white-space:pre-wrap; color:#ddd;"></pre>
+    </div>
+  </div>
+
+  <!-- Print Modal -->
+  <div id="printModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Print DICOM Image</h3>
+        <button id="closePrintModal" class="btn">Close</button>
+      </div>
+      <form id="printForm">
+        <div class="form-group">
+          <label for="printerSelect">Printer:</label>
+          <select id="printerSelect" name="printer_name">
+            <option value="">Loading printers...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="paperSize">Paper Size:</label>
+          <select id="paperSize" name="paper_size">
+            <option value="A4">A4</option>
+            <option value="Letter">Letter</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="paperType">Paper Type:</label>
+          <select id="paperType" name="paper_type">
+            <option value="glossy">Glossy Photo Paper</option>
+            <option value="matte">Matte Paper</option>
+            <option value="plain">Plain Paper</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="printQuality">Print Quality:</label>
+          <select id="printQuality" name="print_quality">
+            <option value="high">High Quality (1200 DPI)</option>
+            <option value="normal">Normal Quality (600 DPI)</option>
+            <option value="draft">Draft Quality (300 DPI)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="copies">Number of Copies:</label>
+          <input type="number" id="copies" name="copies" value="1" min="1" max="10">
+        </div>
+        <div class="btn-group">
+          <button type="button" id="cancelPrint" class="btn">Cancel</button>
+          <button type="submit" id="submitPrint" class="btn btn-primary">
+            <i class="fas fa-print"></i> Print Image
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -1728,6 +1791,110 @@
          const url = canvas.toDataURL('image/jpeg', 0.92);
          const a = document.createElement('a'); a.href = url; a.download = `dicom_capture_${Date.now()}.jpg`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
        } catch(e){}
+     });
+
+     // Print functionality
+     const btnPrint = document.getElementById('btnPrint');
+     const printModal = document.getElementById('printModal');
+     const closePrintModal = document.getElementById('closePrintModal');
+     const cancelPrint = document.getElementById('cancelPrint');
+     const printForm = document.getElementById('printForm');
+     const printerSelect = document.getElementById('printerSelect');
+
+     // Load available printers when modal opens
+     btnPrint.addEventListener('click', async ()=>{
+       try {
+         // Load available printers
+         const response = await fetch('/dicom-viewer/print/printers/');
+         const data = await response.json();
+         
+         if (data.success) {
+           printerSelect.innerHTML = '';
+           if (data.printers.length === 0) {
+             printerSelect.innerHTML = '<option value="">No printers available</option>';
+           } else {
+             data.printers.forEach(printer => {
+               const option = document.createElement('option');
+               option.value = printer.name;
+               option.textContent = `${printer.name} - ${printer.description}`;
+               printerSelect.appendChild(option);
+             });
+           }
+         }
+         
+         printModal.style.display = 'flex';
+       } catch(e) {
+         alert('Error loading printers: ' + e.message);
+       }
+     });
+
+     // Close print modal
+     closePrintModal.addEventListener('click', ()=>{ printModal.style.display = 'none'; });
+     cancelPrint.addEventListener('click', ()=>{ printModal.style.display = 'none'; });
+     printModal.addEventListener('click', (e)=>{ if (e.target === printModal) printModal.style.display = 'none'; });
+
+     // Handle print form submission
+     printForm.addEventListener('submit', async (e)=>{
+       e.preventDefault();
+       
+       try {
+         // Get current canvas image data
+         const imageData = canvas.toDataURL('image/png', 1.0);
+         
+         // Get patient information from current study
+         const patientInfo = document.getElementById('patientInfo').textContent;
+         const patientMatch = patientInfo.match(/Patient: ([^|]+)/);
+         const dateMatch = patientInfo.match(/Study Date: ([^|]+)/);
+         const modalityMatch = patientInfo.match(/Modality: ([^|]+)/);
+         
+         const formData = new FormData();
+         formData.append('image_data', imageData);
+         formData.append('printer_name', document.getElementById('printerSelect').value);
+         formData.append('paper_size', document.getElementById('paperSize').value);
+         formData.append('paper_type', document.getElementById('paperType').value);
+         formData.append('print_quality', document.getElementById('printQuality').value);
+         formData.append('copies', document.getElementById('copies').value);
+         formData.append('patient_name', patientMatch ? patientMatch[1].trim() : 'Unknown Patient');
+         formData.append('study_date', dateMatch ? dateMatch[1].trim() : '');
+         formData.append('modality', modalityMatch ? modalityMatch[1].trim() : '');
+         formData.append('series_description', currentSeries ? currentSeries.description || '' : '');
+         
+         // Add CSRF token
+         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                          document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
+                          getCookie('csrftoken');
+         if (csrfToken) {
+           formData.append('csrfmiddlewaretoken', csrfToken);
+         }
+         
+         // Submit print job
+         const submitBtn = document.getElementById('submitPrint');
+         const originalText = submitBtn.innerHTML;
+         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Printing...';
+         submitBtn.disabled = true;
+         
+         const response = await fetch('/dicom-viewer/print/image/', {
+           method: 'POST',
+           body: formData
+         });
+         
+         const result = await response.json();
+         
+         if (result.success) {
+           alert('Success: ' + result.message);
+           printModal.style.display = 'none';
+         } else {
+           alert('Error: ' + result.error);
+         }
+         
+       } catch(e) {
+         alert('Error printing image: ' + e.message);
+       } finally {
+         // Reset button
+         const submitBtn = document.getElementById('submitPrint');
+         submitBtn.innerHTML = '<i class="fas fa-print"></i> Print Image';
+         submitBtn.disabled = false;
+       }
      });
 
     // Utils
