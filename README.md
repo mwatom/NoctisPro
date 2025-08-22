@@ -43,6 +43,7 @@ NoctisPro is a comprehensive, production-ready medical imaging platform designed
 - **🖨️ Printing**: CUPS, ReportLab, PyCUPS for high-quality medical image printing
 - **Deployment**: Gunicorn, Daphne, Nginx, Systemd
 - **Security**: SSL/TLS, UFW Firewall, Fail2ban
+- **Containerization**: Docker & Docker Compose with automatic installation
 
 ## 📋 System Requirements
 
@@ -63,38 +64,167 @@ NoctisPro is a comprehensive, production-ready medical imaging platform designed
 - **SSL**: Valid SSL certificate for HTTPS
 - **🖨️ Printer**: Professional photo/film printer with multiple media support
 
-## 🏥 COMPLETE DEPLOYMENT GUIDE FOR TECHNICIANS
+### Recommended Server Configuration
+- **512GB NVMe SSD**: For OS, Docker containers, and application runtime
+- **2TB HDD**: For DICOM images, media files, and long-term storage
+- **Dual Storage Benefits**: Fast performance + Large capacity storage
+
+## 🏥 COMPLETE AUTONOMOUS DEPLOYMENT GUIDE FOR TECHNICIANS
+
+> 🎯 **Designed for Autonomous Deployment**: This guide enables technicians to deploy the system independently without requiring the developer's presence.
 
 > 📖 **Ubuntu 24.04 Users**: See [UBUNTU_24_DEPLOYMENT_GUIDE.md](UBUNTU_24_DEPLOYMENT_GUIDE.md) for Ubuntu 24.04 specific instructions with enhanced features.
 
-### Prerequisites Checklist
-Before starting deployment, ensure you have:
-- [ ] **Ubuntu 22.04 LTS or Ubuntu 24.04 LTS** Server installed and updated ✨
-- [ ] Root or sudo access to the server
-- [ ] Network connectivity for package downloads
-- [ ] Domain name (optional but recommended)
+### 🔍 Pre-Deployment System Check
 
-**Optional (for DICOM printing):**
-- [ ] Any CUPS-compatible printer of your facility's choice
-- [ ] Print media as preferred by your facility (paper, film, etc.)
-
-### Step 1: Initial Server Setup
+**Before starting, verify your server setup:**
 
 ```bash
-# Update system packages
+# Check OS version
+lsb_release -a
+
+# Check available storage
+lsblk
+df -h
+
+# Check memory
+free -h
+
+# Check CPU
+nproc
+cat /proc/cpuinfo | grep "model name" | head -1
+
+# Check network connectivity
+ping -c 3 google.com
+```
+
+### 💾 STORAGE CONFIGURATION (SSD + HDD Setup)
+
+**For servers with 512GB SSD + 2TB HDD configuration:**
+
+#### Step 1: Configure Storage Partitions
+
+```bash
+# Check current disk layout
+sudo lsblk
+sudo fdisk -l
+
+# Identify your disks (typical examples):
+# /dev/nvme0n1 - 512GB NVMe SSD (for OS and Docker)
+# /dev/sda - 2TB HDD (for data storage)
+
+# Create data partition on HDD (if not already partitioned)
+sudo fdisk /dev/sda
+# Press 'n' for new partition
+# Press 'p' for primary
+# Press '1' for partition number
+# Press Enter twice for default start/end
+# Press 'w' to write changes
+
+# Format the HDD partition for data storage
+sudo mkfs.ext4 /dev/sda1
+
+# Create mount point for data storage
+sudo mkdir -p /data
+
+# Get UUID of the HDD partition
+sudo blkid /dev/sda1
+
+# Add to fstab for permanent mounting
+echo "UUID=$(sudo blkid -s UUID -o value /dev/sda1) /data ext4 defaults,noatime 0 2" | sudo tee -a /etc/fstab
+
+# Mount the data partition
+sudo mount -a
+sudo chmod 755 /data
+```
+
+#### Step 2: Configure Docker to Use SSD
+
+```bash
+# Create Docker daemon configuration for SSD optimization
+sudo mkdir -p /etc/docker
+
+# Configure Docker to use SSD efficiently
+sudo tee /etc/docker/daemon.json > /dev/null <<EOF
+{
+  "data-root": "/var/lib/docker",
+  "storage-driver": "overlay2",
+  "storage-opts": [
+    "overlay2.override_kernel_check=true"
+  ],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  },
+  "live-restore": true,
+  "userland-proxy": false,
+  "experimental": false
+}
+EOF
+```
+
+#### Step 3: Configure Application Data Storage
+
+```bash
+# Create directories for different data types
+sudo mkdir -p /data/noctis_pro/{media,dicom_images,backups,logs,temp}
+sudo mkdir -p /opt/noctis_pro_fast/{cache,sessions,temp_processing}
+
+# Set proper ownership (will be configured during deployment)
+sudo chown -R 1000:1000 /data/noctis_pro/
+sudo chown -R 1000:1000 /opt/noctis_pro_fast/
+```
+
+### Prerequisites Checklist
+
+**✅ TECHNICIAN CHECKLIST - Complete Before Deployment:**
+
+- [ ] **Server Hardware Verified**
+  - [ ] 512GB+ NVMe SSD mounted as root filesystem (/)
+  - [ ] 2TB+ HDD available for data storage (/data)
+  - [ ] 8GB+ RAM available
+  - [ ] 4+ CPU cores available
+  - [ ] Network connectivity working
+
+- [ ] **Operating System Ready**
+  - [ ] Ubuntu 22.04 LTS or Ubuntu 24.04 LTS Server installed ✨
+  - [ ] System fully updated (`sudo apt update && sudo apt upgrade -y`)
+  - [ ] Root or sudo access confirmed
+  - [ ] SSH access working (if remote deployment)
+
+- [ ] **Network Configuration**
+  - [ ] Static IP configured (recommended) or DHCP working
+  - [ ] Internet connectivity verified
+  - [ ] Domain name available (optional but recommended)
+  - [ ] Firewall ports 80, 443, 22 will be accessible
+
+- [ ] **Optional Equipment**
+  - [ ] CUPS-compatible printer connected (for DICOM printing)
+  - [ ] Print media loaded (paper, film, etc.)
+
+### 🚀 AUTOMATED DEPLOYMENT PROCESS
+
+#### Step 1: Initial Server Setup
+
+```bash
+# Update system packages (always run first)
 sudo apt update && sudo apt upgrade -y
 
 # Install essential packages
-sudo apt install -y curl wget git unzip software-properties-common
+sudo apt install -y curl wget git unzip software-properties-common lsb-release
 
-# Set server hostname (optional)
+# Set server hostname (optional but recommended)
 sudo hostnamectl set-hostname noctis-server
 
-# Reboot to apply updates (recommended)
+# Configure timezone (adjust as needed)
+sudo timedatectl set-timezone UTC
+
+# Reboot to ensure all updates are applied
 sudo reboot
 ```
 
-### Step 2: Clone Repository and Prepare
+#### Step 2: Download and Prepare Deployment
 
 ```bash
 # Clone the repository
@@ -110,9 +240,25 @@ chmod +x ops/*.sh
 ls -la *.sh
 ```
 
-### Step 3: Configure Domain (Optional but Recommended)
+#### Step 3: Configure Storage (SSD + HDD Setup)
 
-If you have a domain name, configure it before deployment:
+**⚠️ IMPORTANT: Run this BEFORE main deployment if you have separate SSD/HDD:**
+
+```bash
+# Run storage configuration script
+sudo ./scripts/configure_storage.sh
+
+# This script will:
+# ✅ Detect SSD and HDD automatically
+# ✅ Configure Docker to use SSD for containers
+# ✅ Configure HDD for DICOM images and media
+# ✅ Optimize file system for medical imaging
+# ✅ Set up proper directory structure
+```
+
+#### Step 4: Configure Domain (Optional but Recommended)
+
+**If you have a domain name, configure it before deployment:**
 
 ```bash
 # Edit the deployment script
@@ -125,78 +271,72 @@ DOMAIN_NAME="your-actual-domain.com"  # Replace with your domain
 DOMAIN_NAME="noctis-server.local"
 ```
 
-### Step 4: 🖨️ Printer Setup (OPTIONAL - Configure After Deployment)
+#### Step 5: 🐳 AUTOMATED DOCKER INSTALLATION & DEPLOYMENT
 
-**NOTE**: Printer setup is **optional** and can be done **after deployment**. Each facility can choose their preferred printers and configure them as needed.
-
-```bash
-# Install CUPS printing system
-sudo apt install -y cups cups-client cups-filters printer-driver-all
-
-# Install additional printer drivers for major brands
-sudo apt install -y printer-driver-canon printer-driver-epson printer-driver-hplip
-
-# Start and enable CUPS service
-sudo systemctl start cups
-sudo systemctl enable cups
-
-# Add your user to lpadmin group for printer management
-sudo usermod -a -G lpadmin $USER
-
-# Configure CUPS for network access (if needed)
-sudo cupsctl --remote-any
-sudo systemctl restart cups
-```
-
-**Configure Your Printer:**
-
-```bash
-# Option 1: Web interface (recommended)
-# Open browser to: http://localhost:631
-# Go to Administration > Add Printer
-# Follow the wizard to add your printer
-
-# Option 2: Command line
-sudo lpadmin -p YourPrinterName -E -v "ipp://printer-ip-address/ipp/print" -m everywhere
-
-# Test printer setup
-lpstat -p -d
-lp -d YourPrinterName /etc/passwd  # Test print
-```
-
-### Step 5: Run Main Production Deployment
-
-**The deployment script will install CUPS printing support automatically. Your facility can configure specific printers later.**
+**This is the main deployment command that handles everything:**
 
 ```bash
 sudo ./deploy_noctis_production.sh
 ```
 
-**This script will automatically:**
-- ✅ **Detect Ubuntu version** (20.04, 22.04, or 24.04) and apply compatibility fixes
-- ✅ Install Docker and Docker Compose (with Ubuntu 24.04 optimizations)
-- ✅ Install PostgreSQL with production configuration
-- ✅ Install Redis with authentication
-- ✅ Install Nginx with security headers
-- ✅ Install Python 3.11+ and create virtual environment
-- ✅ Install all Python dependencies (including enhanced printing libraries)
-- ✅ Install CUPS printing system with film and paper support
-- ✅ Install printer drivers for all major brands
-- ✅ Create secure system user and directories
-- ✅ Generate secure passwords and keys
-- ✅ Configure Django with production settings
-- ✅ Set up Gunicorn with optimal workers
-- ✅ Configure Daphne for WebSockets
-- ✅ Set up Celery for background tasks
-- ✅ Configure UFW firewall with secure rules
-- ✅ Set up Fail2ban for security
-- ✅ Create systemd services for all components
-- ✅ Set up automatic backups
-- ✅ Configure GitHub webhook for auto-deployment
+**🤖 AUTOMATIC INSTALLATION PROCESS:**
 
-**Expected deployment time: 15-25 minutes**
+The script will automatically detect and install Docker if not present:
 
-### Step 6: Configure Internet Access (Optional)
+**Docker Installation (Automatic):**
+- ✅ **Detects if Docker is already installed**
+- ✅ **Removes conflicting Docker versions**
+- ✅ **Installs Docker CE from official repository**
+- ✅ **Installs Docker Compose V2**
+- ✅ **Configures Docker for SSD optimization**
+- ✅ **Starts and enables Docker service**
+- ✅ **Verifies Docker installation**
+- ✅ **Handles Ubuntu 24.04 compatibility issues**
+
+**Complete System Setup (Automatic):**
+- ✅ **Detects Ubuntu version** (20.04, 22.04, or 24.04) and applies compatibility fixes
+- ✅ **Installs Docker and Docker Compose** with automatic detection and setup
+- ✅ **Configures storage optimization** for SSD/HDD configuration
+- ✅ **Installs PostgreSQL** with production configuration
+- ✅ **Installs Redis** with authentication
+- ✅ **Installs Nginx** with security headers
+- ✅ **Installs Python 3.11+** and creates virtual environment
+- ✅ **Installs all Python dependencies** (including enhanced printing libraries)
+- ✅ **Installs CUPS printing system** with film and paper support
+- ✅ **Installs printer drivers** for all major brands
+- ✅ **Creates secure system user** and directories
+- ✅ **Generates secure passwords** and keys
+- ✅ **Configures Django** with production settings
+- ✅ **Sets up Gunicorn** with optimal workers
+- ✅ **Configures Daphne** for WebSockets
+- ✅ **Sets up Celery** for background tasks
+- ✅ **Configures UFW firewall** with secure rules
+- ✅ **Sets up Fail2ban** for security
+- ✅ **Creates systemd services** for all components
+- ✅ **Sets up automatic backups**
+- ✅ **Configures GitHub webhook** for auto-deployment
+
+**Expected deployment time: 15-30 minutes**
+
+#### Step 6: Verify Docker Installation
+
+```bash
+# Check Docker status
+sudo systemctl status docker
+
+# Verify Docker version
+docker --version
+docker compose version
+
+# Test Docker functionality
+sudo docker run hello-world
+
+# Check Docker storage location (should be on SSD)
+sudo docker system df
+sudo docker system info | grep "Docker Root Dir"
+```
+
+#### Step 7: Configure Internet Access (Optional)
 
 **After deployment, the system is accessible locally. To enable internet access:**
 
@@ -229,7 +369,7 @@ sudo ./setup_secure_access.sh
    - **Local Access**: `http://192.168.100.15`
    - No internet exposure
 
-### Step 7: Verify Installation
+#### Step 8: Verify Installation
 
 ```bash
 # Check all services are running
@@ -243,9 +383,16 @@ sudo /usr/local/bin/noctis-status.sh
 # ✅ redis: active (running)
 # ✅ nginx: active (running)
 # ✅ cups: active (running)
+# ✅ docker: active (running)
+
+# Check Docker containers
+sudo docker ps -a
+
+# Check storage configuration
+df -h
 ```
 
-### Step 8: First Login and Configuration
+#### Step 9: First Login and Configuration
 
 1. **Access the application:**
    - **Local Access**: `http://192.168.100.15` (always available)
@@ -266,46 +413,142 @@ sudo /usr/local/bin/noctis-status.sh
    - Set up users and permissions
    - **Optionally configure printers** (if your facility uses DICOM printing)
 
-### Step 9: 🖨️ Configure DICOM Image Printing (Optional)
+## 💾 STORAGE OPTIMIZATION GUIDE
 
-**This step is only needed if your facility wants to use DICOM printing. Skip if not needed.**
+### Recommended Storage Layout for 512GB SSD + 2TB HDD
 
-**Facility Printer Setup:**
-
-```bash
-# Verify printer is detected
-lpstat -p -d
-
-# Test basic printing
-echo "Test print from NoctisPro" | lp
-
-# Check print queue
-lpq
-
-# If printer not working, check status:
-sudo systemctl status cups
-sudo journalctl -u cups -f
+**SSD Usage (Fast Storage - 512GB):**
+```
+/                    - Root filesystem (50GB)
+/var/lib/docker      - Docker containers and images (100GB)
+/opt/noctis_pro      - Application code and dependencies (10GB)
+/opt/noctis_pro_fast - Cache, sessions, temp processing (50GB)
+/swap                - Swap file (16GB)
+Free space           - System overhead and updates (286GB)
 ```
 
-**Configure Glossy Paper Settings:**
+**HDD Usage (Large Storage - 2TB):**
+```
+/data/noctis_pro/media       - DICOM images and studies (1.5TB)
+/data/noctis_pro/backups     - System and database backups (300GB)
+/data/noctis_pro/logs        - Long-term log storage (50GB)
+/data/noctis_pro/exports     - Report exports and archives (100GB)
+Free space                   - Future growth (50GB)
+```
 
-1. **Access CUPS web interface**: `http://localhost:631`
-2. **Go to Printers > Your Printer > Set Default Options**
-3. **Configure for medical imaging:**
-   - **Media Type**: Photo/Glossy
-   - **Print Quality**: High/Best
-   - **Color Mode**: Color
-   - **Resolution**: 1200 DPI or highest available
-   - **Paper Size**: A4 or Letter
+### Storage Configuration Script
 
-**Test DICOM Printing:**
+**The deployment automatically configures storage, but you can run it manually:**
 
-1. Login to NoctisPro
-2. Open any DICOM study
-3. Click the **Print** button in the viewer
-4. Select your printer and "Glossy Photo Paper"
-5. Click "Print Image"
-6. Verify high-quality output on glossy paper
+```bash
+# Create storage configuration script
+sudo ./scripts/configure_storage.sh
+
+# Manual storage verification
+sudo ./scripts/verify_storage.sh
+```
+
+### Storage Performance Optimization
+
+```bash
+# Optimize SSD for Docker
+sudo tee -a /etc/fstab > /dev/null <<EOF
+# SSD optimizations
+/var/lib/docker ext4 defaults,noatime,discard 0 2
+EOF
+
+# Optimize HDD for large files
+sudo tee -a /etc/fstab > /dev/null <<EOF
+# HDD optimizations for large medical files
+/data ext4 defaults,noatime,data=writeback 0 2
+EOF
+
+# Apply optimizations
+sudo mount -o remount /var/lib/docker
+sudo mount -o remount /data
+```
+
+## 🐳 DOCKER INSTALLATION & MANAGEMENT
+
+### Automatic Docker Installation
+
+**The deployment script automatically handles Docker installation:**
+
+```bash
+# Docker installation is automatic, but here's what happens:
+
+# 1. Detection phase
+if ! command -v docker &> /dev/null; then
+    echo "Docker not found - installing automatically..."
+fi
+
+# 2. Cleanup old versions
+sudo apt remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
+
+# 3. Install Docker CE
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# 4. Configure Docker for production
+sudo systemctl enable docker
+sudo systemctl start docker
+
+# 5. Verify installation
+docker --version
+docker compose version
+```
+
+### Manual Docker Installation (If Needed)
+
+**If automatic installation fails, run manual installation:**
+
+```bash
+# Use comprehensive Docker installation script
+sudo ./install_docker_comprehensive.sh
+
+# Or use the official Docker installation script
+sudo ./get-docker.sh
+
+# Verify installation
+sudo docker run hello-world
+```
+
+### Docker Storage Configuration
+
+```bash
+# Check Docker storage location (should be on SSD)
+sudo docker system info | grep "Docker Root Dir"
+
+# Check Docker disk usage
+sudo docker system df
+
+# Configure Docker data location (if needed)
+sudo systemctl stop docker
+sudo mkdir -p /var/lib/docker
+sudo systemctl start docker
+```
+
+### Docker Container Management
+
+```bash
+# View running containers
+sudo docker ps
+
+# View all containers
+sudo docker ps -a
+
+# Check container logs
+sudo docker logs <container_name>
+
+# Restart containers
+sudo docker compose restart
+
+# Update containers
+sudo docker compose pull
+sudo docker compose up -d
+```
 
 ## 🔧 Post-Deployment Configuration
 
@@ -332,12 +575,12 @@ sudo ./setup_secure_access.sh
 
 **The script will provide your internet access link based on your choice:**
 
-- **Option 1 (Domain + HTTPS)**: You get `https://your-domain.com`
-- **Option 2 (Cloudflare Tunnel)**: You get a Cloudflare URL
-- **Option 3 (VPN)**: You get VPN connection details
-- **Option 4 (Local Only)**: No internet link (local access only)
+- **🌐 Domain + HTTPS**: `https://your-domain.com` (requires domain)
+- **☁️ Cloudflare Tunnel**: Secure Cloudflare URL (no domain needed)
+- **🔐 VPN Access**: Private VPN connection for remote access
+- **🔒 Local Only**: `http://192.168.100.15` (local network only)
 
-**After setup, your access information is saved to:**
+**Your access information is saved to:**
 ```bash
 cat /opt/noctis_pro/SECURE_ACCESS_INFO.txt
 ```
@@ -351,6 +594,30 @@ cat /opt/noctis_pro/SECURE_ACCESS_INFO.txt
    - **Content Type**: `application/json`
    - **Events**: Push events
    - **Active**: ✅ Checked
+
+### 🖨️ Printer Setup (OPTIONAL - Configure After Deployment)
+
+**NOTE**: Printer setup is **optional** and can be done **after deployment**. Each facility can choose their preferred printers and configure them as needed.
+
+```bash
+# CUPS is automatically installed during deployment
+# To configure your facility's printer:
+
+# Check if CUPS is running
+sudo systemctl status cups
+
+# Access CUPS web interface
+# Open browser to: http://localhost:631
+# Go to Administration > Add Printer
+# Follow the wizard to add your printer
+
+# Or use command line:
+sudo lpadmin -p YourPrinterName -E -v "ipp://printer-ip-address/ipp/print" -m everywhere
+
+# Test printer setup
+lpstat -p -d
+echo "Test print from NoctisPro" | lp -d YourPrinterName
+```
 
 ## 📊 System Management Commands
 
@@ -370,6 +637,44 @@ sudo systemctl stop noctis-django noctis-daphne noctis-celery
 
 # Start all services
 sudo systemctl start noctis-django noctis-daphne noctis-celery
+```
+
+### Docker Management
+```bash
+# Check Docker status
+sudo systemctl status docker
+
+# View Docker containers
+sudo docker ps -a
+
+# Check Docker resource usage
+sudo docker system df
+
+# Clean up Docker (free space)
+sudo docker system prune -f
+
+# Update Docker images
+cd /opt/noctis_pro
+sudo docker compose pull
+sudo docker compose up -d
+```
+
+### Storage Management
+```bash
+# Check storage usage
+df -h
+
+# Check DICOM storage on HDD
+du -sh /data/noctis_pro/
+
+# Check Docker storage on SSD
+sudo du -sh /var/lib/docker/
+
+# Clean up old DICOM files (if needed)
+find /data/noctis_pro/media -name "*.dcm" -mtime +90 -type f | wc -l
+
+# Monitor storage usage
+watch -n 5 'df -h'
 ```
 
 ### 🖨️ Printer Management
@@ -419,6 +724,394 @@ sudo -u noctis ./venv/bin/python manage.py collectstatic --noinput --settings=no
 sudo systemctl restart noctis-django noctis-daphne noctis-celery
 ```
 
+## 🚨 COMPREHENSIVE TROUBLESHOOTING GUIDE
+
+### Docker Installation Issues
+
+**Issue: Docker installation fails**
+```bash
+# Solution 1: Clean install Docker
+sudo apt remove -y docker docker-engine docker.io containerd runc
+sudo apt autoremove -y
+sudo apt autoclean
+
+# Re-run deployment
+./deploy_noctis_production.sh
+
+# Solution 2: Use manual Docker installation
+sudo ./install_docker_comprehensive.sh
+
+# Solution 3: Use official Docker script
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+```
+
+**Issue: Docker daemon fails to start**
+```bash
+# Check Docker service status
+sudo systemctl status docker
+
+# Check Docker logs
+sudo journalctl -u docker.service -f
+
+# Restart Docker service
+sudo systemctl restart docker
+
+# Check Docker configuration
+sudo docker system info
+```
+
+**Issue: Ubuntu 24.04 Docker compatibility problems**
+```bash
+# The deployment script automatically handles Ubuntu 24.04, but if issues persist:
+
+# Fix iptables for Ubuntu 24.04
+sudo apt install -y iptables-persistent
+sudo update-alternatives --set iptables /usr/sbin/iptables-legacy
+sudo update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
+
+# Install additional packages
+sudo apt install -y fuse-overlayfs
+
+# Restart Docker
+sudo systemctl restart docker
+
+# Re-run deployment
+sudo ./deploy_noctis_production.sh
+```
+
+**Issue: Docker permission denied**
+```bash
+# Add user to docker group
+sudo usermod -aG docker $USER
+sudo usermod -aG docker noctis
+
+# Restart Docker
+sudo systemctl restart docker
+
+# Re-login or restart session
+newgrp docker
+```
+
+### Storage Issues
+
+**Issue: SSD full - Docker images taking too much space**
+```bash
+# Check Docker disk usage
+sudo docker system df
+
+# Clean up unused Docker data
+sudo docker system prune -a -f
+
+# Remove old images
+sudo docker image prune -a -f
+
+# Check available space
+df -h
+```
+
+**Issue: HDD not mounted for data storage**
+```bash
+# Check mount status
+mount | grep /data
+
+# Check fstab entry
+cat /etc/fstab | grep /data
+
+# Mount manually
+sudo mount /data
+
+# Verify permissions
+ls -la /data/noctis_pro/
+```
+
+**Issue: Poor performance due to wrong storage usage**
+```bash
+# Verify Docker is using SSD
+sudo docker system info | grep "Docker Root Dir"
+
+# Verify DICOM storage is on HDD
+ls -la /data/noctis_pro/media/
+
+# Check if application is using correct paths
+grep -r "/data" /opt/noctis_pro/.env
+```
+
+### Common Deployment Issues
+
+**Issue: PostgreSQL connection fails**
+```bash
+# Check PostgreSQL status
+sudo systemctl status postgresql
+
+# Restart PostgreSQL
+sudo systemctl restart postgresql
+
+# Check logs
+sudo journalctl -u postgresql -f
+
+# Reset database password
+sudo -u postgres psql -c "ALTER USER noctis_user PASSWORD 'new_password';"
+```
+
+**Issue: Services fail to start**
+```bash
+# Check service status
+sudo systemctl status noctis-django noctis-daphne noctis-celery
+
+# Check logs for errors
+sudo journalctl -u noctis-django --since "1 hour ago"
+
+# Restart services
+sudo systemctl restart noctis-django noctis-daphne noctis-celery
+```
+
+**Issue: Nginx configuration errors**
+```bash
+# Test Nginx configuration
+sudo nginx -t
+
+# Check Nginx status
+sudo systemctl status nginx
+
+# Restart Nginx
+sudo systemctl restart nginx
+
+# Check Nginx logs
+sudo tail -f /var/log/nginx/error.log
+```
+
+**Issue: Permission errors**
+```bash
+# Fix ownership of application files
+sudo chown -R noctis:noctis /opt/noctis_pro/
+sudo chown -R noctis:noctis /data/noctis_pro/
+
+# Fix permissions
+sudo chmod -R 755 /opt/noctis_pro/
+sudo chmod -R 755 /data/noctis_pro/
+
+# Restart services
+sudo systemctl restart noctis-django
+```
+
+### 🖨️ Printing Troubleshooting
+
+**Issue: No printers available**
+```bash
+# Check CUPS service
+sudo systemctl status cups
+
+# Restart CUPS
+sudo systemctl restart cups
+
+# Check printer detection
+lpstat -p -d
+
+# Re-add printer
+sudo lpadmin -p YourPrinter -E -v "usb://path" -m everywhere
+```
+
+**Issue: Poor print quality on glossy paper**
+```bash
+# Check printer settings
+lpoptions -p YourPrinter
+
+# Set optimal settings for glossy paper
+sudo lpadmin -p YourPrinter -o media-type=photographic-glossy
+sudo lpadmin -p YourPrinter -o print-quality=5
+sudo lpadmin -p YourPrinter -o Resolution=1200dpi
+
+# Test with high quality
+echo "Quality test" | lp -d YourPrinter -o print-quality=5 -o media-type=photographic-glossy
+```
+
+**Issue: Print jobs stuck in queue**
+```bash
+# Check print queue
+lpq
+
+# Cancel stuck jobs
+cancel -a
+
+# Restart CUPS
+sudo systemctl restart cups
+
+# Check CUPS error log
+sudo tail -f /var/log/cups/error_log
+```
+
+### Network Issues
+
+**Issue: Cannot access web interface**
+```bash
+# Check if services are running
+sudo systemctl status nginx noctis-django
+
+# Check firewall
+sudo ufw status
+
+# Check if ports are open
+sudo netstat -tlnp | grep :80
+sudo netstat -tlnp | grep :443
+
+# Test local access
+curl -I http://localhost
+```
+
+**Issue: SSL certificate problems**
+```bash
+# Check certificate status
+sudo certbot certificates
+
+# Renew certificates
+sudo certbot renew
+
+# Test certificate
+openssl s_client -connect your-domain.com:443 -servername your-domain.com
+```
+
+### Performance Issues
+
+**Issue: Slow DICOM loading**
+```bash
+# Check available disk space
+df -h
+
+# Check memory usage
+free -h
+
+# Check system load
+top
+
+# Restart services to clear memory
+sudo systemctl restart noctis-django noctis-daphne noctis-celery
+```
+
+**Issue: Database performance problems**
+```bash
+# Check database connections
+sudo -u postgres psql -d noctis_pro -c "SELECT count(*) FROM pg_stat_activity;"
+
+# Restart PostgreSQL
+sudo systemctl restart postgresql
+
+# Check PostgreSQL logs
+sudo journalctl -u postgresql -f
+```
+
+## 🔄 Maintenance Procedures
+
+### Daily Checks
+```bash
+# Run system status check
+sudo /usr/local/bin/noctis-status.sh
+
+# Check disk space (both SSD and HDD)
+df -h
+
+# Check system load
+uptime
+
+# Check Docker status
+sudo docker ps
+
+# Check print queue
+lpq
+```
+
+### Weekly Maintenance
+```bash
+# Update system packages
+sudo apt update && sudo apt upgrade -y
+
+# Check service logs for errors
+sudo journalctl --since "7 days ago" | grep -i error
+
+# Verify backups
+ls -la /data/noctis_pro/backups/
+
+# Clean Docker cache
+sudo docker system prune -f
+
+# Test printer functionality
+echo "Weekly printer test" | lp
+```
+
+### Monthly Maintenance
+```bash
+# Full system backup
+sudo /usr/local/bin/noctis-backup.sh
+
+# Clean old log files
+sudo journalctl --vacuum-time=30d
+
+# Update SSL certificates
+sudo certbot renew
+
+# Check security updates
+sudo apt list --upgradable | grep -i security
+
+# Optimize database
+sudo -u postgres psql -d noctis_pro -c "VACUUM ANALYZE;"
+
+# Check storage health
+sudo smartctl -a /dev/nvme0n1  # SSD health
+sudo smartctl -a /dev/sda      # HDD health
+```
+
+## 🆘 Emergency Recovery Procedures
+
+### Complete System Recovery
+```bash
+# If system is completely broken, restore from backup:
+
+# 1. Stop all services
+sudo systemctl stop noctis-django noctis-daphne noctis-celery
+sudo docker compose down
+
+# 2. Restore database
+sudo -u postgres dropdb noctis_pro
+sudo -u postgres createdb noctis_pro -O noctis_user
+sudo -u postgres psql -d noctis_pro < /data/noctis_pro/backups/database_LATEST.sql
+
+# 3. Restore media files
+sudo rm -rf /data/noctis_pro/media/*
+sudo tar -xzf /data/noctis_pro/backups/media_LATEST.tar.gz -C /data/noctis_pro/
+
+# 4. Restart services
+sudo docker compose up -d
+sudo systemctl start noctis-django noctis-daphne noctis-celery
+```
+
+### Docker Recovery
+```bash
+# Reset Docker completely
+sudo systemctl stop docker
+sudo rm -rf /var/lib/docker/*
+sudo systemctl start docker
+
+# Rebuild containers
+cd /opt/noctis_pro
+sudo docker compose build --no-cache
+sudo docker compose up -d
+```
+
+### Storage Recovery
+```bash
+# Check file system integrity
+sudo fsck /dev/nvme0n1p1  # SSD check
+sudo fsck /dev/sda1       # HDD check
+
+# Remount storage with proper options
+sudo umount /data
+sudo mount -o defaults,noatime /data
+
+# Verify storage configuration
+cat /etc/fstab
+mount | grep -E "(nvme|sda)"
+```
+
 ## 🛡️ Security Configuration
 
 ### Firewall Rules
@@ -443,6 +1136,133 @@ sudo certbot renew --dry-run
 
 # Force certificate renewal
 sudo certbot renew --force-renewal
+```
+
+## 🎯 TECHNICIAN DEPLOYMENT CHECKLIST
+
+### 📋 Pre-Deployment Verification
+
+**Hardware & OS:**
+- [ ] Server has 512GB+ SSD for OS and Docker
+- [ ] Server has 2TB+ HDD for data storage (or equivalent large storage)
+- [ ] 8GB+ RAM available
+- [ ] 4+ CPU cores available
+- [ ] Ubuntu 22.04 LTS or 24.04 LTS installed
+- [ ] System fully updated (`sudo apt update && sudo apt upgrade -y`)
+- [ ] Network connectivity working (`ping google.com`)
+
+**Access & Permissions:**
+- [ ] Root or sudo access confirmed
+- [ ] SSH access working (if remote)
+- [ ] Git installed (`sudo apt install git`)
+
+**Optional Equipment:**
+- [ ] Printer connected and powered on
+- [ ] Print media loaded (paper/film as preferred)
+
+### 🚀 Deployment Execution
+
+**Step-by-Step Deployment:**
+- [ ] Repository cloned: `git clone https://github.com/mwatom/NoctisPro.git`
+- [ ] Scripts made executable: `chmod +x *.sh`
+- [ ] Storage configured: `sudo ./scripts/configure_storage.sh` (if SSD+HDD)
+- [ ] Domain configured in script (if using domain)
+- [ ] Main deployment executed: `sudo ./deploy_noctis_production.sh`
+- [ ] Docker automatically installed and configured
+- [ ] All services started successfully
+- [ ] System status verified: `sudo /usr/local/bin/noctis-status.sh`
+
+### 🔍 Post-Deployment Validation
+
+**System Verification:**
+- [ ] Web interface accessible: `http://192.168.100.15`
+- [ ] Admin login works (admin/admin123)
+- [ ] Admin password changed immediately
+- [ ] DICOM viewer loads correctly
+- [ ] All systemd services running
+- [ ] Docker containers running: `sudo docker ps`
+- [ ] Storage properly configured: `df -h`
+
+**Security Configuration:**
+- [ ] Firewall enabled and configured: `sudo ufw status`
+- [ ] Fail2ban active: `sudo fail2ban-client status`
+- [ ] SSL certificates installed (if using domain)
+- [ ] Secure access configured: `sudo ./setup_secure_access.sh`
+
+**Optional Features:**
+- [ ] Printer functionality tested (if printer configured)
+- [ ] GitHub webhook configured (if using auto-deployment)
+- [ ] Email notifications configured (if needed)
+
+### 📞 Technician Support Resources
+
+**Immediate Help:**
+- [ ] All commands documented in this README
+- [ ] Log locations identified: `/opt/noctis_pro/logs/`
+- [ ] Status check command available: `sudo /usr/local/bin/noctis-status.sh`
+- [ ] Backup system verified: `/data/noctis_pro/backups/`
+
+**Emergency Procedures:**
+- [ ] Service restart commands documented
+- [ ] Docker recovery procedures available
+- [ ] Database recovery steps provided
+- [ ] Storage recovery instructions included
+
+## 📈 Performance Optimization
+
+### Database Optimization
+```bash
+# Analyze database performance
+sudo -u postgres psql -d noctis_pro -c "SELECT schemaname,tablename,attname,n_distinct,correlation FROM pg_stats WHERE tablename = 'worklist_dicomimage';"
+
+# Vacuum database
+sudo -u postgres psql -d noctis_pro -c "VACUUM ANALYZE;"
+```
+
+### Docker Performance
+```bash
+# Optimize Docker for SSD
+sudo tee /etc/docker/daemon.json > /dev/null <<EOF
+{
+  "storage-driver": "overlay2",
+  "storage-opts": ["overlay2.override_kernel_check=true"],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+EOF
+
+sudo systemctl restart docker
+```
+
+### Storage Performance
+```bash
+# Monitor I/O performance
+iostat -x 1
+
+# Check SSD health
+sudo smartctl -a /dev/nvme0n1
+
+# Check HDD health
+sudo smartctl -a /dev/sda
+
+# Optimize file systems
+sudo tune2fs -o journal_data_writeback /dev/sda1
+```
+
+### Print Performance
+```bash
+# Optimize CUPS for high-volume printing
+sudo nano /etc/cups/cupsd.conf
+
+# Add these lines:
+# MaxJobs 100
+# MaxJobsPerPrinter 10
+# MaxJobsPerUser 10
+
+sudo systemctl restart cups
 ```
 
 ## 🖨️ DICOM IMAGE PRINTING SETUP
@@ -573,347 +1393,123 @@ lp -d YourFacilityPrinter -o print-quality=5 /etc/passwd
 - **PET**: Single, Quad, PET Fusion
 - **All Modalities**: Comparison (side-by-side), Film Standard (minimal text)
 
-## 🚨 TROUBLESHOOTING GUIDE
+## 📋 DEPLOYMENT VALIDATION
 
-### Common Deployment Issues
-
-**Issue: Docker installation fails**
+### Automated Validation
 ```bash
-# Solution: Clean install Docker
-sudo apt remove -y docker docker-engine docker.io containerd runc
-sudo apt autoremove -y
-sudo apt autoclean
-./deploy_noctis_production.sh  # Re-run deployment
+# Run comprehensive deployment validation
+python3 validate_production.py
+
+# Run simple validation
+python3 validate_production_simple.py
+
+# Expected output: All checks should pass ✅
 ```
 
-**Issue: Ubuntu 24.04 Docker compatibility problems**
+### Manual Validation Steps
+
+**1. Web Interface:**
+- [ ] Homepage loads without errors
+- [ ] Login works correctly
+- [ ] Admin panel accessible
+- [ ] DICOM viewer opens
+
+**2. DICOM Functionality:**
+- [ ] Can upload DICOM files
+- [ ] Images display correctly
+- [ ] Window/level adjustments work
+- [ ] Measurements and annotations function
+
+**3. 🖨️ Enhanced Printing Functionality:**
+- [ ] Print button appears in viewer
+- [ ] Print dialog opens with all options
+- [ ] Print medium selection (Paper/Film) works
+- [ ] Layout options load based on modality
+- [ ] Printers are detected correctly
+- [ ] Test print on glossy paper succeeds
+- [ ] Test print on medical film succeeds (if available)
+- [ ] Modality-specific layouts render correctly
+- [ ] Print quality is medical-grade for all layouts
+
+**4. System Services:**
+- [ ] All systemd services running
+- [ ] Docker containers healthy
+- [ ] Database connections work
+- [ ] Redis cache functional
+- [ ] Background tasks processing
+
+**5. Security:**
+- [ ] HTTPS working (if configured)
+- [ ] Firewall rules active
+- [ ] Fail2ban monitoring
+- [ ] SSL certificates valid
+
+**6. Storage Configuration:**
+- [ ] SSD used for OS and Docker: `df -h | grep nvme`
+- [ ] HDD used for data storage: `df -h | grep sda`
+- [ ] Proper mount points configured: `mount | grep data`
+- [ ] Storage performance optimized
+
+## 🌐 INTERNET ACCESS SUMMARY
+
+**✅ YES - The system provides internet access links!**
+
+**How to get your internet access link:**
+
+1. **Deploy the system**: `sudo ./deploy_noctis_production.sh`
+2. **Configure internet access**: `sudo ./setup_secure_access.sh`
+3. **Get your link**: The script provides your internet URL
+
+**Internet Access Options:**
+- **🌐 Domain + HTTPS**: `https://your-domain.com` (requires domain)
+- **☁️ Cloudflare Tunnel**: Secure Cloudflare URL (no domain needed)
+- **🔐 VPN Access**: Private VPN connection for remote access
+- **🔒 Local Only**: `http://192.168.100.15` (local network only)
+
+**Your access information is saved to:**
 ```bash
-# The deployment script automatically handles Ubuntu 24.04, but if issues persist:
-
-# Fix iptables for Ubuntu 24.04
-sudo apt install -y iptables-persistent
-sudo update-alternatives --set iptables /usr/sbin/iptables-legacy
-sudo update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
-
-# Install additional packages
-sudo apt install -y fuse-overlayfs
-
-# Restart Docker
-sudo systemctl restart docker
-
-# Re-run deployment
-sudo ./deploy_noctis_production.sh
+cat /opt/noctis_pro/SECURE_ACCESS_INFO.txt
 ```
 
-**Issue: PostgreSQL connection fails**
+## 🚀 Quick Reference Commands
+
 ```bash
-# Check PostgreSQL status
-sudo systemctl status postgresql
-
-# Restart PostgreSQL
-sudo systemctl restart postgresql
-
-# Check logs
-sudo journalctl -u postgresql -f
-
-# Reset database password
-sudo -u postgres psql -c "ALTER USER noctis_user PASSWORD 'new_password';"
-```
-
-**Issue: Services fail to start**
-```bash
-# Check service status
-sudo systemctl status noctis-django noctis-daphne noctis-celery
-
-# Check logs for errors
-sudo journalctl -u noctis-django --since "1 hour ago"
-
-# Restart services
-sudo systemctl restart noctis-django noctis-daphne noctis-celery
-```
-
-**Issue: Nginx configuration errors**
-```bash
-# Test Nginx configuration
-sudo nginx -t
-
-# Check Nginx status
-sudo systemctl status nginx
-
-# Restart Nginx
-sudo systemctl restart nginx
-
-# Check Nginx logs
-sudo tail -f /var/log/nginx/error.log
-```
-
-### 🖨️ Printing Troubleshooting
-
-**Issue: No printers available**
-```bash
-# Check CUPS service
-sudo systemctl status cups
-
-# Restart CUPS
-sudo systemctl restart cups
-
-# Check printer detection
-lpstat -p -d
-
-# Re-add printer
-sudo lpadmin -p YourPrinter -E -v "usb://path" -m everywhere
-```
-
-**Issue: Poor print quality on glossy paper**
-```bash
-# Check printer settings
-lpoptions -p YourPrinter
-
-# Set optimal settings for glossy paper
-sudo lpadmin -p YourPrinter -o media-type=photographic-glossy
-sudo lpadmin -p YourPrinter -o print-quality=5
-sudo lpadmin -p YourPrinter -o Resolution=1200dpi
-
-# Test with high quality
-echo "Quality test" | lp -d YourPrinter -o print-quality=5 -o media-type=photographic-glossy
-```
-
-**Issue: Print jobs stuck in queue**
-```bash
-# Check print queue
-lpq
-
-# Cancel stuck jobs
-cancel -a
-
-# Restart CUPS
-sudo systemctl restart cups
-
-# Check CUPS error log
-sudo tail -f /var/log/cups/error_log
-```
-
-**Issue: Permission denied for printing**
-```bash
-# Add noctis user to lp group
-sudo usermod -a -G lp noctis
-
-# Restart NoctisPro services
-sudo systemctl restart noctis-django
-```
-
-### Network Issues
-
-**Issue: Cannot access web interface**
-```bash
-# Check if services are running
-sudo systemctl status nginx noctis-django
-
-# Check firewall
-sudo ufw status
-
-# Check if ports are open
-sudo netstat -tlnp | grep :80
-sudo netstat -tlnp | grep :443
-
-# Test local access
-curl -I http://localhost
-```
-
-**Issue: SSL certificate problems**
-```bash
-# Check certificate status
-sudo certbot certificates
-
-# Renew certificates
-sudo certbot renew
-
-# Test certificate
-openssl s_client -connect your-domain.com:443 -servername your-domain.com
-```
-
-### Performance Issues
-
-**Issue: Slow DICOM loading**
-```bash
-# Check available disk space
-df -h
-
-# Check memory usage
-free -h
-
-# Check system load
-top
-
-# Restart services to clear memory
-sudo systemctl restart noctis-django noctis-daphne noctis-celery
-```
-
-**Issue: Database performance problems**
-```bash
-# Check database connections
-sudo -u postgres psql -d noctis_pro -c "SELECT count(*) FROM pg_stat_activity;"
-
-# Restart PostgreSQL
-sudo systemctl restart postgresql
-
-# Check PostgreSQL logs
-sudo journalctl -u postgresql -f
-```
-
-## 🔄 Maintenance Procedures
-
-### Daily Checks
-```bash
-# Run system status check
+# System status
 sudo /usr/local/bin/noctis-status.sh
 
-# Check disk space
-df -h
+# Get internet access link
+cat /opt/noctis_pro/SECURE_ACCESS_INFO.txt
 
-# Check system load
-uptime
+# Configure internet access
+sudo ./setup_secure_access.sh
 
-# Check print queue
-lpq
-```
+# View logs
+sudo journalctl -u noctis-django -f
 
-### Weekly Maintenance
-```bash
-# Update system packages
-sudo apt update && sudo apt upgrade -y
+# Restart application
+sudo systemctl restart noctis-django noctis-daphne noctis-celery
 
-# Check service logs for errors
-sudo journalctl --since "7 days ago" | grep -i error
+# Restart Docker containers
+sudo docker compose restart
 
-# Verify backups
-ls -la /opt/backups/noctis_pro/
-
-# Test printer functionality
-echo "Weekly printer test" | lp
-```
-
-### Monthly Maintenance
-```bash
-# Full system backup
+# Backup system
 sudo /usr/local/bin/noctis-backup.sh
 
-# Clean old log files
-sudo journalctl --vacuum-time=30d
+# Test printer (if configured)
+lpstat -p && echo "Test print" | lp
 
-# Update SSL certificates
-sudo certbot renew
+# Update application
+cd /opt/noctis_pro && sudo -u noctis git pull && sudo systemctl restart noctis-django
 
-# Check security updates
-sudo apt list --upgradable | grep -i security
+# Check security
+sudo ufw status && sudo fail2ban-client status
+
+# Monitor performance
+htop
+
+# Check storage usage
+df -h && du -sh /data/noctis_pro/ && sudo docker system df
 ```
-
-## 📈 Performance Optimization
-
-### Database Optimization
-```bash
-# Analyze database performance
-sudo -u postgres psql -d noctis_pro -c "SELECT schemaname,tablename,attname,n_distinct,correlation FROM pg_stats WHERE tablename = 'worklist_dicomimage';"
-
-# Vacuum database
-sudo -u postgres psql -d noctis_pro -c "VACUUM ANALYZE;"
-```
-
-### Print Performance
-```bash
-# Optimize CUPS for high-volume printing
-sudo nano /etc/cups/cupsd.conf
-
-# Add these lines:
-# MaxJobs 100
-# MaxJobsPerPrinter 10
-# MaxJobsPerUser 10
-
-sudo systemctl restart cups
-```
-
-## 🆘 Emergency Recovery Procedures
-
-### Complete System Recovery
-```bash
-# If system is completely broken, restore from backup:
-
-# 1. Stop all services
-sudo systemctl stop noctis-django noctis-daphne noctis-celery
-
-# 2. Restore database
-sudo -u postgres dropdb noctis_pro
-sudo -u postgres createdb noctis_pro -O noctis_user
-sudo -u postgres psql -d noctis_pro < /opt/backups/noctis_pro/database_LATEST.sql
-
-# 3. Restore media files
-sudo rm -rf /opt/noctis_pro/media/*
-sudo tar -xzf /opt/backups/noctis_pro/media_LATEST.tar.gz -C /opt/noctis_pro/
-
-# 4. Restart services
-sudo systemctl start noctis-django noctis-daphne noctis-celery
-```
-
-### Printer Recovery
-```bash
-# Reset CUPS completely
-sudo systemctl stop cups
-sudo rm -rf /etc/cups/printers.conf
-sudo rm -rf /etc/cups/ppd/*
-sudo systemctl start cups
-
-# Re-add printers
-sudo lpadmin -p MedicalPrinter -E -v "usb://path" -m everywhere
-sudo lpadmin -p MedicalPrinter -o media-type=photographic-glossy -o print-quality=5
-```
-
-## 📞 Support Information
-
-### Log Locations
-- **Application logs**: `/opt/noctis_pro/logs/`
-- **System logs**: `sudo journalctl -u noctis-django`
-- **Nginx logs**: `/var/log/nginx/`
-- **PostgreSQL logs**: `sudo journalctl -u postgresql`
-- **CUPS logs**: `/var/log/cups/`
-
-### Configuration Files
-- **Main settings**: `/opt/noctis_pro/.env`
-- **Nginx config**: `/etc/nginx/sites-available/noctis_pro`
-- **Systemd services**: `/etc/systemd/system/noctis-*`
-- **CUPS config**: `/etc/cups/cupsd.conf`
-
-### Key Directories
-- **Application**: `/opt/noctis_pro/`
-- **Backups**: `/opt/backups/noctis_pro/`
-- **Media files**: `/opt/noctis_pro/media/`
-- **Static files**: `/opt/noctis_pro/static/`
-
-## 🎯 DEPLOYMENT CHECKLIST
-
-**Pre-Deployment:**
-- [ ] Ubuntu 22.04 LTS installed and updated
-- [ ] Network connectivity verified
-- [ ] Domain name configured (if using)
-- [ ] Printer connected and tested
-- [ ] Glossy photo paper loaded
-
-**During Deployment:**
-- [ ] Repository cloned successfully
-- [ ] Scripts made executable
-- [ ] Main deployment script completed without errors
-- [ ] All services started successfully
-- [ ] Secure access configured
-- [ ] Admin password changed
-- [ ] Printing system installed (printer configuration optional)
-
-**Post-Deployment:**
-- [ ] Web interface accessible
-- [ ] DICOM viewer loads correctly
-- [ ] Print functionality available (configure printers as needed by facility)
-- [ ] GitHub webhook configured (if using auto-deployment)
-- [ ] Backup system verified
-- [ ] Security scan completed
-- [ ] Documentation provided to facility users
 
 ## 🏥 Facility User Instructions
 
@@ -974,120 +1570,39 @@ sudo lpadmin -p MedicalPrinter -o media-type=photographic-glossy -o print-qualit
 - **Quality Settings**: Configure based on your facility's standards
 - **Storage**: Follow your facility's protocols for printed materials
 
-## 📋 DEPLOYMENT VALIDATION
-
-### Automated Validation
-```bash
-# Run comprehensive deployment validation
-python3 validate_production.py
-
-# Run simple validation
-python3 validate_production_simple.py
-
-# Expected output: All checks should pass ✅
-```
-
-### Manual Validation Steps
-
-**1. Web Interface:**
-- [ ] Homepage loads without errors
-- [ ] Login works correctly
-- [ ] Admin panel accessible
-- [ ] DICOM viewer opens
-
-**2. DICOM Functionality:**
-- [ ] Can upload DICOM files
-- [ ] Images display correctly
-- [ ] Window/level adjustments work
-- [ ] Measurements and annotations function
-
-**3. 🖨️ Enhanced Printing Functionality:**
-- [ ] Print button appears in viewer
-- [ ] Print dialog opens with all options
-- [ ] Print medium selection (Paper/Film) works
-- [ ] Layout options load based on modality
-- [ ] Printers are detected correctly
-- [ ] Test print on glossy paper succeeds
-- [ ] Test print on medical film succeeds (if available)
-- [ ] Modality-specific layouts render correctly
-- [ ] Print quality is medical-grade for all layouts
-
-**4. System Services:**
-- [ ] All systemd services running
-- [ ] Database connections work
-- [ ] Redis cache functional
-- [ ] Background tasks processing
-
-**5. Security:**
-- [ ] HTTPS working (if configured)
-- [ ] Firewall rules active
-- [ ] Fail2ban monitoring
-- [ ] SSL certificates valid
-
-## 🌐 INTERNET ACCESS SUMMARY
-
-**✅ YES - The system provides internet access links!**
-
-**How to get your internet access link:**
-
-1. **Deploy the system**: `sudo ./deploy_noctis_production.sh`
-2. **Configure internet access**: `sudo ./setup_secure_access.sh`
-3. **Get your link**: The script provides your internet URL
-
-**Internet Access Options:**
-- **🌐 Domain + HTTPS**: `https://your-domain.com` (requires domain)
-- **☁️ Cloudflare Tunnel**: Secure Cloudflare URL (no domain needed)
-- **🔐 VPN Access**: Private VPN connection for remote access
-- **🔒 Local Only**: `http://192.168.100.15` (local network only)
-
-**Your access information is saved to:**
-```bash
-cat /opt/noctis_pro/SECURE_ACCESS_INFO.txt
-```
-
-## 🚀 Quick Reference Commands
-
-```bash
-# System status
-sudo /usr/local/bin/noctis-status.sh
-
-# Get internet access link
-cat /opt/noctis_pro/SECURE_ACCESS_INFO.txt
-
-# Configure internet access
-sudo ./setup_secure_access.sh
-
-# View logs
-sudo journalctl -u noctis-django -f
-
-# Restart application
-sudo systemctl restart noctis-django noctis-daphne noctis-celery
-
-# Backup system
-sudo /usr/local/bin/noctis-backup.sh
-
-# Test printer (if configured)
-lpstat -p && echo "Test print" | lp
-
-# Update application
-cd /opt/noctis_pro && sudo -u noctis git pull && sudo systemctl restart noctis-django
-
-# Check security
-sudo ufw status && sudo fail2ban-client status
-
-# Monitor performance
-htop
-```
-
----
-
 ## 📞 Technical Support
 
 ### Emergency Contacts
 - **System Issues**: Check logs first, then restart services
+- **Docker Issues**: Use `sudo docker ps` and `sudo docker logs <container>`
+- **Storage Issues**: Check `df -h` and mount points
 - **Printer Issues**: Verify CUPS service and printer connection
 - **Security Issues**: Check firewall and fail2ban logs
 - **Performance Issues**: Monitor system resources and restart if needed
+
+### Log Locations
+- **Application logs**: `/opt/noctis_pro/logs/`
+- **System logs**: `sudo journalctl -u noctis-django`
+- **Docker logs**: `sudo docker logs <container_name>`
+- **Nginx logs**: `/var/log/nginx/`
+- **PostgreSQL logs**: `sudo journalctl -u postgresql`
+- **CUPS logs**: `/var/log/cups/`
+
+### Configuration Files
+- **Main settings**: `/opt/noctis_pro/.env`
+- **Docker config**: `/etc/docker/daemon.json`
+- **Nginx config**: `/etc/nginx/sites-available/noctis_pro`
+- **Systemd services**: `/etc/systemd/system/noctis-*`
+- **CUPS config**: `/etc/cups/cupsd.conf`
+- **Storage mounts**: `/etc/fstab`
+
+### Key Directories
+- **Application**: `/opt/noctis_pro/` (SSD)
+- **Fast cache**: `/opt/noctis_pro_fast/` (SSD)
+- **Data storage**: `/data/noctis_pro/` (HDD)
+- **Docker data**: `/var/lib/docker/` (SSD)
+- **Backups**: `/data/noctis_pro/backups/` (HDD)
+- **Media files**: `/data/noctis_pro/media/` (HDD)
 
 ### Documentation
 - **User Manual**: Available in `/opt/noctis_pro/docs/`
@@ -1096,6 +1611,6 @@ htop
 
 ---
 
-**NoctisPro** - Professional Medical Imaging Platform with High-Quality DICOM Printing Support
+**NoctisPro** - Professional Medical Imaging Platform with Autonomous Deployment, Docker Auto-Installation, and Optimized Storage Configuration
 
-*Deployment completed successfully ✅*
+*Ready for independent technician deployment ✅*
