@@ -196,33 +196,38 @@ sudo ./deploy_noctis_production.sh
 
 **Expected deployment time: 15-25 minutes**
 
-### Step 6: Configure Secure Access
+### Step 6: Configure Internet Access (Optional)
+
+**After deployment, the system is accessible locally. To enable internet access:**
 
 ```bash
 sudo ./setup_secure_access.sh
 ```
 
-**Choose your access method:**
+**Internet Access Options:**
 
-1. **🌐 Domain with SSL Certificate** (Recommended for internet access)
-   - Requires registered domain name
-   - Automatic SSL via Let's Encrypt
-   - Access: `https://your-domain.com`
+1. **🌐 Domain with HTTPS** (Recommended for internet access)
+   - Requires your registered domain name
+   - Automatic SSL certificate via Let's Encrypt
+   - **Internet Access Link**: `https://your-domain.com`
+   - **Admin Panel**: `https://your-domain.com/admin`
+   - **Webhook URL**: `https://your-domain.com/webhook`
 
-2. **🔒 Local Network Only** (Recommended for facility-only use)
+2. **☁️ Cloudflare Tunnel** (Zero Trust internet access)
+   - No open ports required on your server
+   - Enhanced DDoS protection and global CDN
+   - **Internet Access Link**: Provided by Cloudflare
+   - Secure tunnel without exposing server IP
+
+3. **🔐 VPN Access** (Private internet access)
+   - WireGuard VPN for secure remote access
+   - **VPN Connection**: Configured during setup
+   - **Internal Access**: `http://10.0.0.1` (via VPN)
+
+4. **🔒 Local Network Only** (No internet access)
+   - Maximum security for facility-only use
+   - **Local Access**: `http://192.168.100.15`
    - No internet exposure
-   - Access: `http://192.168.100.15`
-   - Maximum security for internal use
-
-3. **☁️ Cloudflare Tunnel** (Zero Trust option)
-   - No open ports required
-   - Enhanced DDoS protection
-   - Global CDN acceleration
-
-4. **🔐 VPN Access Only**
-   - WireGuard VPN setup
-   - Private network access
-   - Ultra-secure for sensitive environments
 
 ### Step 7: Verify Installation
 
@@ -243,8 +248,9 @@ sudo /usr/local/bin/noctis-status.sh
 ### Step 8: First Login and Configuration
 
 1. **Access the application:**
-   - Web: `https://your-domain.com` or `http://192.168.100.15`
-   - Default admin credentials:
+   - **Local Access**: `http://192.168.100.15` (always available)
+   - **Internet Access**: `https://your-domain.com` (after running setup_secure_access.sh)
+   - **Default admin credentials**:
      - Username: `admin`
      - Password: `admin123`
 
@@ -316,12 +322,32 @@ EMAIL_HOST_PASSWORD=your-app-password
 DEFAULT_FROM_EMAIL=noctis@your-domain.com
 ```
 
+### 🌐 Getting Your Internet Access Link
+
+**To get your internet access link, run the secure access setup:**
+
+```bash
+sudo ./setup_secure_access.sh
+```
+
+**The script will provide your internet access link based on your choice:**
+
+- **Option 1 (Domain + HTTPS)**: You get `https://your-domain.com`
+- **Option 2 (Cloudflare Tunnel)**: You get a Cloudflare URL
+- **Option 3 (VPN)**: You get VPN connection details
+- **Option 4 (Local Only)**: No internet link (local access only)
+
+**After setup, your access information is saved to:**
+```bash
+cat /opt/noctis_pro/SECURE_ACCESS_INFO.txt
+```
+
 ### GitHub Auto-Deployment Setup
 
 1. **Go to GitHub repository settings**
 2. **Navigate to Webhooks**
-3. **Add webhook:**
-   - **URL**: `https://your-domain.com/webhook`
+3. **Add webhook using your internet access link:**
+   - **URL**: `https://your-domain.com/webhook` (or your Cloudflare URL)
    - **Content Type**: `application/json`
    - **Events**: Push events
    - **Active**: ✅ Checked
@@ -998,11 +1024,38 @@ python3 validate_production_simple.py
 - [ ] Fail2ban monitoring
 - [ ] SSL certificates valid
 
+## 🌐 INTERNET ACCESS SUMMARY
+
+**✅ YES - The system provides internet access links!**
+
+**How to get your internet access link:**
+
+1. **Deploy the system**: `sudo ./deploy_noctis_production.sh`
+2. **Configure internet access**: `sudo ./setup_secure_access.sh`
+3. **Get your link**: The script provides your internet URL
+
+**Internet Access Options:**
+- **🌐 Domain + HTTPS**: `https://your-domain.com` (requires domain)
+- **☁️ Cloudflare Tunnel**: Secure Cloudflare URL (no domain needed)
+- **🔐 VPN Access**: Private VPN connection for remote access
+- **🔒 Local Only**: `http://192.168.100.15` (local network only)
+
+**Your access information is saved to:**
+```bash
+cat /opt/noctis_pro/SECURE_ACCESS_INFO.txt
+```
+
 ## 🚀 Quick Reference Commands
 
 ```bash
 # System status
 sudo /usr/local/bin/noctis-status.sh
+
+# Get internet access link
+cat /opt/noctis_pro/SECURE_ACCESS_INFO.txt
+
+# Configure internet access
+sudo ./setup_secure_access.sh
 
 # View logs
 sudo journalctl -u noctis-django -f
@@ -1013,7 +1066,7 @@ sudo systemctl restart noctis-django noctis-daphne noctis-celery
 # Backup system
 sudo /usr/local/bin/noctis-backup.sh
 
-# Test printer
+# Test printer (if configured)
 lpstat -p && echo "Test print" | lp
 
 # Update application

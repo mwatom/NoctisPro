@@ -94,7 +94,27 @@ sudo ./deploy_noctis_production.sh
 [SUCCESS] NoctisPro deployment completed successfully!
 ```
 
-### Step 5: Validation
+### Step 5: Configure Internet Access (Get Your Internet Link)
+
+**To get your internet access link:**
+
+```bash
+sudo ./setup_secure_access.sh
+```
+
+**Choose your internet access method and get your link:**
+
+1. **🌐 Domain + HTTPS**: Enter your domain → Get `https://your-domain.com`
+2. **☁️ Cloudflare Tunnel**: Get secure Cloudflare URL (no server IP exposure)
+3. **🔐 VPN Access**: Get VPN connection details for secure remote access
+4. **🔒 Local Only**: Skip internet access (local network only)
+
+**Your access information will be saved to:**
+```bash
+cat /opt/noctis_pro/SECURE_ACCESS_INFO.txt
+```
+
+### Step 6: Validation
 
 ```bash
 # Run enhanced validation script
@@ -330,16 +350,25 @@ sudo python3 validate_deployment_with_printing.py
 ## 🚀 Quick Start for Ubuntu 24.04
 
 ```bash
-# One-command deployment for Ubuntu 24.04
+# Complete deployment with internet access for Ubuntu 24.04
 git clone https://github.com/mwatom/NoctisPro.git && \
 cd NoctisPro && \
 sudo ./deploy_noctis_production.sh && \
+sudo ./setup_secure_access.sh && \
 sudo python3 validate_deployment_with_printing.py
 
-# Expected completion time: 20-30 minutes
-# Access: http://localhost:8000 or https://your-domain.com
+# Expected completion time: 25-35 minutes
+# Local Access: http://192.168.100.15 (always available)
+# Internet Access: Provided by setup_secure_access.sh (your choice)
 # Admin: admin/admin123 (change immediately)
 ```
+
+**🌐 Your Internet Access Link:**
+After running `setup_secure_access.sh`, you'll get one of:
+- `https://your-domain.com` (if using domain)
+- Cloudflare tunnel URL (if using Cloudflare)
+- VPN connection details (if using VPN)
+- Local access only (if choosing local-only)
 
 ## 📞 Ubuntu 24.04 Support
 
