@@ -1,0 +1,190 @@
+# Production Dockerfile for Noctis Pro DICOM System
+# Optimized for Ubuntu 24.04 deployment
+
+# Build stage
+FROM python:3.11-slim-bookworm as builder
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install system dependencies for building
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    pkg-config \
+    libpq-dev \
+    libjpeg-dev \
+    libpng-dev \
+    libwebp-dev \
+    libopenjp2-7-dev \
+    libtiff5-dev \
+    libffi-dev \
+    libssl-dev \
+    libsqlite3-dev \
+    libgdcm-dev \
+    libcups2-dev \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+RUN pip install --upgrade pip wheel setuptools && \
+    pip install -r requirements.txt && \
+    pip install gunicorn uvicorn[standard] setproctitle
+
+# Production stage
+FROM python:3.11-slim-bookworm as production
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    DJANGO_SETTINGS_MODULE=noctis_pro.settings
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    libjpeg62-turbo \
+    libpng16-16 \
+    libwebp7 \
+    libopenjp2-7 \
+    libtiff6 \
+    libffi8 \
+    libssl3 \
+    libsqlite3-0 \
+    libgdcm3.0 \
+    libcups2 \
+    curl \
+    netcat-openbsd \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Create app user and directories
+RUN groupadd -r noctis && useradd -r -g noctis noctis && \
+    mkdir -p /app /app/media /app/staticfiles /app/logs /app/backups && \
+    chown -R noctis:noctis /app
+
+# Set working directory
+WORKDIR /app
+
+# Copy application code
+COPY --chown=noctis:noctis . .
+
+# Create entrypoint script
+COPY --chown=noctis:noctis <<'EOF' /app/docker-entrypoint.sh
+#!/bin/bash
+set -e
+
+# Wait for database
+echo "Waiting for database..."
+while ! nc -z $POSTGRES_HOST $POSTGRES_PORT; do
+    sleep 1
+done
+echo "Database is ready!"
+
+# Wait for Redis
+echo "Waiting for Redis..."
+while ! nc -z redis 6379; do
+    sleep 1
+done
+echo "Redis is ready!"
+
+# Run migrations
+echo "Running database migrations..."
+python manage.py migrate --noinput
+
+# Collect static files
+echo "Collecting static files..."
+python manage.py collectstatic --noinput
+
+# Create superuser if needed
+echo "Setting up admin user..."
+python manage.py shell << 'PYTHON_EOF'
+import os
+from django.contrib.auth import get_user_model
+User = get_user_model()
+if not User.objects.filter(username='admin').exists():
+    User.objects.create_superuser(
+        username='admin',
+        email=os.environ.get('ADMIN_EMAIL', 'admin@localhost'),
+        password=os.environ.get('ADMIN_PASSWORD', 'admin123')
+    )
+    print('Created admin user')
+else:
+    print('Admin user already exists')
+PYTHON_EOF
+
+# Start the application
+exec "$@"
+EOF
+
+RUN chmod +x /app/docker-entrypoint.sh
+
+# Health check script
+COPY --chown=noctis:noctis <<'EOF' /app/healthcheck.py
+#!/usr/bin/env python
+import sys
+import requests
+import os
+
+def health_check():
+    try:
+        response = requests.get('http://localhost:8000/health/', timeout=10)
+        if response.status_code == 200:
+            print("Health check passed")
+            sys.exit(0)
+        else:
+            print(f"Health check failed with status {response.status_code}")
+            sys.exit(1)
+    except Exception as e:
+        print(f"Health check failed: {e}")
+        sys.exit(1)
+
+if __name__ == '__main__':
+    health_check()
+EOF
+
+RUN chmod +x /app/healthcheck.py
+
+# Switch to non-root user
+USER noctis
+
+# Expose ports
+EXPOSE 8000 11112
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python /app/healthcheck.py
+
+# Default entrypoint
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+
+# Default command
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "--worker-class", "gthread", "--threads", "2", "--max-requests", "1000", "--max-requests-jitter", "100", "--timeout", "30", "--keep-alive", "2", "--access-logfile", "/app/logs/gunicorn-access.log", "--error-logfile", "/app/logs/gunicorn-error.log", "--log-level", "info", "--capture-output", "noctis_pro.wsgi:application"]
+
+# Development stage (for development with hot reload)
+FROM production as development
+
+# Install development dependencies
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    vim \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install development Python packages
+RUN pip install watchdog[watchmedo] django-debug-toolbar
+
+# Switch back to app user
+USER noctis
+
+# Override command for development
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

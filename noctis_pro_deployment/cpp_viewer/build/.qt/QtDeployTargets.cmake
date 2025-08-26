@@ -1,0 +1,2 @@
+set(__QT_DEPLOY_TARGET_DicomViewer_FILE /workspace/cpp_viewer/build/DicomViewer)
+set(__QT_DEPLOY_TARGET_DicomViewer_TYPE EXECUTABLE)
