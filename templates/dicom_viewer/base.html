@@ -1461,8 +1461,12 @@
         }
       } else if (activeTool === 'annotate'){
         const pos = canvasToImageCoords(vp, e.offsetX, e.offsetY);
-        const text = window.prompt('Annotation text:');
-        if (text && text.trim().length){ annotations.push({ pos, text: text.trim() }); imageIdToAnnotations.set(getCurrentImageId(), annotations); await saveAnnotationToServer(pos, text.trim()); await draw(); }
+        // Create inline annotation with default text
+        const text = 'Annotation';
+        annotations.push({ pos, text }); 
+        imageIdToAnnotations.set(getCurrentImageId(), annotations); 
+        await saveAnnotationToServer(pos, text); 
+        await draw();
       } else if (showHuProbe && huEllipse){
         // Submit ROI to backend
         try {
@@ -2202,7 +2206,7 @@
      // Preset handlers
      if (btnSavePreset) btnSavePreset.addEventListener('click', async()=>{
        try {
-         const name = prompt('Preset name'); if (!name) return;
+         const name = `Preset_${Date.now()}`; // Auto-generate preset name
          const payload = { name, modality: (currentStudy&&currentStudy.modality)||'', window_width: ww, window_level: wl, inverted };
          await fetch('/dicom-viewer/api/presets/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
        } catch(_){}
@@ -2211,11 +2215,10 @@
        try {
          const r = await fetch(`/dicom-viewer/api/presets/?modality=${encodeURIComponent((currentStudy&&currentStudy.modality)||'')}`);
          const j = await r.json();
-         const names = (j.presets||[]).map(p=>p.name);
-         if (!names.length) return;
-         const sel = prompt('Load preset by name:\n' + names.join('\n'));
-         const p = (j.presets||[]).find(pp=>pp.name===sel);
-         if (!p) return;
+         const presets = (j.presets||[]);
+         if (!presets.length) return;
+         // Load the most recent preset automatically
+         const p = presets[presets.length - 1];
          ww = p.window_width; wl = p.window_level; inverted = !!p.inverted; wwSlider.value=ww; wlSlider.value=wl; wwNum.value=Math.round(ww); wlNum.value=Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw();
        } catch(_){}
      });

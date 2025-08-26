@@ -315,13 +315,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
             
             if (result.success) {
-                alert('✅ Test print sent successfully!\n\n' + result.message);
+                console.log('✅ Test print sent successfully:', result.message);
             } else {
-                alert('❌ Test print failed:\n\n' + result.error);
+                console.error('❌ Test print failed:', result.error);
             }
             
         } catch (error) {
-            alert('❌ Error testing printer:\n\n' + error.message);
+            console.error('❌ Error testing printer:', error.message);
         } finally {
             testBtn.disabled = false;
             testBtn.innerHTML = '<i class="fas fa-print"></i> Test Printer';
