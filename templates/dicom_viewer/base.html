@@ -7,15 +7,24 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <style>
     :root {
-      --primary-bg: var(--primary-bg);
-      --secondary-bg: var(--secondary-bg);
-      --card-bg: var(--card-surface);
-      --header-bg: var(--header-bg);
-      --border-color: var(--border-color);
-      --accent-color: var(--accent-color);
-      --text-primary: var(--text-primary);
-      --text-secondary: var(--text-secondary);
-      --text-muted: var(--text-muted);
+      --primary-bg: #0a0a0a;
+      --secondary-bg: #1a1a1a;
+      --card-bg: #252525;
+      --card-surface: #252525;
+      --header-bg: #333333;
+      --border-color: #404040;
+      --accent-color: #00d4ff;
+      --text-primary: #ffffff;
+      --text-secondary: #b3b3b3;
+      --text-muted: #666666;
+      --success-color: #00ff88;
+      --warning-color: #ffaa00;
+      --danger-color: #ff4444;
+      --urgent-color: #ff0066;
+      --scheduled-color: #4a90e2;
+      --in-progress-color: #f5a623;
+      --completed-color: #7ed321;
+      --cancelled-color: #d0021b;
     }
     body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--primary-bg); color: var(--text-primary); }
     .layout { display: grid; grid-template-columns: 82px 1fr 320px; grid-template-rows: 60px 1fr; height: 100vh; }
@@ -25,11 +34,13 @@
     .tool:hover:not(.active) { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); }
     .tool i { font-size: 16px; margin-bottom: 2px; }
     .topbar { grid-row: 1; grid-column: 2 / span 2; display: flex; align-items: center; gap: 8px; padding: 0 16px; background: var(--header-bg); border-bottom: 1px solid var(--border-color); }
-    .btn { padding: 4px 12px; border: 1px solid var(--border-color); border-radius: 2px; cursor: pointer; font-size: 11px; background: var(--card-bg); color: var(--text-primary); transition: all 0.2s ease; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; text-decoration: none; }
+    .btn { padding: 3px 8px; border: 1px solid var(--border-color); border-radius: 2px; cursor: pointer; font-size: 10px; background: var(--card-bg); color: var(--text-primary); transition: all 0.2s ease; font-weight: 500; display: inline-flex; align-items: center; gap: 3px; text-decoration: none; }
     .btn:hover { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); }
     .btn-primary { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); }
     .btn-primary:hover { background: #00b8d4; border-color: #00b8d4; }
-    .select { padding: 6px 8px; background: var(--secondary-bg); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); min-width: 180px; font-size: 11px; }
+    .btn-control { padding: 3px 8px; border: 1px solid var(--border-color); border-radius: 2px; cursor: pointer; font-size: 10px; background: var(--card-bg); color: var(--text-primary); transition: all 0.2s ease; font-weight: 500; display: inline-flex; align-items: center; gap: 3px; text-decoration: none; }
+    .btn-control:hover { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); }
+    .select { padding: 4px 6px; background: var(--secondary-bg); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); min-width: 160px; font-size: 10px; }
     .select:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 1px var(--accent-color); }
     .viewport { grid-row: 2; grid-column: 2; background: #000000; position: relative; display: flex; align-items: center; justify-content: center; }
     .right { grid-row: 2; grid-column: 3; background: var(--secondary-bg); border-left: 1px solid var(--border-color); padding: 16px; overflow: auto; }
