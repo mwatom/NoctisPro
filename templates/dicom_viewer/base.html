@@ -1461,12 +1461,13 @@
         }
       } else if (activeTool === 'annotate'){
         const pos = canvasToImageCoords(vp, e.offsetX, e.offsetY);
-        // Create inline annotation with default text
-        const text = 'Annotation';
-        annotations.push({ pos, text }); 
-        imageIdToAnnotations.set(getCurrentImageId(), annotations); 
-        await saveAnnotationToServer(pos, text); 
-        await draw();
+                 // Create inline annotation with default text
+         const text = 'Annotation';
+         annotations.push({ pos, text }); 
+         imageIdToAnnotations.set(getCurrentImageId(), annotations); 
+         await saveAnnotationToServer(pos, text); 
+         await draw();
+         showToast('Annotation added', 'success', 2000);
       } else if (showHuProbe && huEllipse){
         // Submit ROI to backend
         try {
@@ -2002,9 +2003,11 @@
          
          if (result.success) {
            console.log('Print success:', result.message);
+           showToast('Print job sent successfully', 'success');
            printModal.style.display = 'none';
          } else {
            console.error('Print error:', result.error);
+           showToast('Print failed', 'error');
          }
          
                 } catch(e) {
@@ -2016,6 +2019,61 @@
          submitBtn.disabled = false;
        }
      });
+
+    // Clean toast notification system
+    function showToast(message, type = 'info', duration = 3000) {
+      const toast = document.createElement('div');
+      toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: var(--card-surface);
+        border: 1px solid var(--border-color);
+        border-left: 4px solid var(--accent-color);
+        color: var(--text-primary);
+        padding: 8px 12px;
+        border-radius: 3px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        z-index: 2000;
+        font-size: 11px;
+        max-width: 280px;
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+        opacity: 0.95;
+      `;
+      
+      if (type === 'error') {
+        toast.style.borderLeftColor = 'var(--danger-color)';
+      } else if (type === 'success') {
+        toast.style.borderLeftColor = 'var(--success-color)';
+      } else if (type === 'warning') {
+        toast.style.borderLeftColor = 'var(--warning-color)';
+      }
+      
+      toast.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'exclamation-triangle' : 'info-circle'}" style="font-size: 10px;"></i>
+          <span>${message}</span>
+        </div>
+      `;
+      
+      document.body.appendChild(toast);
+      
+      // Slide in
+      setTimeout(() => {
+        toast.style.transform = 'translateX(0)';
+      }, 10);
+      
+      // Auto-remove
+      setTimeout(() => {
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+          if (toast.parentNode) {
+            toast.remove();
+          }
+        }, 300);
+      }, duration);
+    }
 
     // Utils
     function loadImage(src){
@@ -2209,6 +2267,7 @@
          const name = `Preset_${Date.now()}`; // Auto-generate preset name
          const payload = { name, modality: (currentStudy&&currentStudy.modality)||'', window_width: ww, window_level: wl, inverted };
          await fetch('/dicom-viewer/api/presets/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+         showToast('Preset saved', 'success', 2000);
        } catch(_){}
      });
      if (btnLoadPreset) btnLoadPreset.addEventListener('click', async()=>{
@@ -2220,6 +2279,7 @@
          // Load the most recent preset automatically
          const p = presets[presets.length - 1];
          ww = p.window_width; wl = p.window_level; inverted = !!p.inverted; wwSlider.value=ww; wlSlider.value=wl; wwNum.value=Math.round(ww); wlNum.value=Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw();
+         showToast(`Preset "${p.name}" loaded`, 'success', 2000);
        } catch(_){}
      });
    })();

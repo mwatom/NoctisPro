@@ -975,8 +975,14 @@
                 renderStudiesTable();
                 updateStatusCounts();
                 
+                // Show success toast
+                showToast(`Study ${accession} deleted`, 'success');
+                
             }catch(err){
                 console.error('Delete failed:', err);
+                
+                // Show error toast
+                showToast(`Failed to delete study`, 'error');
                 
                 // Reset button state
                 const deleteButton = document.querySelector(`button[onclick*="deleteStudy('${studyId}'"]`);
@@ -1050,10 +1056,10 @@
             window.location.href = '{% url 'worklist:upload_study' %}';
         }
 
-        // Notification system
-        function showNotification(message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.style.cssText = `
+        // Clean toast notification system
+        function showToast(message, type = 'info', duration = 3000) {
+            const toast = document.createElement('div');
+            toast.style.cssText = `
                 position: fixed;
                 top: 20px;
                 right: 20px;
@@ -1061,39 +1067,48 @@
                 border: 1px solid var(--border-color);
                 border-left: 4px solid var(--accent-color);
                 color: var(--text-primary);
-                padding: 12px 16px;
-                border-radius: 4px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                z-index: 1000;
-                font-size: 12px;
-                max-width: 300px;
-                transition: all 0.3s ease;
+                padding: 8px 12px;
+                border-radius: 3px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+                z-index: 2000;
+                font-size: 11px;
+                max-width: 280px;
+                transform: translateX(100%);
+                transition: transform 0.3s ease;
+                opacity: 0.95;
             `;
             
             if (type === 'error') {
-                notification.style.borderLeftColor = 'var(--danger-color)';
+                toast.style.borderLeftColor = 'var(--danger-color)';
             } else if (type === 'success') {
-                notification.style.borderLeftColor = 'var(--success-color)';
+                toast.style.borderLeftColor = 'var(--success-color)';
+            } else if (type === 'warning') {
+                toast.style.borderLeftColor = 'var(--warning-color)';
             }
             
-            notification.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            toast.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'exclamation-triangle' : 'info-circle'}" style="font-size: 10px;"></i>
                     <span>${message}</span>
-                    <button onclick="this.parentElement.parentElement.remove()" 
-                            style="background: none; border: none; color: var(--text-muted); cursor: pointer; margin-left: 8px;">
-                        <i class="fas fa-times"></i>
-                    </button>
                 </div>
             `;
             
-            document.body.appendChild(notification);
+            document.body.appendChild(toast);
             
-            // Auto-remove after 5 seconds
+            // Slide in
             setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.remove();
-                }
-            }, 5000);
+                toast.style.transform = 'translateX(0)';
+            }, 10);
+            
+            // Auto-remove
+            setTimeout(() => {
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.remove();
+                    }
+                }, 300);
+            }, duration);
         }
         
         function selectStudy(row) {
@@ -1147,10 +1162,11 @@
                     timeElement.textContent = now.toLocaleTimeString('en-US', { hour12: false });
                 }
                 
-                // Refresh completed silently
+                showToast('Worklist refreshed', 'success', 2000);
             }).catch(error => {
                 icon.classList.remove('fa-spin');
                 btn.disabled = false;
+                showToast('Refresh failed', 'error');
                 console.error('Error refreshing data:', error.message);
             });
         }
@@ -1178,8 +1194,10 @@
                         const currentStudyCount = data.total_recent;
                         const currentUploadTime = data.refresh_time;
                         
-                        // If new studies were uploaded, refresh silently
+                        // If new studies were uploaded, refresh and notify
                         if (currentStudyCount > lastStudyCount && lastStudyCount > 0) {
+                            const newStudies = currentStudyCount - lastStudyCount;
+                            showToast(`${newStudies} new study${newStudies > 1 ? 'ies' : ''} uploaded`, 'success');
                             // Full refresh
                             await loadStudiesData();
                         } else if (lastUploadTime && currentUploadTime !== lastUploadTime) {
