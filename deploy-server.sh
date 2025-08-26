@@ -157,7 +157,7 @@ http {
 EOF
 
 # Replace domain placeholder
-sed -i "s/DOMAIN_PLACEHOLDER/$DOMAIN_NAME/g" nginx.conf
+sed -i "s#DOMAIN_PLACEHOLDER#$DOMAIN_NAME#g" nginx.conf
 
 # Stop nginx if running
 systemctl stop nginx 2>/dev/null || true
