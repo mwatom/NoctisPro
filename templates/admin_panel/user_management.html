@@ -875,30 +875,24 @@ function bulkAction(action) {
         'delete': 'delete selected users (this cannot be undone)'
     };
     
-    if (confirm(`Are you sure you want to ${actionMessages[action]}?`)) {
-        // Implement bulk action API call here
-        console.log(`Bulk ${action} for users:`, selected);
-        // After successful action, reload the page
-        location.reload();
-    }
+    // Implement bulk action API call here
+    console.log(`Bulk ${action} for users:`, selected);
+    // After successful action, reload the page
+    location.reload();
 }
 
 // Toggle user status
 function toggleUserStatus(userId, activate) {
     const action = activate ? 'activate' : 'deactivate';
     
-    if (confirm(`Are you sure you want to ${action} this user?`)) {
-        // Implement toggle user status API call here
-        console.log(`${action} user ${userId}`);
-        location.reload();
-    }
+    // Implement toggle user status API call here
+    console.log(`${action} user ${userId}`);
+    location.reload();
 }
 
 // Delete user function
 function deleteUser(userId, username) {
-    if (confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
-        window.location.href = `{% url 'admin_panel:user_delete' 0 %}`.replace('0', userId);
-    }
+    window.location.href = `{% url 'admin_panel:user_delete' 0 %}`.replace('0', userId);
 }
 
 // Export functionality

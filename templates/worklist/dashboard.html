@@ -938,10 +938,6 @@
 
         async function deleteStudy(studyId, accession){
             try{
-                // Show confirmation dialog
-                const proceed = confirm(`Are you sure you want to delete study ${accession}?\n\nThis action cannot be undone and will permanently remove all study data including images, attachments, and reports.`);
-                if(!proceed) return;
-                
                 // Get CSRF token (optional since API is CSRF exempt)
                 const csrfToken = getCSRFToken();
                 
@@ -979,12 +975,8 @@
                 renderStudiesTable();
                 updateStatusCounts();
                 
-                // Show success message
-                alert(`Study ${accession} deleted successfully.`);
-                
             }catch(err){
                 console.error('Delete failed:', err);
-                alert(`Failed to delete study: ${err.message}`);
                 
                 // Reset button state
                 const deleteButton = document.querySelector(`button[onclick*="deleteStudy('${studyId}'"]`);
@@ -1155,11 +1147,11 @@
                     timeElement.textContent = now.toLocaleTimeString('en-US', { hour12: false });
                 }
                 
-                showNotification('Worklist refreshed successfully', 'success');
+                // Refresh completed silently
             }).catch(error => {
                 icon.classList.remove('fa-spin');
                 btn.disabled = false;
-                showNotification('Error refreshing data: ' + error.message, 'error');
+                console.error('Error refreshing data:', error.message);
             });
         }
 
@@ -1186,11 +1178,8 @@
                         const currentStudyCount = data.total_recent;
                         const currentUploadTime = data.refresh_time;
                         
-                        // If new studies were uploaded, show notification and refresh
+                        // If new studies were uploaded, refresh silently
                         if (currentStudyCount > lastStudyCount && lastStudyCount > 0) {
-                            const newStudies = currentStudyCount - lastStudyCount;
-                            showNotification(`${newStudies} new study(ies) uploaded! Refreshing worklist...`, 'success');
-                            
                             // Full refresh
                             await loadStudiesData();
                         } else if (lastUploadTime && currentUploadTime !== lastUploadTime) {

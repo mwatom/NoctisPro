@@ -1878,7 +1878,7 @@
          
          printModal.style.display = 'flex';
        } catch(e) {
-         alert('Error loading print options: ' + e.message);
+         console.error('Error loading print options:', e.message);
        }
      });
 
@@ -1997,15 +1997,15 @@
          const result = await response.json();
          
          if (result.success) {
-           alert('Success: ' + result.message);
+           console.log('Print success:', result.message);
            printModal.style.display = 'none';
          } else {
-           alert('Error: ' + result.error);
+           console.error('Print error:', result.error);
          }
          
-       } catch(e) {
-         alert('Error printing image: ' + e.message);
-       } finally {
+                } catch(e) {
+           console.error('Error printing image:', e.message);
+         } finally {
          // Reset button
          const submitBtn = document.getElementById('submitPrint');
          submitBtn.innerHTML = '<i class="fas fa-print"></i> Print Image';
