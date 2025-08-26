@@ -38,71 +38,106 @@
                     </div>
 
                     <div class="col-md-6">
-                        <label for="name" class="form-label text-white">
+                        <label for="id_name" class="form-label text-white">
                             Facility Name <span class="text-danger">*</span>
                         </label>
-                        <input type="text" class="form-control form-control-medical" id="name" name="name" 
-                               value="{{ facility.name|default:'' }}" required>
+                        {{ form.name }}
+                        {% if form.name.errors %}
+                          {% for error in form.name.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                          {% endfor %}
+                        {% endif %}
                     </div>
 
                     <div class="col-md-6">
-                        <label for="license_number" class="form-label text-white">
+                        <label for="id_license_number" class="form-label text-white">
                             License Number <span class="text-danger">*</span>
                         </label>
-                        <input type="text" class="form-control form-control-medical" id="license_number" name="license_number" 
-                               value="{{ facility.license_number|default:'' }}" required>
+                        {{ form.license_number }}
+                        {% if form.license_number.errors %}
+                          {% for error in form.license_number.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                          {% endfor %}
+                        {% endif %}
                     </div>
 
                     <div class="col-md-6">
-                        <label for="email" class="form-label text-white">Email</label>
-                        <input type="email" class="form-control form-control-medical" id="email" name="email" value="{{ facility.email|default:'' }}">
+                        <label for="id_email" class="form-label text-white">Email</label>
+                        {{ form.email }}
+                        {% if form.email.errors %}
+                          {% for error in form.email.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                          {% endfor %}
+                        {% endif %}
                     </div>
 
                     <div class="col-md-6">
-                        <label for="phone" class="form-label text-white">Phone</label>
-                        <input type="text" class="form-control form-control-medical" id="phone" name="phone" value="{{ facility.phone|default:'' }}">
+                        <label for="id_phone" class="form-label text-white">Phone</label>
+                        {{ form.phone }}
+                        {% if form.phone.errors %}
+                          {% for error in form.phone.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                          {% endfor %}
+                        {% endif %}
                     </div>
 
                     <div class="col-12">
-                        <label for="address" class="form-label text-white">
+                        <label for="id_address" class="form-label text-white">
                             Address <span class="text-danger">*</span>
                         </label>
-                        <textarea class="form-control form-control-medical" id="address" name="address" rows="3" required>{{ facility.address|default:'' }}</textarea>
+                        {{ form.address }}
+                        {% if form.address.errors %}
+                          {% for error in form.address.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                          {% endfor %}
+                        {% endif %}
                     </div>
 
                     <div class="col-md-6">
-                        <label for="ae_title" class="form-label text-white">
+                        <label for="id_ae_title" class="form-label text-white">
                             DICOM AE Title
                         </label>
-                        <input type="text" class="form-control form-control-medical" id="ae_title" name="ae_title"
-                               placeholder="Auto-generated from Facility Name if left blank"
-                               value="{{ facility.ae_title|default:'' }}">
+                        {{ form.ae_title }}
                         <div class="form-text text-secondary">
                             <small>Must be <= 16 chars, A-Z, 0-9 or underscore. Will be standardized automatically.</small>
                         </div>
+                        {% if form.ae_title.errors %}
+                          {% for error in form.ae_title.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                          {% endfor %}
+                        {% endif %}
                     </div>
 
                     <div class="col-md-6">
-                        <label for="letterhead" class="form-label text-white">Letterhead (optional)</label>
-                        <input type="file" class="form-control form-control-medical" id="letterhead" name="letterhead" accept="image/*">
+                        <label for="id_letterhead" class="form-label text-white">Letterhead (optional)</label>
+                        {{ form.letterhead }}
                         {% if facility.letterhead %}
                         <div class="mt-2">
                             <img src="{{ facility.letterhead.url }}" alt="Current letterhead" class="img-thumbnail" style="max-height: 100px;">
                         </div>
                         {% endif %}
+                        {% if form.letterhead.errors %}
+                          {% for error in form.letterhead.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                          {% endfor %}
+                        {% endif %}
                     </div>
 
                     <div class="col-12 mt-2">
                         <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="is_active" name="is_active" 
-                                   {% if facility %}{% if facility.is_active %}checked{% endif %}{% else %}checked{% endif %}>
-                            <label class="form-check-label text-white" for="is_active">
+                            {{ form.is_active }}
+                            <label class="form-check-label text-white" for="id_is_active">
                                 Facility Active
                             </label>
                         </div>
                         <div class="form-text text-secondary">
                             <small>Inactive facilities cannot receive new studies</small>
                         </div>
+                        {% if form.is_active.errors %}
+                          {% for error in form.is_active.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                          {% endfor %}
+                        {% endif %}
                     </div>
 
                     <!-- Optional Facility Login -->
@@ -114,24 +149,65 @@
                     </div>
                     <div class="col-12">
                         <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="create_facility_user" name="create_facility_user">
-                            <label class="form-check-label text-white" for="create_facility_user">Create a facility user account for this facility</label>
+                            {{ form.create_facility_user }}
+                            <label class="form-check-label text-white" for="id_create_facility_user">Create a facility user account for this facility</label>
                         </div>
+                        {% if form.create_facility_user.help_text %}
+                        <div class="form-text text-secondary">
+                            <small>{{ form.create_facility_user.help_text }}</small>
+                        </div>
+                        {% else %}
                         <div class="form-text text-secondary">
                             <small>If enabled, a Facility User will be created and linked to this facility.</small>
                         </div>
+                        {% endif %}
+                        {% if form.create_facility_user.errors %}
+                          {% for error in form.create_facility_user.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                          {% endfor %}
+                        {% endif %}
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label text-white">Username</label>
-                        <input type="text" class="form-control form-control-medical" name="facility_username" placeholder="Defaults to AE Title if blank">
+                        <label for="id_facility_username" class="form-label text-white">Username</label>
+                        {{ form.facility_username }}
+                        {% if form.facility_username.help_text %}
+                        <div class="form-text text-secondary">
+                            <small>{{ form.facility_username.help_text }}</small>
+                        </div>
+                        {% endif %}
+                        {% if form.facility_username.errors %}
+                          {% for error in form.facility_username.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                          {% endfor %}
+                        {% endif %}
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label text-white">Email (optional)</label>
-                        <input type="email" class="form-control form-control-medical" name="facility_email">
+                        <label for="id_facility_email" class="form-label text-white">Email (optional)</label>
+                        {{ form.facility_email }}
+                        {% if form.facility_email.help_text %}
+                        <div class="form-text text-secondary">
+                            <small>{{ form.facility_email.help_text }}</small>
+                        </div>
+                        {% endif %}
+                        {% if form.facility_email.errors %}
+                          {% for error in form.facility_email.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                          {% endfor %}
+                        {% endif %}
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label text-white">Password (optional)</label>
-                        <input type="text" class="form-control form-control-medical" name="facility_password" placeholder="Auto-generates if left blank">
+                        <label for="id_facility_password" class="form-label text-white">Password (optional)</label>
+                        {{ form.facility_password }}
+                        {% if form.facility_password.help_text %}
+                        <div class="form-text text-secondary">
+                            <small>{{ form.facility_password.help_text }}</small>
+                        </div>
+                        {% endif %}
+                        {% if form.facility_password.errors %}
+                          {% for error in form.facility_password.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                          {% endfor %}
+                        {% endif %}
                     </div>
 
                     <!-- Submit Buttons -->

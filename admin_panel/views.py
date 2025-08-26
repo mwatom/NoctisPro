@@ -144,117 +144,74 @@ def user_management(request):
 @login_required
 @user_passes_test(is_admin)
 def user_create(request):
-    """Create new user"""
-    if request.method == 'POST':
-        try:
-            # Get form data
-            username = request.POST.get('username')
-            email = request.POST.get('email')
-            first_name = request.POST.get('first_name')
-            last_name = request.POST.get('last_name')
-            role = request.POST.get('role')
-            facility_id = request.POST.get('facility')
-            password = request.POST.get('password')
-            confirm_password = request.POST.get('password_confirm')
-            phone = request.POST.get('phone', '')
-            license_number = request.POST.get('license_number', '')
-            specialization = request.POST.get('specialization', '')
-
-            # Validation
-            if not username or not password:
-                messages.error(request, 'Username and password are required')
-                return redirect('admin_panel:user_create')
-
-            if password != confirm_password:
-                messages.error(request, 'Passwords do not match')
-                return redirect('admin_panel:user_create')
-
-            if len(password) < 8:
-                messages.error(request, 'Password must be at least 8 characters long')
-                return redirect('admin_panel:user_create')
-
-            if User.objects.filter(username=username).exists():
-                messages.error(request, 'Username already exists')
-                return redirect('admin_panel:user_create')
-            
-            if email and User.objects.filter(email=email).exists():
-                messages.error(request, 'Email already exists')
-                return redirect('admin_panel:user_create')
-            
-            # Handle facility assignment based on role
-            facility = None
-            if role == 'facility':
-                # Facility users must have a facility assigned
-                if not facility_id:
-                    messages.error(request, 'Facility is required for Facility User role')
-                    return redirect('admin_panel:user_create')
-                facility = get_object_or_404(Facility, id=facility_id)
-            elif role == 'radiologist' and facility_id:
-                # Radiologists can optionally have a facility assigned
-                try:
-                    facility = Facility.objects.get(id=facility_id)
-                except Facility.DoesNotExist:
-                    messages.warning(request, 'Selected facility not found, radiologist will be created without facility assignment')
-                    facility = None
-            elif role == 'admin':
-                # Admins don't need facility assignment
-                facility = None
-
-            # Create user
-            user = User.objects.create_user(
-                username=username,
-                email=email,
-                password=password,
-                first_name=first_name,
-                last_name=last_name
-            )
-            # Set additional fields after creation
-            user.role = role
-            if facility:
-                user.facility = facility
-            user.phone = phone
-            user.license_number = license_number
-            user.specialization = specialization
-            user.is_verified = True  # Set new users as verified by default
-            user.is_active = True  # Ensure user is active by default
-            user.save()
-            
-            # Log the action
-            AuditLog.objects.create(
-                user=request.user,
-                action='create',
-                model_name='User',
-                object_id=str(user.id),
-                object_repr=str(user),
-                description=f'Created user {user.username}'
-            )
-            
-            messages.success(request, f'User {username} created successfully. Username: {username}, Role: {user.get_role_display()}, Status: Active & Verified')
-            return redirect('admin_panel:user_management')
-            
-        except Exception as e:
-            messages.error(request, f'Error creating user: {str(e)}')
+    """Create new user with enhanced form validation"""
+    from .forms import CustomUserCreationForm
     
-    # Get all active facilities, ordered by name for consistent display
+    if request.method == 'POST':
+        form = CustomUserCreationForm(request.POST)
+        if form.is_valid():
+            try:
+                # Save the user
+                user = form.save()
+                
+                # Log the action
+                AuditLog.objects.create(
+                    user=request.user,
+                    action='create',
+                    model_name='User',
+                    object_id=str(user.id),
+                    object_repr=str(user),
+                    description=f'Created user {user.username} ({user.get_role_display()})'
+                )
+                
+                # Success message with detailed info
+                facility_info = f" - Assigned to {user.facility.name}" if user.facility else ""
+                messages.success(
+                    request, 
+                    f'User "{user.username}" created successfully! '
+                    f'Role: {user.get_role_display()}{facility_info}. '
+                    f'Status: Active & Verified.'
+                )
+                
+                return redirect('admin_panel:user_management')
+                
+            except Exception as e:
+                messages.error(request, f'Error creating user: {str(e)}')
+        else:
+            # Form validation errors
+            for field, errors in form.errors.items():
+                for error in errors:
+                    if field == '__all__':
+                        messages.error(request, error)
+                    else:
+                        field_name = form.fields[field].label or field.replace('_', ' ').title()
+                        messages.error(request, f'{field_name}: {error}')
+    else:
+        # Initialize form with preset values from URL parameters
+        initial_data = {}
+        if request.GET.get('role'):
+            initial_data['role'] = request.GET.get('role')
+        if request.GET.get('facility'):
+            try:
+                facility_id = int(request.GET.get('facility'))
+                if Facility.objects.filter(id=facility_id, is_active=True).exists():
+                    initial_data['facility'] = facility_id
+            except (ValueError, TypeError):
+                pass
+        
+        form = CustomUserCreationForm(initial=initial_data)
+    
+    # Get facilities for context (for debugging/display)
     facilities = Facility.objects.filter(is_active=True).order_by('name')
     
-    # Get pre-fill values from URL parameters
-    preset_role = request.GET.get('role', '')
-    preset_facility = request.GET.get('facility', '')
-    
-    # Debug logging for facility count
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f"User create view: Found {facilities.count()} active facilities")
-    for facility in facilities:
-        logger.info(f"  - Facility ID: {facility.id}, Name: {facility.name}")
-    
     context = {
+        'form': form,
         'facilities': facilities,
         'user_roles': User.USER_ROLES,
-        'preset_role': preset_role,
-        'preset_facility': preset_facility,
-        'facilities_count': facilities.count(),  # Add count for debugging
+        'preset_role': request.GET.get('role', ''),
+        'preset_facility': request.GET.get('facility', ''),
+        'facilities_count': facilities.count(),
+        'edit_mode': False,
     }
     
     return render(request, 'admin_panel/user_form.html', context)
@@ -262,67 +219,70 @@ def user_create(request):
 @login_required
 @user_passes_test(is_admin)
 def user_edit(request, user_id):
-    """Edit existing user"""
+    """Edit existing user with enhanced form validation"""
+    from .forms import CustomUserUpdateForm
+    
     user = get_object_or_404(User, id=user_id)
     
     if request.method == 'POST':
-        try:
-            # Update user fields
-            user.username = request.POST.get('username')
-            user.email = request.POST.get('email')
-            user.first_name = request.POST.get('first_name')
-            user.last_name = request.POST.get('last_name')
-            user.role = request.POST.get('role')
-            user.phone = request.POST.get('phone', '')
-            user.license_number = request.POST.get('license_number', '')
-            user.specialization = request.POST.get('specialization', '')
-            user.is_active = request.POST.get('is_active') == 'on'
-            user.is_verified = request.POST.get('is_verified') == 'on'
-            
-            # Update facility
-            facility_id = request.POST.get('facility')
-            if facility_id:
-                user.facility = get_object_or_404(Facility, id=facility_id)
-            else:
-                user.facility = None
-            
-            # Update password if provided
-            new_password = request.POST.get('password')
-            if new_password:
-                user.set_password(new_password)
-            
-            user.save()
-            
-            # Log the action
-            AuditLog.objects.create(
-                user=request.user,
-                action='update',
-                model_name='User',
-                object_id=str(user.id),
-                object_repr=str(user),
-                description=f'Updated user {user.username}'
-            )
-            
-            messages.success(request, f'User {user.username} updated successfully')
-            return redirect('admin_panel:user_management')
-            
-        except Exception as e:
-            messages.error(request, f'Error updating user: {str(e)}')
+        form = CustomUserUpdateForm(request.POST, instance=user)
+        if form.is_valid():
+            try:
+                # Save the updated user
+                updated_user = form.save()
+                
+                # Log the action
+                AuditLog.objects.create(
+                    user=request.user,
+                    action='update',
+                    model_name='User',
+                    object_id=str(updated_user.id),
+                    object_repr=str(updated_user),
+                    description=f'Updated user {updated_user.username} ({updated_user.get_role_display()})'
+                )
+                
+                # Success message with detailed info
+                facility_info = f" - Assigned to {updated_user.facility.name}" if updated_user.facility else ""
+                status_info = []
+                if updated_user.is_active:
+                    status_info.append("Active")
+                if updated_user.is_verified:
+                    status_info.append("Verified")
+                status_text = ", ".join(status_info) if status_info else "Inactive"
+                
+                messages.success(
+                    request,
+                    f'User "{updated_user.username}" updated successfully! '
+                    f'Role: {updated_user.get_role_display()}{facility_info}. '
+                    f'Status: {status_text}.'
+                )
+                
+                return redirect('admin_panel:user_management')
+                
+            except Exception as e:
+                messages.error(request, f'Error updating user: {str(e)}')
+        else:
+            # Form validation errors
+            for field, errors in form.errors.items():
+                for error in errors:
+                    if field == '__all__':
+                        messages.error(request, error)
+                    else:
+                        field_name = form.fields[field].label or field.replace('_', ' ').title()
+                        messages.error(request, f'{field_name}: {error}')
+    else:
+        form = CustomUserUpdateForm(instance=user)
     
-    # Get all active facilities, ordered by name for consistent display
+    # Get facilities for context
     facilities = Facility.objects.filter(is_active=True).order_by('name')
     
-    # Debug logging for facility count
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f"User edit view: Found {facilities.count()} active facilities")
-    
     context = {
+        'form': form,
         'user_obj': user,
         'facilities': facilities,
         'user_roles': User.USER_ROLES,
         'edit_mode': True,
-        'facilities_count': facilities.count(),  # Add count for debugging
+        'facilities_count': facilities.count(),
     }
     
     return render(request, 'admin_panel/user_form.html', context)
@@ -639,132 +599,201 @@ def bulk_facility_action(request):
 @login_required
 @user_passes_test(is_admin)
 def facility_create(request):
-    """Create new facility"""
+    """Create new facility with enhanced form validation"""
+    from .forms import FacilityForm
+    
     if request.method == 'POST':
-        try:
-            name = request.POST.get('name')
-            ae_title_raw = (request.POST.get('ae_title', '') or '').strip()
-            if ae_title_raw:
-                # Standardize provided AE Title
-                ae_title = _standardize_aetitle(ae_title_raw)
-            else:
-                ae_title = _standardize_aetitle(name)
-            facility = Facility.objects.create(
-                name=name,
-                address=request.POST.get('address'),
-                phone=request.POST.get('phone'),
-                email=request.POST.get('email'),
-                license_number=request.POST.get('license_number'),
-                ae_title=ae_title,
-                is_active=request.POST.get('is_active') == 'on'
-            )
-            
-            # Handle letterhead upload
-            if 'letterhead' in request.FILES:
-                facility.letterhead = request.FILES['letterhead']
-                facility.save()
-            
-            # Optionally create a facility user account
-            if request.POST.get('create_facility_user') in ['on', '1', 'true', 'True']:
-                desired_username = (request.POST.get('facility_username') or facility.ae_title or name or '').strip()
-                desired_username = re.sub(r"[^A-Za-z0-9_.-]", "", desired_username)[:150] or facility.ae_title
-                username = desired_username
-                idx = 1
-                while User.objects.filter(username=username).exists():
-                    suffix = f"{idx}"
-                    username = (desired_username[:150 - len(suffix)] + suffix)
-                    idx += 1
-                facility_email = request.POST.get('facility_email') or ''
-                raw_password = request.POST.get('facility_password') or get_random_string(12)
-                user = User.objects.create_user(
-                    username=username,
-                    email=facility_email,
-                    password=raw_password,
-                    role='facility'
-                )
-                user.facility = facility
-                user.first_name = name
-                user.save()
+        form = FacilityForm(request.POST, request.FILES)
+        if form.is_valid():
+            try:
+                # Save the facility
+                facility = form.save()
+                
+                # Handle optional facility user creation
+                if form.cleaned_data.get('create_facility_user'):
+                    username = form.cleaned_data.get('facility_username') or facility.ae_title or facility.name
+                    username = re.sub(r"[^A-Za-z0-9_.-]", "", username)[:150] or facility.ae_title
+                    
+                    # Ensure unique username
+                    original_username = username
+                    idx = 1
+                    while User.objects.filter(username=username).exists():
+                        suffix = f"{idx}"
+                        username = (original_username[:150 - len(suffix)] + suffix)
+                        idx += 1
+                    
+                    # Create facility user
+                    facility_email = form.cleaned_data.get('facility_email') or ''
+                    raw_password = form.cleaned_data.get('facility_password') or get_random_string(12)
+                    
+                    user = User.objects.create_user(
+                        username=username,
+                        email=facility_email,
+                        password=raw_password,
+                        first_name=facility.name,
+                        role='facility'
+                    )
+                    user.facility = facility
+                    user.is_verified = True
+                    user.is_active = True
+                    user.save()
+                    
+                    # Log user creation
+                    AuditLog.objects.create(
+                        user=request.user,
+                        action='create',
+                        model_name='User',
+                        object_id=str(user.id),
+                        object_repr=str(user),
+                        description=f'Created facility user {user.username} for {facility.name}'
+                    )
+                    
+                    messages.success(
+                        request,
+                        f'Facility "{facility.name}" created successfully! '
+                        f'Facility user account "{username}" has been created. '
+                        f'AE Title: {facility.ae_title}'
+                    )
+                else:
+                    messages.success(
+                        request,
+                        f'Facility "{facility.name}" created successfully! '
+                        f'AE Title: {facility.ae_title}'
+                    )
+                
+                # Log facility creation
                 AuditLog.objects.create(
                     user=request.user,
                     action='create',
-                    model_name='User',
-                    object_id=str(user.id),
-                    object_repr=str(user),
-                    description=f'Created facility user {user.username} for {facility.name}'
+                    model_name='Facility',
+                    object_id=str(facility.id),
+                    object_repr=str(facility),
+                    description=f'Created facility {facility.name}'
                 )
-                messages.success(request, f"Facility {facility.name} created. Facility login '{username}' has been created.")
-            else:
-                messages.success(request, f'Facility {facility.name} created successfully')
-            
-            return redirect('admin_panel:facility_management')
-            
-        except Exception as e:
-            messages.error(request, f'Error creating facility: {str(e)}')
+                
+                return redirect('admin_panel:facility_management')
+                
+            except Exception as e:
+                messages.error(request, f'Error creating facility: {str(e)}')
+        else:
+            # Form validation errors
+            for field, errors in form.errors.items():
+                for error in errors:
+                    if field == '__all__':
+                        messages.error(request, error)
+                    else:
+                        field_name = form.fields[field].label or field.replace('_', ' ').title()
+                        messages.error(request, f'{field_name}: {error}')
+    else:
+        form = FacilityForm()
     
-    return render(request, 'admin_panel/facility_form.html')
+    context = {
+        'form': form,
+        'edit_mode': False,
+    }
+    
+    return render(request, 'admin_panel/facility_form.html', context)
 
 @login_required
 @user_passes_test(is_admin)
 def facility_edit(request, facility_id):
-    """Edit existing facility"""
+    """Edit existing facility with enhanced form validation"""
+    from .forms import FacilityForm
+    
     facility = get_object_or_404(Facility, id=facility_id)
     
     if request.method == 'POST':
-        try:
-            facility.name = request.POST.get('name')
-            facility.address = request.POST.get('address')
-            facility.phone = request.POST.get('phone')
-            facility.email = request.POST.get('email')
-            facility.license_number = request.POST.get('license_number')
-            ae_title_raw = (request.POST.get('ae_title', '') or '').strip()
-            facility.ae_title = _standardize_aetitle(ae_title_raw or facility.name)
-            facility.is_active = request.POST.get('is_active') == 'on'
-            
-            # Handle letterhead upload
-            if 'letterhead' in request.FILES:
-                facility.letterhead = request.FILES['letterhead']
-            
-            facility.save()
-            
-            # Optionally create a facility user account during edit
-            if request.POST.get('create_facility_user') in ['on', '1', 'true', 'True']:
-                desired_username = (request.POST.get('facility_username') or facility.ae_title or facility.name or '').strip()
-                desired_username = re.sub(r"[^A-Za-z0-9_.-]", "", desired_username)[:150] or facility.ae_title
-                username = desired_username
-                idx = 1
-                while User.objects.filter(username=username).exists():
-                    suffix = f"{idx}"
-                    username = (desired_username[:150 - len(suffix)] + suffix)
-                    idx += 1
-                facility_email = request.POST.get('facility_email') or ''
-                raw_password = request.POST.get('facility_password') or get_random_string(12)
-                user = User.objects.create_user(
-                    username=username,
-                    email=facility_email,
-                    password=raw_password,
-                    role='facility'
-                )
-                user.facility = facility
-                user.first_name = facility.name
-                user.save()
+        form = FacilityForm(request.POST, request.FILES, instance=facility)
+        if form.is_valid():
+            try:
+                # Save the updated facility
+                updated_facility = form.save()
+                
+                # Handle optional facility user creation during edit
+                if form.cleaned_data.get('create_facility_user'):
+                    username = form.cleaned_data.get('facility_username') or updated_facility.ae_title or updated_facility.name
+                    username = re.sub(r"[^A-Za-z0-9_.-]", "", username)[:150] or updated_facility.ae_title
+                    
+                    # Ensure unique username
+                    original_username = username
+                    idx = 1
+                    while User.objects.filter(username=username).exists():
+                        suffix = f"{idx}"
+                        username = (original_username[:150 - len(suffix)] + suffix)
+                        idx += 1
+                    
+                    # Create facility user
+                    facility_email = form.cleaned_data.get('facility_email') or ''
+                    raw_password = form.cleaned_data.get('facility_password') or get_random_string(12)
+                    
+                    user = User.objects.create_user(
+                        username=username,
+                        email=facility_email,
+                        password=raw_password,
+                        first_name=updated_facility.name,
+                        role='facility'
+                    )
+                    user.facility = updated_facility
+                    user.is_verified = True
+                    user.is_active = True
+                    user.save()
+                    
+                    # Log user creation
+                    AuditLog.objects.create(
+                        user=request.user,
+                        action='create',
+                        model_name='User',
+                        object_id=str(user.id),
+                        object_repr=str(user),
+                        description=f'Created facility user {user.username} for {updated_facility.name}'
+                    )
+                    
+                    messages.success(
+                        request,
+                        f'Facility "{updated_facility.name}" updated successfully! '
+                        f'Facility user account "{username}" has been created. '
+                        f'AE Title: {updated_facility.ae_title}'
+                    )
+                else:
+                    messages.success(
+                        request,
+                        f'Facility "{updated_facility.name}" updated successfully! '
+                        f'AE Title: {updated_facility.ae_title}'
+                    )
+                
+                # Log facility update
                 AuditLog.objects.create(
                     user=request.user,
-                    action='create',
-                    model_name='User',
-                    object_id=str(user.id),
-                    object_repr=str(user),
-                    description=f'Created facility user {user.username} for {facility.name}'
+                    action='update',
+                    model_name='Facility',
+                    object_id=str(updated_facility.id),
+                    object_repr=str(updated_facility),
+                    description=f'Updated facility {updated_facility.name}'
                 )
-                messages.success(request, f"Facility updated. Facility login '{username}' has been created.")
-            else:
-                messages.success(request, f'Facility {facility.name} updated successfully')
-            return redirect('admin_panel:facility_management')
-            
-        except Exception as e:
-            messages.error(request, f'Error updating facility: {str(e)}')
+                
+                return redirect('admin_panel:facility_management')
+                
+            except Exception as e:
+                messages.error(request, f'Error updating facility: {str(e)}')
+        else:
+            # Form validation errors
+            for field, errors in form.errors.items():
+                for error in errors:
+                    if field == '__all__':
+                        messages.error(request, error)
+                    else:
+                        field_name = form.fields[field].label or field.replace('_', ' ').title()
+                        messages.error(request, f'{field_name}: {error}')
+    else:
+        form = FacilityForm(instance=facility)
     
-    return render(request, 'admin_panel/facility_form.html', { 'facility': facility })
+    context = {
+        'form': form,
+        'facility': facility,
+        'edit_mode': True,
+    }
+    
+    return render(request, 'admin_panel/facility_form.html', context)
 
 @login_required
 @user_passes_test(is_admin)
