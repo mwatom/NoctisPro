@@ -52,23 +52,281 @@
         }
 
         body {
-            font-family: 'Inter', sans-serif;
-            background: var(--dark-bg);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--primary-bg);
             color: var(--text-primary);
+            font-size: 12px;
             line-height: 1.6;
             overflow-x: hidden;
         }
 
-        .bg-medical {
-            background: linear-gradient(135deg, 
-                rgba(30, 30, 30, 0.95) 0%, 
-                rgba(20, 20, 20, 0.98) 50%, 
-                rgba(30, 30, 30, 0.95) 100%),
-                url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
-            background-size: cover, 50px 50px;
-            background-position: center, center;
+        .dashboard-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
+        /* Top Navigation */
+        .top-navbar {
+            background: var(--header-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 50px;
+        }
+
+        .nav-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo {
+            color: var(--accent-color);
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 2px;
+        }
+
+        .nav-tab {
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 6px 12px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .nav-tab.active {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+            font-weight: bold;
+        }
+
+        .nav-tab:hover:not(.active) {
+            background: var(--card-bg);
+            color: var(--text-primary);
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 11px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .user-avatar {
+            background: var(--accent-color);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: var(--primary-bg);
+            font-size: 10px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--success-color);
+        }
+
+        .admin-btn {
+            background: var(--danger-color);
+            border: none;
+            color: var(--text-primary);
+            padding: 4px 8px;
+            font-size: 9px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: bold;
+        }
+
+        .admin-btn:hover {
+            background: #cc3333;
+            transform: scale(1.05);
+        }
+
+        /* Controls Bar */
+        .controls-bar {
+            background: var(--secondary-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            height: 40px;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .control-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .control-input, .control-select {
+            background: var(--primary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 4px 8px;
+            font-size: 11px;
+            border-radius: 2px;
+            min-width: 100px;
+        }
+
+        .control-input:focus, .control-select:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 1px var(--accent-color);
+        }
+
+        .control-input::placeholder {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .btn-control {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 4px 12px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn-control:hover {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+        }
+
+        .btn-control.reset {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Data Table */
+        .data-table-container {
+            flex: 1;
+            overflow: auto;
+            background: var(--primary-bg);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 11px;
+        }
+
+        .data-table th {
+            background: var(--header-bg);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            white-space: nowrap;
+        }
+
+        .data-table th:last-child {
+            border-right: none;
+        }
+
+        .data-table th.sortable {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .data-table th.sortable:hover {
+            background: var(--card-bg);
+        }
+
+        .data-table td {
+            padding: 4px 12px;
+            border-bottom: 1px solid rgba(64, 64, 64, 0.3);
+            border-right: 1px solid rgba(64, 64, 64, 0.3);
+            color: var(--text-secondary);
+            white-space: nowrap;
+            vertical-align: middle;
+            font-size: 11px;
+        }
+
+        .data-table td:last-child {
+            border-right: none;
+        }
+
+        .data-table tbody tr {
+            transition: background-color 0.1s ease;
+            cursor: pointer;
+        }
+
+        .data-table tbody tr:hover {
+            background: rgba(0, 212, 255, 0.08);
+        }
+
+        .data-table tbody tr:nth-child(even) {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .data-table tbody tr:nth-child(even):hover {
+            background: rgba(0, 212, 255, 0.08);
+        }
+
+        /* Cards and Forms */
         .card-medical {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
@@ -77,16 +335,25 @@
             backdrop-filter: blur(10px);
         }
 
-        
-
-        .btn-medical:hover {
-            /* reduce transform for snappier response */
-            /* transform: translateY(-2px); */
-            box-shadow: 0 6px 16px rgba(0, 212, 255, 0.25);
-            color: white;
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
         }
 
-        .form-control-medical {
+        .card-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-body {
+            padding: 16px;
+        }
+
+        .form-control-medical, .form-control {
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--border-color);
             border-radius: 2px;
@@ -95,183 +362,119 @@
             transition: all 0.3s ease;
         }
 
-        .form-control-medical:focus {
+        .form-control-medical:focus, .form-control:focus {
             background: rgba(255, 255, 255, 0.08);
             border-color: var(--accent-color);
             box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
             color: var(--text-primary);
         }
 
-        .form-control-medical::placeholder {
-            color: var(--text-secondary);
+        .form-control-medical::placeholder, .form-control::placeholder {
+            color: var(--text-muted);
+            opacity: 0.8;
         }
 
-        .navbar-medical {
-            background: var(--gradient-primary);
-            border-bottom: 1px solid var(--border-color);
-            backdrop-filter: blur(10px);
+        /* Status Badges */
+        .status-badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 9px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
         }
 
-        .sidebar-medical {
-            background: var(--card-bg);
-            border-right: 1px solid var(--border-color);
-            min-height: 100vh;
+        .status-scheduled {
+            background: rgba(74, 144, 226, 0.2);
+            color: var(--scheduled-color);
+            border: 1px solid var(--scheduled-color);
         }
 
-        .nav-link-medical {
-            color: var(--text-secondary);
-            padding: 12px 20px;
-            border-radius: 2px;
-            margin: 2px 0;
-            transition: all 0.3s ease;
-            text-decoration: none;
+        .status-urgent {
+            background: rgba(255, 0, 102, 0.2);
+            color: var(--urgent-color);
+            border: 1px solid var(--urgent-color);
+            animation: pulse 2s infinite;
         }
 
-        .nav-link-medical:hover,
-        .nav-link-medical.active {
-            background: var(--accent-color);
-            color: var(--primary-bg);
-            transform: translateX(4px);
+        .status-in-progress {
+            background: rgba(245, 166, 35, 0.2);
+            color: var(--in-progress-color);
+            border: 1px solid var(--in-progress-color);
         }
 
-        .alert-medical {
-            border: none;
-            border-radius: 2px;
-            border-left: 4px solid;
+        .status-completed {
+            background: rgba(126, 211, 33, 0.2);
+            color: var(--completed-color);
+            border: 1px solid var(--completed-color);
         }
 
-        .alert-success-medical {
-            background: rgba(0, 255, 136, 0.1);
-            border-left-color: var(--success-color);
+        .status-cancelled {
+            background: rgba(208, 2, 27, 0.2);
+            color: var(--cancelled-color);
+            border: 1px solid var(--cancelled-color);
+        }
+
+        .status-pending {
+            background: rgba(255, 170, 0, 0.2);
+            color: var(--warning-color);
+            border: 1px solid var(--warning-color);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* Priority Indicators */
+        .priority-urgent { 
+            color: var(--urgent-color); 
+            font-weight: bold;
+        }
+        .priority-high { 
+            color: var(--warning-color); 
+            font-weight: bold;
+        }
+        .priority-normal { 
             color: var(--success-color);
         }
-
-        .alert-danger-medical {
-            background: rgba(255, 68, 68, 0.1);
-            border-left-color: var(--danger-color);
-            color: var(--danger-color);
+        .priority-low { 
+            color: var(--text-muted);
         }
 
-        .alert-warning-medical {
-            background: rgba(255, 170, 0, 0.1);
-            border-left-color: var(--warning-color);
-            color: var(--warning-color);
-        }
-
-        .badge-medical {
-            background: var(--gradient-accent);
-            border-radius: 20px;
-            padding: 6px 12px;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-
-        .text-accent {
-            color: var(--accent-color);
-        }
-
-        .loading-spinner {
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            border-radius: 50%;
-            border-top: 2px solid var(--accent-color);
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .hover-scale {
-            transition: transform 0.3s ease;
-        }
-
-        .hover-scale:hover {
-            transform: scale(1.02);
-        }
-
-        /* Medical icons and imagery */
-        .medical-icon {
-            background: var(--gradient-accent);
-            border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            color: white;
-            margin: 0 auto 20px;
-        }
-
-        /* Responsive adjustments */
-        @media (max-width: 768px) {
-            .sidebar-medical { min-height: auto; }
-        }
-
-        /* Refined top navbar styles (aligned with Worklist UI) */
-        .top-navbar {
-            background: var(--header-bg);
-            border-bottom: 1px solid var(--border-color);
-            padding: 8px 16px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-        }
-        .nav-left { display: flex; align-items: center; gap: 16px; }
-        .logo { color: var(--accent-color); font-weight: 700; display: flex; align-items: center; gap: 8px; }
-        .nav-tabs { display: flex; gap: 8px; }
-        .nav-tab {
-            padding: 8px 12px;
-            background: var(--secondary-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 2px;
-            color: var(--text-secondary);
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            cursor: pointer;
-            user-select: none;
-            transition: all 0.2s ease;
-        }
-        .nav-tab.active, .nav-tab:hover {
-            background: var(--card-surface);
-            color: var(--text-primary);
-            border-color: var(--accent-color);
-            box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.1) inset;
-        }
-        .nav-right { display: flex; align-items: center; gap: 8px; }
-        .status-indicator { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 999px; color: var(--text-secondary); }
-        .status-dot { width: 8px; height: 8px; background: var(--success-color); border-radius: 50%; box-shadow: 0 0 10px var(--success-color); }
-        .user-info { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--secondary-bg); }
-        .user-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--accent-color); color: #000; display: flex; align-items: center; justify-content: center; font-weight: 700; }
-        .btn-control {
-            background: var(--card-surface);
+        /* Modality Badges */
+        .modality-badge {
+            background: var(--card-bg);
             border: 1px solid var(--border-color);
             color: var(--text-primary);
-            padding: 4px 12px;
-            border-radius: 2px;
-            font-size: 11px;
-            cursor: pointer;
-            transition: all 0.2s ease;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: bold;
         }
-        .btn-control:hover { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); box-shadow: none; }
-        .btn-control.reset { background: var(--accent-color); color: var(--primary-bg); }
-        .btn-control.primary { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); }
-        .btn-control.primary:hover { background: #00b8d4; border-color: #00b8d4; }
-        .btn-control.btn-sm { padding: 3px 6px; font-size: 10px; border-radius: 2px; }
 
-        /* Canonical Worklist button variants available globally */
+        .modality-ct { border-color: #4a90e2; color: #4a90e2; }
+        .modality-mri { border-color: #7b68ee; color: #7b68ee; }
+        .modality-xr { border-color: #50c878; color: #50c878; }
+        .modality-us { border-color: #ffa500; color: #ffa500; }
+        .modality-nm { border-color: #ff6347; color: #ff6347; }
+
+        /* DICOM Viewer Buttons */
+        .viewer-buttons {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
         .btn-viewer {
             background: var(--accent-color);
             border: none;
             color: var(--primary-bg);
             padding: 4px 8px;
-            border-radius: 2px;
+            border-radius: 3px;
             font-size: 9px;
             font-weight: bold;
             cursor: pointer;
@@ -279,74 +482,119 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
-        .btn-viewer:hover { background: #00b8d4; }
-        .btn-viewer.viewer-only { background: var(--card-surface); color: var(--text-primary); border: 1px solid var(--border-color); }
-        .btn-viewer.viewer-only:hover { background: var(--text-secondary); color: var(--primary-bg); }
 
-        .btn-upload {
+        .btn-viewer:hover {
+            background: #00b8d4;
+        }
+
+        .btn-viewer.viewer-only {
+            background: var(--card-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-viewer.viewer-only:hover {
+            background: var(--text-secondary);
+            color: var(--primary-bg);
+        }
+
+        /* Footer Status Bar */
+        .footer-status {
+            background: var(--secondary-bg);
+            border-top: 1px solid var(--border-color);
+            padding: 6px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 10px;
+            color: var(--text-muted);
+            height: 30px;
+        }
+
+        .status-left {
+            display: flex;
+            gap: 20px;
+        }
+
+        .status-right {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .connection-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--success-color);
+        }
+
+        /* General styling for consistency */
+        .container-fluid {
+            padding: 16px;
+        }
+
+        .btn, .btn-primary, .btn-secondary, .btn-outline-light {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 4px 12px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn:hover, .btn-primary:hover, .btn-secondary:hover, .btn-outline-light:hover {
             background: var(--accent-color);
             color: var(--primary-bg);
-            border: none;
-            padding: 12px 24px;
-            border-radius: 2px;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.2s ease;
+            border-color: var(--accent-color);
         }
-        .btn-upload:hover { background: #00b8d4; }
 
-        /* Legacy button class aliases aligned to Worklist style */
-        .btn-mini {
-            background: var(--card-surface);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            padding: 4px 8px;
-            border-radius: 2px;
-            font-size: 11px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 4px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            text-decoration: none;
+        .btn-primary {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+            border-color: var(--accent-color);
         }
-        .btn-mini:hover { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); }
 
-        /* Ensure dropdown menus are visible over dark theme */
-        .dropdown-menu {
-            background: var(--card-surface);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            z-index: 2000;
+        .btn-primary:hover {
+            background: #00b8d4;
+            border-color: #00b8d4;
         }
-        .dropdown-item { color: var(--text-primary); }
-        .dropdown-item:hover { background: var(--accent-color); color: var(--primary-bg); }
 
-        .action-btn, .worklist-btn {
-            background: var(--card-surface);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            padding: 4px 8px;
-            border-radius: 2px;
-            font-size: 11px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .action-btn:hover, .worklist-btn:hover { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); }
-        .admin-btn { padding: 8px 12px; border-radius: 2px; background: linear-gradient(135deg, #1f1f1f 0%, #2a2a2a 100%); border: 1px solid var(--accent-color); color: var(--text-primary); font-weight: 700; }
-        .study-count { margin-left: 6px; padding: 2px 6px; font-size: 10px; border-radius: 999px; background: #ff4444; color: #fff; border: 1px solid rgba(255,255,255,0.2); }
+        /* Responsive adjustments */
+        @media (max-width: 1200px) {
+            .data-table th,
+            .data-table td {
+                padding: 4px 8px;
+                font-size: 10px;
+            }
+            
+            .controls-bar {
+                flex-wrap: wrap;
+                height: auto;
+                min-height: 40px;
+            }
 
-        @media (max-width: 768px) {
-            .nav-tabs { display: none; }
-            .nav-right { gap: 6px; }
-            .btn-control, .admin-btn { padding: 6px 8px; font-size: 12px; }
-            .user-info { display: none; }
+            .viewer-buttons {
+                flex-direction: column;
+                gap: 2px;
+            }
+
+            .btn-viewer {
+                font-size: 8px;
+                padding: 3px 6px;
+            }
         }
     </style>
     {% block extra_css %}{% endblock %}
