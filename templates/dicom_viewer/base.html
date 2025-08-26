@@ -7,15 +7,24 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <style>
     :root {
-      --primary-bg: var(--primary-bg);
-      --secondary-bg: var(--secondary-bg);
-      --card-bg: var(--card-surface);
-      --header-bg: var(--header-bg);
-      --border-color: var(--border-color);
-      --accent-color: var(--accent-color);
-      --text-primary: var(--text-primary);
-      --text-secondary: var(--text-secondary);
-      --text-muted: var(--text-muted);
+      --primary-bg: #0a0a0a;
+      --secondary-bg: #1a1a1a;
+      --card-bg: #252525;
+      --card-surface: #252525;
+      --header-bg: #333333;
+      --border-color: #404040;
+      --accent-color: #00d4ff;
+      --text-primary: #ffffff;
+      --text-secondary: #b3b3b3;
+      --text-muted: #666666;
+      --success-color: #00ff88;
+      --warning-color: #ffaa00;
+      --danger-color: #ff4444;
+      --urgent-color: #ff0066;
+      --scheduled-color: #4a90e2;
+      --in-progress-color: #f5a623;
+      --completed-color: #7ed321;
+      --cancelled-color: #d0021b;
     }
     body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--primary-bg); color: var(--text-primary); }
     .layout { display: grid; grid-template-columns: 82px 1fr 320px; grid-template-rows: 60px 1fr; height: 100vh; }
@@ -25,11 +34,13 @@
     .tool:hover:not(.active) { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); }
     .tool i { font-size: 16px; margin-bottom: 2px; }
     .topbar { grid-row: 1; grid-column: 2 / span 2; display: flex; align-items: center; gap: 8px; padding: 0 16px; background: var(--header-bg); border-bottom: 1px solid var(--border-color); }
-    .btn { padding: 4px 12px; border: 1px solid var(--border-color); border-radius: 2px; cursor: pointer; font-size: 11px; background: var(--card-bg); color: var(--text-primary); transition: all 0.2s ease; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; text-decoration: none; }
+    .btn { padding: 3px 8px; border: 1px solid var(--border-color); border-radius: 2px; cursor: pointer; font-size: 10px; background: var(--card-bg); color: var(--text-primary); transition: all 0.2s ease; font-weight: 500; display: inline-flex; align-items: center; gap: 3px; text-decoration: none; }
     .btn:hover { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); }
     .btn-primary { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); }
     .btn-primary:hover { background: #00b8d4; border-color: #00b8d4; }
-    .select { padding: 6px 8px; background: var(--secondary-bg); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); min-width: 180px; font-size: 11px; }
+    .btn-control { padding: 3px 8px; border: 1px solid var(--border-color); border-radius: 2px; cursor: pointer; font-size: 10px; background: var(--card-bg); color: var(--text-primary); transition: all 0.2s ease; font-weight: 500; display: inline-flex; align-items: center; gap: 3px; text-decoration: none; }
+    .btn-control:hover { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); }
+    .select { padding: 4px 6px; background: var(--secondary-bg); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); min-width: 160px; font-size: 10px; }
     .select:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 1px var(--accent-color); }
     .viewport { grid-row: 2; grid-column: 2; background: #000000; position: relative; display: flex; align-items: center; justify-content: center; }
     .right { grid-row: 2; grid-column: 3; background: var(--secondary-bg); border-left: 1px solid var(--border-color); padding: 16px; overflow: auto; }
@@ -1450,8 +1461,13 @@
         }
       } else if (activeTool === 'annotate'){
         const pos = canvasToImageCoords(vp, e.offsetX, e.offsetY);
-        const text = window.prompt('Annotation text:');
-        if (text && text.trim().length){ annotations.push({ pos, text: text.trim() }); imageIdToAnnotations.set(getCurrentImageId(), annotations); await saveAnnotationToServer(pos, text.trim()); await draw(); }
+                 // Create inline annotation with default text
+         const text = 'Annotation';
+         annotations.push({ pos, text }); 
+         imageIdToAnnotations.set(getCurrentImageId(), annotations); 
+         await saveAnnotationToServer(pos, text); 
+         await draw();
+         showToast('Annotation added', 'success', 2000);
       } else if (showHuProbe && huEllipse){
         // Submit ROI to backend
         try {
@@ -1867,7 +1883,7 @@
          
          printModal.style.display = 'flex';
        } catch(e) {
-         alert('Error loading print options: ' + e.message);
+         console.error('Error loading print options:', e.message);
        }
      });
 
@@ -1986,21 +2002,78 @@
          const result = await response.json();
          
          if (result.success) {
-           alert('Success: ' + result.message);
+           console.log('Print success:', result.message);
+           showToast('Print job sent successfully', 'success');
            printModal.style.display = 'none';
          } else {
-           alert('Error: ' + result.error);
+           console.error('Print error:', result.error);
+           showToast('Print failed', 'error');
          }
          
-       } catch(e) {
-         alert('Error printing image: ' + e.message);
-       } finally {
+                } catch(e) {
+           console.error('Error printing image:', e.message);
+         } finally {
          // Reset button
          const submitBtn = document.getElementById('submitPrint');
          submitBtn.innerHTML = '<i class="fas fa-print"></i> Print Image';
          submitBtn.disabled = false;
        }
      });
+
+    // Clean toast notification system
+    function showToast(message, type = 'info', duration = 3000) {
+      const toast = document.createElement('div');
+      toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: var(--card-surface);
+        border: 1px solid var(--border-color);
+        border-left: 4px solid var(--accent-color);
+        color: var(--text-primary);
+        padding: 8px 12px;
+        border-radius: 3px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        z-index: 2000;
+        font-size: 11px;
+        max-width: 280px;
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+        opacity: 0.95;
+      `;
+      
+      if (type === 'error') {
+        toast.style.borderLeftColor = 'var(--danger-color)';
+      } else if (type === 'success') {
+        toast.style.borderLeftColor = 'var(--success-color)';
+      } else if (type === 'warning') {
+        toast.style.borderLeftColor = 'var(--warning-color)';
+      }
+      
+      toast.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'exclamation-triangle' : 'info-circle'}" style="font-size: 10px;"></i>
+          <span>${message}</span>
+        </div>
+      `;
+      
+      document.body.appendChild(toast);
+      
+      // Slide in
+      setTimeout(() => {
+        toast.style.transform = 'translateX(0)';
+      }, 10);
+      
+      // Auto-remove
+      setTimeout(() => {
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+          if (toast.parentNode) {
+            toast.remove();
+          }
+        }, 300);
+      }, duration);
+    }
 
     // Utils
     function loadImage(src){
@@ -2191,21 +2264,22 @@
      // Preset handlers
      if (btnSavePreset) btnSavePreset.addEventListener('click', async()=>{
        try {
-         const name = prompt('Preset name'); if (!name) return;
+         const name = `Preset_${Date.now()}`; // Auto-generate preset name
          const payload = { name, modality: (currentStudy&&currentStudy.modality)||'', window_width: ww, window_level: wl, inverted };
          await fetch('/dicom-viewer/api/presets/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+         showToast('Preset saved', 'success', 2000);
        } catch(_){}
      });
      if (btnLoadPreset) btnLoadPreset.addEventListener('click', async()=>{
        try {
          const r = await fetch(`/dicom-viewer/api/presets/?modality=${encodeURIComponent((currentStudy&&currentStudy.modality)||'')}`);
          const j = await r.json();
-         const names = (j.presets||[]).map(p=>p.name);
-         if (!names.length) return;
-         const sel = prompt('Load preset by name:\n' + names.join('\n'));
-         const p = (j.presets||[]).find(pp=>pp.name===sel);
-         if (!p) return;
+         const presets = (j.presets||[]);
+         if (!presets.length) return;
+         // Load the most recent preset automatically
+         const p = presets[presets.length - 1];
          ww = p.window_width; wl = p.window_level; inverted = !!p.inverted; wwSlider.value=ww; wlSlider.value=wl; wwNum.value=Math.round(ww); wlNum.value=Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw();
+         showToast(`Preset "${p.name}" loaded`, 'success', 2000);
        } catch(_){}
      });
    })();

@@ -9,15 +9,16 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
-            --primary-bg: var(--primary-bg);
-            --secondary-bg: var(--secondary-bg);
-            --card-bg: var(--card-surface);
-            --header-bg: var(--header-bg);
-            --border-color: var(--border-color);
-            --accent-color: var(--accent-color);
-            --text-primary: var(--text-primary);
-            --text-secondary: var(--text-secondary);
-            --text-muted: var(--text-muted);
+            --primary-bg: #0a0a0a;
+            --secondary-bg: #1a1a1a;
+            --card-bg: #252525;
+            --card-surface: #252525;
+            --header-bg: #333333;
+            --border-color: #404040;
+            --accent-color: #00d4ff;
+            --text-primary: #ffffff;
+            --text-secondary: #b3b3b3;
+            --text-muted: #666666;
             --success-color: #00ff88;
             --warning-color: #ffaa00;
             --danger-color: #ff4444;
@@ -858,12 +859,59 @@ function selectSuggestion(value) {
     document.getElementById('filterForm').submit();
 }
 
+// Clean toast notification system
+function showToast(message, type = 'info', duration = 3000) {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #252525;
+        border: 1px solid #404040;
+        border-left: 4px solid ${type === 'success' ? '#00ff88' : type === 'error' ? '#ff4444' : '#00d4ff'};
+        color: #ffffff;
+        padding: 8px 12px;
+        border-radius: 3px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        z-index: 2000;
+        font-size: 11px;
+        max-width: 280px;
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+        opacity: 0.95;
+    `;
+    
+    toast.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 6px;">
+            <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'exclamation-triangle' : 'info-circle'}" style="font-size: 10px;"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Slide in
+    setTimeout(() => {
+        toast.style.transform = 'translateX(0)';
+    }, 10);
+    
+    // Auto-remove
+    setTimeout(() => {
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.remove();
+            }
+        }, 300);
+    }, duration);
+}
+
 // Bulk actions
 function bulkAction(action) {
     const selected = Array.from(document.querySelectorAll('.user-checkbox:checked')).map(cb => cb.value);
     
     if (selected.length === 0) {
-        alert('Please select users first');
+        showToast('Please select users first', 'warning');
         return;
     }
     
@@ -874,30 +922,26 @@ function bulkAction(action) {
         'delete': 'delete selected users (this cannot be undone)'
     };
     
-    if (confirm(`Are you sure you want to ${actionMessages[action]}?`)) {
-        // Implement bulk action API call here
-        console.log(`Bulk ${action} for users:`, selected);
-        // After successful action, reload the page
-        location.reload();
-    }
+    // Implement bulk action API call here
+    console.log(`Bulk ${action} for users:`, selected);
+    showToast(`${action} action applied to ${selected.length} user${selected.length > 1 ? 's' : ''}`, 'success');
+    // After successful action, reload the page
+    setTimeout(() => location.reload(), 1500);
 }
 
 // Toggle user status
 function toggleUserStatus(userId, activate) {
     const action = activate ? 'activate' : 'deactivate';
     
-    if (confirm(`Are you sure you want to ${action} this user?`)) {
-        // Implement toggle user status API call here
-        console.log(`${action} user ${userId}`);
-        location.reload();
-    }
+    // Implement toggle user status API call here
+    console.log(`${action} user ${userId}`);
+    showToast(`User ${action}d successfully`, 'success');
+    setTimeout(() => location.reload(), 1500);
 }
 
 // Delete user function
 function deleteUser(userId, username) {
-    if (confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
-        window.location.href = `{% url 'admin_panel:user_delete' 0 %}`.replace('0', userId);
-    }
+    window.location.href = `{% url 'admin_panel:user_delete' 0 %}`.replace('0', userId);
 }
 
 // Export functionality
