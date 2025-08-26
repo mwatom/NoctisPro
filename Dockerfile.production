@@ -24,6 +24,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl-dev \
     libsqlite3-dev \
     libgdcm-dev \
+    libcups2-dev \
     git \
     && rm -rf /var/lib/apt/lists/*
 
@@ -58,6 +59,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl3 \
     libsqlite3-0 \
     libgdcm3.0 \
+    libcups2 \
     curl \
     netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*

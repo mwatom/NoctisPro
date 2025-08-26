@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
     libffi-dev \
     libxml2-dev \
     libxslt1-dev \
+    libcups2-dev \
     git \
     curl \
     wget \
