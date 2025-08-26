@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from attachment_viewer import api_view_attachment, attachment_viewer_page, api_attachment_search
+# from attachment_viewer import api_view_attachment, attachment_viewer_page, api_attachment_search
 
 app_name = 'worklist'
 
@@ -19,10 +19,10 @@ urlpatterns = [
     path('attachment/<int:attachment_id>/comments/', views.attachment_comments, name='attachment_comments'),
     path('attachment/<int:attachment_id>/delete/', views.delete_attachment, name='delete_attachment'),
     
-    # Attachment viewer
-    path('attachment/<int:attachment_id>/viewer/', attachment_viewer_page, name='attachment_viewer'),
-    path('api/attachment/<int:attachment_id>/view/', api_view_attachment, name='api_view_attachment'),
-    path('api/attachment/<int:attachment_id>/search/', api_attachment_search, name='api_attachment_search'),
+    # Attachment viewer - COMMENTED OUT until functions are implemented
+    # path('attachment/<int:attachment_id>/viewer/', attachment_viewer_page, name='attachment_viewer'),
+    # path('api/attachment/<int:attachment_id>/view/', api_view_attachment, name='api_view_attachment'),
+    # path('api/attachment/<int:attachment_id>/search/', api_attachment_search, name='api_attachment_search'),
     
     # API endpoints
     path('api/studies/', views.api_studies, name='api_studies'),
