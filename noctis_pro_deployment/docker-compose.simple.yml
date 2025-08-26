@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  # Database
+  db:
+    image: postgres:16-alpine
+    container_name: noctis_db
+    environment:
+      POSTGRES_DB: noctis_pro
+      POSTGRES_USER: noctis_user
+      POSTGRES_PASSWORD: noctis_pass_2024
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: noctis_redis
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # Web Application
+  web:
+    build: .
+    container_name: noctis_web
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - POSTGRES_DB=noctis_pro
+      - POSTGRES_USER=noctis_user
+      - POSTGRES_PASSWORD=noctis_pass_2024
+      - POSTGRES_HOST=db
+      - REDIS_URL=redis://redis:6379/0
+      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+    volumes:
+      - media_files:/app/media
+      - static_files:/app/staticfiles
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+
+  # Background Tasks
+  celery:
+    build: .
+    container_name: noctis_celery
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - POSTGRES_DB=noctis_pro
+      - POSTGRES_USER=noctis_user
+      - POSTGRES_PASSWORD=noctis_pass_2024
+      - POSTGRES_HOST=db
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - media_files:/app/media
+      - .:/app
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    command: celery -A noctis_pro worker --loglevel=info
+
+  # DICOM Receiver
+  dicom:
+    build: .
+    container_name: noctis_dicom
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - POSTGRES_DB=noctis_pro
+      - POSTGRES_USER=noctis_user
+      - POSTGRES_PASSWORD=noctis_pass_2024
+      - POSTGRES_HOST=db
+    volumes:
+      - media_files:/app/media
+      - dicom_storage:/app/dicom_storage
+      - .:/app
+    ports:
+      - "11112:11112"
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    command: python dicom_receiver.py --port 11112 --aet NOCTIS_SCP --bind 0.0.0.0
+
+volumes:
+  db_data:
+  redis_data:
+  media_files:
+  static_files:
+  dicom_storage:
+
+networks:
+  default:
+    name: noctis_network
