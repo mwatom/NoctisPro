@@ -67,10 +67,10 @@ case $ACCESS_METHOD in
         log_info "Updating Nginx configuration for domain: $DOMAIN_NAME"
         
         # Update Django settings
-        sed -i "s/DOMAIN_NAME=noctis-server.local/DOMAIN_NAME=$DOMAIN_NAME/" $PROJECT_DIR/.env
+        sed -i "s#DOMAIN_NAME=noctis-server.local#DOMAIN_NAME=$DOMAIN_NAME#" $PROJECT_DIR/.env
         
         # Update Nginx configuration
-        sed -i "s/server_name .*/server_name $DOMAIN_NAME;/" /etc/nginx/sites-available/noctis-pro
+        sed -i "s#server_name .*#server_name $DOMAIN_NAME;#" /etc/nginx/sites-available/noctis-pro
         
         # Get SSL certificate
         log_info "Obtaining SSL certificate for $DOMAIN_NAME..."
@@ -81,7 +81,7 @@ case $ACCESS_METHOD in
             sed -i 's/ENABLE_SSL=false/ENABLE_SSL=true/' $PROJECT_DIR/.env
             
             # Update allowed hosts
-            sed -i "s/ALLOWED_HOSTS=.*/ALLOWED_HOSTS=$DOMAIN_NAME,localhost,127.0.0.1/" $PROJECT_DIR/.env
+            sed -i "s#ALLOWED_HOSTS=.*#ALLOWED_HOSTS=$DOMAIN_NAME,localhost,127.0.0.1#" $PROJECT_DIR/.env
             
             # Restart services
             systemctl restart noctis-django noctis-daphne nginx
@@ -161,8 +161,8 @@ EOF
         systemctl start wg-quick@wg0
         
         # Update Nginx to only listen on VPN interface
-        sed -i 's/listen 80;/listen 10.0.0.1:80;/' /etc/nginx/sites-available/noctis-pro
-        sed -i 's/listen 443 ssl;/listen 10.0.0.1:443 ssl;/' /etc/nginx/sites-available/noctis-pro
+        sed -i 's#listen 80;#listen 10.0.0.1:80;#' /etc/nginx/sites-available/noctis-pro
+        sed -i 's#listen 443 ssl;#listen 10.0.0.1:443 ssl;#' /etc/nginx/sites-available/noctis-pro
         
         systemctl reload nginx
         
@@ -213,7 +213,7 @@ EOF
         ufw --force enable
         
         # Update Nginx to listen only on private IP
-        sed -i "s/listen 80;/listen 192.168.100.15:80;/" /etc/nginx/sites-available/noctis-pro
+        sed -i "s#listen 80;#listen 192.168.100.15:80;#" /etc/nginx/sites-available/noctis-pro
         
         systemctl reload nginx
         

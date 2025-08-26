@@ -381,8 +381,8 @@ setup_standard_deployment() {
     cp deploy_noctis_production.sh deploy_internet_production.sh
     
     # Update configuration for internet deployment
-    sed -i "s/DOMAIN_NAME=\"noctis-server.local\"/DOMAIN_NAME=\"$domain\"/" deploy_internet_production.sh
-    sed -i "s/SERVER_IP=\"192.168.100.15\"/SERVER_IP=\"$PUBLIC_IP\"/" deploy_internet_production.sh
+    sed -i "s#DOMAIN_NAME=\"noctis-server.local\"#DOMAIN_NAME=\"$domain\"#" deploy_internet_production.sh
+    sed -i "s#SERVER_IP=\"192.168.100.15\"#SERVER_IP=\"$PUBLIC_IP\"#" deploy_internet_production.sh
     
     # Add internet security configurations
     cat >> deploy_internet_production.sh << 'EOF'
