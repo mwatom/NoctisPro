@@ -107,10 +107,10 @@ echo "System configuration completed!"
 EOF
 
 # Replace placeholders in the configuration script
-sed -i "s/TIMEZONE_PLACEHOLDER/$TIMEZONE/g" /tmp/configure_system.sh
-sed -i "s/HOSTNAME_PLACEHOLDER/$HOSTNAME/g" /tmp/configure_system.sh
-sed -i "s/USERNAME_PLACEHOLDER/$USERNAME/g" /tmp/configure_system.sh
-sed -i "s|DISK_PLACEHOLDER|${TARGET_PARTITION%?}|g" /tmp/configure_system.sh  # Remove last character (partition number)
+sed -i "s#TIMEZONE_PLACEHOLDER#$TIMEZONE#g" /tmp/configure_system.sh
+sed -i "s#HOSTNAME_PLACEHOLDER#$HOSTNAME#g" /tmp/configure_system.sh
+sed -i "s#USERNAME_PLACEHOLDER#$USERNAME#g" /tmp/configure_system.sh
+sed -i "s#DISK_PLACEHOLDER#${TARGET_PARTITION%?}#g" /tmp/configure_system.sh  # Remove last character (partition number)
 
 # Copy script to chroot environment and make executable
 sudo cp /tmp/configure_system.sh $TARGET_MOUNT/tmp/configure_system.sh

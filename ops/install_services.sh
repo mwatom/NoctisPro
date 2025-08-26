@@ -210,8 +210,8 @@ if [ -n "$DUCK_DOMAIN" ]; then
 	SERVER_NAMES="$SERVER_NAMES $DUCK_DOMAIN"
 fi
 NGINX_SITE="/etc/nginx/sites-available/noctis"
-sed -e "s|{{SERVER_NAME}}|$SERVER_NAMES|g" \
-	-e "s|{{APP_DIR}}|$APP_DIR|g" \
+sed -e "s#{{SERVER_NAME}}#$SERVER_NAMES#g" \
+	-e "s#{{APP_DIR}}#$APP_DIR#g" \
 	"$APP_DIR/ops/nginx-noctis.conf.template" > "$NGINX_SITE"
 ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/noctis
 rm -f /etc/nginx/sites-enabled/default
