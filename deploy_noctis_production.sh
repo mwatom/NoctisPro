@@ -286,7 +286,7 @@ systemctl restart postgresql
 
 # Configure Redis
 log_info "Configuring Redis..."
-sed -i "s/# requirepass foobared/requirepass $REDIS_PASSWORD/" /etc/redis/redis.conf
+sed -i "s|# requirepass foobared|requirepass $REDIS_PASSWORD|" /etc/redis/redis.conf
 sed -i "s/bind 127.0.0.1 ::1/bind 127.0.0.1/" /etc/redis/redis.conf
 systemctl enable redis-server
 systemctl restart redis-server

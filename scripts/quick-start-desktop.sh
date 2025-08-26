@@ -117,7 +117,7 @@ setup_environment() {
             
             # Replace the default secret key
             if command -v sed &> /dev/null; then
-                sed -i "s/dev-secret-key-change-before-production-use/$SECRET_KEY/" "$ENV_FILE"
+                sed -i "s#dev-secret-key-change-before-production-use#$SECRET_KEY#" "$ENV_FILE"
                 log "Generated random secret key"
             fi
             
