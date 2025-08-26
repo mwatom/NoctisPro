@@ -153,7 +153,7 @@ create_environment_simple() {
             fi
             
             # Replace the secret key
-            sed -i "s/dev-secret-key-change-before-production-use/$SECRET_KEY/" "$ENV_FILE"
+            sed -i "s#dev-secret-key-change-before-production-use#$SECRET_KEY#" "$ENV_FILE"
             
             log "Configuration file created with secure settings!"
         else

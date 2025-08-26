@@ -179,7 +179,7 @@ setup_noctis() {
             SECRET_KEY=$(openssl rand -base64 32 2>/dev/null || python3 -c "import secrets; print(secrets.token_urlsafe(32))" 2>/dev/null || echo "dev-secret-key-$(date +%s)")
             
             # Replace the default secret key
-            sed -i "s/dev-secret-key-change-before-production-use/$SECRET_KEY/" .env
+            sed -i "s#dev-secret-key-change-before-production-use#$SECRET_KEY#" .env
             log "Environment file created with random secret key"
         else
             error "Environment template not found: .env.desktop.example"

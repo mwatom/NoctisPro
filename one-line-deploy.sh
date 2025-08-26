@@ -103,8 +103,8 @@ volumes:
   db_data:
 EOF
 
-# Replace the secret key
-sed -i "s/your-secret-key-here/$SECRET_KEY/g" docker-compose.instant.yml
+# Replace the secret key (using # as delimiter to avoid issues with base64 / characters)
+sed -i "s#your-secret-key-here#$SECRET_KEY#g" docker-compose.instant.yml
 
 success "Application configured"
 
