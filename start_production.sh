@@ -29,8 +29,8 @@ echo "   Cache: Redis (localhost:6379)"
 echo "   Server: http://0.0.0.0:8000"
 echo ""
 
-# Navigate to workspace
-cd /workspace
+# Navigate to workspace (use current directory)
+cd "$(dirname "$0")"
 
 # Activate virtual environment
 source venv/bin/activate
@@ -44,4 +44,8 @@ echo "   Press Ctrl+C to stop"
 echo "   Access at: http://localhost:8000"
 echo ""
 
+# Run migrations
+python manage.py migrate
+
+# Start Django server
 python manage.py runserver 0.0.0.0:8000

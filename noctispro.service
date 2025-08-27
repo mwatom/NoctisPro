@@ -1,0 +1,20 @@
+[Unit]
+Description=NoctisPro Django Application
+After=network.target postgresql.service redis-server.service
+Wants=postgresql.service redis-server.service
+
+[Service]
+Type=exec
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/workspace
+Environment=PATH=/workspace/venv/bin
+ExecStartPre=/bin/bash -c 'cd /workspace && source venv/bin/activate && python manage.py migrate'
+ExecStart=/bin/bash -c 'cd /workspace && source venv/bin/activate && source .env.production && python manage.py runserver 0.0.0.0:8000'
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
