@@ -368,7 +368,7 @@ sudo ./setup_secure_access.sh
 
 4. **🔒 Local Network Only** (No internet access)
    - Maximum security for facility-only use
-   - **Local Access**: `http://192.168.100.15`
+   - **Local Access**: `http://192.168.100.15` or `http://192.168.100.15:2222`
    - No internet exposure
 
 #### Step 8: Verify Installation
@@ -397,7 +397,7 @@ df -h
 #### Step 9: First Login and Configuration
 
 1. **Access the application:**
-   - **Local Access**: `http://192.168.100.15` (always available)
+   - **Local Access**: `http://192.168.100.15` or `http://192.168.100.15:2222` (always available)
    - **Internet Access**: `https://your-domain.com` (after running setup_secure_access.sh)
    - **Default admin credentials**:
      - Username: `admin`

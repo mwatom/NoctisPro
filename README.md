@@ -368,7 +368,7 @@ sudo ./setup_secure_access.sh
 
 4. **🔒 Local Network Only** (No internet access)
    - Maximum security for facility-only use
-   - **Local Access**: `http://192.168.100.15`
+   - **Local Access**: `http://192.168.100.15` or `http://192.168.100.15:2222`
    - No internet exposure
 
 #### Step 8: Verify Installation
@@ -397,7 +397,7 @@ df -h
 #### Step 9: First Login and Configuration
 
 1. **Access the application:**
-   - **Local Access**: `http://192.168.100.15` (always available)
+   - **Local Access**: `http://192.168.100.15` or `http://192.168.100.15:2222` (always available)
    - **Internet Access**: `https://your-domain.com` (after running setup_secure_access.sh)
    - **Default admin credentials**:
      - Username: `admin`
@@ -580,7 +580,7 @@ sudo ./setup_secure_access.sh
 - **🌐 Domain + HTTPS**: `https://your-domain.com` (requires domain)
 - **☁️ Cloudflare Tunnel**: Secure Cloudflare URL (no domain needed)
 - **🔐 VPN Access**: Private VPN connection for remote access
-- **🔒 Local Only**: `http://192.168.100.15` (local network only)
+- **🔒 Local Only**: `http://192.168.100.15` or `http://192.168.100.15:2222` (local network only)
 
 **Your access information is saved to:**
 ```bash
@@ -1177,7 +1177,7 @@ sudo certbot renew --force-renewal
 ### 🔍 Post-Deployment Validation
 
 **System Verification:**
-- [ ] Web interface accessible: `http://192.168.100.15`
+- [ ] Web interface accessible: `http://192.168.100.15` and `http://192.168.100.15:2222`
 - [ ] Admin login works (admin/admin123)
 - [ ] Admin password changed immediately
 - [ ] DICOM viewer loads correctly
@@ -1466,7 +1466,7 @@ python3 validate_production_simple.py
 - **🌐 Domain + HTTPS**: `https://your-domain.com` (requires domain)
 - **☁️ Cloudflare Tunnel**: Secure Cloudflare URL (no domain needed)
 - **🔐 VPN Access**: Private VPN connection for remote access
-- **🔒 Local Only**: `http://192.168.100.15` (local network only)
+- **🔒 Local Only**: `http://192.168.100.15` or `http://192.168.100.15:2222` (local network only)
 
 **Your access information is saved to:**
 ```bash

@@ -561,6 +561,7 @@ log_info "Configuring firewall..."
 ufw --force enable
 ufw allow ssh
 ufw allow 'Nginx Full'
+ufw allow 2222/tcp
 ufw allow from 192.168.100.0/24
 
 # Configure fail2ban
@@ -739,7 +740,9 @@ echo "=== Deployment Information ==="
 echo "Server IP: $SERVER_IP"
 echo "Domain: $DOMAIN_NAME"
 echo "HTTP URL: http://$SERVER_IP"
+echo "HTTP URL (Port 2222): http://$SERVER_IP:2222"
 echo "Admin URL: http://$SERVER_IP/admin"
+echo "Admin URL (Port 2222): http://$SERVER_IP:2222/admin"
 echo "Admin Username: admin"
 echo "Admin Password: admin123"
 echo
@@ -763,8 +766,10 @@ echo "View logs: journalctl -u noctis-django -f"
 echo "Restart services: systemctl restart noctis-django noctis-daphne noctis-celery"
 echo
 echo "=== ACCESS INFORMATION ==="
-echo "🌐 Local Access: http://$SERVER_IP"
-echo "🔧 Admin Panel: http://$SERVER_IP/admin"
+echo "🌐 Local Access: http://$SERVER_IP (port 80)"
+echo "🌐 Local Access: http://$SERVER_IP:2222 (port 2222)"
+echo "🔧 Admin Panel: http://$SERVER_IP/admin (port 80)"
+echo "🔧 Admin Panel: http://$SERVER_IP:2222/admin (port 2222)"
 echo "🔗 Local Webhook: http://$SERVER_IP/webhook"
 echo
 echo "=== INTERNET ACCESS SETUP ==="
