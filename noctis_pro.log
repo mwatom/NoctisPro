@@ -4,3 +4,9 @@ Watching for file changes with StatReloader
 [32mHTTP GET / 302 [0.00, 172.30.0.2:35372][0m
 [32mHTTP HEAD / 302 [0.00, 127.0.0.1:59762][0m
 [32mHTTP HEAD / 302 [0.00, 172.30.0.2:44598][0m
+Watching for file changes with StatReloader
+[32mHTTP HEAD / 302 [0.01, 127.0.0.1:48590][0m
+[32mHTTP GET / 302 [0.01, 127.0.0.1:49190][0m
+[32mHTTP GET / 302 [0.00, 172.30.0.2:49798][0m
+Watching for file changes with StatReloader
+[32mHTTP HEAD / 302 [0.01, 127.0.0.1:34160][0m
