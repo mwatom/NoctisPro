@@ -1,0 +1,18 @@
+[Unit]
+Description=NoctisPro Ngrok Tunnel
+After=network.target noctispro.service
+Wants=noctispro.service
+
+[Service]
+Type=exec
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/workspace
+ExecStart=/usr/local/bin/ngrok http 8000 --log=stdout
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
