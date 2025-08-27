@@ -33,7 +33,7 @@ step() { echo -e "${BLUE}🔄 $1${NC}"; }
 [[ $EUID -ne 0 ]] && { echo -e "${RED}❌ Run as root: sudo bash one-line-deploy.sh${NC}"; exit 1; }
 
 step "Installing system dependencies (1/6)..."
-apt update >/dev/null 2>&1 && apt install -y curl wget git docker.io docker-compose nginx python3-pip >/dev/null 2>&1
+apt update >/dev/null 2>&1 && apt install -y curl wget git docker.io docker-compose nginx python3-pip ufw >/dev/null 2>&1
 systemctl enable --now docker >/dev/null 2>&1
 success "Dependencies installed"
 
@@ -57,7 +57,7 @@ fi
 # Generate secure credentials
 SECRET_KEY=$(openssl rand -base64 50)
 
-# Create simple docker-compose for instant deployment
+# Create simple docker-compose for instant deployment (now includes DICOM receiver)
 cat > docker-compose.instant.yml << 'EOF'
 version: '3.8'
 services:
@@ -99,14 +99,48 @@ services:
       - ./media:/app/media
       - ./staticfiles:/app/staticfiles
 
+  dicom_receiver:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=your-secret-key-here
+      - DJANGO_SETTINGS_MODULE=noctis_pro.settings.production
+      - POSTGRES_DB=noctis_pro
+      - POSTGRES_USER=noctis
+      - POSTGRES_PASSWORD=noctis123
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./media:/app/media
+      - ./dicom_storage:/app/dicom_storage
+    ports:
+      - "11112:11112"
+    depends_on:
+      - db
+      - redis
+    command: python dicom_receiver.py --port 11112 --aet NOCTIS_SCP --bind 0.0.0.0
+
 volumes:
   db_data:
+  
+  dicom_storage:
 EOF
 
 # Replace the secret key (using # as delimiter to avoid issues with base64 / characters)
 sed -i "s#your-secret-key-here#$SECRET_KEY#g" docker-compose.instant.yml
 
 success "Application configured"
+
+# If UFW is active, allow required ports (do not enable or change policies here)
+if command -v ufw >/dev/null 2>&1; then
+  if ufw status 2>/dev/null | grep -qi active; then
+    ufw allow 8000/tcp >/dev/null 2>&1 || true
+    ufw allow 11112/tcp >/dev/null 2>&1 || true
+  fi
+fi
 
 step "Building and starting Noctis Pro (4/6)..."
 docker-compose -f docker-compose.instant.yml up -d --build >/dev/null 2>&1
@@ -227,6 +261,10 @@ echo -e "${GREEN}
 ╚══════════════════════════════════════════════════════════════════╝
 ${NC}"
 
+LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+echo -e "${CYAN}💻 Local access (same network):${NC}"
+echo -e "${YELLOW}   👉 http://$LOCAL_IP:8000${NC}"
+
 if [ ! -z "$NGROK_URL" ]; then
     echo -e "${CYAN}🌐 Your system is accessible at:${NC}"
     echo -e "${YELLOW}   👉 $NGROK_URL${NC}"
@@ -245,6 +283,11 @@ echo -e "${PURPLE}🛠️  Management Commands:${NC}"
 echo "   • noctis-status          - Show system status and URL"
 echo "   • systemctl restart noctis-instant  - Restart system"
 echo "   • docker-compose -f /opt/noctis_pro/docker-compose.instant.yml logs -f"
+echo ""
+echo -e "${PURPLE}📡 DICOM Receiver:${NC}"
+echo "   • AE Title: NOCTIS_SCP"
+echo "   • Port: 11112 (TCP)"
+echo "   • Send from modality to: $LOCAL_IP:11112"
 echo ""
 echo -e "${GREEN}✅ Your medical imaging system is now accessible from anywhere in the world!${NC}"
 echo -e "${YELLOW}⚡ Total deployment time: Under 5 minutes${NC}"
