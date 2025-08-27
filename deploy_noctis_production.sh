@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # NoctisPro Production Deployment Script for Ubuntu Server
-# Server: noctis-server (102.215.33.50)
+# Server: noctis-server (192.168.100.15)
 # This script sets up a complete production environment with HTTPS
 
 set -e  # Exit on any error
@@ -18,7 +18,7 @@ PROJECT_NAME="noctis_pro"
 PROJECT_USER="noctis"
 PROJECT_DIR="/opt/noctis_pro"
 DOMAIN_NAME="noctis-server.local"  # Change this to your actual domain
-SERVER_IP="102.215.33.50"
+SERVER_IP="192.168.100.15"
 GITHUB_REPO="https://github.com/mwatom/NoctisPro.git"
 
 # Database configuration
@@ -347,7 +347,7 @@ cat > $PROJECT_DIR/.env << EOF
 # Django Configuration
 SECRET_KEY=$DJANGO_SECRET_KEY
 DEBUG=False
-ALLOWED_HOSTS=noctis-server,102.215.33.50,localhost,127.0.0.1,$DOMAIN_NAME
+ALLOWED_HOSTS=noctis-server,192.168.100.15,localhost,127.0.0.1,$DOMAIN_NAME
 
 # Database Configuration
 DB_ENGINE=django.db.backends.postgresql
