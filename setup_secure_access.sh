@@ -196,7 +196,7 @@ EOF
         systemctl restart noctis-django nginx
         
         log_success "Reverse proxy configuration applied"
-        log_info "Configure your reverse proxy to forward to: http://192.168.100.15"
+        log_info "Configure your reverse proxy to forward to: http://102.215.33.50"
         ;;
         
     5)
@@ -213,12 +213,12 @@ EOF
         ufw --force enable
         
         # Update Nginx to listen only on private IP
-        sed -i "s#listen 80;#listen 192.168.100.15:80;#" /etc/nginx/sites-available/noctis-pro
+        sed -i "s#listen 80;#listen 102.215.33.50:80;#" /etc/nginx/sites-available/noctis-pro
         
         systemctl reload nginx
         
         log_success "Local network access configured"
-        log_info "Access via: http://192.168.100.15 (local network only)"
+        log_info "Access via: http://102.215.33.50 (local network only)"
         ;;
         
     *)
@@ -257,7 +257,7 @@ EOF
     3)
         cat >> $PROJECT_DIR/SECURE_ACCESS_INFO.txt << EOF
 - VPN-only access via WireGuard
-- VPN Server: 192.168.100.15:51820
+- VPN Server: 102.215.33.50:51820
 - Internal URL: http://10.0.0.1
 - Client configuration required
 EOF
@@ -266,13 +266,13 @@ EOF
         cat >> $PROJECT_DIR/SECURE_ACCESS_INFO.txt << EOF
 - Reverse proxy configuration applied
 - Access via: https://$PROXY_DOMAIN
-- Backend: http://192.168.100.15
+- Backend: http://102.215.33.50
 EOF
         ;;
     5)
         cat >> $PROJECT_DIR/SECURE_ACCESS_INFO.txt << EOF
 - Local network access only
-- URL: http://192.168.100.15
+- URL: http://102.215.33.50
 - Restricted to private IP ranges
 EOF
         ;;

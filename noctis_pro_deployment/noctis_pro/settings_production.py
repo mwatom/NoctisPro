@@ -19,7 +19,7 @@ DEBUG = False
 
 ALLOWED_HOSTS = [
     'noctis-server',
-    '192.168.100.15',
+    '102.215.33.50',
     'localhost',
     '127.0.0.1',
 ]
