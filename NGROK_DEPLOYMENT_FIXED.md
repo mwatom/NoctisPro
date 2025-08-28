@@ -88,10 +88,29 @@ print(f"Fixed! Admin role: {admin.role}, is_admin(): {admin.is_admin()}")
 2. Get your auth token: https://dashboard.ngrok.com/get-started/your-authtoken
 3. Configure: `ngrok config add-authtoken YOUR_TOKEN`
 
-### Custom Subdomain (Paid Feature)
+### 🌟 **NEW: Static URLs (Fixed Every Time!)**
+**No more changing URLs!** Set up a fixed ngrok URL that never changes:
+
 ```bash
+# Quick setup for static URLs
+./setup_ngrok_static.sh
+```
+
+**Options**:
+- 🆓 **Free**: Random URLs (changes each restart)
+- 💰 **Paid**: Static subdomain (`noctispro.ngrok.io`) - **RECOMMENDED**
+- 🌐 **Paid**: Custom domain (`noctis.yourdomain.com`)
+
+See detailed guide: **[NGROK_STATIC_SETUP.md](./NGROK_STATIC_SETUP.md)**
+
+### Custom Subdomain (Paid Feature) - AUTOMATED
+```bash
+# Old way (manual):
 ngrok http 8000 --subdomain=noctispro
-# Access at: https://noctispro.ngrok.io
+
+# New way (automated with static setup):
+./setup_ngrok_static.sh  # Choose option 1
+./start_with_ngrok.sh     # Always uses: https://noctispro.ngrok.io
 ```
 
 ### ngrok Web Interface
