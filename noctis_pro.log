@@ -61,3 +61,8 @@ HTTP GET /admin/ 302 [0.00, 127.0.0.1:38174]
 HTTP GET /worklist/ 302 [0.00, 127.0.0.1:38174]
 HTTP GET /login/?next=/worklist/ 200 [0.00, 127.0.0.1:38174]
 Method Not Allowed (HEAD): /health/simple/
+[32mHTTP GET / 302 [0.01, 127.0.0.1:47936][0m
+[32mHTTP GET / 302 [0.01, 127.0.0.1:47938][0m
+[32mHTTP GET /admin/ 302 [0.00, 127.0.0.1:53108][0m
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader

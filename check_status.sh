@@ -1,40 +1,24 @@
 #!/bin/bash
-
-echo "🔍 NoctisPro Status Check"
-echo "========================"
+echo "📊 NoctisPro Production Status"
+echo "============================"
 echo ""
 
-# Check processes
-echo "📊 Process Status:"
-if pgrep -f "manage.py runserver" > /dev/null; then
-    echo "✅ Django: Running"
-else
-    echo "❌ Django: Not Running"
-fi
-
-if pgrep -f "ngrok" > /dev/null; then
-    echo "✅ Ngrok: Running"
-else
-    echo "❌ Ngrok: Not Running"
-fi
+echo "🎯 Service Status:"
+sudo systemctl status noctispro-production.service --no-pager -l
 
 echo ""
-echo "🌐 Access URLs:"
-echo "   Local: http://localhost:80"
-
-if [ -f "/workspace/current_ngrok_url.txt" ]; then
-    URL=$(cat "/workspace/current_ngrok_url.txt" 2>/dev/null)
-    if [ ! -z "$URL" ] && [ "$URL" != "LOCAL_ONLY" ]; then
-        echo "   Remote: $URL"
-    else
-        echo "   Remote: Not available"
-    fi
-else
-    echo "   Remote: Not available"
-fi
+echo "🌐 Ngrok Tunnel:"
+NGROK_URL=$(curl -s http://localhost:4040/api/tunnels 2>/dev/null | jq -r '.tunnels[0].public_url' 2>/dev/null || echo "Not available")
+echo "   Current URL: $NGROK_URL"
 
 echo ""
-echo "📝 Logs:"
-echo "   Container logs: tail -f /workspace/container_startup.log"
-echo "   Django logs:    tail -f /workspace/django.log"
-echo "   Ngrok logs:     tail -f /workspace/ngrok.log"
+echo "📱 Quick Access:"
+echo "   Application: https://colt-charmed-lark.ngrok-free.app"
+echo "   Admin Panel: https://colt-charmed-lark.ngrok-free.app/admin/"
+
+echo ""
+echo "🔧 Management:"
+echo "   Start:   ./start_production.sh"
+echo "   Stop:    ./stop_production.sh"
+echo "   Restart: sudo systemctl restart noctispro-production.service"
+echo "   Logs:    sudo journalctl -u noctispro-production.service -f"
