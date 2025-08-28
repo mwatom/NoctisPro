@@ -11,3 +11,14 @@ Watching for file changes with StatReloader
 Watching for file changes with StatReloader
 [32mHTTP HEAD / 302 [0.01, 127.0.0.1:34160][0m
 Watching for file changes with StatReloader
+[32mHTTP HEAD / 302 [0.01, 127.0.0.1:39668][0m
+Not Found: /dicom_viewer/api/image/1/display/
+Not Found: /dicom_viewer/api/image/1/display/
+Not Found: /dicom_viewer/api/image/1/display/
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+[32mHTTP GET /dicom-viewer/ 302 [0.01, 127.0.0.1:58758][0m
+[32mHTTP HEAD /dicom-viewer/ 302 [0.00, 127.0.0.1:46724][0m
+[32mHTTP HEAD /dicom-viewer/web/ 302 [0.00, 127.0.0.1:46738][0m

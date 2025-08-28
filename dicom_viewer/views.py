@@ -826,13 +826,26 @@ def api_dicom_image_display(request, image_id):
                 return fallback
             flat = arr.flatten()
             try:
+                min_val = float(np.min(flat))
+                max_val = float(np.max(flat))
                 p1 = float(np.percentile(flat, 1))
                 p99 = float(np.percentile(flat, 99))
+                
+                # For uniform images (min == max), use a reasonable window around the value
+                if min_val == max_val:
+                    if min_val == 0:
+                        # For all-zero images, use a small window around zero
+                        return 100.0, 50.0
+                    else:
+                        # For uniform non-zero images, center window on the value
+                        return max(100.0, min_val * 2), min_val
+                
+                # For normal images with variation
+                ww = max(100.0, p99 - p1)  # Minimum window width of 100
+                wl = (p99 + p1) / 2.0
+                return ww, wl
             except Exception:
                 return fallback
-            ww = max(1.0, p99 - p1)
-            wl = (p99 + p1) / 2.0
-            return ww, wl
         
         default_window_width = None
         default_window_level = None
@@ -889,22 +902,52 @@ def api_dicom_image_display(request, image_id):
             except Exception:
                 return fallback
         
+        # Helper function to safely convert DICOM values to JSON-serializable types
+        def safe_dicom_value(value, default):
+            try:
+                if hasattr(value, '__iter__') and not isinstance(value, str):
+                    return [float(x) for x in value]
+                return float(value) if value is not None else default
+            except (ValueError, TypeError):
+                return default
+        
+        # Safely extract pixel spacing
+        pixel_spacing = [1.0, 1.0]
+        if ds is not None:
+            ps = getattr(ds, 'PixelSpacing', None)
+            if ps is not None:
+                try:
+                    pixel_spacing = [float(ps[0]), float(ps[1])]
+                except (IndexError, ValueError, TypeError):
+                    pixel_spacing = [1.0, 1.0]
+        elif image.series.pixel_spacing:
+            try:
+                if isinstance(image.series.pixel_spacing, str):
+                    # Parse string format like "1.0\\1.0"
+                    parts = image.series.pixel_spacing.replace('\\', ' ').split()
+                    if len(parts) >= 2:
+                        pixel_spacing = [float(parts[0]), float(parts[1])]
+                else:
+                    pixel_spacing = [float(x) for x in image.series.pixel_spacing[:2]]
+            except (ValueError, TypeError, IndexError):
+                pixel_spacing = [1.0, 1.0]
+        
         image_info = {
             'id': image.id,
             'instance_number': getattr(image, 'instance_number', None),
             'slice_location': getattr(image, 'slice_location', None),
             'dimensions': [int(getattr(ds, 'Rows', 0) or 0), int(getattr(ds, 'Columns', 0) or 0)] if ds is not None else [0, 0],
-            'pixel_spacing': getattr(ds, 'PixelSpacing', [1.0, 1.0]) if ds is not None else (image.series.pixel_spacing or [1.0, 1.0]),
-            'slice_thickness': getattr(ds, 'SliceThickness', 1.0) if ds is not None else safe_float(getattr(image.series, 'slice_thickness', 1.0), 1.0),
+            'pixel_spacing': pixel_spacing,
+            'slice_thickness': safe_dicom_value(getattr(ds, 'SliceThickness', None) if ds is not None else getattr(image.series, 'slice_thickness', None), 1.0),
             'default_window_width': float(default_window_width) if default_window_width is not None else 400.0,
             'default_window_level': float(default_window_level) if default_window_level is not None else 40.0,
-            'modality': getattr(ds, 'Modality', '') if ds is not None else (image.series.modality or ''),
-            'series_description': getattr(ds, 'SeriesDescription', '') if ds is not None else getattr(image.series, 'series_description', ''),
+            'modality': str(getattr(ds, 'Modality', '')) if ds is not None else str(image.series.modality or ''),
+            'series_description': str(getattr(ds, 'SeriesDescription', '')) if ds is not None else str(getattr(image.series, 'series_description', '')),
             'patient_name': str(getattr(ds, 'PatientName', '')) if ds is not None else (getattr(image.series.study.patient, 'full_name', '') if hasattr(image.series.study, 'patient') else ''),
-            'study_date': str(getattr(ds, 'StudyDate', '')) if ds is not None else (getattr(image.series.study, 'study_date', '') or ''),
-            'bits_allocated': getattr(ds, 'BitsAllocated', 16) if ds is not None else 16,
-            'bits_stored': getattr(ds, 'BitsStored', 16) if ds is not None else 16,
-            'photometric_interpretation': getattr(ds, 'PhotometricInterpretation', '') if ds is not None else '',
+            'study_date': str(getattr(ds, 'StudyDate', '')) if ds is not None else str(getattr(image.series.study, 'study_date', '') or ''),
+            'bits_allocated': int(getattr(ds, 'BitsAllocated', 16)) if ds is not None else 16,
+            'bits_stored': int(getattr(ds, 'BitsStored', 16)) if ds is not None else 16,
+            'photometric_interpretation': str(getattr(ds, 'PhotometricInterpretation', '')) if ds is not None else '',
         }
         
         payload = {
