@@ -66,3 +66,15 @@ Method Not Allowed (HEAD): /health/simple/
 [32mHTTP GET /admin/ 302 [0.00, 127.0.0.1:53108][0m
 Watching for file changes with StatReloader
 Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+[32mHTTP GET /admin/ 302 [0.01, 127.0.0.1:49374][0m
+/workspace/noctis_pro/urls.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+[32mHTTP GET /admin/ 302 [0.01, 127.0.0.1:43932][0m
+[32mHTTP GET /admin/ 302 [0.00, 127.0.0.1:33208][0m
+[32mHTTP GET /admin/ 302 [0.00, 127.0.0.1:45406][0m
+[mHTTP GET /admin/login/ 200 [0.02, 127.0.0.1:45420][0m
+[mHTTP GET /admin/login/ 200 [0.01, 127.0.0.1:33958][0m
+Forbidden (CSRF cookie not set.): /admin/login/
+[31;1mHTTP POST /admin/login/ 403 [0.00, 127.0.0.1:33972][0m
