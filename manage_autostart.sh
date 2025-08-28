@@ -70,7 +70,18 @@ get_status() {
                 echo "   🌍 URL: $url"
             fi
         else
-            print_error "Ngrok tunnel is not running"
+            if [ -f "$WORKSPACE_DIR/current_ngrok_url.txt" ]; then
+                local url=$(cat "$WORKSPACE_DIR/current_ngrok_url.txt")
+                if [[ "$url" == "http://localhost:8000" ]]; then
+                    print_warning "Running in local mode (no external tunnel)"
+                    echo "   🏠 Local URL: $url"
+                    echo "   ℹ️  To enable external access, configure ngrok authentication"
+                else
+                    print_error "Ngrok tunnel is not running"
+                fi
+            else
+                print_error "Ngrok tunnel is not running"
+            fi
         fi
         
         # Show recent log entries
