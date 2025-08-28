@@ -300,3 +300,229 @@ class SlowConnectionOptimizationMiddleware:
         if '</body>' in content:
             content = content.replace('</body>', optimization_script + '</body>')
             response.content = content.encode('utf-8')
+
+
+import time
+from django.http import JsonResponse
+from django.urls import reverse
+from django.utils.deprecation import MiddlewareMixin
+from django.contrib.auth import logout
+from django.shortcuts import redirect
+from django.utils import timezone
+from datetime import timedelta
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class SessionTimeoutMiddleware(MiddlewareMixin):
+    """
+    Middleware to handle automatic logout on inactivity
+    """
+    
+    def process_request(self, request):
+        if not request.user.is_authenticated:
+            return None
+        
+        # Skip timeout for AJAX requests to avoid interrupting operations
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            # Update last activity for AJAX requests but don't timeout
+            request.session['last_activity'] = time.time()
+            return None
+        
+        # Check if this is a session timeout check request
+        if request.path == '/accounts/session-status/':
+            return None
+        
+        # Get session timeout settings
+        timeout_seconds = getattr(settings, 'SESSION_COOKIE_AGE', 1800)  # Default 30 minutes
+        warning_seconds = getattr(settings, 'SESSION_TIMEOUT_WARNING', 300)  # Default 5 minutes
+        
+        # Get last activity time
+        last_activity = request.session.get('last_activity')
+        current_time = time.time()
+        
+        if last_activity:
+            # Check if session has expired
+            time_since_activity = current_time - last_activity
+            
+            if time_since_activity > timeout_seconds:
+                # Session expired - logout user
+                logout(request)
+                if request.headers.get('Accept', '').startswith('application/json'):
+                    return JsonResponse({
+                        'error': 'Session expired due to inactivity',
+                        'redirect': reverse('accounts:login')
+                    }, status=401)
+                else:
+                    return redirect('accounts:login')
+        
+        # Update last activity time
+        request.session['last_activity'] = current_time
+        
+        return None
+
+
+class SessionTimeoutWarningMiddleware(MiddlewareMixin):
+    """
+    Middleware to inject session timeout warning JavaScript
+    """
+    
+    def process_response(self, request, response):
+        # Only inject for authenticated users and HTML responses
+        if (request.user.is_authenticated and 
+            response.get('Content-Type', '').startswith('text/html') and
+            hasattr(response, 'content')):
+            
+            # Get timeout settings
+            timeout_seconds = getattr(settings, 'SESSION_COOKIE_AGE', 1800)
+            warning_seconds = getattr(settings, 'SESSION_TIMEOUT_WARNING', 300)
+            
+            # Get last activity
+            last_activity = request.session.get('last_activity', time.time())
+            current_time = time.time()
+            remaining_time = timeout_seconds - (current_time - last_activity)
+            
+            # Inject session timeout JavaScript
+            timeout_script = f"""
+            <script>
+            (function() {{
+                let sessionTimeoutSeconds = {timeout_seconds};
+                let warningSeconds = {warning_seconds};
+                let remainingTime = {max(0, int(remaining_time))};
+                let warningShown = false;
+                let logoutTimer = null;
+                let warningTimer = null;
+                
+                function showTimeoutWarning() {{
+                    if (warningShown) return;
+                    warningShown = true;
+                    
+                    const warningDiv = document.createElement('div');
+                    warningDiv.id = 'session-timeout-warning';
+                    warningDiv.style.cssText = `
+                        position: fixed;
+                        top: 20px;
+                        right: 20px;
+                        background: #ff6b6b;
+                        color: white;
+                        padding: 15px 20px;
+                        border-radius: 8px;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                        z-index: 10000;
+                        max-width: 350px;
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                        font-size: 14px;
+                        line-height: 1.4;
+                    `;
+                    
+                    let timeLeft = Math.floor(warningSeconds);
+                    warningDiv.innerHTML = `
+                        <div style="font-weight: bold; margin-bottom: 8px;">⚠️ Session Timeout Warning</div>
+                        <div>Your session will expire in <span id="countdown">${timeLeft}</span> seconds due to inactivity.</div>
+                        <div style="margin-top: 10px;">
+                            <button onclick="extendSession()" style="background: white; color: #ff6b6b; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;">Stay Logged In</button>
+                        </div>
+                    `;
+                    
+                    document.body.appendChild(warningDiv);
+                    
+                    // Countdown timer
+                    const countdown = setInterval(() => {{
+                        timeLeft--;
+                        const countdownEl = document.getElementById('countdown');
+                        if (countdownEl) {{
+                            countdownEl.textContent = timeLeft;
+                        }}
+                        if (timeLeft <= 0) {{
+                            clearInterval(countdown);
+                        }}
+                    }}, 1000);
+                }}
+                
+                function forceLogout() {{
+                    alert('Your session has expired due to inactivity. You will be redirected to the login page.');
+                    window.location.href = '/accounts/login/';
+                }}
+                
+                window.extendSession = function() {{
+                    // Make a request to extend session
+                    fetch('/accounts/session-extend/', {{
+                        method: 'POST',
+                        headers: {{
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+                            'Content-Type': 'application/json',
+                        }},
+                        credentials: 'same-origin'
+                    }})
+                    .then(response => response.json())
+                    .then(data => {{
+                        if (data.success) {{
+                            // Remove warning and reset timers
+                            const warning = document.getElementById('session-timeout-warning');
+                            if (warning) warning.remove();
+                            warningShown = false;
+                            
+                            // Reset timers
+                            clearTimeout(logoutTimer);
+                            clearTimeout(warningTimer);
+                            setupTimeoutTimers();
+                        }}
+                    }})
+                    .catch(error => {{
+                        console.error('Error extending session:', error);
+                    }});
+                }};
+                
+                function setupTimeoutTimers() {{
+                    // Set warning timer
+                    const warningTime = Math.max(0, (remainingTime - warningSeconds) * 1000);
+                    warningTimer = setTimeout(showTimeoutWarning, warningTime);
+                    
+                    // Set logout timer
+                    logoutTimer = setTimeout(forceLogout, remainingTime * 1000);
+                }}
+                
+                // Reset timers on user activity
+                let activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+                let activityTimeout = null;
+                
+                function resetActivity() {{
+                    if (activityTimeout) clearTimeout(activityTimeout);
+                    activityTimeout = setTimeout(() => {{
+                        // Send keep-alive request
+                        fetch('/accounts/session-keep-alive/', {{
+                            method: 'POST',
+                            headers: {{
+                                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }},
+                            credentials: 'same-origin'
+                        }});
+                    }}, 60000); // Send keep-alive every minute of activity
+                }}
+                
+                // Add activity listeners
+                activityEvents.forEach(event => {{
+                    document.addEventListener(event, resetActivity, true);
+                }});
+                
+                // Initialize timers if there's remaining time
+                if (remainingTime > 0) {{
+                    setupTimeoutTimers();
+                }}
+            }})();
+            </script>
+            """
+            
+            try:
+                content = response.content.decode('utf-8')
+                if '</body>' in content:
+                    content = content.replace('</body>', timeout_script + '</body>')
+                    response.content = content.encode('utf-8')
+                    response['Content-Length'] = len(response.content)
+            except (UnicodeDecodeError, AttributeError):
+                # Skip if we can't decode the content
+                pass
+        
+        return response

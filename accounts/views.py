@@ -4,10 +4,12 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from django.contrib.auth.forms import AuthenticationForm
 from .models import User, UserSession, Facility
 import json
+import time
 
 def login_view(request):
     """Custom login view with enhanced security tracking"""
