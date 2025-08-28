@@ -1,4 +1,5 @@
-2025-08-28 20:23:27,331 INFO     Starting server at tcp:port=8000:interface=0.0.0.0
-2025-08-28 20:23:27,331 INFO     HTTP/2 support not enabled (install the http2 and tls Twisted extras)
-2025-08-28 20:23:27,331 INFO     Configuring endpoint tcp:port=8000:interface=0.0.0.0
-2025-08-28 20:23:27,331 INFO     Listening on TCP address 0.0.0.0:8000
+2025-08-28 20:37:34,239 INFO     Starting server at tcp:port=8000:interface=0.0.0.0
+2025-08-28 20:37:34,239 INFO     HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+2025-08-28 20:37:34,239 INFO     Configuring endpoint tcp:port=8000:interface=0.0.0.0
+2025-08-28 20:37:34,239 INFO     Listening on TCP address 0.0.0.0:8000
+2025-08-28 20:55:12,901 WARNING  Method Not Allowed (HEAD): /health/simple/

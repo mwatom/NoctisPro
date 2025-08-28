@@ -5,6 +5,13 @@
 
 set -e
 
+# Set environment variables for container deployment
+export USE_SQLITE=true
+export DISABLE_REDIS=true
+export USE_DUMMY_CACHE=true
+export DEBUG=false
+export PATH="/home/ubuntu/.local/bin:$PATH"
+
 WORKSPACE_DIR="/workspace"
 STATIC_NGROK_URL="colt-charmed-lark.ngrok-free.app"
 LOG_FILE="$WORKSPACE_DIR/autostart_noctispro.log"
@@ -84,8 +91,15 @@ start_ngrok_with_retries() {
         # Stop any existing ngrok processes first
         stop_existing_ngrok
         
-        # Start ngrok in background (log to file to avoid console UI conflicts)
-        nohup ngrok http --url=https://$STATIC_NGROK_URL 8000 --log=file > "$WORKSPACE_DIR/ngrok.log" 2>&1 &
+        # Check if ngrok is authenticated
+        if ! ngrok config check > /dev/null 2>&1; then
+            log "⚠️  Ngrok not authenticated. Trying without custom domain..."
+            # Start ngrok without custom domain
+            nohup ngrok http 8000 --log=file > "$WORKSPACE_DIR/ngrok.log" 2>&1 &
+        else
+            # Start ngrok with custom domain
+            nohup ngrok http --url=https://$STATIC_NGROK_URL 8000 --log=file > "$WORKSPACE_DIR/ngrok.log" 2>&1 &
+        fi
         local ngrok_pid=$!
         
         # Wait a bit for ngrok to start
@@ -94,7 +108,34 @@ start_ngrok_with_retries() {
         # Check if ngrok is still running
         if kill -0 $ngrok_pid 2>/dev/null; then
             log "✅ Ngrok started successfully (PID: $ngrok_pid)"
-            echo "https://$STATIC_NGROK_URL" > "$URL_FILE"
+            
+            # Get the actual ngrok URL
+            sleep 5  # Wait for ngrok to establish tunnel
+            local ngrok_url
+            if ngrok config check > /dev/null 2>&1; then
+                # Using custom domain
+                ngrok_url="https://$STATIC_NGROK_URL"
+            else
+                # Get dynamic URL from ngrok API
+                ngrok_url=$(curl -s http://localhost:4040/api/tunnels 2>/dev/null | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    for tunnel in data.get('tunnels', []):
+        if tunnel.get('proto') == 'https':
+            print(tunnel['public_url'])
+            break
+except:
+    pass
+" 2>/dev/null)
+                if [ -z "$ngrok_url" ]; then
+                    ngrok_url="http://localhost:8000"
+                    log "⚠️  Could not get ngrok URL, using localhost"
+                fi
+            fi
+            
+            echo "$ngrok_url" > "$URL_FILE"
+            log "🌍 Tunnel URL: $ngrok_url"
             return 0
         else
             log "❌ Ngrok failed to start, checking logs..."
@@ -121,23 +162,25 @@ start_ngrok_with_retries() {
 start_django() {
     log "🐍 Starting Django server..."
     
-    # Activate virtual environment
-    if [ -f "$WORKSPACE_DIR/venv/bin/activate" ]; then
-        source "$WORKSPACE_DIR/venv/bin/activate"
-        log "✅ Virtual environment activated"
+    # Add local bin to PATH for Django and other tools
+    export PATH="/home/ubuntu/.local/bin:$PATH"
+    
+    # Check if Python packages are available
+    if python3 -c "import django" 2>/dev/null; then
+        log "✅ Django is available"
     else
-        log "❌ Virtual environment not found"
+        log "❌ Django not found in Python path"
         return 1
     fi
     
     # Run migrations
     log "🔄 Running database migrations..."
     cd "$WORKSPACE_DIR"
-    python manage.py migrate --noinput
+    python3 manage.py migrate --noinput
     
     # Collect static files
     log "📂 Collecting static files..."
-    python manage.py collectstatic --noinput || true
+    python3 manage.py collectstatic --noinput || true
     
     # Start Django with Daphne (ASGI server)
     log "🌐 Starting Django/Daphne server on port 8000..."
@@ -174,10 +217,15 @@ monitor_services() {
             start_ngrok_with_retries
         fi
         
-        # Verify external access
-        if ! curl -s -f "https://$STATIC_NGROK_URL/health/simple/" > /dev/null 2>&1; then
-            log "⚠️  External access failed, services may need restart..."
-            # Could add more sophisticated restart logic here
+        # Verify external access (if available)
+        if [ -f "$URL_FILE" ]; then
+            local current_url=$(cat "$URL_FILE")
+            if [[ "$current_url" == http*://*.ngrok*.* ]]; then
+                if ! curl -s -f "$current_url/health/simple/" > /dev/null 2>&1; then
+                    log "⚠️  External access failed, services may need restart..."
+                    # Could add more sophisticated restart logic here
+                fi
+            fi
         fi
     done
 }
@@ -202,29 +250,46 @@ main() {
         exit 1
     fi
     
-    # Start ngrok
+    # Start ngrok (optional)
     if start_ngrok_with_retries; then
         log "✅ Ngrok startup successful"
     else
-        log "❌ Ngrok startup failed, exiting"
-        exit 1
+        log "⚠️  Ngrok startup failed - continuing without external tunnel"
+        log "ℹ️  NoctisPro will run locally only. To enable external access:"
+        log "ℹ️  1. Get a free ngrok account: https://dashboard.ngrok.com/signup"
+        log "ℹ️  2. Get your auth token: https://dashboard.ngrok.com/get-started/your-authtoken"
+        log "ℹ️  3. Run: ngrok config add-authtoken YOUR_TOKEN"
+        log "ℹ️  4. Restart this service: ./manage_autostart.sh restart"
+        echo "http://localhost:8000" > "$URL_FILE"
     fi
     
-    # Wait for external access
-    if wait_for_service "https://$STATIC_NGROK_URL/health/simple/"; then
-        log "🎉 External access confirmed!"
+    # Get the current ngrok URL
+    local current_url
+    if [ -f "$URL_FILE" ]; then
+        current_url=$(cat "$URL_FILE")
     else
-        log "⚠️  External access not working, but services are running"
+        current_url="http://localhost:8000"
+    fi
+    
+    # Wait for external access (only if we have an external URL)
+    if [[ "$current_url" == http*://*.ngrok*.* ]]; then
+        if wait_for_service "$current_url/health/simple/"; then
+            log "🎉 External access confirmed!"
+        else
+            log "⚠️  External access not working, but services are running"
+        fi
+    else
+        log "ℹ️  Running in local mode (no external tunnel)"
     fi
     
     # Display access information
     echo ""
     log "🌟 NoctisPro is now running!"
-    log "🌍 Static URL: https://$STATIC_NGROK_URL"
+    log "🌍 External URL: $current_url"
     log "🏠 Local URL: http://localhost:8000"
-    log "📊 Admin panel: https://$STATIC_NGROK_URL/admin-panel/"
-    log "🏥 DICOM viewer: https://$STATIC_NGROK_URL/dicom-viewer/"
-    log "📋 Worklist: https://$STATIC_NGROK_URL/worklist/"
+    log "📊 Admin panel: $current_url/admin-panel/"
+    log "🏥 DICOM viewer: $current_url/dicom-viewer/"
+    log "📋 Worklist: $current_url/worklist/"
     echo ""
     
     # Start monitoring loop
