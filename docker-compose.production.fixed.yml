@@ -1,0 +1,406 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database - Production Optimized
+  db:
+    image: postgres:16-alpine
+    container_name: noctis_db_prod
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-noctisprodb}
+      POSTGRES_USER: ${POSTGRES_USER:-noctispro}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=C"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+      - ./deployment/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./deployment/postgres/postgresql.conf.production:/etc/postgresql/postgresql.conf:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+    command: >
+      postgres
+      -c config_file=/etc/postgresql/postgresql.conf
+      -c log_statement=all
+      -c log_destination=stderr
+      -c logging_collector=on
+      -c max_connections=100
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-noctispro} -d ${POSTGRES_DB:-noctisprodb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - noctis_network
+
+  # Redis for caching and message broker - Production Optimized
+  redis:
+    image: redis:7-alpine
+    container_name: noctis_redis_prod
+    command: >
+      redis-server
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --appendonly yes
+      --appendfsync everysec
+      --auto-aof-rewrite-percentage 100
+      --auto-aof-rewrite-min-size 64mb
+    volumes:
+      - redis_data:/data
+      - ./deployment/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - noctis_network
+
+  # Django Web Application - Production Ready
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+      target: production
+    container_name: noctis_web_prod
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY}
+      - DJANGO_SETTINGS_MODULE=noctis_pro.settings_production
+      - POSTGRES_DB=${POSTGRES_DB:-noctisprodb}
+      - POSTGRES_USER=${POSTGRES_USER:-noctispro}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+      - SECURE_SSL_REDIRECT=False
+      - EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-demo@noctispro.com}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-demo123456}
+      - USE_SQLITE=False
+      - DB_CONN_MAX_AGE=300
+    volumes:
+      - media_files:/app/media
+      - static_files:/app/staticfiles
+      - backup_files:/app/backups
+      - ./logs:/app/logs
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - noctis_network
+
+  # Celery Worker for background tasks - Production Optimized
+  celery:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+      target: production
+    container_name: noctis_celery_prod
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY}
+      - DJANGO_SETTINGS_MODULE=noctis_pro.settings_production
+      - POSTGRES_DB=${POSTGRES_DB:-noctisprodb}
+      - POSTGRES_USER=${POSTGRES_USER:-noctispro}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - C_FORCE_ROOT=1
+      - USE_SQLITE=False
+    volumes:
+      - media_files:/app/media
+      - backup_files:/app/backups
+      - ./logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    command: celery -A noctis_pro worker --loglevel=info --concurrency=4 --max-tasks-per-child=1000 --prefetch-multiplier=1
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - noctis_network
+
+  # Celery Beat Scheduler - Production Ready
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+      target: production
+    container_name: noctis_celery_beat_prod
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY}
+      - DJANGO_SETTINGS_MODULE=noctis_pro.settings_production
+      - POSTGRES_DB=${POSTGRES_DB:-noctisprodb}
+      - POSTGRES_USER=${POSTGRES_USER:-noctispro}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - USE_SQLITE=False
+    volumes:
+      - media_files:/app/media
+      - backup_files:/app/backups
+      - ./logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    command: celery -A noctis_pro beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - noctis_network
+
+  # DICOM Receiver Service - Production Optimized
+  dicom_receiver:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+      target: production
+    container_name: noctis_dicom_prod
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY}
+      - DJANGO_SETTINGS_MODULE=noctis_pro.settings_production
+      - POSTGRES_DB=${POSTGRES_DB:-noctisprodb}
+      - POSTGRES_USER=${POSTGRES_USER:-noctispro}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - USE_SQLITE=False
+    volumes:
+      - media_files:/app/media
+      - dicom_storage:/app/dicom_storage
+      - ./logs:/app/logs
+    ports:
+      - "11112:11112"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    command: python dicom_receiver.py --port 11112 --aet NOCTIS_SCP --bind 0.0.0.0
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - noctis_network
+
+  # Nginx Reverse Proxy - Production Security
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: noctis_nginx_prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deployment/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deployment/nginx/sites-available/noctis.conf:/etc/nginx/conf.d/noctis.conf:ro
+      - static_files:/var/www/static:ro
+      - media_files:/var/www/media:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - web
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - noctis_network
+
+  # Backup service for automated backups - Production Ready
+  backup:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+      target: production
+    container_name: noctis_backup
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - POSTGRES_DB=${POSTGRES_DB:-noctisprodb}
+      - POSTGRES_USER=${POSTGRES_USER:-noctispro}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+    volumes:
+      - backup_files:/app/backups
+      - media_files:/app/media:ro
+      - ./deployment/backup/backup.sh:/app/backup.sh:ro
+    depends_on:
+      - db
+    restart: "no"
+    command: ["/bin/sh", "-c", "while true; do sleep 86400; /app/backup.sh; done"]
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - noctis_network
+    profiles:
+      - backup
+
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/noctis/data/postgres
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/noctis/data/redis
+  media_files:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/noctis/media
+  static_files:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/noctis/staticfiles
+  backup_files:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/noctis/backups
+  dicom_storage:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/noctis/dicom_storage
+
+networks:
+  noctis_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+    driver_opts:
+      com.docker.network.bridge.name: noctis0
