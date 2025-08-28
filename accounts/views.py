@@ -16,10 +16,13 @@ def login_view(request):
     if request.user.is_authenticated:
         return redirect('worklist:dashboard')
     
-    # Clear any existing messages on GET request to prevent accumulation
-    if request.method == 'GET':
-        # Clear any existing messages
-        list(messages.get_messages(request))
+    # Always clear any existing messages to prevent admin messages from showing
+    # This ensures no success/info messages from admin operations appear on login
+    storage = messages.get_messages(request)
+    if storage:
+        # Clear all messages completely
+        list(storage)
+        storage.used = True
     
     if request.method == 'POST':
         username = request.POST.get('username')
@@ -180,3 +183,71 @@ def user_api_info(request):
             'is_facility_user': user.is_facility_user(),
         }
     })
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def session_extend(request):
+    """Extend user session - reset the timeout timer"""
+    try:
+        # Update last activity time
+        request.session['last_activity'] = time.time()
+        request.session.modified = True
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Session extended successfully'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def session_keep_alive(request):
+    """Keep session alive during user activity"""
+    try:
+        # Update last activity time
+        request.session['last_activity'] = time.time()
+        request.session.modified = True
+        
+        return JsonResponse({
+            'success': True,
+            'status': 'active'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
+def session_status(request):
+    """Get current session status and remaining time"""
+    try:
+        from django.conf import settings
+        
+        timeout_seconds = getattr(settings, 'SESSION_COOKIE_AGE', 1800)
+        last_activity = request.session.get('last_activity', time.time())
+        current_time = time.time()
+        
+        time_since_activity = current_time - last_activity
+        remaining_time = max(0, timeout_seconds - time_since_activity)
+        
+        return JsonResponse({
+            'authenticated': True,
+            'remaining_time': int(remaining_time),
+            'timeout_seconds': timeout_seconds,
+            'warning_threshold': getattr(settings, 'SESSION_TIMEOUT_WARNING', 300)
+        })
+    except Exception as e:
+        return JsonResponse({
+            'authenticated': False,
+            'error': str(e)
+        }, status=500)

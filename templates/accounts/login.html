@@ -178,9 +178,11 @@
 
             {% if messages %}
                 {% for message in messages %}
-                    <div class="error-message">
-                        {{ message }}
-                    </div>
+                    {% if message.tags == 'error' or message.tags == 'warning' %}
+                        <div class="error-message">
+                            {{ message }}
+                        </div>
+                    {% endif %}
                 {% endfor %}
             {% endif %}
 

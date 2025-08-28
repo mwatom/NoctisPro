@@ -741,10 +741,13 @@
                   const dw = im.width * scale, dh = im.height * scale;
                   const dx = reg.x + (reg.w - dw)/2, dy = reg.y + (reg.h - dh)/2;
                   
-                  // Apply windowing for better contrast
+                  // Apply windowing for better contrast and enhanced clarity
                   ctx.save();
                   ctx.imageSmoothingEnabled = true; // Enable smoothing for better image quality
                   ctx.imageSmoothingQuality = 'high';
+                  
+                  // Apply image enhancement for clarity
+                  ctx.filter = 'contrast(1.1) brightness(1.05)';
                   
                   ctx.drawImage(im, dx, dy, dw, dh);
                   
@@ -896,8 +899,15 @@
         const htmlImg = await getImageForIndex(index);
         const vp = getViewportPlacement(htmlImg.width, htmlImg.height);
         ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
-                 if (ctx.imageSmoothingEnabled !== false) ctx.imageSmoothingEnabled = false;
-         ctx.drawImage(htmlImg, vp.x, vp.y, vp.w, vp.h);
+        
+        // Enhanced image rendering for clarity
+        ctx.save();
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.filter = 'contrast(1.05) brightness(1.02)';
+        
+        ctx.drawImage(htmlImg, vp.x, vp.y, vp.w, vp.h);
+        ctx.restore();
         lastVp = { x: vp.x, y: vp.y, scale: vp.scale, imgW: htmlImg.width, imgH: htmlImg.height };
         drawOverlays(vp);
         if (huEllipse && huEllipse.mode==='series') drawEllipseOverlay();
@@ -1031,9 +1041,9 @@
     }
 
     function drawEllipseOverlay(planeKey){
+      if (!huEllipse) return;
       ctx.save();
-      ctx.strokeStyle = '#00ff88';
-      ctx.lineWidth = 2;
+      
       let mapping;
       if (huEllipse && huEllipse.mode==='mpr'){
         mapping = mprRegionVps[planeKey||huEllipse.plane];
@@ -1041,14 +1051,53 @@
         mapping = lastVp;
       }
       if (!mapping) { ctx.restore(); return; }
+      
       const { x, y, scale } = mapping;
       const cx = x + huEllipse.cx * scale;
       const cy = y + huEllipse.cy * scale;
-      const rx = huEllipse.rx * scale;
-      const ry = huEllipse.ry * scale;
+      const rx = Math.max(2, Math.abs(huEllipse.rx * scale)); // Minimum 2px radius
+      const ry = Math.max(2, Math.abs(huEllipse.ry * scale)); // Minimum 2px radius
+      
+      // Draw ellipse with enhanced visibility
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#00ff88';
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+      ctx.shadowBlur = 3;
+      
       ctx.beginPath();
-      ctx.ellipse(cx, cy, Math.abs(rx), Math.abs(ry), 0, 0, Math.PI*2);
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2);
       ctx.stroke();
+      
+      // Draw center crosshair
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#ffff00';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx - 5, cy);
+      ctx.lineTo(cx + 5, cy);
+      ctx.moveTo(cx, cy - 5);
+      ctx.lineTo(cx, cy + 5);
+      ctx.stroke();
+      
+      // Draw resize handles if ellipse is large enough
+      if (rx > 10 || ry > 10) {
+        ctx.fillStyle = '#00ff88';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        
+        // Right handle
+        ctx.beginPath();
+        ctx.arc(cx + rx, cy, 3, 0, Math.PI*2);
+        ctx.fill();
+        ctx.stroke();
+        
+        // Bottom handle
+        ctx.beginPath();
+        ctx.arc(cx, cy + ry, 3, 0, Math.PI*2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      
       ctx.restore();
     }
 
@@ -1399,12 +1448,45 @@
             mprScroll.sagittal = Math.max(0, Math.min((mprScroll.counts.sagittal||1)-1, mprCross.x));
           }
           
-          // Force refresh of all plane images when crosshair moves significantly
-          if (Math.abs(oldCross.x - mprCross.x) > 1 || Math.abs(oldCross.y - mprCross.y) > 1 || Math.abs(oldCross.z - mprCross.z) > 1) {
-            // Clear images to force reload with new slice positions
-            mprImgs = { axial: null, sagittal: null, coronal: null };
+          // Check if crosshair position actually changed
+          const crossChanged = (oldCross.x !== mprCross.x || oldCross.y !== mprCross.y || oldCross.z !== mprCross.z);
+          
+          if (crossChanged) {
+            // Prefetch new slices for updated orthogonal planes
+            console.log(`Crosshair moved to [${mprCross.x}, ${mprCross.y}, ${mprCross.z}]`);
             
-            // Prefetch the new slice positions for smooth interaction
+            // Update slice indicators
+            document.querySelector('[data-plane="axial"] .slice-indicator')?.textContent = `${mprScroll.axial + 1}/${mprScroll.counts.axial || 0}`;
+            document.querySelector('[data-plane="sagittal"] .slice-indicator')?.textContent = `${mprScroll.sagittal + 1}/${mprScroll.counts.sagittal || 0}`;
+            document.querySelector('[data-plane="coronal"] .slice-indicator')?.textContent = `${mprScroll.coronal + 1}/${mprScroll.counts.coronal || 0}`;
+            
+            // Load new slices for orthogonal planes immediately
+            const loadPromises = [];
+            if (plane !== 'axial') {
+              loadPromises.push(getMprImage(currentSeries.id, 'axial', mprScroll.axial).then(img => {
+                mprImgs.axial = img;
+              }));
+            }
+            if (plane !== 'sagittal') {
+              loadPromises.push(getMprImage(currentSeries.id, 'sagittal', mprScroll.sagittal).then(img => {
+                mprImgs.sagittal = img;
+              }));
+            }
+            if (plane !== 'coronal') {
+              loadPromises.push(getMprImage(currentSeries.id, 'coronal', mprScroll.coronal).then(img => {
+                mprImgs.coronal = img;
+              }));
+            }
+            
+            // Wait for all images to load then redraw
+            Promise.all(loadPromises).then(() => {
+              requestDraw();
+            }).catch(err => {
+              console.error('Error loading orthogonal images:', err);
+              requestDraw(); // Draw anyway
+            });
+            
+            // Also prefetch surrounding slices
             prefetchMprSlices('axial', mprScroll.axial, 2);
             prefetchMprSlices('sagittal', mprScroll.sagittal, 2);
             prefetchMprSlices('coronal', mprScroll.coronal, 2);
@@ -1429,7 +1511,10 @@
     });
     // HU probe on mousemove in MPR when enabled
     viewport.addEventListener('mousemove', async (e)=>{
-      if (!mprMode || !showHuProbe || (huEllipse && (huEllipse.rx>1 || huEllipse.ry>1))) return;
+      if (!mprMode || !showHuProbe) return;
+      
+      // Skip if we're in the middle of dragging to resize an ellipse
+      if (isDragging && huEllipse) return;
       // Determine which plane region the mouse is in
       const halfW = Math.floor(canvas.width/2), halfH = Math.floor(canvas.height/2);
       const mx = e.offsetX, my = e.offsetY;
