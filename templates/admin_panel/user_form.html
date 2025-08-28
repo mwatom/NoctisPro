@@ -643,32 +643,83 @@
     }
 
     function validateCurrentStep() {
+      console.log('Validating step:', currentStep);
       const currentFormStep = document.querySelector(`.form-step[data-step="${currentStep}"]`);
+      
+      if (!currentFormStep) {
+        console.error('Current form step not found:', currentStep);
+        return false;
+      }
+      
       const requiredFields = currentFormStep.querySelectorAll('[required]');
+      console.log('Required fields in step:', requiredFields.length);
       
       for (let field of requiredFields) {
         if (!field.value.trim()) {
+          console.log('Required field missing value:', field.name || field.id);
+          
+          // Show visual feedback
+          field.style.borderColor = '#ff4444';
           field.focus();
-          field.reportValidity();
+          
+          // Add temporary error message
+          let errorMsg = field.parentNode.querySelector('.validation-error');
+          if (!errorMsg) {
+            errorMsg = document.createElement('div');
+            errorMsg.className = 'validation-error';
+            errorMsg.style.cssText = 'color: #ff4444; font-size: 11px; margin-top: 4px;';
+            field.parentNode.appendChild(errorMsg);
+          }
+          errorMsg.textContent = 'This field is required';
+          
+          // Remove error styling on input
+          field.addEventListener('input', function() {
+            field.style.borderColor = '';
+            if (errorMsg) errorMsg.remove();
+          }, { once: true });
+          
           return false;
         }
       }
       
       // Additional validation for step 2 (passwords)
       if (currentStep === 2) {
-        if (password.value !== passwordConfirm.value) {
+        if (password && passwordConfirm && password.value !== passwordConfirm.value) {
+          console.log('Passwords do not match');
+          passwordConfirm.style.borderColor = '#ff4444';
           passwordConfirm.focus();
-          passwordConfirm.reportValidity();
+          
+          let errorMsg = passwordConfirm.parentNode.querySelector('.validation-error');
+          if (!errorMsg) {
+            errorMsg = document.createElement('div');
+            errorMsg.className = 'validation-error';
+            errorMsg.style.cssText = 'color: #ff4444; font-size: 11px; margin-top: 4px;';
+            passwordConfirm.parentNode.appendChild(errorMsg);
+          }
+          errorMsg.textContent = 'Passwords do not match';
+          
           return false;
         }
         
-        if (roleSelect.value === 'facility' && !facilitySelect.value) {
+        if (roleSelect && facilitySelect && roleSelect.value === 'facility' && !facilitySelect.value) {
+          console.log('Facility required for facility user');
+          facilitySelect.style.borderColor = '#ff4444';
           facilitySelect.focus();
-          facilitySelect.reportValidity();
+          
+          let errorMsg = facilitySelect.parentNode.querySelector('.validation-error');
+          if (!errorMsg) {
+            errorMsg = document.createElement('div');
+            errorMsg.className = 'validation-error';
+            errorMsg.style.cssText = 'color: #ff4444; font-size: 11px; margin-top: 4px;';
+            facilitySelect.parentNode.appendChild(errorMsg);
+          }
+          errorMsg.textContent = 'Facility is required for facility users';
+          
           return false;
         }
       }
       
+      console.log('Step validation passed');
       return true;
     }
 
@@ -706,10 +757,20 @@
     passwordConfirm.addEventListener('input', validatePasswordMatch);
     refreshFacilitiesBtn.addEventListener('click', refreshFacilities);
 
-    nextBtn.addEventListener('click', function() {
-      if (validateCurrentStep()) {
-        currentStep++;
-        showStep(currentStep);
+    nextBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      console.log('Next button clicked, current step:', currentStep);
+      
+      try {
+        if (validateCurrentStep()) {
+          console.log('Validation passed, moving to next step');
+          currentStep++;
+          showStep(currentStep);
+        } else {
+          console.log('Validation failed for step:', currentStep);
+        }
+      } catch (error) {
+        console.error('Error in next button handler:', error);
       }
     });
 

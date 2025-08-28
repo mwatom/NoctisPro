@@ -60,12 +60,14 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'noctis_pro.middleware.SlowConnectionOptimizationMiddleware',  # Connection detection
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'noctis_pro.middleware.SessionTimeoutMiddleware',  # Session timeout handling
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'noctis_pro.middleware.ImageOptimizationMiddleware',  # Image optimization
+    'noctis_pro.middleware.SessionTimeoutWarningMiddleware',  # Session timeout warnings
 ]
 
 ROOT_URLCONF = 'noctis_pro.urls'
@@ -236,6 +238,12 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', 'True').lower() == 'true'
     SESSION_COOKIE_HTTPONLY = True
     CSRF_COOKIE_HTTPONLY = True
+
+# Session timeout and auto-logout settings
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_COOKIE_AGE = int(os.environ.get('SESSION_TIMEOUT_MINUTES', '30')) * 60  # Default 30 minutes
+SESSION_SAVE_EVERY_REQUEST = True  # Reset timer on every request
+SESSION_TIMEOUT_WARNING = int(os.environ.get('SESSION_WARNING_MINUTES', '5')) * 60  # Warning 5 minutes before timeout
 
 # Database
 # Production database configuration with fallback to SQLite

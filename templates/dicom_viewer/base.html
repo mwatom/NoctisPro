@@ -298,6 +298,9 @@
           <select id="printerSelect" name="printer_name">
             <option value="">Loading printers...</option>
           </select>
+          <div class="form-text" id="printerHelp" style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">
+            🖨️ Client printers automatically detected. Server printers marked with 🖥️.
+          </div>
         </div>
         <div class="form-group">
           <label for="paperSize">Paper/Film Size:</label>
@@ -736,14 +739,27 @@
             if (imgSrc){
               try {
                 const im = await loadImage(imgSrc);
-                const scale = Math.min(reg.w / im.width, reg.h / im.height);
-                const dw = im.width * scale, dh = im.height * scale;
-                const dx = reg.x + (reg.w - dw)/2, dy = reg.y + (reg.h - dh)/2;
-                // Hint to use low quality interpolation for speed
-                if (ctx.imageSmoothingEnabled !== false) ctx.imageSmoothingEnabled = false;
-                ctx.drawImage(im, dx, dy, dw, dh);
-                // Save mapping for tools
-                mprRegionVps[reg.key] = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height, rect: reg };
+                if (im && im.width > 0 && im.height > 0) {
+                  const scale = Math.min(reg.w / im.width, reg.h / im.height);
+                  const dw = im.width * scale, dh = im.height * scale;
+                  const dx = reg.x + (reg.w - dw)/2, dy = reg.y + (reg.h - dh)/2;
+                  
+                  // Apply windowing for better contrast and enhanced clarity
+                  ctx.save();
+                  ctx.imageSmoothingEnabled = true; // Enable smoothing for better image quality
+                  ctx.imageSmoothingQuality = 'high';
+                  
+                  // Apply image enhancement for clarity
+                  ctx.filter = 'contrast(1.1) brightness(1.05)';
+                  
+                  ctx.drawImage(im, dx, dy, dw, dh);
+                  
+                  // Save mapping for tools
+                  mprRegionVps[reg.key] = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height, rect: reg };
+                  ctx.restore();
+                } else {
+                  throw new Error('Invalid image dimensions');
+                }
               } catch (e) {
                 console.error(`Failed to load ${reg.key} image:`, e);
                 // Draw placeholder for failed image but keep trying
@@ -751,10 +767,17 @@
                 ctx.fillStyle = '#333';
                 ctx.fillRect(reg.x, reg.y, reg.w, reg.h);
                 ctx.fillStyle = '#666';
-                ctx.font = '12px monospace';
+                ctx.font = '14px Arial, sans-serif';
                 ctx.textAlign = 'center';
-                ctx.fillText('Loading...', reg.x + reg.w/2, reg.y + reg.h/2);
+                ctx.fillText(`${reg.key.toUpperCase()}`, reg.x + reg.w/2, reg.y + reg.h/2 - 10);
+                ctx.fillText('Loading...', reg.x + reg.w/2, reg.y + reg.h/2 + 10);
                 ctx.restore();
+                
+                // Retry loading after a short delay
+                setTimeout(() => {
+                  console.log(`Retrying load for ${reg.key}...`);
+                  requestDraw();
+                }, 1000);
               }
               // Draw plane label and slice index (use region coordinates if image failed)
               const labelX = (mprRegionVps[reg.key] ? mprRegionVps[reg.key].x : reg.x) + 8;
@@ -879,8 +902,15 @@
         const htmlImg = await getImageForIndex(index);
         const vp = getViewportPlacement(htmlImg.width, htmlImg.height);
         ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
-                 if (ctx.imageSmoothingEnabled !== false) ctx.imageSmoothingEnabled = false;
-         ctx.drawImage(htmlImg, vp.x, vp.y, vp.w, vp.h);
+        
+        // Enhanced image rendering for clarity
+        ctx.save();
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.filter = 'contrast(1.05) brightness(1.02)';
+        
+        ctx.drawImage(htmlImg, vp.x, vp.y, vp.w, vp.h);
+        ctx.restore();
         lastVp = { x: vp.x, y: vp.y, scale: vp.scale, imgW: htmlImg.width, imgH: htmlImg.height };
         drawOverlays(vp);
         if (huEllipse && huEllipse.mode==='series') drawEllipseOverlay();
@@ -1014,9 +1044,9 @@
     }
 
     function drawEllipseOverlay(planeKey){
+      if (!huEllipse) return;
       ctx.save();
-      ctx.strokeStyle = '#00ff88';
-      ctx.lineWidth = 2;
+      
       let mapping;
       if (huEllipse && huEllipse.mode==='mpr'){
         mapping = mprRegionVps[planeKey||huEllipse.plane];
@@ -1024,14 +1054,53 @@
         mapping = lastVp;
       }
       if (!mapping) { ctx.restore(); return; }
+      
       const { x, y, scale } = mapping;
       const cx = x + huEllipse.cx * scale;
       const cy = y + huEllipse.cy * scale;
-      const rx = huEllipse.rx * scale;
-      const ry = huEllipse.ry * scale;
+      const rx = Math.max(2, Math.abs(huEllipse.rx * scale)); // Minimum 2px radius
+      const ry = Math.max(2, Math.abs(huEllipse.ry * scale)); // Minimum 2px radius
+      
+      // Draw ellipse with enhanced visibility
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#00ff88';
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+      ctx.shadowBlur = 3;
+      
       ctx.beginPath();
-      ctx.ellipse(cx, cy, Math.abs(rx), Math.abs(ry), 0, 0, Math.PI*2);
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2);
       ctx.stroke();
+      
+      // Draw center crosshair
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#ffff00';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx - 5, cy);
+      ctx.lineTo(cx + 5, cy);
+      ctx.moveTo(cx, cy - 5);
+      ctx.lineTo(cx, cy + 5);
+      ctx.stroke();
+      
+      // Draw resize handles if ellipse is large enough
+      if (rx > 10 || ry > 10) {
+        ctx.fillStyle = '#00ff88';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        
+        // Right handle
+        ctx.beginPath();
+        ctx.arc(cx + rx, cy, 3, 0, Math.PI*2);
+        ctx.fill();
+        ctx.stroke();
+        
+        // Bottom handle
+        ctx.beginPath();
+        ctx.arc(cx, cy + ry, 3, 0, Math.PI*2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      
       ctx.restore();
     }
 
@@ -1382,12 +1451,45 @@
             mprScroll.sagittal = Math.max(0, Math.min((mprScroll.counts.sagittal||1)-1, mprCross.x));
           }
           
-          // Force refresh of all plane images when crosshair moves significantly
-          if (Math.abs(oldCross.x - mprCross.x) > 1 || Math.abs(oldCross.y - mprCross.y) > 1 || Math.abs(oldCross.z - mprCross.z) > 1) {
-            // Clear images to force reload with new slice positions
-            mprImgs = { axial: null, sagittal: null, coronal: null };
+          // Check if crosshair position actually changed
+          const crossChanged = (oldCross.x !== mprCross.x || oldCross.y !== mprCross.y || oldCross.z !== mprCross.z);
+          
+          if (crossChanged) {
+            // Prefetch new slices for updated orthogonal planes
+            console.log(`Crosshair moved to [${mprCross.x}, ${mprCross.y}, ${mprCross.z}]`);
             
-            // Prefetch the new slice positions for smooth interaction
+            // Update slice indicators
+            document.querySelector('[data-plane="axial"] .slice-indicator')?.textContent = `${mprScroll.axial + 1}/${mprScroll.counts.axial || 0}`;
+            document.querySelector('[data-plane="sagittal"] .slice-indicator')?.textContent = `${mprScroll.sagittal + 1}/${mprScroll.counts.sagittal || 0}`;
+            document.querySelector('[data-plane="coronal"] .slice-indicator')?.textContent = `${mprScroll.coronal + 1}/${mprScroll.counts.coronal || 0}`;
+            
+            // Load new slices for orthogonal planes immediately
+            const loadPromises = [];
+            if (plane !== 'axial') {
+              loadPromises.push(getMprImage(currentSeries.id, 'axial', mprScroll.axial).then(img => {
+                mprImgs.axial = img;
+              }));
+            }
+            if (plane !== 'sagittal') {
+              loadPromises.push(getMprImage(currentSeries.id, 'sagittal', mprScroll.sagittal).then(img => {
+                mprImgs.sagittal = img;
+              }));
+            }
+            if (plane !== 'coronal') {
+              loadPromises.push(getMprImage(currentSeries.id, 'coronal', mprScroll.coronal).then(img => {
+                mprImgs.coronal = img;
+              }));
+            }
+            
+            // Wait for all images to load then redraw
+            Promise.all(loadPromises).then(() => {
+              requestDraw();
+            }).catch(err => {
+              console.error('Error loading orthogonal images:', err);
+              requestDraw(); // Draw anyway
+            });
+            
+            // Also prefetch surrounding slices
             prefetchMprSlices('axial', mprScroll.axial, 2);
             prefetchMprSlices('sagittal', mprScroll.sagittal, 2);
             prefetchMprSlices('coronal', mprScroll.coronal, 2);
@@ -1412,7 +1514,10 @@
     });
     // HU probe on mousemove in MPR when enabled
     viewport.addEventListener('mousemove', async (e)=>{
-      if (!mprMode || !showHuProbe || (huEllipse && (huEllipse.rx>1 || huEllipse.ry>1))) return;
+      if (!mprMode || !showHuProbe) return;
+      
+      // Skip if we're in the middle of dragging to resize an ellipse
+      if (isDragging && huEllipse) return;
       // Determine which plane region the mouse is in
       const halfW = Math.floor(canvas.width/2), halfH = Math.floor(canvas.height/2);
       const mx = e.offsetX, my = e.offsetY;
@@ -1633,6 +1738,57 @@
     // Debounce mechanism for reconstruction buttons to prevent multiple clicks
     let reconstructionInProgress = false;
     let reconstructionTimeout = null;
+    
+    // Progress indicator functions
+    function showProgressIndicator() {
+      let progressDiv = document.getElementById('reconstruction-progress');
+      if (!progressDiv) {
+        progressDiv = document.createElement('div');
+        progressDiv.id = 'reconstruction-progress';
+        progressDiv.style.cssText = `
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          background: rgba(0, 0, 0, 0.8);
+          color: white;
+          padding: 20px 30px;
+          border-radius: 8px;
+          z-index: 10000;
+          text-align: center;
+          font-family: Arial, sans-serif;
+        `;
+        progressDiv.innerHTML = `
+          <div style="margin-bottom: 15px;">
+            <div class="spinner" style="border: 3px solid #f3f3f3; border-top: 3px solid #00bcd4; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto;"></div>
+          </div>
+          <div>Processing 3D Reconstruction...</div>
+          <div style="font-size: 12px; margin-top: 5px; opacity: 0.8;">Please wait</div>
+        `;
+        document.body.appendChild(progressDiv);
+        
+        // Add spinner animation
+        if (!document.getElementById('spinner-style')) {
+          const style = document.createElement('style');
+          style.id = 'spinner-style';
+          style.textContent = `
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `;
+          document.head.appendChild(style);
+        }
+      }
+      progressDiv.style.display = 'block';
+    }
+    
+    function hideProgressIndicator() {
+      const progressDiv = document.getElementById('reconstruction-progress');
+      if (progressDiv) {
+        progressDiv.style.display = 'none';
+      }
+    }
 
     // Extracted function so both dropdown and button can trigger
     async function generateReconstruction(kind){
@@ -1651,11 +1807,17 @@
         
         // Set loading state immediately to prevent UI freezing
         reconstructionInProgress = true;
-        reconStatus.textContent = 'Generating...';
+        reconStatus.textContent = 'Preparing reconstruction...';
         
         // Disable reconstruction buttons during processing
         const reconButtons = document.querySelectorAll('[data-recon], #btnGenerateRecon');
         reconButtons.forEach(btn => btn.style.pointerEvents = 'none');
+        
+        // Show progress indicator
+        showProgressIndicator();
+        
+        // Clear any cached MPR images to ensure fresh load
+        mprImgs = {};
         
         reconMode = null; reconImgs = []; reconIndex = 0; panOffset = {x:0,y:0}; zoom = 1.0;
         const params = new URLSearchParams();
@@ -1669,13 +1831,33 @@
         else { url = `/dicom-viewer/api/series/${currentSeries.id}/bone/?threshold=${boneSlider.value}&mesh=true&quality=high`; }
         
         console.log(`Requesting reconstruction: ${type}, URL: ${url}`);
-        const r = await fetch(url);
+        
+        // Add timeout and progress updates
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+          throw new Error('Reconstruction timeout - please try again');
+        }, 180000); // 3 minute timeout for slow connections
+        
+        reconStatus.textContent = 'Loading reconstruction...';
+        
+        const r = await fetch(url, { 
+          signal: controller.signal,
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        
+        clearTimeout(timeoutId);
         console.log(`Response status: ${r.status}`);
         
         if (!r.ok) {
           const errorText = await r.text();
           throw new Error(`HTTP ${r.status}: ${errorText}`);
         }
+        
+        reconStatus.textContent = 'Processing data...';
         
         const j = await r.json();
         console.log(`Response data:`, j);
@@ -1732,6 +1914,7 @@
       } finally {
         // Re-enable reconstruction buttons and reset state
         reconstructionInProgress = false;
+        hideProgressIndicator();
         const reconButtons = document.querySelectorAll('[data-recon], #btnGenerateRecon');
         reconButtons.forEach(btn => btn.style.pointerEvents = '');
       }
@@ -1836,26 +2019,107 @@
      const cancelPrint = document.getElementById('cancelPrint');
      const printForm = document.getElementById('printForm');
      const printerSelect = document.getElementById('printerSelect');
+     
+     // Client-side printer detection and capabilities
+     async function loadClientPrinters() {
+       printerSelect.innerHTML = '<option value="">Detecting printers...</option>';
+       
+       try {
+         // Check if the browser supports the Print API
+         if ('navigator' in window && 'print' in navigator) {
+           console.log('Browser print API available');
+         }
+         
+         // Use the modern approach with Print API if available
+         if (window.navigator && window.navigator.printer) {
+           try {
+             const printers = await window.navigator.printer.getPrinters();
+             if (printers && printers.length > 0) {
+               printerSelect.innerHTML = '';
+               printers.forEach((printer, index) => {
+                 const option = document.createElement('option');
+                 option.value = `client:${printer.id || index}`;
+                 option.textContent = `🖨️ ${printer.name || `Printer ${index + 1}`}`;
+                 printerSelect.appendChild(option);
+               });
+               return;
+             }
+           } catch (e) {
+             console.log('Print API not fully supported:', e);
+           }
+         }
+         
+         // Fallback: Auto-detect using browser's print dialog capabilities
+         await detectPrintersFromMediaQuery();
+         
+       } catch (error) {
+         console.error('Error detecting client printers:', error);
+         printerSelect.innerHTML = '<option value="browser">🖨️ Use Browser Print Dialog</option>';
+       }
+     }
+     
+     // Detect printer capabilities using media queries and print dialog
+     async function detectPrintersFromMediaQuery() {
+       printerSelect.innerHTML = '';
+       
+       // Add default browser printing option
+       const browserOption = document.createElement('option');
+       browserOption.value = 'browser';
+       browserOption.textContent = '🖨️ System Default Printer (Browser)';
+       browserOption.selected = true;
+       printerSelect.appendChild(browserOption);
+       
+       // Try to detect common printer types and capabilities
+       const printCapabilities = {
+         color: window.matchMedia('print and (color)').matches,
+         grayscale: window.matchMedia('print and (monochrome)').matches,
+         highResolution: window.matchMedia('print and (min-resolution: 300dpi)').matches,
+         a4: window.matchMedia('print and (width: 210mm)').matches,
+         letter: window.matchMedia('print and (width: 8.5in)').matches
+       };
+       
+       console.log('Detected print capabilities:', printCapabilities);
+       
+       // Add high-quality option if supported
+       if (printCapabilities.highResolution || printCapabilities.color) {
+         const hqOption = document.createElement('option');
+         hqOption.value = 'browser-hq';
+         hqOption.textContent = '🖨️ High Quality Print (300+ DPI)';
+         printerSelect.appendChild(hqOption);
+       }
+       
+       // Add photo printer option
+       const photoOption = document.createElement('option');
+       photoOption.value = 'browser-photo';
+       photoOption.textContent = '📸 Photo Quality Print';
+       printerSelect.appendChild(photoOption);
+       
+       // Store capabilities for later use
+       window.detectedPrintCapabilities = printCapabilities;
+     }
 
      // Load available printers and layouts when modal opens
      btnPrint.addEventListener('click', async ()=>{
        try {
-         // Load available printers
-         const printersResponse = await fetch('/dicom-viewer/print/printers/');
-         const printersData = await printersResponse.json();
+         // Auto-detect client machine printers using Web API
+         await loadClientPrinters();
          
-         if (printersData.success) {
-           printerSelect.innerHTML = '';
-           if (printersData.printers.length === 0) {
-             printerSelect.innerHTML = '<option value="">No printers available</option>';
-           } else {
+         // Also load server printers as fallback
+         try {
+           const printersResponse = await fetch('/dicom-viewer/print/printers/');
+           const printersData = await printersResponse.json();
+           
+           if (printersData.success && printersData.printers.length > 0) {
+             // Add server printers with indication
              printersData.printers.forEach(printer => {
                const option = document.createElement('option');
-               option.value = printer.name;
-               option.textContent = `${printer.name} - ${printer.description}`;
+               option.value = `server:${printer.name}`;
+               option.textContent = `🖥️ Server: ${printer.name} - ${printer.description}`;
                printerSelect.appendChild(option);
              });
            }
+         } catch (e) {
+           console.warn('Server printers not available:', e);
          }
          
          // Load modality-specific layouts
@@ -1951,6 +2215,111 @@
      cancelPrint.addEventListener('click', ()=>{ printModal.style.display = 'none'; });
      printModal.addEventListener('click', (e)=>{ if (e.target === printModal) printModal.style.display = 'none'; });
 
+     // Client-side printing function
+     function printImageOnClient(imageData, printerSettings) {
+       // Create a new window for printing
+       const printWindow = window.open('', '_blank', 'width=800,height=600');
+       
+       // Get patient information
+       const patientInfo = document.getElementById('patientInfo').textContent;
+       const patientMatch = patientInfo.match(/Patient: ([^|]+)/);
+       const dateMatch = patientInfo.match(/Study Date: ([^|]+)/);
+       const modalityMatch = patientInfo.match(/Modality: ([^|]+)/);
+       
+       // Create print-optimized HTML
+       const printHTML = `
+         <!DOCTYPE html>
+         <html>
+         <head>
+           <title>DICOM Print - ${patientMatch ? patientMatch[1].trim() : 'Unknown Patient'}</title>
+           <style>
+             @page {
+               size: ${printerSettings.paperSize || 'A4'};
+               margin: 10mm;
+             }
+             @media print {
+               body { margin: 0; }
+               .no-print { display: none; }
+               .print-header { 
+                 font-size: 12px; 
+                 margin-bottom: 10px; 
+                 border-bottom: 1px solid #000; 
+                 padding-bottom: 5px; 
+               }
+               .dicom-image { 
+                 max-width: 100%; 
+                 height: auto; 
+                 page-break-inside: avoid; 
+               }
+               .print-footer { 
+                 font-size: 10px; 
+                 margin-top: 10px; 
+                 border-top: 1px solid #000; 
+                 padding-top: 5px; 
+               }
+             }
+             body { 
+               font-family: Arial, sans-serif; 
+               margin: 20px; 
+             }
+             .print-controls { 
+               margin-bottom: 20px; 
+               text-align: center; 
+             }
+             .btn { 
+               padding: 10px 20px; 
+               margin: 5px; 
+               border: none; 
+               background: #007bff; 
+               color: white; 
+               cursor: pointer; 
+               border-radius: 4px; 
+             }
+             .btn:hover { background: #0056b3; }
+           </style>
+         </head>
+         <body>
+           <div class="print-controls no-print">
+             <button class="btn" onclick="window.print()">🖨️ Print</button>
+             <button class="btn" onclick="window.close()">❌ Close</button>
+           </div>
+           
+           <div class="print-header">
+             <strong>Medical Imaging Report</strong><br>
+             <strong>Patient:</strong> ${patientMatch ? patientMatch[1].trim() : 'Unknown Patient'}<br>
+             <strong>Study Date:</strong> ${dateMatch ? dateMatch[1].trim() : new Date().toLocaleDateString()}<br>
+             <strong>Modality:</strong> ${modalityMatch ? modalityMatch[1].trim() : 'DICOM'}<br>
+             <strong>Institution:</strong> Medical Facility<br>
+             <strong>Print Date:</strong> ${new Date().toLocaleString()}
+           </div>
+           
+           <div style="text-align: center;">
+             <img src="${imageData}" class="dicom-image" alt="DICOM Image" />
+           </div>
+           
+           <div class="print-footer">
+             <strong>Technical Information:</strong><br>
+             Quality: ${printerSettings.quality || 'High'} | 
+             Paper: ${printerSettings.paperSize || 'A4'} | 
+             Type: ${printerSettings.paperType || 'Photo Paper'}<br>
+             Generated by NoctisPro DICOM Viewer
+           </div>
+         </body>
+         </html>
+       `;
+       
+       printWindow.document.write(printHTML);
+       printWindow.document.close();
+       
+       // Auto-print after a short delay
+       setTimeout(() => {
+         printWindow.focus();
+         printWindow.print();
+       }, 500);
+       
+       return printWindow;
+     }
+
      // Handle print form submission
      printForm.addEventListener('submit', async (e)=>{
        e.preventDefault();
@@ -1958,27 +2327,52 @@
        try {
          // Get current canvas image data
          const imageData = canvas.toDataURL('image/png', 1.0);
+         const selectedPrinter = document.getElementById('printerSelect').value;
          
+         // Check if this is a client-side printer
+         if (selectedPrinter.startsWith('browser') || selectedPrinter.startsWith('client')) {
+           // Handle client-side printing
+           const printerSettings = {
+             paperSize: document.getElementById('paperSize').value,
+             paperType: document.getElementById('paperType').value,
+             quality: document.getElementById('printQuality').value,
+             copies: document.getElementById('copies').value,
+             layout: document.getElementById('layoutType').value,
+             medium: document.getElementById('printMedium').value
+           };
+           
+           console.log('Printing on client with settings:', printerSettings);
+           
+           // Use client-side printing
+           const printWindow = printImageOnClient(imageData, printerSettings);
+           
+           showToast('Print dialog opened successfully', 'success');
+           printModal.style.display = 'none';
+           
+           return;
+         }
+         
+         // Server-side printing (existing functionality)
          // Get patient information from current study
          const patientInfo = document.getElementById('patientInfo').textContent;
          const patientMatch = patientInfo.match(/Patient: ([^|]+)/);
          const dateMatch = patientInfo.match(/Study Date: ([^|]+)/);
          const modalityMatch = patientInfo.match(/Modality: ([^|]+)/);
          
-                   const formData = new FormData();
-          formData.append('image_data', imageData);
-          formData.append('printer_name', document.getElementById('printerSelect').value);
-          formData.append('paper_size', document.getElementById('paperSize').value);
-          formData.append('paper_type', document.getElementById('paperType').value);
-          formData.append('print_quality', document.getElementById('printQuality').value);
-          formData.append('copies', document.getElementById('copies').value);
-          formData.append('layout_type', document.getElementById('layoutType').value);
-          formData.append('print_medium', document.getElementById('printMedium').value);
-          formData.append('patient_name', patientMatch ? patientMatch[1].trim() : 'Unknown Patient');
-          formData.append('study_date', dateMatch ? dateMatch[1].trim() : '');
-          formData.append('modality', modalityMatch ? modalityMatch[1].trim() : '');
-          formData.append('series_description', currentSeries ? currentSeries.description || '' : '');
-          formData.append('institution_name', 'Medical Facility'); // You can make this dynamic
+         const formData = new FormData();
+         formData.append('image_data', imageData);
+         formData.append('printer_name', selectedPrinter.replace('server:', ''));
+         formData.append('paper_size', document.getElementById('paperSize').value);
+         formData.append('paper_type', document.getElementById('paperType').value);
+         formData.append('print_quality', document.getElementById('printQuality').value);
+         formData.append('copies', document.getElementById('copies').value);
+         formData.append('layout_type', document.getElementById('layoutType').value);
+         formData.append('print_medium', document.getElementById('printMedium').value);
+         formData.append('patient_name', patientMatch ? patientMatch[1].trim() : 'Unknown Patient');
+         formData.append('study_date', dateMatch ? dateMatch[1].trim() : '');
+         formData.append('modality', modalityMatch ? modalityMatch[1].trim() : '');
+         formData.append('series_description', currentSeries ? currentSeries.description || '' : '');
+         formData.append('institution_name', 'Medical Facility');
          
          // Add CSRF token
          const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 

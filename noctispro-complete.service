@@ -1,0 +1,47 @@
+[Unit]
+Description=NoctisPro Complete System with Ngrok
+After=network.target postgresql.service redis-server.service
+Wants=postgresql.service redis-server.service
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=forking
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/workspace
+Environment=PATH=/workspace/venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=HOME=/home/ubuntu
+EnvironmentFile=-/workspace/.env.production
+EnvironmentFile=-/workspace/.env.ngrok
+
+# Pre-start checks and setup
+ExecStartPre=/bin/bash -c 'systemctl is-active postgresql || systemctl start postgresql'
+ExecStartPre=/bin/bash -c 'systemctl is-active redis-server || systemctl start redis-server'
+ExecStartPre=/bin/sleep 10
+ExecStartPre=/bin/bash -c 'cd /workspace && source venv/bin/activate && python manage.py migrate --noinput'
+ExecStartPre=/bin/bash -c 'cd /workspace && source venv/bin/activate && python manage.py collectstatic --noinput'
+
+# Start the complete system
+ExecStart=/workspace/start_complete_system.sh
+
+# Stop command
+ExecStop=/workspace/stop_complete_system.sh
+
+# Restart settings
+Restart=always
+RestartSec=10
+TimeoutStartSec=300
+TimeoutStopSec=60
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=noctispro-complete
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

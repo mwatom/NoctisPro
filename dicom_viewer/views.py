@@ -2311,10 +2311,13 @@ def _get_mpr_volume_and_spacing(series, force_rebuild=False):
     - Optionally resamples along Z to approximate isotropic voxels based on in-plane pixel spacing
       to improve MPR quality without degrading in-plane resolution
     - Uses tiny LRU cache; extends existing cache entry with spacing when available
+    - Optimized for browser responsiveness and no freezing
     """
     import numpy as _np
     import pydicom as _pydicom
     import os as _os
+    import gc
+    import time
 
     # Try cache first
     with _MPR_CACHE_LOCK:
@@ -2334,25 +2337,40 @@ def _get_mpr_volume_and_spacing(series, force_rebuild=False):
     first_ps = (1.0, 1.0)
     st = None
     normal = None
-    for img in images_qs:
-        try:
-            dicom_path = _os.path.join(settings.MEDIA_ROOT, str(img.file_path))
-            ds = _pydicom.dcmread(dicom_path)
+    start_time = time.time()
+    
+    # Process images in batches to prevent browser freezing
+    batch_size = 10
+    image_list = list(images_qs)
+    
+    for batch_start in range(0, len(image_list), batch_size):
+        batch_end = min(batch_start + batch_size, len(image_list))
+        batch_images = image_list[batch_start:batch_end]
+        
+        for img in batch_images:
             try:
-                arr = ds.pixel_array.astype(_np.float32)
-            except Exception:
+                # Check for timeout to prevent browser freezing
+                if time.time() - start_time > 30:  # 30 second timeout
+                    logger.warning(f"Volume loading timeout for series {series.id}")
+                    break
+                    
+                dicom_path = _os.path.join(settings.MEDIA_ROOT, str(img.file_path))
+                ds = _pydicom.dcmread(dicom_path)
                 try:
-                    import SimpleITK as _sitk
-                    sitk_image = _sitk.ReadImage(dicom_path)
-                    px = _sitk.GetArrayFromImage(sitk_image)
-                    if px.ndim == 3 and px.shape[0] == 1:
-                        px = px[0]
-                    arr = px.astype(_np.float32)
+                    arr = ds.pixel_array.astype(_np.float32)
                 except Exception:
-                    continue
-            slope = float(getattr(ds, 'RescaleSlope', 1.0) or 1.0)
-            intercept = float(getattr(ds, 'RescaleIntercept', 0.0) or 0.0)
-            arr = arr * slope + intercept
+                    try:
+                        import SimpleITK as _sitk
+                        sitk_image = _sitk.ReadImage(dicom_path)
+                        px = _sitk.GetArrayFromImage(sitk_image)
+                        if px.ndim == 3 and px.shape[0] == 1:
+                            px = px[0]
+                        arr = px.astype(_np.float32)
+                    except Exception:
+                        continue
+                slope = float(getattr(ds, 'RescaleSlope', 1.0) or 1.0)
+                intercept = float(getattr(ds, 'RescaleIntercept', 0.0) or 0.0)
+                arr = arr * slope + intercept
 
             # Orientation-aware sorting
             pos = getattr(ds, 'ImagePositionPatient', None)
@@ -2402,29 +2420,42 @@ def _get_mpr_volume_and_spacing(series, force_rebuild=False):
     volume = _np.stack([a for _, a in items], axis=0)
 
     # Enhanced interpolation for thin stacks - optimized for minimal images
-    # Use high-quality interpolation for better 3D reconstruction
+    # Use optimized interpolation to prevent freezing
     original_depth = volume.shape[0]
-    if volume.shape[0] < 32:  # Increased threshold for better quality
+    
+    # Limit interpolation to prevent memory issues and browser freezing
+    max_volume_size = 512 * 512 * 512  # Limit volume size to prevent freezing
+    current_size = volume.shape[0] * volume.shape[1] * volume.shape[2]
+    
+    if volume.shape[0] < 32 and current_size < max_volume_size:  # Only if safe to interpolate
         # Calculate optimal interpolation factor for minimal images
         if volume.shape[0] < 8:
-            # Very few images - use maximum interpolation
-            target_slices = max(64, volume.shape[0] * 8)
+            # Very few images - use controlled interpolation
+            target_slices = min(64, volume.shape[0] * 6)  # Reduced factor
         else:
             # Moderate number of images
-            target_slices = max(32, volume.shape[0] * 4)
+            target_slices = min(32, volume.shape[0] * 3)  # Reduced factor
         
         factor = target_slices / volume.shape[0]
         
-        # Use high-quality spline interpolation for better results
-        try:
-            volume = ndimage.zoom(volume, (factor, 1, 1), order=3, prefilter=True)
-            st = st / factor
-            logger.info(f"Enhanced interpolation: {original_depth} -> {volume.shape[0]} slices (factor: {factor:.2f})")
-        except Exception as e:
-            logger.warning(f"High-quality interpolation failed, using linear: {e}")
-            # Fallback to linear interpolation
-            volume = ndimage.zoom(volume, (factor, 1, 1), order=1)
-            st = st / factor
+        # Check if interpolated volume would be too large
+        projected_size = int(volume.shape[0] * factor) * volume.shape[1] * volume.shape[2]
+        
+        if projected_size < max_volume_size:
+            # Use linear interpolation for speed and stability
+            try:
+                volume = ndimage.zoom(volume, (factor, 1, 1), order=1, prefilter=False)
+                st = st / factor
+                logger.info(f"Safe interpolation: {original_depth} -> {volume.shape[0]} slices (factor: {factor:.2f})")
+            except Exception as e:
+                logger.warning(f"Interpolation failed, using original volume: {e}")
+        else:
+            logger.info(f"Skipping interpolation - volume would be too large: {projected_size}")
+    else:
+        logger.info(f"Skipping interpolation - volume sufficient or too large: {volume.shape}")
+        
+    # Garbage collection to free memory
+    gc.collect()
 
     # Resample along Z to approximate isotropic voxels using in-plane pixel spacing average
     # Keep in-plane resolution; only resample depth for quality MPR
