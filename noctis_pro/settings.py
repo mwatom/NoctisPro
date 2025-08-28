@@ -58,12 +58,14 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # Re-enabled
     'django.middleware.security.SecurityMiddleware',
+    'noctis_pro.middleware.SlowConnectionOptimizationMiddleware',  # Connection detection
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'noctis_pro.middleware.ImageOptimizationMiddleware',  # Image optimization
 ]
 
 ROOT_URLCONF = 'noctis_pro.urls'
@@ -153,6 +155,25 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # DICOM files storage
 DICOM_ROOT = os.path.join(MEDIA_ROOT, 'dicom')
+
+# Image optimization settings for slow connections
+IMAGE_OPTIMIZATION = {
+    'ENABLE': True,
+    'DEFAULT_QUALITY': 70,
+    'SLOW_CONNECTION_QUALITY': 50,
+    'MAX_WIDTH': 1920,
+    'MAX_HEIGHT': 1080,
+    'SLOW_CONNECTION_MAX_WIDTH': 800,
+    'SLOW_CONNECTION_MAX_HEIGHT': 600,
+    'FORMATS': {
+        'auto': True,  # Auto-detect best format
+        'webp': True,  # Enable WebP for better compression
+        'jpeg': True,
+        'png': True,
+    },
+    'CACHE_OPTIMIZED': True,  # Cache optimized images
+    'CACHE_TTL': 86400,  # 24 hours
+}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

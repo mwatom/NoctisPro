@@ -61,7 +61,12 @@ if ngrok config check > /dev/null 2>&1; then
     
     # Determine which tunnel to start based on configuration
     if [ "${NGROK_USE_STATIC:-false}" = "true" ]; then
-        if [ ! -z "${NGROK_DOMAIN:-}" ]; then
+        if [ ! -z "${NGROK_STATIC_URL:-}" ]; then
+            echo "🌐 Starting ngrok with specific static URL: $NGROK_STATIC_URL"
+            ngrok http --url=https://$NGROK_STATIC_URL ${DJANGO_PORT:-80} --log=stdout > ngrok.log 2>&1 &
+            TUNNEL_TYPE="specific static URL"
+            EXPECTED_URL="https://$NGROK_STATIC_URL"
+        elif [ ! -z "${NGROK_DOMAIN:-}" ]; then
             echo "🌐 Starting ngrok with custom domain: $NGROK_DOMAIN"
             ngrok start noctispro-domain --log=stdout > ngrok.log 2>&1 &
             TUNNEL_TYPE="custom domain"
@@ -152,7 +157,7 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 # Start Django server
-python manage.py runserver 0.0.0.0:8000
+python manage.py runserver ${DJANGO_HOST:-0.0.0.0}:${DJANGO_PORT:-80}
 
 # Cleanup when Django exits
 cleanup
