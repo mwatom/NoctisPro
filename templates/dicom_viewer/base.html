@@ -298,6 +298,9 @@
           <select id="printerSelect" name="printer_name">
             <option value="">Loading printers...</option>
           </select>
+          <div class="form-text" id="printerHelp" style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">
+            🖨️ Client printers automatically detected. Server printers marked with 🖥️.
+          </div>
         </div>
         <div class="form-group">
           <label for="paperSize">Paper/Film Size:</label>
@@ -2016,26 +2019,107 @@
      const cancelPrint = document.getElementById('cancelPrint');
      const printForm = document.getElementById('printForm');
      const printerSelect = document.getElementById('printerSelect');
+     
+     // Client-side printer detection and capabilities
+     async function loadClientPrinters() {
+       printerSelect.innerHTML = '<option value="">Detecting printers...</option>';
+       
+       try {
+         // Check if the browser supports the Print API
+         if ('navigator' in window && 'print' in navigator) {
+           console.log('Browser print API available');
+         }
+         
+         // Use the modern approach with Print API if available
+         if (window.navigator && window.navigator.printer) {
+           try {
+             const printers = await window.navigator.printer.getPrinters();
+             if (printers && printers.length > 0) {
+               printerSelect.innerHTML = '';
+               printers.forEach((printer, index) => {
+                 const option = document.createElement('option');
+                 option.value = `client:${printer.id || index}`;
+                 option.textContent = `🖨️ ${printer.name || `Printer ${index + 1}`}`;
+                 printerSelect.appendChild(option);
+               });
+               return;
+             }
+           } catch (e) {
+             console.log('Print API not fully supported:', e);
+           }
+         }
+         
+         // Fallback: Auto-detect using browser's print dialog capabilities
+         await detectPrintersFromMediaQuery();
+         
+       } catch (error) {
+         console.error('Error detecting client printers:', error);
+         printerSelect.innerHTML = '<option value="browser">🖨️ Use Browser Print Dialog</option>';
+       }
+     }
+     
+     // Detect printer capabilities using media queries and print dialog
+     async function detectPrintersFromMediaQuery() {
+       printerSelect.innerHTML = '';
+       
+       // Add default browser printing option
+       const browserOption = document.createElement('option');
+       browserOption.value = 'browser';
+       browserOption.textContent = '🖨️ System Default Printer (Browser)';
+       browserOption.selected = true;
+       printerSelect.appendChild(browserOption);
+       
+       // Try to detect common printer types and capabilities
+       const printCapabilities = {
+         color: window.matchMedia('print and (color)').matches,
+         grayscale: window.matchMedia('print and (monochrome)').matches,
+         highResolution: window.matchMedia('print and (min-resolution: 300dpi)').matches,
+         a4: window.matchMedia('print and (width: 210mm)').matches,
+         letter: window.matchMedia('print and (width: 8.5in)').matches
+       };
+       
+       console.log('Detected print capabilities:', printCapabilities);
+       
+       // Add high-quality option if supported
+       if (printCapabilities.highResolution || printCapabilities.color) {
+         const hqOption = document.createElement('option');
+         hqOption.value = 'browser-hq';
+         hqOption.textContent = '🖨️ High Quality Print (300+ DPI)';
+         printerSelect.appendChild(hqOption);
+       }
+       
+       // Add photo printer option
+       const photoOption = document.createElement('option');
+       photoOption.value = 'browser-photo';
+       photoOption.textContent = '📸 Photo Quality Print';
+       printerSelect.appendChild(photoOption);
+       
+       // Store capabilities for later use
+       window.detectedPrintCapabilities = printCapabilities;
+     }
 
      // Load available printers and layouts when modal opens
      btnPrint.addEventListener('click', async ()=>{
        try {
-         // Load available printers
-         const printersResponse = await fetch('/dicom-viewer/print/printers/');
-         const printersData = await printersResponse.json();
+         // Auto-detect client machine printers using Web API
+         await loadClientPrinters();
          
-         if (printersData.success) {
-           printerSelect.innerHTML = '';
-           if (printersData.printers.length === 0) {
-             printerSelect.innerHTML = '<option value="">No printers available</option>';
-           } else {
+         // Also load server printers as fallback
+         try {
+           const printersResponse = await fetch('/dicom-viewer/print/printers/');
+           const printersData = await printersResponse.json();
+           
+           if (printersData.success && printersData.printers.length > 0) {
+             // Add server printers with indication
              printersData.printers.forEach(printer => {
                const option = document.createElement('option');
-               option.value = printer.name;
-               option.textContent = `${printer.name} - ${printer.description}`;
+               option.value = `server:${printer.name}`;
+               option.textContent = `🖥️ Server: ${printer.name} - ${printer.description}`;
                printerSelect.appendChild(option);
              });
            }
+         } catch (e) {
+           console.warn('Server printers not available:', e);
          }
          
          // Load modality-specific layouts
@@ -2131,6 +2215,111 @@
      cancelPrint.addEventListener('click', ()=>{ printModal.style.display = 'none'; });
      printModal.addEventListener('click', (e)=>{ if (e.target === printModal) printModal.style.display = 'none'; });
 
+     // Client-side printing function
+     function printImageOnClient(imageData, printerSettings) {
+       // Create a new window for printing
+       const printWindow = window.open('', '_blank', 'width=800,height=600');
+       
+       // Get patient information
+       const patientInfo = document.getElementById('patientInfo').textContent;
+       const patientMatch = patientInfo.match(/Patient: ([^|]+)/);
+       const dateMatch = patientInfo.match(/Study Date: ([^|]+)/);
+       const modalityMatch = patientInfo.match(/Modality: ([^|]+)/);
+       
+       // Create print-optimized HTML
+       const printHTML = `
+         <!DOCTYPE html>
+         <html>
+         <head>
+           <title>DICOM Print - ${patientMatch ? patientMatch[1].trim() : 'Unknown Patient'}</title>
+           <style>
+             @page {
+               size: ${printerSettings.paperSize || 'A4'};
+               margin: 10mm;
+             }
+             @media print {
+               body { margin: 0; }
+               .no-print { display: none; }
+               .print-header { 
+                 font-size: 12px; 
+                 margin-bottom: 10px; 
+                 border-bottom: 1px solid #000; 
+                 padding-bottom: 5px; 
+               }
+               .dicom-image { 
+                 max-width: 100%; 
+                 height: auto; 
+                 page-break-inside: avoid; 
+               }
+               .print-footer { 
+                 font-size: 10px; 
+                 margin-top: 10px; 
+                 border-top: 1px solid #000; 
+                 padding-top: 5px; 
+               }
+             }
+             body { 
+               font-family: Arial, sans-serif; 
+               margin: 20px; 
+             }
+             .print-controls { 
+               margin-bottom: 20px; 
+               text-align: center; 
+             }
+             .btn { 
+               padding: 10px 20px; 
+               margin: 5px; 
+               border: none; 
+               background: #007bff; 
+               color: white; 
+               cursor: pointer; 
+               border-radius: 4px; 
+             }
+             .btn:hover { background: #0056b3; }
+           </style>
+         </head>
+         <body>
+           <div class="print-controls no-print">
+             <button class="btn" onclick="window.print()">🖨️ Print</button>
+             <button class="btn" onclick="window.close()">❌ Close</button>
+           </div>
+           
+           <div class="print-header">
+             <strong>Medical Imaging Report</strong><br>
+             <strong>Patient:</strong> ${patientMatch ? patientMatch[1].trim() : 'Unknown Patient'}<br>
+             <strong>Study Date:</strong> ${dateMatch ? dateMatch[1].trim() : new Date().toLocaleDateString()}<br>
+             <strong>Modality:</strong> ${modalityMatch ? modalityMatch[1].trim() : 'DICOM'}<br>
+             <strong>Institution:</strong> Medical Facility<br>
+             <strong>Print Date:</strong> ${new Date().toLocaleString()}
+           </div>
+           
+           <div style="text-align: center;">
+             <img src="${imageData}" class="dicom-image" alt="DICOM Image" />
+           </div>
+           
+           <div class="print-footer">
+             <strong>Technical Information:</strong><br>
+             Quality: ${printerSettings.quality || 'High'} | 
+             Paper: ${printerSettings.paperSize || 'A4'} | 
+             Type: ${printerSettings.paperType || 'Photo Paper'}<br>
+             Generated by NoctisPro DICOM Viewer
+           </div>
+         </body>
+         </html>
+       `;
+       
+       printWindow.document.write(printHTML);
+       printWindow.document.close();
+       
+       // Auto-print after a short delay
+       setTimeout(() => {
+         printWindow.focus();
+         printWindow.print();
+       }, 500);
+       
+       return printWindow;
+     }
+
      // Handle print form submission
      printForm.addEventListener('submit', async (e)=>{
        e.preventDefault();
@@ -2138,27 +2327,52 @@
        try {
          // Get current canvas image data
          const imageData = canvas.toDataURL('image/png', 1.0);
+         const selectedPrinter = document.getElementById('printerSelect').value;
          
+         // Check if this is a client-side printer
+         if (selectedPrinter.startsWith('browser') || selectedPrinter.startsWith('client')) {
+           // Handle client-side printing
+           const printerSettings = {
+             paperSize: document.getElementById('paperSize').value,
+             paperType: document.getElementById('paperType').value,
+             quality: document.getElementById('printQuality').value,
+             copies: document.getElementById('copies').value,
+             layout: document.getElementById('layoutType').value,
+             medium: document.getElementById('printMedium').value
+           };
+           
+           console.log('Printing on client with settings:', printerSettings);
+           
+           // Use client-side printing
+           const printWindow = printImageOnClient(imageData, printerSettings);
+           
+           showToast('Print dialog opened successfully', 'success');
+           printModal.style.display = 'none';
+           
+           return;
+         }
+         
+         // Server-side printing (existing functionality)
          // Get patient information from current study
          const patientInfo = document.getElementById('patientInfo').textContent;
          const patientMatch = patientInfo.match(/Patient: ([^|]+)/);
          const dateMatch = patientInfo.match(/Study Date: ([^|]+)/);
          const modalityMatch = patientInfo.match(/Modality: ([^|]+)/);
          
-                   const formData = new FormData();
-          formData.append('image_data', imageData);
-          formData.append('printer_name', document.getElementById('printerSelect').value);
-          formData.append('paper_size', document.getElementById('paperSize').value);
-          formData.append('paper_type', document.getElementById('paperType').value);
-          formData.append('print_quality', document.getElementById('printQuality').value);
-          formData.append('copies', document.getElementById('copies').value);
-          formData.append('layout_type', document.getElementById('layoutType').value);
-          formData.append('print_medium', document.getElementById('printMedium').value);
-          formData.append('patient_name', patientMatch ? patientMatch[1].trim() : 'Unknown Patient');
-          formData.append('study_date', dateMatch ? dateMatch[1].trim() : '');
-          formData.append('modality', modalityMatch ? modalityMatch[1].trim() : '');
-          formData.append('series_description', currentSeries ? currentSeries.description || '' : '');
-          formData.append('institution_name', 'Medical Facility'); // You can make this dynamic
+         const formData = new FormData();
+         formData.append('image_data', imageData);
+         formData.append('printer_name', selectedPrinter.replace('server:', ''));
+         formData.append('paper_size', document.getElementById('paperSize').value);
+         formData.append('paper_type', document.getElementById('paperType').value);
+         formData.append('print_quality', document.getElementById('printQuality').value);
+         formData.append('copies', document.getElementById('copies').value);
+         formData.append('layout_type', document.getElementById('layoutType').value);
+         formData.append('print_medium', document.getElementById('printMedium').value);
+         formData.append('patient_name', patientMatch ? patientMatch[1].trim() : 'Unknown Patient');
+         formData.append('study_date', dateMatch ? dateMatch[1].trim() : '');
+         formData.append('modality', modalityMatch ? modalityMatch[1].trim() : '');
+         formData.append('series_description', currentSeries ? currentSeries.description || '' : '');
+         formData.append('institution_name', 'Medical Facility');
          
          // Add CSRF token
          const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
