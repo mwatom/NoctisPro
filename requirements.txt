@@ -71,8 +71,8 @@ django-extensions
 
 # Printing support for DICOM images
 reportlab
-pycups
-python-escpos
+# pycups  # Commented out - requires CUPS development headers
+# python-escpos  # Commented out - depends on pycups
 
 # Health checks and monitoring
 django-health-check

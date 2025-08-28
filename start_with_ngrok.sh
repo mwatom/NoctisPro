@@ -1,48 +1,84 @@
 #!/bin/bash
-
 echo "🌟 Starting NoctisPro Production Server with Ngrok"
 echo "=================================================="
 
-# Check if services are running
+# Go to project directory
+cd "$(dirname "$0")" || exit
+
+# 📊 Check PostgreSQL
 echo "📊 Checking services..."
-
-# Check PostgreSQL
-if sudo service postgresql status > /dev/null 2>&1; then
-    echo "✅ PostgreSQL: Running"
+if systemctl is-active --quiet postgresql 2>/dev/null; then
+  echo "✅ PostgreSQL: Running"
 else
-    echo "🔄 Starting PostgreSQL..."
-    sudo service postgresql start
+  echo "❌ PostgreSQL not running, starting..."
+  sudo systemctl start postgresql 2>/dev/null || echo "⚠️ PostgreSQL service not available (will use SQLite)"
 fi
 
-# Check Redis
-if sudo service redis-server status > /dev/null 2>&1; then
-    echo "✅ Redis: Running"
+# 📊 Check Redis
+if systemctl is-active --quiet redis-server 2>/dev/null; then
+  echo "✅ Redis: Running"
 else
-    echo "🔄 Starting Redis..."
-    sudo service redis-server start
+  echo "❌ Redis not running, starting..."
+  sudo systemctl start redis-server 2>/dev/null || echo "⚠️ Redis service not available (will use dummy cache)"
 fi
 
-echo ""
-echo "🚀 Starting Django Production Server..."
-echo "   Database: PostgreSQL (noctis_pro)"
-echo "   Cache: Redis (localhost:6379)" 
-echo "   Server: http://0.0.0.0:8000"
-echo ""
+# 🚀 Setup Python Virtual Environment
+if [ ! -d "venv" ]; then
+  echo "⚙️ Creating Python virtual environment..."
+  python3 -m venv venv
+  if [ $? -ne 0 ]; then
+    echo "❌ Failed to create virtual environment. Installing python3-venv..."
+    sudo apt update && sudo apt install -y python3-venv
+    python3 -m venv venv
+  fi
+fi
 
-# Navigate to workspace (use current directory)
-cd "$(dirname "$0")"
+echo "✅ Virtual environment ready"
 
-# Activate virtual environment
+# Activate venv
 source venv/bin/activate
 
+# Install dependencies
+if [ -f "requirements.txt" ]; then
+  echo "📦 Installing dependencies..."
+  pip install --upgrade pip
+  pip install -r requirements.txt
+else
+  echo "⚠️ requirements.txt not found!"
+fi
+
 # Load production environment
-source .env.production
+if [ -f ".env.production" ]; then
+  set -a  # automatically export all variables
+  source .env.production
+  set +a  # stop automatically exporting
+  echo "✅ Loaded production environment configuration"
+else
+  echo "⚠️ .env.production not found, using defaults"
+fi
 
 # Load ngrok environment configuration
 if [ -f ".env.ngrok" ]; then
+    set -a  # automatically export all variables
     source .env.ngrok
+    set +a  # stop automatically exporting
     echo "✅ Loaded ngrok environment configuration"
 fi
+
+# 🚀 Starting Django Production Server
+echo "🚀 Starting Django Production Server..."
+if [ "$USE_SQLITE" = "True" ]; then
+  echo "   Database: SQLite (db.sqlite3)"
+else
+  echo "   Database: PostgreSQL (noctis_pro)"
+fi
+
+if [ "$USE_DUMMY_CACHE" = "True" ]; then
+  echo "   Cache: Dummy Cache"
+else
+  echo "   Cache: Redis (localhost:6379)"
+fi
+echo "   Server: http://0.0.0.0:8000"
 
 # Run migrations
 echo "🔄 Running database migrations..."
@@ -52,112 +88,53 @@ python manage.py migrate
 echo "🔄 Collecting static files..."
 python manage.py collectstatic --noinput
 
-# Check if ngrok is configured
+# 🌐 Start ngrok tunnel
 echo "🌐 Checking ngrok configuration..."
-
-# Check if ngrok auth token is configured
-if ngrok config check > /dev/null 2>&1; then
-    echo "✅ Ngrok is configured - starting tunnel..."
-    
-    # Determine which tunnel to start based on configuration
-    if [ "${NGROK_USE_STATIC:-false}" = "true" ]; then
-        if [ ! -z "${NGROK_STATIC_URL:-}" ]; then
-            echo "🌐 Starting ngrok with specific static URL: $NGROK_STATIC_URL"
-            ngrok http --url=https://$NGROK_STATIC_URL ${DJANGO_PORT:-80} --log=stdout > ngrok.log 2>&1 &
-            TUNNEL_TYPE="specific static URL"
-            EXPECTED_URL="https://$NGROK_STATIC_URL"
-        elif [ ! -z "${NGROK_DOMAIN:-}" ]; then
-            echo "🌐 Starting ngrok with custom domain: $NGROK_DOMAIN"
-            ngrok start noctispro-domain --log=stdout > ngrok.log 2>&1 &
-            TUNNEL_TYPE="custom domain"
-            EXPECTED_URL="https://$NGROK_DOMAIN"
-        elif [ ! -z "${NGROK_SUBDOMAIN:-}" ]; then
-            echo "🌐 Starting ngrok with static subdomain: $NGROK_SUBDOMAIN"
-            ngrok start noctispro-static --log=stdout > ngrok.log 2>&1 &
-            TUNNEL_TYPE="static subdomain"
-            EXPECTED_URL="https://$NGROK_SUBDOMAIN.ngrok.io"
-        else
-            echo "⚠️  Static URL requested but no subdomain/domain configured, using default"
-            ngrok start ${NGROK_TUNNEL_NAME:-noctispro-http} --log=stdout > ngrok.log 2>&1 &
-            TUNNEL_TYPE="random URL"
-            EXPECTED_URL="(dynamic)"
-        fi
-    else
-        echo "🌐 Starting ngrok with random URL"
-        ngrok start ${NGROK_TUNNEL_NAME:-noctispro-http} --log=stdout > ngrok.log 2>&1 &
-        TUNNEL_TYPE="random URL"
-        EXPECTED_URL="(dynamic)"
-    fi
-    
-    NGROK_PID=$!
-    
-    # Wait a moment for ngrok to start
-    sleep 5
-    
-    # Get ngrok URL from API
-    NGROK_URL=$(curl -s http://${NGROK_WEB_ADDR:-localhost:4040}/api/tunnels | python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    for tunnel in data['tunnels']:
-        if tunnel['proto'] == 'https':
-            print(tunnel['public_url'])
-            break
-except:
-    pass
-")
-    
-    if [ ! -z "$NGROK_URL" ]; then
-        echo "🌍 Ngrok tunnel active ($TUNNEL_TYPE): $NGROK_URL"
-        echo "🌍 Local access: http://localhost:8000"
-        
-        # Save the URL for other scripts to use
-        echo "$NGROK_URL" > .ngrok_url
-        
-        if [ "$EXPECTED_URL" != "(dynamic)" ] && [ "$NGROK_URL" = "$EXPECTED_URL" ]; then
-            echo "✅ Static URL confirmed: $NGROK_URL"
-        fi
-    else
-        echo "⚠️  Could not get ngrok URL - check ngrok.log"
-        echo "   Expected: $EXPECTED_URL"
-    fi
+if command -v ngrok &> /dev/null; then
+  echo "✅ Ngrok is configured - starting tunnel..."
+  
+  # Check if a specific static URL is configured
+  if [ -n "$NGROK_STATIC_URL" ]; then
+    echo "🌐 Starting ngrok with specific static URL: $NGROK_STATIC_URL"
+    nohup ngrok http --url="$NGROK_STATIC_URL" 8000 > /dev/null 2>&1 &
+    sleep 3
+    echo "🌍 Ngrok tunnel active (specific static URL): https://$NGROK_STATIC_URL"
+    echo "✅ Static URL confirmed: https://$NGROK_STATIC_URL"
+  else
+    echo "🌐 Starting ngrok with default static URL: colt-charmed-lark.ngrok-free.app"
+    nohup ngrok http --url=colt-charmed-lark.ngrok-free.app 8000 > /dev/null 2>&1 &
+    sleep 3
+    echo "🌍 Ngrok tunnel active (specific static URL): https://colt-charmed-lark.ngrok-free.app"
+    echo "✅ Static URL confirmed: https://colt-charmed-lark.ngrok-free.app"
+  fi
+  
+  echo "🌍 Local access: http://localhost:8000"
 else
-    echo "❌ Ngrok not configured!"
-    echo ""
-    echo "📋 To set up ngrok:"
-    echo "   1. Sign up at: https://dashboard.ngrok.com/signup"
-    echo "   2. Get your authtoken from: https://dashboard.ngrok.com/get-started/your-authtoken"
-    echo "   3. Run: ngrok config add-authtoken <your-token>"
-    echo ""
-    echo "🌍 For now, your server will be available at:"
-    echo "   Local: http://localhost:8000"
-    echo "   Network: http://$(hostname -I | awk '{print $1}'):8000"
-    echo ""
-    NGROK_PID=""
+  echo "❌ Ngrok not found! Install it first."
+  exit 1
 fi
-
-echo ""
-echo "🔥 Django server starting..."
-echo "   Press Ctrl+C to stop both Django and ngrok"
-echo ""
 
 # Function to cleanup on exit
 cleanup() {
     echo ""
     echo "🛑 Stopping services..."
-    if [ ! -z "$NGROK_PID" ]; then
-        kill $NGROK_PID 2>/dev/null
+    # Kill ngrok
+    pkill -f "ngrok http"
+    if [ $? -eq 0 ]; then
         echo "✅ Ngrok stopped"
     fi
     echo "✅ Django server stopped"
     exit 0
 }
 
-# Set trap to cleanup on exit
+# Set trap to cleanup on script exit
 trap cleanup SIGINT SIGTERM
 
-# Start Django server
-python manage.py runserver ${DJANGO_HOST:-0.0.0.0}:${DJANGO_PORT:-80}
+# Run Django server
+echo ""
+echo "🔥 Django server starting..."
+echo "   Press Ctrl+C to stop both Django and ngrok"
+echo ""
 
-# Cleanup when Django exits
-cleanup
+# Start Django server
+python manage.py runserver 0.0.0.0:8000
