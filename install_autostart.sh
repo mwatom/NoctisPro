@@ -5,7 +5,7 @@
 
 set -e
 
-WORKSPACE_DIR="/workspace"
+WORKSPACE_DIR="$(pwd)"
 SERVICE_NAME="noctispro-complete"
 SERVICE_FILE="${SERVICE_NAME}.service"
 
