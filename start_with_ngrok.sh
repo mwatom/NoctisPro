@@ -38,6 +38,12 @@ source venv/bin/activate
 # Load production environment
 source .env.production
 
+# Load ngrok environment configuration
+if [ -f ".env.ngrok" ]; then
+    source .env.ngrok
+    echo "✅ Loaded ngrok environment configuration"
+fi
+
 # Run migrations
 echo "🔄 Running database migrations..."
 python manage.py migrate
@@ -52,14 +58,44 @@ echo "🌐 Checking ngrok configuration..."
 # Check if ngrok auth token is configured
 if ngrok config check > /dev/null 2>&1; then
     echo "✅ Ngrok is configured - starting tunnel..."
-    ngrok http 8000 --log=stdout > ngrok.log 2>&1 &
+    
+    # Determine which tunnel to start based on configuration
+    if [ "${NGROK_USE_STATIC:-false}" = "true" ]; then
+        if [ ! -z "${NGROK_STATIC_URL:-}" ]; then
+            echo "🌐 Starting ngrok with specific static URL: $NGROK_STATIC_URL"
+            ngrok http --url=https://$NGROK_STATIC_URL ${DJANGO_PORT:-80} --log=stdout > ngrok.log 2>&1 &
+            TUNNEL_TYPE="specific static URL"
+            EXPECTED_URL="https://$NGROK_STATIC_URL"
+        elif [ ! -z "${NGROK_DOMAIN:-}" ]; then
+            echo "🌐 Starting ngrok with custom domain: $NGROK_DOMAIN"
+            ngrok start noctispro-domain --log=stdout > ngrok.log 2>&1 &
+            TUNNEL_TYPE="custom domain"
+            EXPECTED_URL="https://$NGROK_DOMAIN"
+        elif [ ! -z "${NGROK_SUBDOMAIN:-}" ]; then
+            echo "🌐 Starting ngrok with static subdomain: $NGROK_SUBDOMAIN"
+            ngrok start noctispro-static --log=stdout > ngrok.log 2>&1 &
+            TUNNEL_TYPE="static subdomain"
+            EXPECTED_URL="https://$NGROK_SUBDOMAIN.ngrok.io"
+        else
+            echo "⚠️  Static URL requested but no subdomain/domain configured, using default"
+            ngrok start ${NGROK_TUNNEL_NAME:-noctispro-http} --log=stdout > ngrok.log 2>&1 &
+            TUNNEL_TYPE="random URL"
+            EXPECTED_URL="(dynamic)"
+        fi
+    else
+        echo "🌐 Starting ngrok with random URL"
+        ngrok start ${NGROK_TUNNEL_NAME:-noctispro-http} --log=stdout > ngrok.log 2>&1 &
+        TUNNEL_TYPE="random URL"
+        EXPECTED_URL="(dynamic)"
+    fi
+    
     NGROK_PID=$!
     
     # Wait a moment for ngrok to start
     sleep 5
     
-    # Get ngrok URL
-    NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | python3 -c "
+    # Get ngrok URL from API
+    NGROK_URL=$(curl -s http://${NGROK_WEB_ADDR:-localhost:4040}/api/tunnels | python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
@@ -72,10 +108,18 @@ except:
 ")
     
     if [ ! -z "$NGROK_URL" ]; then
-        echo "🌍 Ngrok tunnel active: $NGROK_URL"
+        echo "🌍 Ngrok tunnel active ($TUNNEL_TYPE): $NGROK_URL"
         echo "🌍 Local access: http://localhost:8000"
+        
+        # Save the URL for other scripts to use
+        echo "$NGROK_URL" > .ngrok_url
+        
+        if [ "$EXPECTED_URL" != "(dynamic)" ] && [ "$NGROK_URL" = "$EXPECTED_URL" ]; then
+            echo "✅ Static URL confirmed: $NGROK_URL"
+        fi
     else
         echo "⚠️  Could not get ngrok URL - check ngrok.log"
+        echo "   Expected: $EXPECTED_URL"
     fi
 else
     echo "❌ Ngrok not configured!"
@@ -113,7 +157,7 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 # Start Django server
-python manage.py runserver 0.0.0.0:8000
+python manage.py runserver ${DJANGO_HOST:-0.0.0.0}:${DJANGO_PORT:-80}
 
 # Cleanup when Django exits
 cleanup

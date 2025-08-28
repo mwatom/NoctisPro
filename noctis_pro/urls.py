@@ -15,9 +15,10 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
+from . import views
 from django.shortcuts import redirect
 from django.http import HttpResponse
 from worklist import views as worklist_views
@@ -52,9 +53,14 @@ urlpatterns = [
     path('chat/', include('chat.urls')),  # Re-enabled to fix template URLs
     path('notifications/', include('notifications.urls')),  # Re-enabled to fix template URLs
     path('ai/', include('ai_analysis.urls')),
+    
+    # Optimized media serving
+    re_path(r'^media/(?P<path>.*)$', views.OptimizedMediaView.as_view(), name='optimized_media'),
+    path('connection-info/', views.connection_info, name='connection_info'),
 ]
 
-# Serve media files during development
-if settings.DEBUG:
+# Serve media files during development and production (for ngrok deployment)
+# Note: In production with a proper web server, this should be handled by nginx/apache
+if settings.DEBUG or getattr(settings, 'SERVE_MEDIA_FILES', False):
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
