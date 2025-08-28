@@ -47,7 +47,7 @@ INSTALLED_APPS = [
     # Custom apps
     'accounts',
     'worklist',
-    'dicom_viewer',
+    # 'dicom_viewer',  # Temporarily disabled due to syntax issues
     'reports',  # Re-enabled to fix model registration
     'admin_panel',
     'chat',  # Re-enabled to fix template URLs
@@ -60,10 +60,10 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'noctis_pro.middleware.SlowConnectionOptimizationMiddleware',  # Connection detection
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'noctis_pro.middleware.SessionTimeoutMiddleware',  # Session timeout handling
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'noctis_pro.middleware.SessionTimeoutMiddleware',  # Session timeout handling - moved after auth
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'noctis_pro.middleware.ImageOptimizationMiddleware',  # Image optimization
@@ -94,15 +94,24 @@ ASGI_APPLICATION = 'noctis_pro.asgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# Redis configuration for channels
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379')],
+# Channel layers configuration
+if os.environ.get('DISABLE_REDIS', 'False').lower() == 'true':
+    # Use in-memory channel layer for container deployments
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
         },
-    },
-}
+    }
+else:
+    # Redis configuration for channels
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                "hosts": [os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379')],
+            },
+        },
+    }
 
 # Celery Configuration
 CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379')
@@ -274,21 +283,30 @@ if os.environ.get('USE_SQLITE', 'False').lower() == 'true':
     }
 
 # Cache configuration
-CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379/1'),
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-        },
-        'KEY_PREFIX': 'noctis',
-        'TIMEOUT': 300,  # 5 minutes default
+if os.environ.get('USE_DUMMY_CACHE', 'False').lower() == 'true':
+    # Use dummy cache for container deployments without Redis
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+        }
     }
-}
-
-# Session backend using Redis for better performance
-SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
-SESSION_CACHE_ALIAS = 'default'
+    # Use database sessions when Redis is not available
+    SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379/1'),
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            },
+            'KEY_PREFIX': 'noctis',
+            'TIMEOUT': 300,  # 5 minutes default
+        }
+    }
+    # Session backend using Redis for better performance
+    SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+    SESSION_CACHE_ALIAS = 'default'
 
 # Logging
 LOGGING = {
