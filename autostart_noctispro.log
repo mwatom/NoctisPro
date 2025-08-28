@@ -1,0 +1,656 @@
+[2025-08-28 20:17:48] 🚀 Starting NoctisPro Auto-Startup Service
+[2025-08-28 20:17:48] ============================================
+[2025-08-28 20:17:48] Static Ngrok URL: https://colt-charmed-lark.ngrok-free.app
+[2025-08-28 20:17:48] Workspace: /workspace
+[2025-08-28 20:17:48] Started at: Thu Aug 28 08:17:48 PM UTC 2025
+[2025-08-28 20:17:48] 2025-08-28 20:17:48: 🏁 Starting main startup sequence...
+[2025-08-28 20:17:48] 2025-08-28 20:17:48: 🐍 Starting Django server...
+[2025-08-28 20:17:48] 2025-08-28 20:17:48: ✅ Virtual environment activated
+[2025-08-28 20:17:48] 2025-08-28 20:17:48: 🔄 Running database migrations...
+[2025-08-28 20:17:49] Traceback (most recent call last):
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+[2025-08-28 20:17:49]     self.connect()
+[2025-08-28 20:17:49]     ~~~~~~~~~~~~^^
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:17:49]     return func(*args, **kwargs)
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+[2025-08-28 20:17:49]     self.connection = self.get_new_connection(conn_params)
+[2025-08-28 20:17:49]                       ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:17:49]     return func(*args, **kwargs)
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 332, in get_new_connection
+[2025-08-28 20:17:49]     connection = self.Database.connect(**conn_params)
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/psycopg2/__init__.py", line 122, in connect
+[2025-08-28 20:17:49]     conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+[2025-08-28 20:17:49] psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused
+[2025-08-28 20:17:49] 	Is the server running on that host and accepting TCP/IP connections?
+[2025-08-28 20:17:49] connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+[2025-08-28 20:17:49] 	Is the server running on that host and accepting TCP/IP connections?
+[2025-08-28 20:17:49] 
+[2025-08-28 20:17:49] 
+[2025-08-28 20:17:49] The above exception was the direct cause of the following exception:
+[2025-08-28 20:17:49] 
+[2025-08-28 20:17:49] Traceback (most recent call last):
+[2025-08-28 20:17:49]   File "/workspace/manage.py", line 22, in <module>
+[2025-08-28 20:17:49]     main()
+[2025-08-28 20:17:49]     ~~~~^^
+[2025-08-28 20:17:49]   File "/workspace/manage.py", line 18, in main
+[2025-08-28 20:17:49]     execute_from_command_line(sys.argv)
+[2025-08-28 20:17:49]     ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/__init__.py", line 442, in execute_from_command_line
+[2025-08-28 20:17:49]     utility.execute()
+[2025-08-28 20:17:49]     ~~~~~~~~~~~~~~~^^
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/__init__.py", line 436, in execute
+[2025-08-28 20:17:49]     self.fetch_command(subcommand).run_from_argv(self.argv)
+[2025-08-28 20:17:49]     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/base.py", line 416, in run_from_argv
+[2025-08-28 20:17:49]     self.execute(*args, **cmd_options)
+[2025-08-28 20:17:49]     ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/base.py", line 460, in execute
+[2025-08-28 20:17:49]     output = self.handle(*args, **options)
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/base.py", line 107, in wrapper
+[2025-08-28 20:17:49]     res = handle_func(*args, **kwargs)
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/commands/migrate.py", line 114, in handle
+[2025-08-28 20:17:49]     executor = MigrationExecutor(connection, self.migration_progress_callback)
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/executor.py", line 18, in __init__
+[2025-08-28 20:17:49]     self.loader = MigrationLoader(self.connection)
+[2025-08-28 20:17:49]                   ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/loader.py", line 58, in __init__
+[2025-08-28 20:17:49]     self.build_graph()
+[2025-08-28 20:17:49]     ~~~~~~~~~~~~~~~~^^
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/loader.py", line 235, in build_graph
+[2025-08-28 20:17:49]     self.applied_migrations = recorder.applied_migrations()
+[2025-08-28 20:17:49]                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/recorder.py", line 89, in applied_migrations
+[2025-08-28 20:17:49]     if self.has_table():
+[2025-08-28 20:17:49]        ~~~~~~~~~~~~~~^^
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/recorder.py", line 63, in has_table
+[2025-08-28 20:17:49]     with self.connection.cursor() as cursor:
+[2025-08-28 20:17:49]          ~~~~~~~~~~~~~~~~~~~~~~^^
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:17:49]     return func(*args, **kwargs)
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 320, in cursor
+[2025-08-28 20:17:49]     return self._cursor()
+[2025-08-28 20:17:49]            ~~~~~~~~~~~~^^
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 296, in _cursor
+[2025-08-28 20:17:49]     self.ensure_connection()
+[2025-08-28 20:17:49]     ~~~~~~~~~~~~~~~~~~~~~~^^
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:17:49]     return func(*args, **kwargs)
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 278, in ensure_connection
+[2025-08-28 20:17:49]     with self.wrap_database_errors:
+[2025-08-28 20:17:49]          ^^^^^^^^^^^^^^^^^^^^^^^^^
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/db/utils.py", line 91, in __exit__
+[2025-08-28 20:17:49]     raise dj_exc_value.with_traceback(traceback) from exc_value
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+[2025-08-28 20:17:49]     self.connect()
+[2025-08-28 20:17:49]     ~~~~~~~~~~~~^^
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:17:49]     return func(*args, **kwargs)
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+[2025-08-28 20:17:49]     self.connection = self.get_new_connection(conn_params)
+[2025-08-28 20:17:49]                       ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:17:49]     return func(*args, **kwargs)
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 332, in get_new_connection
+[2025-08-28 20:17:49]     connection = self.Database.connect(**conn_params)
+[2025-08-28 20:17:49]   File "/workspace/venv/lib/python3.13/site-packages/psycopg2/__init__.py", line 122, in connect
+[2025-08-28 20:17:49]     conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+[2025-08-28 20:17:49] django.db.utils.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused
+[2025-08-28 20:17:49] 	Is the server running on that host and accepting TCP/IP connections?
+[2025-08-28 20:17:49] connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+[2025-08-28 20:17:49] 	Is the server running on that host and accepting TCP/IP connections?
+[2025-08-28 20:17:49] 
+[2025-08-28 20:17:49] 2025-08-28 20:17:49: 📂 Collecting static files...
+[2025-08-28 20:17:50] 
+[2025-08-28 20:17:50] 163 static files copied to '/workspace/staticfiles', 2 unmodified.
+[2025-08-28 20:17:50] 2025-08-28 20:17:50: 🌐 Starting Django/Daphne server on port 8000...
+[2025-08-28 20:17:55] 2025-08-28 20:17:55: ✅ Django started successfully (PID: 4122)
+[2025-08-28 20:17:55] 2025-08-28 20:17:55: ✅ Django startup successful
+[2025-08-28 20:17:55] 2025-08-28 20:17:55: 🔍 Waiting for service at http://localhost:8000/health/simple/...
+[2025-08-28 20:17:55] 2025-08-28 20:17:55: ✅ Service is ready at http://localhost:8000/health/simple/
+[2025-08-28 20:17:55] 2025-08-28 20:17:55: ✅ Django is responding to health checks
+[2025-08-28 20:17:55] 2025-08-28 20:17:55: 🌐 Attempt 1/5: Starting ngrok with static URL...
+[2025-08-28 20:17:55] 2025-08-28 20:17:55: 🛑 Checking for existing ngrok processes...
+[2025-08-28 20:17:55] 2025-08-28 20:17:55: ✅ No existing ngrok processes found
+[2025-08-28 20:18:05] 2025-08-28 20:18:05: ❌ Ngrok failed to start, checking logs...
+[2025-08-28 20:18:05] 2025-08-28 20:18:05: 📄 Ngrok log: nohup: failed to run command 'ngrok': No such file or directory
+[2025-08-28 20:18:05] 2025-08-28 20:18:05: 🔄 Retrying in 15 seconds...
+[2025-08-28 20:18:20] 2025-08-28 20:18:20: 🌐 Attempt 2/5: Starting ngrok with static URL...
+[2025-08-28 20:18:20] 2025-08-28 20:18:20: 🛑 Checking for existing ngrok processes...
+[2025-08-28 20:18:20] 2025-08-28 20:18:20: ✅ No existing ngrok processes found
+[2025-08-28 20:18:30] 2025-08-28 20:18:30: ❌ Ngrok failed to start, checking logs...
+[2025-08-28 20:18:30] 2025-08-28 20:18:30: 📄 Ngrok log: ERROR:  Install your authtoken: https://dashboard.ngrok.com/get-started/your-authtoken
+[2025-08-28 20:18:30] 2025-08-28 20:18:30: 📄 Ngrok log: ERROR:  
+[2025-08-28 20:18:30] 2025-08-28 20:18:30: 📄 Ngrok log: ERROR:  ERR_NGROK_4018
+[2025-08-28 20:18:30] 2025-08-28 20:18:30: 📄 Ngrok log: ERROR:  https://ngrok.com/docs/errors/err_ngrok_4018
+[2025-08-28 20:18:30] 2025-08-28 20:18:30: 📄 Ngrok log: ERROR:
+[2025-08-28 20:18:30] 2025-08-28 20:18:30: 🔄 Retrying in 15 seconds...
+[2025-08-28 20:18:45] 2025-08-28 20:18:45: 🌐 Attempt 3/5: Starting ngrok with static URL...
+[2025-08-28 20:18:45] 2025-08-28 20:18:45: 🛑 Checking for existing ngrok processes...
+[2025-08-28 20:18:45] 2025-08-28 20:18:45: ✅ No existing ngrok processes found
+[2025-08-28 20:18:55] 2025-08-28 20:18:55: ❌ Ngrok failed to start, checking logs...
+[2025-08-28 20:18:55] 2025-08-28 20:18:55: 📄 Ngrok log: t=2025-08-28T20:18:45+0000 lvl=info msg="no configuration paths supplied"
+[2025-08-28 20:18:55] 2025-08-28 20:18:55: 📄 Ngrok log: t=2025-08-28T20:18:45+0000 lvl=info msg="using configuration at default config path" path=/home/ubuntu/.config/ngrok/ngrok.yml
+[2025-08-28 20:18:55] 2025-08-28 20:18:55: 📄 Ngrok log: t=2025-08-28T20:18:45+0000 lvl=info msg="open config file" path=/home/ubuntu/.config/ngrok/ngrok.yml err=nil
+[2025-08-28 20:18:55] 2025-08-28 20:18:55: 📄 Ngrok log: ERROR:  You can't enable the console UI and log to stdout or stderr
+[2025-08-28 20:18:55] 2025-08-28 20:18:55: 🔄 Retrying in 15 seconds...
+[2025-08-28 20:19:10] 2025-08-28 20:19:10: 🛑 Received termination signal, cleaning up...
+[2025-08-28 20:19:10] 2025-08-28 20:19:10: 🛑 Stopping Django...
+[2025-08-28 20:19:10] 2025-08-28 20:19:10: ✅ Cleanup complete
+[2025-08-28 20:19:34] 🚀 Starting NoctisPro Auto-Startup Service
+[2025-08-28 20:19:34] ============================================
+[2025-08-28 20:19:34] Static Ngrok URL: https://colt-charmed-lark.ngrok-free.app
+[2025-08-28 20:19:34] Workspace: /workspace
+[2025-08-28 20:19:34] Started at: Thu Aug 28 08:19:34 PM UTC 2025
+[2025-08-28 20:19:34] 2025-08-28 20:19:34: 🏁 Starting main startup sequence...
+[2025-08-28 20:19:34] 2025-08-28 20:19:34: 🐍 Starting Django server...
+[2025-08-28 20:19:34] 2025-08-28 20:19:34: ✅ Virtual environment activated
+[2025-08-28 20:19:34] 2025-08-28 20:19:34: 🔄 Running database migrations...
+[2025-08-28 20:19:34] Traceback (most recent call last):
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+[2025-08-28 20:19:34]     self.connect()
+[2025-08-28 20:19:34]     ~~~~~~~~~~~~^^
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:19:34]     return func(*args, **kwargs)
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+[2025-08-28 20:19:34]     self.connection = self.get_new_connection(conn_params)
+[2025-08-28 20:19:34]                       ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:19:34]     return func(*args, **kwargs)
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 332, in get_new_connection
+[2025-08-28 20:19:34]     connection = self.Database.connect(**conn_params)
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/psycopg2/__init__.py", line 122, in connect
+[2025-08-28 20:19:34]     conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+[2025-08-28 20:19:34] psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused
+[2025-08-28 20:19:34] 	Is the server running on that host and accepting TCP/IP connections?
+[2025-08-28 20:19:34] connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+[2025-08-28 20:19:34] 	Is the server running on that host and accepting TCP/IP connections?
+[2025-08-28 20:19:34] 
+[2025-08-28 20:19:34] 
+[2025-08-28 20:19:34] The above exception was the direct cause of the following exception:
+[2025-08-28 20:19:34] 
+[2025-08-28 20:19:34] Traceback (most recent call last):
+[2025-08-28 20:19:34]   File "/workspace/manage.py", line 22, in <module>
+[2025-08-28 20:19:34]     main()
+[2025-08-28 20:19:34]     ~~~~^^
+[2025-08-28 20:19:34]   File "/workspace/manage.py", line 18, in main
+[2025-08-28 20:19:34]     execute_from_command_line(sys.argv)
+[2025-08-28 20:19:34]     ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/__init__.py", line 442, in execute_from_command_line
+[2025-08-28 20:19:34]     utility.execute()
+[2025-08-28 20:19:34]     ~~~~~~~~~~~~~~~^^
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/__init__.py", line 436, in execute
+[2025-08-28 20:19:34]     self.fetch_command(subcommand).run_from_argv(self.argv)
+[2025-08-28 20:19:34]     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/base.py", line 416, in run_from_argv
+[2025-08-28 20:19:34]     self.execute(*args, **cmd_options)
+[2025-08-28 20:19:34]     ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/base.py", line 460, in execute
+[2025-08-28 20:19:34]     output = self.handle(*args, **options)
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/base.py", line 107, in wrapper
+[2025-08-28 20:19:34]     res = handle_func(*args, **kwargs)
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/commands/migrate.py", line 114, in handle
+[2025-08-28 20:19:34]     executor = MigrationExecutor(connection, self.migration_progress_callback)
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/executor.py", line 18, in __init__
+[2025-08-28 20:19:34]     self.loader = MigrationLoader(self.connection)
+[2025-08-28 20:19:34]                   ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/loader.py", line 58, in __init__
+[2025-08-28 20:19:34]     self.build_graph()
+[2025-08-28 20:19:34]     ~~~~~~~~~~~~~~~~^^
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/loader.py", line 235, in build_graph
+[2025-08-28 20:19:34]     self.applied_migrations = recorder.applied_migrations()
+[2025-08-28 20:19:34]                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/recorder.py", line 89, in applied_migrations
+[2025-08-28 20:19:34]     if self.has_table():
+[2025-08-28 20:19:34]        ~~~~~~~~~~~~~~^^
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/recorder.py", line 63, in has_table
+[2025-08-28 20:19:34]     with self.connection.cursor() as cursor:
+[2025-08-28 20:19:34]          ~~~~~~~~~~~~~~~~~~~~~~^^
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:19:34]     return func(*args, **kwargs)
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 320, in cursor
+[2025-08-28 20:19:34]     return self._cursor()
+[2025-08-28 20:19:34]            ~~~~~~~~~~~~^^
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 296, in _cursor
+[2025-08-28 20:19:34]     self.ensure_connection()
+[2025-08-28 20:19:34]     ~~~~~~~~~~~~~~~~~~~~~~^^
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:19:34]     return func(*args, **kwargs)
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 278, in ensure_connection
+[2025-08-28 20:19:34]     with self.wrap_database_errors:
+[2025-08-28 20:19:34]          ^^^^^^^^^^^^^^^^^^^^^^^^^
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/db/utils.py", line 91, in __exit__
+[2025-08-28 20:19:34]     raise dj_exc_value.with_traceback(traceback) from exc_value
+[2025-08-28 20:19:34]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+[2025-08-28 20:19:35]     self.connect()
+[2025-08-28 20:19:35]     ~~~~~~~~~~~~^^
+[2025-08-28 20:19:35]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:19:35]     return func(*args, **kwargs)
+[2025-08-28 20:19:35]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+[2025-08-28 20:19:35]     self.connection = self.get_new_connection(conn_params)
+[2025-08-28 20:19:35]                       ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+[2025-08-28 20:19:35]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:19:35]     return func(*args, **kwargs)
+[2025-08-28 20:19:35]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 332, in get_new_connection
+[2025-08-28 20:19:35]     connection = self.Database.connect(**conn_params)
+[2025-08-28 20:19:35]   File "/workspace/venv/lib/python3.13/site-packages/psycopg2/__init__.py", line 122, in connect
+[2025-08-28 20:19:35]     conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+[2025-08-28 20:19:35] django.db.utils.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused
+[2025-08-28 20:19:35] 	Is the server running on that host and accepting TCP/IP connections?
+[2025-08-28 20:19:35] connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+[2025-08-28 20:19:35] 	Is the server running on that host and accepting TCP/IP connections?
+[2025-08-28 20:19:35] 
+[2025-08-28 20:19:35] 2025-08-28 20:19:35: 📂 Collecting static files...
+[2025-08-28 20:19:35] 
+[2025-08-28 20:19:35] 0 static files copied to '/workspace/staticfiles', 165 unmodified.
+[2025-08-28 20:19:35] 2025-08-28 20:19:35: 🌐 Starting Django/Daphne server on port 8000...
+[2025-08-28 20:19:40] 2025-08-28 20:19:40: ✅ Django started successfully (PID: 5104)
+[2025-08-28 20:19:40] 2025-08-28 20:19:40: ✅ Django startup successful
+[2025-08-28 20:19:40] 2025-08-28 20:19:40: 🔍 Waiting for service at http://localhost:8000/health/simple/...
+[2025-08-28 20:19:40] 2025-08-28 20:19:40: ✅ Service is ready at http://localhost:8000/health/simple/
+[2025-08-28 20:19:40] 2025-08-28 20:19:40: ✅ Django is responding to health checks
+[2025-08-28 20:19:40] 2025-08-28 20:19:40: 🌐 Attempt 1/5: Starting ngrok with static URL...
+[2025-08-28 20:19:40] 2025-08-28 20:19:40: 🛑 Checking for existing ngrok processes...
+[2025-08-28 20:19:40] 2025-08-28 20:19:40: ✅ No existing ngrok processes found
+[2025-08-28 20:19:50] 2025-08-28 20:19:50: ❌ Ngrok failed to start, checking logs...
+[2025-08-28 20:19:50] 2025-08-28 20:19:50: 📄 Ngrok log: t=2025-08-28T20:19:40+0000 lvl=info msg="no configuration paths supplied"
+[2025-08-28 20:19:50] 2025-08-28 20:19:50: 📄 Ngrok log: t=2025-08-28T20:19:40+0000 lvl=info msg="using configuration at default config path" path=/home/ubuntu/.config/ngrok/ngrok.yml
+[2025-08-28 20:19:50] 2025-08-28 20:19:50: 📄 Ngrok log: t=2025-08-28T20:19:40+0000 lvl=info msg="open config file" path=/home/ubuntu/.config/ngrok/ngrok.yml err=nil
+[2025-08-28 20:19:50] 2025-08-28 20:19:50: 📄 Ngrok log: ERROR:  You can't enable the console UI and log to stdout or stderr
+[2025-08-28 20:19:50] 2025-08-28 20:19:50: 🔄 Retrying in 15 seconds...
+[2025-08-28 20:20:05] 2025-08-28 20:20:05: 🌐 Attempt 2/5: Starting ngrok with static URL...
+[2025-08-28 20:20:05] 2025-08-28 20:20:05: 🛑 Checking for existing ngrok processes...
+[2025-08-28 20:20:05] 2025-08-28 20:20:05: ✅ No existing ngrok processes found
+[2025-08-28 20:20:15] 2025-08-28 20:20:15: 🛑 Received termination signal, cleaning up...
+[2025-08-28 20:20:15] 2025-08-28 20:20:15: 🛑 Stopping Django...
+[2025-08-28 20:20:15] 2025-08-28 20:20:15: ✅ Cleanup complete
+[2025-08-28 20:20:42] 🚀 Starting NoctisPro Auto-Startup Service
+[2025-08-28 20:20:42] ============================================
+[2025-08-28 20:20:42] Static Ngrok URL: https://colt-charmed-lark.ngrok-free.app
+[2025-08-28 20:20:42] Workspace: /workspace
+[2025-08-28 20:20:42] Started at: Thu Aug 28 08:20:42 PM UTC 2025
+[2025-08-28 20:20:42] 2025-08-28 20:20:42: 🏁 Starting main startup sequence...
+[2025-08-28 20:20:42] 2025-08-28 20:20:42: 🐍 Starting Django server...
+[2025-08-28 20:20:42] 2025-08-28 20:20:42: ✅ Virtual environment activated
+[2025-08-28 20:20:42] 2025-08-28 20:20:42: 🔄 Running database migrations...
+[2025-08-28 20:20:43] Traceback (most recent call last):
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+[2025-08-28 20:20:43]     self.connect()
+[2025-08-28 20:20:43]     ~~~~~~~~~~~~^^
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:20:43]     return func(*args, **kwargs)
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+[2025-08-28 20:20:43]     self.connection = self.get_new_connection(conn_params)
+[2025-08-28 20:20:43]                       ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:20:43]     return func(*args, **kwargs)
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 332, in get_new_connection
+[2025-08-28 20:20:43]     connection = self.Database.connect(**conn_params)
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/psycopg2/__init__.py", line 122, in connect
+[2025-08-28 20:20:43]     conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+[2025-08-28 20:20:43] psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused
+[2025-08-28 20:20:43] 	Is the server running on that host and accepting TCP/IP connections?
+[2025-08-28 20:20:43] connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+[2025-08-28 20:20:43] 	Is the server running on that host and accepting TCP/IP connections?
+[2025-08-28 20:20:43] 
+[2025-08-28 20:20:43] 
+[2025-08-28 20:20:43] The above exception was the direct cause of the following exception:
+[2025-08-28 20:20:43] 
+[2025-08-28 20:20:43] Traceback (most recent call last):
+[2025-08-28 20:20:43]   File "/workspace/manage.py", line 22, in <module>
+[2025-08-28 20:20:43]     main()
+[2025-08-28 20:20:43]     ~~~~^^
+[2025-08-28 20:20:43]   File "/workspace/manage.py", line 18, in main
+[2025-08-28 20:20:43]     execute_from_command_line(sys.argv)
+[2025-08-28 20:20:43]     ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/__init__.py", line 442, in execute_from_command_line
+[2025-08-28 20:20:43]     utility.execute()
+[2025-08-28 20:20:43]     ~~~~~~~~~~~~~~~^^
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/__init__.py", line 436, in execute
+[2025-08-28 20:20:43]     self.fetch_command(subcommand).run_from_argv(self.argv)
+[2025-08-28 20:20:43]     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/base.py", line 416, in run_from_argv
+[2025-08-28 20:20:43]     self.execute(*args, **cmd_options)
+[2025-08-28 20:20:43]     ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/base.py", line 460, in execute
+[2025-08-28 20:20:43]     output = self.handle(*args, **options)
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/base.py", line 107, in wrapper
+[2025-08-28 20:20:43]     res = handle_func(*args, **kwargs)
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/commands/migrate.py", line 114, in handle
+[2025-08-28 20:20:43]     executor = MigrationExecutor(connection, self.migration_progress_callback)
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/executor.py", line 18, in __init__
+[2025-08-28 20:20:43]     self.loader = MigrationLoader(self.connection)
+[2025-08-28 20:20:43]                   ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/loader.py", line 58, in __init__
+[2025-08-28 20:20:43]     self.build_graph()
+[2025-08-28 20:20:43]     ~~~~~~~~~~~~~~~~^^
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/loader.py", line 235, in build_graph
+[2025-08-28 20:20:43]     self.applied_migrations = recorder.applied_migrations()
+[2025-08-28 20:20:43]                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/recorder.py", line 89, in applied_migrations
+[2025-08-28 20:20:43]     if self.has_table():
+[2025-08-28 20:20:43]        ~~~~~~~~~~~~~~^^
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/recorder.py", line 63, in has_table
+[2025-08-28 20:20:43]     with self.connection.cursor() as cursor:
+[2025-08-28 20:20:43]          ~~~~~~~~~~~~~~~~~~~~~~^^
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:20:43]     return func(*args, **kwargs)
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 320, in cursor
+[2025-08-28 20:20:43]     return self._cursor()
+[2025-08-28 20:20:43]            ~~~~~~~~~~~~^^
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 296, in _cursor
+[2025-08-28 20:20:43]     self.ensure_connection()
+[2025-08-28 20:20:43]     ~~~~~~~~~~~~~~~~~~~~~~^^
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:20:43]     return func(*args, **kwargs)
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 278, in ensure_connection
+[2025-08-28 20:20:43]     with self.wrap_database_errors:
+[2025-08-28 20:20:43]          ^^^^^^^^^^^^^^^^^^^^^^^^^
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/db/utils.py", line 91, in __exit__
+[2025-08-28 20:20:43]     raise dj_exc_value.with_traceback(traceback) from exc_value
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+[2025-08-28 20:20:43]     self.connect()
+[2025-08-28 20:20:43]     ~~~~~~~~~~~~^^
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:20:43]     return func(*args, **kwargs)
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+[2025-08-28 20:20:43]     self.connection = self.get_new_connection(conn_params)
+[2025-08-28 20:20:43]                       ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:20:43]     return func(*args, **kwargs)
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 332, in get_new_connection
+[2025-08-28 20:20:43]     connection = self.Database.connect(**conn_params)
+[2025-08-28 20:20:43]   File "/workspace/venv/lib/python3.13/site-packages/psycopg2/__init__.py", line 122, in connect
+[2025-08-28 20:20:43]     conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+[2025-08-28 20:20:43] django.db.utils.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused
+[2025-08-28 20:20:43] 	Is the server running on that host and accepting TCP/IP connections?
+[2025-08-28 20:20:43] connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+[2025-08-28 20:20:43] 	Is the server running on that host and accepting TCP/IP connections?
+[2025-08-28 20:20:43] 
+[2025-08-28 20:20:43] 2025-08-28 20:20:43: 📂 Collecting static files...
+[2025-08-28 20:20:43] 
+[2025-08-28 20:20:43] 0 static files copied to '/workspace/staticfiles', 165 unmodified.
+[2025-08-28 20:20:43] 2025-08-28 20:20:43: 🌐 Starting Django/Daphne server on port 8000...
+[2025-08-28 20:20:48] 2025-08-28 20:20:48: ✅ Django started successfully (PID: 5841)
+[2025-08-28 20:20:48] 2025-08-28 20:20:48: ✅ Django startup successful
+[2025-08-28 20:20:48] 2025-08-28 20:20:48: 🔍 Waiting for service at http://localhost:8000/health/simple/...
+[2025-08-28 20:20:48] 2025-08-28 20:20:48: ✅ Service is ready at http://localhost:8000/health/simple/
+[2025-08-28 20:20:48] 2025-08-28 20:20:48: ✅ Django is responding to health checks
+[2025-08-28 20:20:48] 2025-08-28 20:20:48: 🌐 Attempt 1/5: Starting ngrok with static URL...
+[2025-08-28 20:20:48] 2025-08-28 20:20:48: 🛑 Checking for existing ngrok processes...
+[2025-08-28 20:20:48] 2025-08-28 20:20:48: ✅ No existing ngrok processes found
+[2025-08-28 20:20:58] 2025-08-28 20:20:58: ❌ Ngrok failed to start, checking logs...
+[2025-08-28 20:20:58] 2025-08-28 20:20:58: 📄 Ngrok log: ERROR:  unknown flag: --console-ui
+[2025-08-28 20:20:58] 2025-08-28 20:20:58: 🔄 Retrying in 15 seconds...
+[2025-08-28 20:21:13] 2025-08-28 20:21:13: 🌐 Attempt 2/5: Starting ngrok with static URL...
+[2025-08-28 20:21:13] 2025-08-28 20:21:13: 🛑 Checking for existing ngrok processes...
+[2025-08-28 20:21:13] 2025-08-28 20:21:13: ✅ No existing ngrok processes found
+[2025-08-28 20:21:23] 2025-08-28 20:21:23: ❌ Ngrok failed to start, checking logs...
+[2025-08-28 20:21:23] 2025-08-28 20:21:23: 📄 Ngrok log: ERROR:  unknown flag: --console-ui
+[2025-08-28 20:21:23] 2025-08-28 20:21:23: 🔄 Retrying in 15 seconds...
+[2025-08-28 20:21:38] 2025-08-28 20:21:38: 🛑 Received termination signal, cleaning up...
+[2025-08-28 20:21:38] 2025-08-28 20:21:38: 🛑 Stopping Django...
+[2025-08-28 20:21:38] 2025-08-28 20:21:38: ✅ Cleanup complete
+[2025-08-28 20:22:04] 🚀 Starting NoctisPro Auto-Startup Service
+[2025-08-28 20:22:04] ============================================
+[2025-08-28 20:22:04] Static Ngrok URL: https://colt-charmed-lark.ngrok-free.app
+[2025-08-28 20:22:04] Workspace: /workspace
+[2025-08-28 20:22:04] Started at: Thu Aug 28 08:22:04 PM UTC 2025
+[2025-08-28 20:22:04] 2025-08-28 20:22:04: 🏁 Starting main startup sequence...
+[2025-08-28 20:22:04] 2025-08-28 20:22:04: 🐍 Starting Django server...
+[2025-08-28 20:22:04] 2025-08-28 20:22:04: ✅ Virtual environment activated
+[2025-08-28 20:22:04] 2025-08-28 20:22:04: 🔄 Running database migrations...
+[2025-08-28 20:22:05] Traceback (most recent call last):
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+[2025-08-28 20:22:05]     self.connect()
+[2025-08-28 20:22:05]     ~~~~~~~~~~~~^^
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:22:05]     return func(*args, **kwargs)
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+[2025-08-28 20:22:05]     self.connection = self.get_new_connection(conn_params)
+[2025-08-28 20:22:05]                       ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:22:05]     return func(*args, **kwargs)
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 332, in get_new_connection
+[2025-08-28 20:22:05]     connection = self.Database.connect(**conn_params)
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/psycopg2/__init__.py", line 122, in connect
+[2025-08-28 20:22:05]     conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+[2025-08-28 20:22:05] psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused
+[2025-08-28 20:22:05] 	Is the server running on that host and accepting TCP/IP connections?
+[2025-08-28 20:22:05] connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+[2025-08-28 20:22:05] 	Is the server running on that host and accepting TCP/IP connections?
+[2025-08-28 20:22:05] 
+[2025-08-28 20:22:05] 
+[2025-08-28 20:22:05] The above exception was the direct cause of the following exception:
+[2025-08-28 20:22:05] 
+[2025-08-28 20:22:05] Traceback (most recent call last):
+[2025-08-28 20:22:05]   File "/workspace/manage.py", line 22, in <module>
+[2025-08-28 20:22:05]     main()
+[2025-08-28 20:22:05]     ~~~~^^
+[2025-08-28 20:22:05]   File "/workspace/manage.py", line 18, in main
+[2025-08-28 20:22:05]     execute_from_command_line(sys.argv)
+[2025-08-28 20:22:05]     ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/__init__.py", line 442, in execute_from_command_line
+[2025-08-28 20:22:05]     utility.execute()
+[2025-08-28 20:22:05]     ~~~~~~~~~~~~~~~^^
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/__init__.py", line 436, in execute
+[2025-08-28 20:22:05]     self.fetch_command(subcommand).run_from_argv(self.argv)
+[2025-08-28 20:22:05]     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/base.py", line 416, in run_from_argv
+[2025-08-28 20:22:05]     self.execute(*args, **cmd_options)
+[2025-08-28 20:22:05]     ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/base.py", line 460, in execute
+[2025-08-28 20:22:05]     output = self.handle(*args, **options)
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/base.py", line 107, in wrapper
+[2025-08-28 20:22:05]     res = handle_func(*args, **kwargs)
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/commands/migrate.py", line 114, in handle
+[2025-08-28 20:22:05]     executor = MigrationExecutor(connection, self.migration_progress_callback)
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/executor.py", line 18, in __init__
+[2025-08-28 20:22:05]     self.loader = MigrationLoader(self.connection)
+[2025-08-28 20:22:05]                   ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/loader.py", line 58, in __init__
+[2025-08-28 20:22:05]     self.build_graph()
+[2025-08-28 20:22:05]     ~~~~~~~~~~~~~~~~^^
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/loader.py", line 235, in build_graph
+[2025-08-28 20:22:05]     self.applied_migrations = recorder.applied_migrations()
+[2025-08-28 20:22:05]                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/recorder.py", line 89, in applied_migrations
+[2025-08-28 20:22:05]     if self.has_table():
+[2025-08-28 20:22:05]        ~~~~~~~~~~~~~~^^
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/recorder.py", line 63, in has_table
+[2025-08-28 20:22:05]     with self.connection.cursor() as cursor:
+[2025-08-28 20:22:05]          ~~~~~~~~~~~~~~~~~~~~~~^^
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:22:05]     return func(*args, **kwargs)
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 320, in cursor
+[2025-08-28 20:22:05]     return self._cursor()
+[2025-08-28 20:22:05]            ~~~~~~~~~~~~^^
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 296, in _cursor
+[2025-08-28 20:22:05]     self.ensure_connection()
+[2025-08-28 20:22:05]     ~~~~~~~~~~~~~~~~~~~~~~^^
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:22:05]     return func(*args, **kwargs)
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 278, in ensure_connection
+[2025-08-28 20:22:05]     with self.wrap_database_errors:
+[2025-08-28 20:22:05]          ^^^^^^^^^^^^^^^^^^^^^^^^^
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/db/utils.py", line 91, in __exit__
+[2025-08-28 20:22:05]     raise dj_exc_value.with_traceback(traceback) from exc_value
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+[2025-08-28 20:22:05]     self.connect()
+[2025-08-28 20:22:05]     ~~~~~~~~~~~~^^
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:22:05]     return func(*args, **kwargs)
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+[2025-08-28 20:22:05]     self.connection = self.get_new_connection(conn_params)
+[2025-08-28 20:22:05]                       ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:22:05]     return func(*args, **kwargs)
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 332, in get_new_connection
+[2025-08-28 20:22:05]     connection = self.Database.connect(**conn_params)
+[2025-08-28 20:22:05]   File "/workspace/venv/lib/python3.13/site-packages/psycopg2/__init__.py", line 122, in connect
+[2025-08-28 20:22:05]     conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+[2025-08-28 20:22:05] django.db.utils.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused
+[2025-08-28 20:22:05] 	Is the server running on that host and accepting TCP/IP connections?
+[2025-08-28 20:22:05] connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+[2025-08-28 20:22:05] 	Is the server running on that host and accepting TCP/IP connections?
+[2025-08-28 20:22:05] 
+[2025-08-28 20:22:05] 2025-08-28 20:22:05: 📂 Collecting static files...
+[2025-08-28 20:22:05] 
+[2025-08-28 20:22:05] 0 static files copied to '/workspace/staticfiles', 165 unmodified.
+[2025-08-28 20:22:05] 2025-08-28 20:22:05: 🌐 Starting Django/Daphne server on port 8000...
+[2025-08-28 20:22:10] 2025-08-28 20:22:10: ✅ Django started successfully (PID: 6818)
+[2025-08-28 20:22:10] 2025-08-28 20:22:10: ✅ Django startup successful
+[2025-08-28 20:22:10] 2025-08-28 20:22:10: 🔍 Waiting for service at http://localhost:8000/health/simple/...
+[2025-08-28 20:22:11] 2025-08-28 20:22:11: ✅ Service is ready at http://localhost:8000/health/simple/
+[2025-08-28 20:22:11] 2025-08-28 20:22:11: ✅ Django is responding to health checks
+[2025-08-28 20:22:11] 2025-08-28 20:22:11: 🌐 Attempt 1/5: Starting ngrok with static URL...
+[2025-08-28 20:22:11] 2025-08-28 20:22:11: 🛑 Checking for existing ngrok processes...
+[2025-08-28 20:22:11] 2025-08-28 20:22:11: ✅ No existing ngrok processes found
+[2025-08-28 20:22:21] 2025-08-28 20:22:21: ❌ Ngrok failed to start, checking logs...
+[2025-08-28 20:22:21] 2025-08-28 20:22:21: 📄 Ngrok log: t=2025-08-28T20:22:11+0000 lvl=info msg="no configuration paths supplied"
+[2025-08-28 20:22:21] 2025-08-28 20:22:21: 📄 Ngrok log: t=2025-08-28T20:22:11+0000 lvl=info msg="using configuration at default config path" path=/home/ubuntu/.config/ngrok/ngrok.yml
+[2025-08-28 20:22:21] 2025-08-28 20:22:21: 📄 Ngrok log: t=2025-08-28T20:22:11+0000 lvl=info msg="open config file" path=/home/ubuntu/.config/ngrok/ngrok.yml err=nil
+[2025-08-28 20:22:21] 2025-08-28 20:22:21: 📄 Ngrok log: ERROR:  You can't enable the console UI and log to stdout or stderr
+[2025-08-28 20:22:21] 2025-08-28 20:22:21: 🔄 Retrying in 15 seconds...
+[2025-08-28 20:22:36] 2025-08-28 20:22:36: 🌐 Attempt 2/5: Starting ngrok with static URL...
+[2025-08-28 20:22:36] 2025-08-28 20:22:36: 🛑 Checking for existing ngrok processes...
+[2025-08-28 20:22:36] 2025-08-28 20:22:36: ✅ No existing ngrok processes found
+[2025-08-28 20:22:46] 2025-08-28 20:22:46: ❌ Ngrok failed to start, checking logs...
+[2025-08-28 20:22:46] 2025-08-28 20:22:46: 📄 Ngrok log: t=2025-08-28T20:22:36+0000 lvl=info msg="no configuration paths supplied"
+[2025-08-28 20:22:46] 2025-08-28 20:22:46: 📄 Ngrok log: t=2025-08-28T20:22:36+0000 lvl=info msg="using configuration at default config path" path=/home/ubuntu/.config/ngrok/ngrok.yml
+[2025-08-28 20:22:46] 2025-08-28 20:22:46: 📄 Ngrok log: t=2025-08-28T20:22:36+0000 lvl=info msg="open config file" path=/home/ubuntu/.config/ngrok/ngrok.yml err=nil
+[2025-08-28 20:22:46] 2025-08-28 20:22:46: 📄 Ngrok log: ERROR:  You can't enable the console UI and log to stdout or stderr
+[2025-08-28 20:22:46] 2025-08-28 20:22:46: 🔄 Retrying in 15 seconds...
+[2025-08-28 20:23:01] 2025-08-28 20:23:01: 🛑 Received termination signal, cleaning up...
+[2025-08-28 20:23:01] 2025-08-28 20:23:01: 🛑 Stopping Django...
+[2025-08-28 20:23:01] 2025-08-28 20:23:01: ✅ Cleanup complete
+[2025-08-28 20:23:25] 🚀 Starting NoctisPro Auto-Startup Service
+[2025-08-28 20:23:25] ============================================
+[2025-08-28 20:23:25] Static Ngrok URL: https://colt-charmed-lark.ngrok-free.app
+[2025-08-28 20:23:25] Workspace: /workspace
+[2025-08-28 20:23:25] Started at: Thu Aug 28 08:23:25 PM UTC 2025
+[2025-08-28 20:23:25] 2025-08-28 20:23:25: 🏁 Starting main startup sequence...
+[2025-08-28 20:23:25] 2025-08-28 20:23:25: 🐍 Starting Django server...
+[2025-08-28 20:23:25] 2025-08-28 20:23:25: ✅ Virtual environment activated
+[2025-08-28 20:23:25] 2025-08-28 20:23:25: 🔄 Running database migrations...
+[2025-08-28 20:23:26] Traceback (most recent call last):
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+[2025-08-28 20:23:26]     self.connect()
+[2025-08-28 20:23:26]     ~~~~~~~~~~~~^^
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:23:26]     return func(*args, **kwargs)
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+[2025-08-28 20:23:26]     self.connection = self.get_new_connection(conn_params)
+[2025-08-28 20:23:26]                       ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:23:26]     return func(*args, **kwargs)
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 332, in get_new_connection
+[2025-08-28 20:23:26]     connection = self.Database.connect(**conn_params)
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/psycopg2/__init__.py", line 122, in connect
+[2025-08-28 20:23:26]     conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+[2025-08-28 20:23:26] psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused
+[2025-08-28 20:23:26] 	Is the server running on that host and accepting TCP/IP connections?
+[2025-08-28 20:23:26] connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+[2025-08-28 20:23:26] 	Is the server running on that host and accepting TCP/IP connections?
+[2025-08-28 20:23:26] 
+[2025-08-28 20:23:26] 
+[2025-08-28 20:23:26] The above exception was the direct cause of the following exception:
+[2025-08-28 20:23:26] 
+[2025-08-28 20:23:26] Traceback (most recent call last):
+[2025-08-28 20:23:26]   File "/workspace/manage.py", line 22, in <module>
+[2025-08-28 20:23:26]     main()
+[2025-08-28 20:23:26]     ~~~~^^
+[2025-08-28 20:23:26]   File "/workspace/manage.py", line 18, in main
+[2025-08-28 20:23:26]     execute_from_command_line(sys.argv)
+[2025-08-28 20:23:26]     ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/__init__.py", line 442, in execute_from_command_line
+[2025-08-28 20:23:26]     utility.execute()
+[2025-08-28 20:23:26]     ~~~~~~~~~~~~~~~^^
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/__init__.py", line 436, in execute
+[2025-08-28 20:23:26]     self.fetch_command(subcommand).run_from_argv(self.argv)
+[2025-08-28 20:23:26]     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/base.py", line 416, in run_from_argv
+[2025-08-28 20:23:26]     self.execute(*args, **cmd_options)
+[2025-08-28 20:23:26]     ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/base.py", line 460, in execute
+[2025-08-28 20:23:26]     output = self.handle(*args, **options)
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/base.py", line 107, in wrapper
+[2025-08-28 20:23:26]     res = handle_func(*args, **kwargs)
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/core/management/commands/migrate.py", line 114, in handle
+[2025-08-28 20:23:26]     executor = MigrationExecutor(connection, self.migration_progress_callback)
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/executor.py", line 18, in __init__
+[2025-08-28 20:23:26]     self.loader = MigrationLoader(self.connection)
+[2025-08-28 20:23:26]                   ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/loader.py", line 58, in __init__
+[2025-08-28 20:23:26]     self.build_graph()
+[2025-08-28 20:23:26]     ~~~~~~~~~~~~~~~~^^
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/loader.py", line 235, in build_graph
+[2025-08-28 20:23:26]     self.applied_migrations = recorder.applied_migrations()
+[2025-08-28 20:23:26]                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/recorder.py", line 89, in applied_migrations
+[2025-08-28 20:23:26]     if self.has_table():
+[2025-08-28 20:23:26]        ~~~~~~~~~~~~~~^^
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/db/migrations/recorder.py", line 63, in has_table
+[2025-08-28 20:23:26]     with self.connection.cursor() as cursor:
+[2025-08-28 20:23:26]          ~~~~~~~~~~~~~~~~~~~~~~^^
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:23:26]     return func(*args, **kwargs)
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 320, in cursor
+[2025-08-28 20:23:26]     return self._cursor()
+[2025-08-28 20:23:26]            ~~~~~~~~~~~~^^
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 296, in _cursor
+[2025-08-28 20:23:26]     self.ensure_connection()
+[2025-08-28 20:23:26]     ~~~~~~~~~~~~~~~~~~~~~~^^
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:23:26]     return func(*args, **kwargs)
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 278, in ensure_connection
+[2025-08-28 20:23:26]     with self.wrap_database_errors:
+[2025-08-28 20:23:26]          ^^^^^^^^^^^^^^^^^^^^^^^^^
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/db/utils.py", line 91, in __exit__
+[2025-08-28 20:23:26]     raise dj_exc_value.with_traceback(traceback) from exc_value
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+[2025-08-28 20:23:26]     self.connect()
+[2025-08-28 20:23:26]     ~~~~~~~~~~~~^^
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:23:26]     return func(*args, **kwargs)
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+[2025-08-28 20:23:26]     self.connection = self.get_new_connection(conn_params)
+[2025-08-28 20:23:26]                       ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+[2025-08-28 20:23:26]     return func(*args, **kwargs)
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 332, in get_new_connection
+[2025-08-28 20:23:26]     connection = self.Database.connect(**conn_params)
+[2025-08-28 20:23:26]   File "/workspace/venv/lib/python3.13/site-packages/psycopg2/__init__.py", line 122, in connect
+[2025-08-28 20:23:26]     conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+[2025-08-28 20:23:26] django.db.utils.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused
+[2025-08-28 20:23:26] 	Is the server running on that host and accepting TCP/IP connections?
+[2025-08-28 20:23:26] connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+[2025-08-28 20:23:26] 	Is the server running on that host and accepting TCP/IP connections?
+[2025-08-28 20:23:26] 
+[2025-08-28 20:23:26] 2025-08-28 20:23:26: 📂 Collecting static files...
+[2025-08-28 20:23:26] 
+[2025-08-28 20:23:26] 0 static files copied to '/workspace/staticfiles', 165 unmodified.
+[2025-08-28 20:23:27] 2025-08-28 20:23:27: 🌐 Starting Django/Daphne server on port 8000...
+[2025-08-28 20:23:32] 2025-08-28 20:23:32: ✅ Django started successfully (PID: 7461)
+[2025-08-28 20:23:32] 2025-08-28 20:23:32: ✅ Django startup successful
+[2025-08-28 20:23:32] 2025-08-28 20:23:32: 🔍 Waiting for service at http://localhost:8000/health/simple/...
+[2025-08-28 20:23:32] 2025-08-28 20:23:32: ✅ Service is ready at http://localhost:8000/health/simple/
+[2025-08-28 20:23:32] 2025-08-28 20:23:32: ✅ Django is responding to health checks
+[2025-08-28 20:23:32] 2025-08-28 20:23:32: 🌐 Attempt 1/5: Starting ngrok with static URL...
+[2025-08-28 20:23:32] 2025-08-28 20:23:32: 🛑 Checking for existing ngrok processes...
+[2025-08-28 20:23:32] 2025-08-28 20:23:32: ✅ No existing ngrok processes found
+[2025-08-28 20:23:42] 2025-08-28 20:23:42: ✅ Ngrok started successfully (PID: 7531)
+[2025-08-28 20:23:42] 2025-08-28 20:23:42: ✅ Ngrok startup successful
+[2025-08-28 20:23:42] 2025-08-28 20:23:42: 🔍 Waiting for service at https://colt-charmed-lark.ngrok-free.app/health/simple/...
+[2025-08-28 20:23:42] 2025-08-28 20:23:42: ✅ Service is ready at https://colt-charmed-lark.ngrok-free.app/health/simple/
+[2025-08-28 20:23:42] 2025-08-28 20:23:42: 🎉 External access confirmed!
+[2025-08-28 20:23:42] 
+[2025-08-28 20:23:42] 2025-08-28 20:23:42: 🌟 NoctisPro is now running!
+[2025-08-28 20:23:42] 2025-08-28 20:23:42: 🌍 Static URL: https://colt-charmed-lark.ngrok-free.app
+[2025-08-28 20:23:42] 2025-08-28 20:23:42: 🏠 Local URL: http://localhost:8000
+[2025-08-28 20:23:42] 2025-08-28 20:23:42: 📊 Admin panel: https://colt-charmed-lark.ngrok-free.app/admin-panel/
+[2025-08-28 20:23:42] 2025-08-28 20:23:42: 🏥 DICOM viewer: https://colt-charmed-lark.ngrok-free.app/dicom-viewer/
+[2025-08-28 20:23:42] 2025-08-28 20:23:42: 📋 Worklist: https://colt-charmed-lark.ngrok-free.app/worklist/
+[2025-08-28 20:23:42] 
+[2025-08-28 20:23:42] 2025-08-28 20:23:42: 👁️  Starting service monitoring...

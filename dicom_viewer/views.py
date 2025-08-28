@@ -2410,8 +2410,8 @@ def _get_mpr_volume_and_spacing(series, force_rebuild=False):
                         first_ps = (1.0, 1.0)
 
                 items.append((d, arr))
-        except Exception:
-            continue
+            except Exception:
+                continue
 
     if len(items) < 2:
         raise ValueError('Could not read enough images for MPR')

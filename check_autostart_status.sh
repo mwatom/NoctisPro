@@ -1,114 +1,71 @@
 #!/bin/bash
 
-# Check Autostart Status Script
+# Simple status check for NoctisPro in container environment
+echo "🔍 NoctisPro System Status Check"
+echo "================================="
 
-echo "🔍 NoctisPro Autostart Status Check"
-echo "==================================="
+# Check if autostart service is running
+if [ -f "/workspace/autostart_noctispro.pid" ] && kill -0 $(cat "/workspace/autostart_noctispro.pid") 2>/dev/null; then
+    echo "✅ Autostart service is running"
+    echo "   PID: $(cat /workspace/autostart_noctispro.pid)"
+    echo "   Static URL: https://colt-charmed-lark.ngrok-free.app"
+else
+    echo "❌ Autostart service is not running"
+    echo "   💡 Start with: ./manage_autostart.sh start"
+fi
 echo ""
 
-# Function to show status with color
-show_status() {
-    local service="$1"
-    local description="$2"
+# Check if Django server is running
+if pgrep -f "python.*manage.py" > /dev/null; then
+    echo "✅ Django server is running"
+    DJANGO_PID=$(pgrep -f "python.*manage.py")
+    echo "   PID: $DJANGO_PID"
+else
+    echo "❌ Django server is not running"
+fi
+
+# Check if ngrok is running
+if pgrep -f "ngrok" > /dev/null; then
+    echo "✅ Ngrok is running"
+    NGROK_PID=$(pgrep -f "ngrok")
+    echo "   PID: $NGROK_PID"
     
-    if systemctl is-enabled "$service" >/dev/null 2>&1; then
-        if systemctl is-active "$service" >/dev/null 2>&1; then
-            echo "✅ $description: Enabled and Running"
-        else
-            echo "🟡 $description: Enabled but Not Running"
-        fi
-    else
-        echo "❌ $description: Not Enabled"
-    fi
-}
-
-# Check main service
-echo "📊 Service Status:"
-show_status "noctispro-complete" "NoctisPro Complete System"
-
-# Check dependencies
-echo ""
-echo "🔗 Dependencies:"
-show_status "postgresql" "PostgreSQL Database"
-show_status "redis-server" "Redis Cache"
-
-# Check ngrok configuration
-echo ""
-echo "🌐 Ngrok Configuration:"
-if ngrok config check >/dev/null 2>&1; then
-    echo "✅ Ngrok: Configured with auth token"
-else
-    echo "❌ Ngrok: Not configured (need auth token)"
-fi
-
-# Check environment files
-echo ""
-echo "📁 Configuration Files:"
-if [ -f "/workspace/.env.ngrok" ]; then
-    echo "✅ Ngrok Environment: Present"
-    if grep -q "NGROK_USE_STATIC=true" "/workspace/.env.ngrok" 2>/dev/null; then
-        STATIC_URL=$(grep "NGROK_STATIC_URL=" "/workspace/.env.ngrok" 2>/dev/null | cut -d'=' -f2 | tr -d ' "')
-        if [ ! -z "$STATIC_URL" ]; then
-            echo "   🔗 Static URL: https://$STATIC_URL"
-        fi
+    # Check for ngrok URL
+    if [ -f "/workspace/current_ngrok_url.txt" ]; then
+        URL=$(cat /workspace/current_ngrok_url.txt)
+        echo "   URL: $URL"
     fi
 else
-    echo "❌ Ngrok Environment: Missing"
+    echo "❌ Ngrok is not running"
 fi
 
-if [ -f "/workspace/.env.production" ]; then
-    echo "✅ Production Environment: Present"
+# Check database
+if [ -f "/workspace/db.sqlite3" ]; then
+    echo "✅ Database file exists"
+    DB_SIZE=$(du -h /workspace/db.sqlite3 | cut -f1)
+    echo "   Size: $DB_SIZE"
 else
-    echo "❌ Production Environment: Missing"
+    echo "❌ Database file missing"
 fi
 
-# Check current URL
+# Check log files
 echo ""
-echo "🌍 Current Access:"
-if [ -f "/workspace/current_ngrok_url.txt" ]; then
-    URL=$(cat "/workspace/current_ngrok_url.txt" 2>/dev/null)
-    if [ ! -z "$URL" ]; then
-        echo "   🌐 Ngrok URL: $URL"
-    else
-        echo "   🟡 Ngrok URL file exists but is empty"
-    fi
+echo "📋 Recent log entries:"
+if [ -f "/workspace/noctispro_complete.log" ]; then
+    echo "   Last 5 lines from noctispro_complete.log:"
+    tail -5 /workspace/noctispro_complete.log | sed 's/^/   /'
 else
-    echo "   ❌ No current ngrok URL available"
+    echo "   No complete log file found"
 fi
 
-echo "   🏠 Local URL: http://localhost:80"
-
-# Check logs
+# Quick commands section
 echo ""
-echo "📝 Recent Activity:"
-if systemctl is-active noctispro-complete >/dev/null 2>&1; then
-    echo "   Last 3 log entries:"
-    journalctl -u noctispro-complete -n 3 --no-pager --output=short-iso 2>/dev/null | sed 's/^/      /'
-else
-    echo "   Service not running - no active logs"
-fi
-
-# Show useful commands
+echo "🔧 Quick Commands:"
+echo "   Start autostart:    ./manage_autostart.sh start"
+echo "   Stop autostart:     ./manage_autostart.sh stop"
+echo "   Restart autostart:  ./manage_autostart.sh restart"
+echo "   View logs:          ./manage_autostart.sh logs"
+echo "   Service status:     ./manage_autostart.sh status"
+echo "   Django admin:       source venv/bin/activate && python manage.py createsuperuser"
 echo ""
-echo "🔧 Useful Commands:"
-echo "   Start service:     sudo systemctl start noctispro-complete"
-echo "   Stop service:      sudo systemctl stop noctispro-complete" 
-echo "   Restart service:   sudo systemctl restart noctispro-complete"
-echo "   View live logs:    sudo journalctl -u noctispro-complete -f"
-echo "   Check full status: sudo systemctl status noctispro-complete"
-echo ""
-
-# Final summary
-echo "📋 Summary:"
-if systemctl is-enabled noctispro-complete >/dev/null 2>&1; then
-    echo "✅ Autostart is configured and will run on boot"
-    if systemctl is-active noctispro-complete >/dev/null 2>&1; then
-        echo "✅ System is currently running"
-    else
-        echo "🟡 System configured but not currently running"
-        echo "   Run: sudo systemctl start noctispro-complete"
-    fi
-else
-    echo "❌ Autostart is NOT configured"
-    echo "   Run: sudo ./quick_autostart_setup.sh"
-fi
+echo "🌍 Static URL: https://colt-charmed-lark.ngrok-free.app"

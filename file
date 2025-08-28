@@ -1,0 +1,9 @@
+t=2025-08-28T20:23:32+0000 lvl=info msg="no configuration paths supplied"
+t=2025-08-28T20:23:32+0000 lvl=info msg="using configuration at default config path" path=/home/ubuntu/.config/ngrok/ngrok.yml
+t=2025-08-28T20:23:32+0000 lvl=info msg="open config file" path=/home/ubuntu/.config/ngrok/ngrok.yml err=nil
+t=2025-08-28T20:23:32+0000 lvl=info msg="starting web service" obj=web addr=localhost:4040 allow_hosts=[]
+t=2025-08-28T20:23:32+0000 lvl=info msg="client session established" obj=tunnels.session
+t=2025-08-28T20:23:32+0000 lvl=info msg="tunnel session started" obj=tunnels.session
+t=2025-08-28T20:23:32+0000 lvl=info msg="started tunnel" obj=tunnels name=command_line addr=http://localhost:8000 url=https://colt-charmed-lark.ngrok-free.app
+t=2025-08-28T20:23:42+0000 lvl=info msg="join connections" obj=join id=3fe61940be8f l=127.0.0.1:8000 r=35.153.85.60:45379
+t=2025-08-28T20:23:54+0000 lvl=info msg="join connections" obj=join id=b0c72bc4961b l=127.0.0.1:8000 r=34.195.201.10:20838
