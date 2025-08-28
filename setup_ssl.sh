@@ -46,7 +46,7 @@ if [ $? -eq 0 ]; then
     log_success "SSL certificate obtained successfully"
     
     # Update environment to enable SSL
-    sed -i 's/ENABLE_SSL=false/ENABLE_SSL=true/' /opt/noctis_pro/.env
+    sed -i 's/ENABLE_SSL=false/ENABLE_SSL=true/' /workspace/.env
     
     # Restart services
     systemctl restart noctis-django noctis-daphne
