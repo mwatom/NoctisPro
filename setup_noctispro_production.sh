@@ -134,13 +134,11 @@ $SUDO systemctl start postgresql
 log "Configuring PostgreSQL database..."
 
 # Create database user and database
-$SUDO -u postgres psql -c "SELECT 1 FROM pg_user WHERE usename = 'noctis_user';" | grep -q 1 || \
-    $SUDO -u postgres createuser --createdb --no-createrole --no-superuser noctis_user
+$SUDO -u postgres psql -c "SELECT 1 FROM pg_user WHERE usename = 'noctis_user';" | grep -q 1 || $SUDO -u postgres createuser --createdb --no-createrole --no-superuser noctis_user
 
 $SUDO -u postgres psql -c "ALTER USER noctis_user PASSWORD 'noctis_secure_password_2025';"
 
-$SUDO -u postgres psql -c "SELECT 1 FROM pg_database WHERE datname = 'noctis_pro';" | grep -q 1 || \
-    $SUDO -u postgres createdb -O noctis_user noctis_pro
+$SUDO -u postgres psql -c "SELECT 1 FROM pg_database WHERE datname = 'noctis_pro';" | grep -q 1 || $SUDO -u postgres createdb -O noctis_user noctis_pro
 
 echo "✅ PostgreSQL configured"
 echo ""
