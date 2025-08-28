@@ -2,6 +2,10 @@ version: '3.8'
 
 services:
   noctispro:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ${BUILD_TARGET:-development}
     command: ["/bin/bash", "-c", "cd /workspace && ./container_start.sh"]
     restart: unless-stopped
     environment:
