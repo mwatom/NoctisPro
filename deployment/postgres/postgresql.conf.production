@@ -1,0 +1,115 @@
+# PostgreSQL Configuration for NoctisPro Production
+# Optimized for medical imaging workloads
+
+# Connection Settings
+listen_addresses = '*'
+port = 5432
+max_connections = 100
+
+# Memory Settings - Optimized for production
+shared_buffers = 256MB
+effective_cache_size = 1GB
+maintenance_work_mem = 64MB
+work_mem = 16MB
+wal_buffers = 16MB
+
+# Checkpoint Settings
+checkpoint_completion_target = 0.9
+checkpoint_timeout = 15min
+max_wal_size = 1GB
+min_wal_size = 80MB
+
+# Performance Settings
+random_page_cost = 1.1
+seq_page_cost = 1
+effective_io_concurrency = 200
+cpu_tuple_cost = 0.01
+cpu_index_tuple_cost = 0.005
+cpu_operator_cost = 0.0025
+
+# Statistics and Planner Settings
+default_statistics_target = 100
+constraint_exclusion = partition
+cursor_optimization = on
+
+# Write-Ahead Logging
+wal_level = replica
+wal_compression = on
+wal_log_hints = on
+
+# Logging Settings for Production
+log_destination = 'stderr'
+logging_collector = on
+log_directory = 'pg_log'
+log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+log_rotation_age = 1d
+log_rotation_size = 10MB
+log_min_duration_statement = 1000
+log_connections = on
+log_disconnections = on
+log_hostname = on
+log_line_prefix = '%t [%p-%l] %q%u@%d '
+
+# Lock Settings
+deadlock_timeout = 1s
+lock_timeout = 30s
+statement_timeout = 0
+
+# Locale Settings
+lc_messages = 'en_US.UTF-8'
+lc_monetary = 'en_US.UTF-8'
+lc_numeric = 'en_US.UTF-8'
+lc_time = 'en_US.UTF-8'
+
+# Connection Pooling
+tcp_keepalives_idle = 600
+tcp_keepalives_interval = 30
+tcp_keepalives_count = 3
+
+# Security Settings
+ssl = off  # Enable if you have SSL certificates
+ssl_ciphers = 'HIGH:MEDIUM:+3DES:!aNULL'
+ssl_prefer_server_ciphers = on
+
+# Vacuum and Autovacuum Settings
+autovacuum = on
+autovacuum_max_workers = 3
+autovacuum_naptime = 1min
+autovacuum_vacuum_threshold = 50
+autovacuum_analyze_threshold = 50
+autovacuum_vacuum_scale_factor = 0.2
+autovacuum_analyze_scale_factor = 0.1
+autovacuum_freeze_max_age = 200000000
+autovacuum_multixact_freeze_max_age = 400000000
+autovacuum_vacuum_cost_delay = 20ms
+autovacuum_vacuum_cost_limit = 200
+
+# Background Writer
+bgwriter_delay = 200ms
+bgwriter_lru_maxpages = 100
+bgwriter_lru_multiplier = 2.0
+
+# Archive Settings (for backup)
+archive_mode = off
+archive_command = ''
+archive_timeout = 0
+
+# Hot Standby (for replication)
+hot_standby = off
+wal_receiver_status_interval = 10s
+hot_standby_feedback = off
+
+# Parallel Queries
+max_parallel_workers_per_gather = 2
+max_parallel_workers = 8
+max_worker_processes = 8
+
+# JIT Settings (PostgreSQL 11+)
+jit = off
+
+# Shared Preload Libraries
+shared_preload_libraries = 'pg_stat_statements'
+
+# Extension Settings
+pg_stat_statements.max = 10000
+pg_stat_statements.track = all

@@ -89,14 +89,19 @@ ASGI_APPLICATION = 'noctis_pro.asgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME', 'noctis_pro'),
-        'USER': os.environ.get('DB_USER', 'noctis_user'),
-        'PASSWORD': os.environ.get('DB_PASSWORD'),
-        'HOST': os.environ.get('DB_HOST', 'localhost'),
-        'PORT': os.environ.get('DB_PORT', '5432'),
+        'NAME': os.environ.get('POSTGRES_DB', 'noctisprodb'),
+        'USER': os.environ.get('POSTGRES_USER', 'noctispro'),
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD'),
+        'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
+        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
         'OPTIONS': {
             'charset': 'utf8',
+            'sslmode': os.environ.get('DB_OPTIONS_SSLMODE', 'prefer'),
+            'connect_timeout': 10,
+            'options': '-c default_transaction_isolation=read committed'
         },
+        'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', 300)),
+        'CONN_HEALTH_CHECKS': True,
     }
 }
 
@@ -177,6 +182,9 @@ X_FRAME_OPTIONS = 'DENY'
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
+
+# Database connection health checks
+DATABASE_CONNECTION_HEALTH_CHECKS = True
 
 # SSL settings (enable when SSL is configured)
 if os.environ.get('ENABLE_SSL', 'false').lower() == 'true':
