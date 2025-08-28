@@ -1,21 +1,21 @@
 [Unit]
 Description=NoctisPro Ngrok Tunnel
-After=network.target noctispro.service
-Wants=noctispro.service
+After=network-online.target noctispro-production.service
+Wants=network-online.target
+Requires=noctispro-production.service
 
 [Service]
-Type=exec
-User=ubuntu
-Group=ubuntu
-WorkingDirectory=/workspace
-Environment="HOME=/home/ubuntu"
-EnvironmentFile=-/workspace/.env.ngrok
-ExecStartPre=/bin/bash -c 'source /workspace/.env.ngrok 2>/dev/null || true'
-ExecStart=/bin/bash -c 'cd /workspace && source .env.ngrok 2>/dev/null || true && if [ "${NGROK_USE_STATIC:-false}" = "true" ]; then if [ ! -z "${NGROK_DOMAIN:-}" ]; then /usr/local/bin/ngrok start noctispro-domain --log=stdout; elif [ ! -z "${NGROK_SUBDOMAIN:-}" ]; then /usr/local/bin/ngrok start noctispro-static --log=stdout; else /usr/local/bin/ngrok start ${NGROK_TUNNEL_NAME:-noctispro-http} --log=stdout; fi; else /usr/local/bin/ngrok start ${NGROK_TUNNEL_NAME:-noctispro-http} --log=stdout; fi'
+Type=simple
 Restart=always
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
+RestartSec=10
+User=root
+WorkingDirectory=/opt/noctispro
+Environment=HOME=/root
+ExecStartPre=/bin/sleep 30
+ExecStart=/usr/local/bin/ngrok http --url=colt-charmed-lark.ngrok-free.app 80 --log=stdout
+ExecStop=/usr/bin/pkill -f ngrok
+StandardOutput=append:/opt/noctispro/logs/ngrok.log
+StandardError=append:/opt/noctispro/logs/ngrok-error.log
 
 [Install]
 WantedBy=multi-user.target

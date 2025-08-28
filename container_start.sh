@@ -61,7 +61,7 @@ start_ngrok_with_retries() {
         
         # Start ngrok with static URL
         log "Starting ngrok with static URL: colt-charmed-lark.ngrok-free.app"
-        nohup ngrok http --url=https://colt-charmed-lark.ngrok-free.app 80 --log=stdout > "$WORKSPACE_DIR/ngrok.log" 2>&1 &
+        nohup ngrok http --url=colt-charmed-lark.ngrok-free.app 80 --log=stdout > "$WORKSPACE_DIR/ngrok.log" 2>&1 &
         NGROK_PID=$!
         log "Ngrok started with PID: $NGROK_PID"
         

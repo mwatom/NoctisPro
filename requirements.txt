@@ -7,6 +7,7 @@ python-dotenv
 # Production server
 gunicorn
 whitenoise
+uvicorn[standard]
 
 # Database
 psycopg2-binary
@@ -72,3 +73,6 @@ django-extensions
 reportlab
 pycups
 python-escpos
+
+# Health checks and monitoring
+django-health-check

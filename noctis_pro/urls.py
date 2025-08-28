@@ -23,6 +23,7 @@ from django.shortcuts import redirect
 from django.http import HttpResponse
 from worklist import views as worklist_views
 from django.views.generic.base import RedirectView
+from . import health
 
 def home_redirect(request):
     """Redirect home page to login or dashboard based on authentication"""
@@ -53,6 +54,12 @@ urlpatterns = [
     path('chat/', include('chat.urls')),  # Re-enabled to fix template URLs
     path('notifications/', include('notifications.urls')),  # Re-enabled to fix template URLs
     path('ai/', include('ai_analysis.urls')),
+    
+    # Health check endpoints
+    path('health/', health.health_check, name='health_check'),
+    path('health/simple/', health.simple_health_check, name='simple_health_check'),
+    path('health/ready/', health.ready_check, name='ready_check'),
+    path('health/live/', health.live_check, name='live_check'),
     
     # Optimized media serving
     re_path(r'^media/(?P<path>.*)$', views.OptimizedMediaView.as_view(), name='optimized_media'),
