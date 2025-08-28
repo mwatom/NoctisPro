@@ -131,6 +131,11 @@ tunnels:
   noctispro-static:
     proto: http
     addr: 8000
+    hostname: ${NGROK_STATIC_URL:-}
+    bind_tls: true
+  noctispro-subdomain:
+    proto: http
+    addr: 8000
     subdomain: ${NGROK_SUBDOMAIN:-}
     bind_tls: true
   noctispro-domain:
@@ -139,6 +144,12 @@ tunnels:
     hostname: ${NGROK_DOMAIN:-}
     bind_tls: true
 EOF
+else
+    log "Ngrok config exists, updating static URL..."
+    # Update the static URL in existing config if needed
+    if [ ! -z "${NGROK_STATIC_URL:-}" ]; then
+        sed -i "s/hostname: .*/hostname: ${NGROK_STATIC_URL}/" "$NGROK_CONFIG_FILE" 2>/dev/null || true
+    fi
 fi
 
 # Start ngrok
@@ -147,9 +158,13 @@ if is_running "ngrok"; then
     log "Ngrok is already running"
     NGROK_PID=$(pgrep ngrok)
 else
-    # Determine which tunnel to use
+    # Determine which tunnel to use based on configuration
     if [ "${NGROK_USE_STATIC:-false}" = "true" ]; then
-        if [ ! -z "${NGROK_DOMAIN:-}" ]; then
+        if [ ! -z "${NGROK_STATIC_URL:-}" ]; then
+            # Use static URL directly
+            log "Using configured static URL: $NGROK_STATIC_URL"
+            TUNNEL_NAME="noctispro-static"
+        elif [ ! -z "${NGROK_DOMAIN:-}" ]; then
             TUNNEL_NAME="noctispro-domain"
         elif [ ! -z "${NGROK_SUBDOMAIN:-}" ]; then
             TUNNEL_NAME="noctispro-static"
@@ -172,8 +187,15 @@ sleep 10
 
 # Get ngrok URL
 NGROK_URL=""
-for i in {1..15}; do
-    NGROK_URL=$(curl -s http://localhost:4040/api/tunnels 2>/dev/null | python3 -c "
+
+# If static URL is configured, use it directly
+if [ "${NGROK_USE_STATIC:-false}" = "true" ] && [ ! -z "${NGROK_STATIC_URL:-}" ]; then
+    NGROK_URL="https://${NGROK_STATIC_URL}"
+    log "✅ Using configured static URL: $NGROK_URL"
+else
+    # Try to get URL from ngrok API
+    for i in {1..15}; do
+        NGROK_URL=$(curl -s http://localhost:4040/api/tunnels 2>/dev/null | python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
@@ -184,18 +206,24 @@ try:
 except:
     pass
 " 2>/dev/null)
-    
-    if [ ! -z "$NGROK_URL" ]; then
-        log "✅ Ngrok tunnel active: $NGROK_URL"
-        break
-    else
-        log "Waiting for ngrok tunnel... (attempt $i/15)"
-        sleep 2
-    fi
-done
+        
+        if [ ! -z "$NGROK_URL" ]; then
+            log "✅ Ngrok tunnel active: $NGROK_URL"
+            break
+        else
+            log "Waiting for ngrok tunnel... (attempt $i/15)"
+            sleep 2
+        fi
+    done
+fi
 
 if [ -z "$NGROK_URL" ]; then
     log "⚠️  Could not get ngrok URL - check ngrok configuration"
+    # Fallback to static URL if configured
+    if [ ! -z "${NGROK_STATIC_URL:-}" ]; then
+        NGROK_URL="https://${NGROK_STATIC_URL}"
+        log "⚠️  Using fallback static URL: $NGROK_URL"
+    fi
 else
     # Save URL to file for easy access
     echo "$NGROK_URL" > "$WORKSPACE_DIR/current_ngrok_url.txt"
