@@ -78,3 +78,5 @@ Watching for file changes with StatReloader
 [mHTTP GET /admin/login/ 200 [0.01, 127.0.0.1:33958][0m
 Forbidden (CSRF cookie not set.): /admin/login/
 [31;1mHTTP POST /admin/login/ 403 [0.00, 127.0.0.1:33972][0m
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
