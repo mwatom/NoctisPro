@@ -1,0 +1,69 @@
+[Unit]
+Description=NoctisPro Production System with Ngrok Static URL
+Documentation=file:///workspace/README.md
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target postgresql.service redis-server.service
+Requires=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=forking
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/workspace
+Environment=PATH=/workspace/venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=HOME=/home/ubuntu
+Environment=PYTHONPATH=/workspace
+Environment=DJANGO_SETTINGS_MODULE=noctis_pro.settings
+EnvironmentFile=-/workspace/.env.production
+EnvironmentFile=-/workspace/.env.ngrok
+
+# Health checks and dependency verification
+ExecStartPre=/bin/bash -c 'echo "🔍 Checking system dependencies..."'
+ExecStartPre=/bin/bash -c 'systemctl is-active postgresql || (echo "Starting PostgreSQL..." && systemctl start postgresql)'
+ExecStartPre=/bin/bash -c 'systemctl is-active redis-server || (echo "Starting Redis..." && systemctl start redis-server)'
+ExecStartPre=/bin/bash -c 'sleep 5'
+
+# Verify ngrok authentication
+ExecStartPre=/bin/bash -c 'if ! /usr/local/bin/ngrok config check >/dev/null 2>&1; then echo "❌ Ngrok auth not configured. Run: ngrok config add-authtoken <token>"; exit 1; fi'
+
+# Django setup
+ExecStartPre=/bin/bash -c 'echo "🔧 Setting up Django environment..."'
+ExecStartPre=/bin/bash -c 'cd /workspace && source venv/bin/activate && python manage.py migrate --noinput'
+ExecStartPre=/bin/bash -c 'cd /workspace && source venv/bin/activate && python manage.py collectstatic --noinput --clear'
+ExecStartPre=/bin/bash -c 'cd /workspace && source venv/bin/activate && python manage.py check --deploy'
+
+# Start the production system
+ExecStart=/workspace/start_production_with_ngrok.sh
+
+# Graceful shutdown
+ExecStop=/workspace/stop_production_system.sh
+ExecStopPost=/bin/bash -c 'pkill -f "manage.py runserver" || true'
+ExecStopPost=/bin/bash -c 'pkill -f "ngrok" || true'
+
+# Process management
+PIDFile=/workspace/noctispro_production.pid
+TimeoutStartSec=120
+TimeoutStopSec=30
+Restart=always
+RestartSec=15
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=noctispro-production
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/workspace
+ProtectHome=true
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=2G
+
+[Install]
+WantedBy=multi-user.target
