@@ -76,7 +76,7 @@ services:
     environment:
       - DEBUG=False
       - SECRET_KEY=${SECRET_KEY}
-      - DJANGO_SETTINGS_MODULE=noctis_pro.settings.production
+      - DJANGO_SETTINGS_MODULE=noctis_pro.settings
       - POSTGRES_DB=${POSTGRES_DB:-noctis_pro}
       - POSTGRES_USER=${POSTGRES_USER:-noctis_user}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -85,16 +85,18 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
-      - SECURE_SSL_REDIRECT=${SECURE_SSL_REDIRECT:-False}
-      - EMAIL_BACKEND=${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+      - ALLOWED_HOSTS=*
+      - SECURE_SSL_REDIRECT=False
+      - EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-demo@noctispro.com}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-demo123456}
     volumes:
       - media_files:/app/media
       - static_files:/app/staticfiles
       - backup_files:/app/backups
       - ./logs:/app/logs
     ports:
-      - "127.0.0.1:8000:8000"
+      - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
