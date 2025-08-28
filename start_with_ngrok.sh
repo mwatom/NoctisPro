@@ -46,16 +46,20 @@ python manage.py migrate
 echo "🔄 Collecting static files..."
 python manage.py collectstatic --noinput
 
-# Start ngrok in background
-echo "🌐 Starting ngrok tunnel..."
-ngrok http 8000 --log=stdout > ngrok.log 2>&1 &
-NGROK_PID=$!
+# Check if ngrok is configured
+echo "🌐 Checking ngrok configuration..."
 
-# Wait a moment for ngrok to start
-sleep 3
-
-# Get ngrok URL
-NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | python3 -c "
+# Check if ngrok auth token is configured
+if ngrok config check > /dev/null 2>&1; then
+    echo "✅ Ngrok is configured - starting tunnel..."
+    ngrok http 8000 --log=stdout > ngrok.log 2>&1 &
+    NGROK_PID=$!
+    
+    # Wait a moment for ngrok to start
+    sleep 5
+    
+    # Get ngrok URL
+    NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
@@ -66,12 +70,26 @@ try:
 except:
     pass
 ")
-
-if [ ! -z "$NGROK_URL" ]; then
-    echo "🌍 Ngrok tunnel active: $NGROK_URL"
-    echo "🌍 Local access: http://localhost:8000"
+    
+    if [ ! -z "$NGROK_URL" ]; then
+        echo "🌍 Ngrok tunnel active: $NGROK_URL"
+        echo "🌍 Local access: http://localhost:8000"
+    else
+        echo "⚠️  Could not get ngrok URL - check ngrok.log"
+    fi
 else
-    echo "⚠️  Could not get ngrok URL - check ngrok.log"
+    echo "❌ Ngrok not configured!"
+    echo ""
+    echo "📋 To set up ngrok:"
+    echo "   1. Sign up at: https://dashboard.ngrok.com/signup"
+    echo "   2. Get your authtoken from: https://dashboard.ngrok.com/get-started/your-authtoken"
+    echo "   3. Run: ngrok config add-authtoken <your-token>"
+    echo ""
+    echo "🌍 For now, your server will be available at:"
+    echo "   Local: http://localhost:8000"
+    echo "   Network: http://$(hostname -I | awk '{print $1}'):8000"
+    echo ""
+    NGROK_PID=""
 fi
 
 echo ""
@@ -83,8 +101,11 @@ echo ""
 cleanup() {
     echo ""
     echo "🛑 Stopping services..."
-    kill $NGROK_PID 2>/dev/null
-    echo "✅ Ngrok stopped"
+    if [ ! -z "$NGROK_PID" ]; then
+        kill $NGROK_PID 2>/dev/null
+        echo "✅ Ngrok stopped"
+    fi
+    echo "✅ Django server stopped"
     exit 0
 }
 
