@@ -45,10 +45,10 @@ urlpatterns = [
     path('worklist/', include('worklist.urls')),
     # Alias endpoints expected by the dashboard UI
     path('api/studies/', worklist_views.api_studies, name='api_studies_root'),
-    path('dicom-viewer/', include(('dicom_viewer.urls','dicom_viewer'), namespace='dicom_viewer')),  # single namespaced include
+    # path('dicom-viewer/', include(('dicom_viewer.urls','dicom_viewer'), namespace='dicom_viewer')),  # Temporarily disabled
     # Removed duplicate 'viewer/' include to avoid namespace clash; keep alias via redirect if needed
-    path('viewer/', RedirectView.as_view(url='/dicom-viewer/', permanent=False, query_string=True)),
-    path('viewer/<path:subpath>/', RedirectView.as_view(url='/dicom-viewer/%(subpath)s/', permanent=False, query_string=True)),
+    # path('viewer/', RedirectView.as_view(url='/dicom-viewer/', permanent=False, query_string=True)),
+    # path('viewer/<path:subpath>/', RedirectView.as_view(url='/dicom-viewer/%(subpath)s/', permanent=False, query_string=True)),
     path('reports/', include('reports.urls')),
     path('admin-panel/', include('admin_panel.urls')),
     path('chat/', include('chat.urls')),  # Re-enabled to fix template URLs

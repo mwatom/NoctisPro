@@ -2368,47 +2368,48 @@ def _get_mpr_volume_and_spacing(series, force_rebuild=False):
                         arr = px.astype(_np.float32)
                     except Exception:
                         continue
+                
                 slope = float(getattr(ds, 'RescaleSlope', 1.0) or 1.0)
                 intercept = float(getattr(ds, 'RescaleIntercept', 0.0) or 0.0)
                 arr = arr * slope + intercept
 
-            # Orientation-aware sorting
-            pos = getattr(ds, 'ImagePositionPatient', None)
-            iop = getattr(ds, 'ImageOrientationPatient', None)
-            if iop is not None and len(iop) == 6:
-                # row (x) and col (y) direction cosines
-                r = _np.array([float(iop[0]), float(iop[1]), float(iop[2])], dtype=_np.float64)
-                c = _np.array([float(iop[3]), float(iop[4]), float(iop[5])], dtype=_np.float64)
-                n = _np.cross(r, c)
-                if normal is None:
-                    normal = n / ( _np.linalg.norm(n) + 1e-8 )
-            else:
-                n = _np.array([0.0, 0.0, 1.0], dtype=_np.float64)
-                if normal is None:
-                    normal = n
-            if pos is not None and len(pos) == 3:
-                p = _np.array([float(pos[0]), float(pos[1]), float(pos[2])], dtype=_np.float64)
-                d = float(_np.dot(p, normal))
-            else:
-                # Fallback to slice_location, then instance number
-                d = float(getattr(ds, 'SliceLocation', getattr(ds, 'InstanceNumber', 0)) or 0)
+                # Orientation-aware sorting
+                pos = getattr(ds, 'ImagePositionPatient', None)
+                iop = getattr(ds, 'ImageOrientationPatient', None)
+                if iop is not None and len(iop) == 6:
+                    # row (x) and col (y) direction cosines
+                    r = _np.array([float(iop[0]), float(iop[1]), float(iop[2])], dtype=_np.float64)
+                    c = _np.array([float(iop[3]), float(iop[4]), float(iop[5])], dtype=_np.float64)
+                    n = _np.cross(r, c)
+                    if normal is None:
+                        normal = n / ( _np.linalg.norm(n) + 1e-8 )
+                else:
+                    n = _np.array([0.0, 0.0, 1.0], dtype=_np.float64)
+                    if normal is None:
+                        normal = n
+                if pos is not None and len(pos) == 3:
+                    p = _np.array([float(pos[0]), float(pos[1]), float(pos[2])], dtype=_np.float64)
+                    d = float(_np.dot(p, normal))
+                else:
+                    # Fallback to slice_location, then instance number
+                    d = float(getattr(ds, 'SliceLocation', getattr(ds, 'InstanceNumber', 0)) or 0)
 
-            # Pixel spacing & slice thickness (from first slice)
-            if st is None:
-                st = getattr(ds, 'SpacingBetweenSlices', None)
+                # Pixel spacing & slice thickness (from first slice)
                 if st is None:
-                    st = getattr(ds, 'SliceThickness', 1.0)
-                try:
-                    st = float(st)
-                except Exception:
-                    st = 1.0
-                ps_attr = getattr(ds, 'PixelSpacing', [1.0, 1.0])
-                try:
-                    first_ps = (float(ps_attr[0]), float(ps_attr[1]))
-                except Exception:
-                    first_ps = (1.0, 1.0)
+                    st = getattr(ds, 'SpacingBetweenSlices', None)
+                    if st is None:
+                        st = getattr(ds, 'SliceThickness', 1.0)
+                    try:
+                        st = float(st)
+                    except Exception:
+                        st = 1.0
+                    ps_attr = getattr(ds, 'PixelSpacing', [1.0, 1.0])
+                    try:
+                        first_ps = (float(ps_attr[0]), float(ps_attr[1]))
+                    except Exception:
+                        first_ps = (1.0, 1.0)
 
-            items.append((d, arr))
+                items.append((d, arr))
         except Exception:
             continue
 

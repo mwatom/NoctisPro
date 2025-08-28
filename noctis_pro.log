@@ -2,3 +2,61 @@
 Watching for file changes with StatReloader
 Watching for file changes with StatReloader
 Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Internal Server Error: /
+Traceback (most recent call last):
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/utils/deprecation.py", line 119, in __call__
+    response = self.process_request(request)
+  File "/workspace/noctis_pro/middleware.py", line 324, in process_request
+    if not request.user.is_authenticated:
+           ^^^^^^^^^^^^
+AttributeError: 'ASGIRequest' object has no attribute 'user'
+HTTP GET / 500 [0.00, 127.0.0.1:59660]
+Internal Server Error: /
+Traceback (most recent call last):
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/utils/deprecation.py", line 119, in __call__
+    response = self.process_request(request)
+  File "/workspace/noctis_pro/middleware.py", line 324, in process_request
+    if not request.user.is_authenticated:
+           ^^^^^^^^^^^^
+AttributeError: 'ASGIRequest' object has no attribute 'user'
+HTTP GET / 500 [0.00, 127.0.0.1:59670]
+Internal Server Error: /
+Traceback (most recent call last):
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/utils/deprecation.py", line 119, in __call__
+    response = self.process_request(request)
+  File "/workspace/noctis_pro/middleware.py", line 324, in process_request
+    if not request.user.is_authenticated:
+           ^^^^^^^^^^^^
+AttributeError: 'ASGIRequest' object has no attribute 'user'
+HTTP GET / 500 [0.00, 127.0.0.1:40590]
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Internal Server Error: /admin/
+Traceback (most recent call last):
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/django/utils/deprecation.py", line 119, in __call__
+    response = self.process_request(request)
+  File "/workspace/noctis_pro/middleware.py", line 324, in process_request
+    if not request.user.is_authenticated:
+           ^^^^^^^^^^^^
+AttributeError: 'ASGIRequest' object has no attribute 'user'
+HTTP GET /admin/ 500 [0.00, 127.0.0.1:50314]
+/workspace/noctis_pro/settings.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+HTTP GET / 302 [0.01, 127.0.0.1:36828]
+HTTP GET / 302 [0.00, 127.0.0.1:36836]
+HTTP GET /admin/ 302 [0.00, 127.0.0.1:48532]
+HTTP GET /admin/ 302 [0.00, 127.0.0.1:38174]
+HTTP GET /worklist/ 302 [0.00, 127.0.0.1:38174]
+HTTP GET /login/?next=/worklist/ 200 [0.00, 127.0.0.1:38174]
