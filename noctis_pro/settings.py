@@ -47,7 +47,7 @@ INSTALLED_APPS = [
     # Custom apps
     'accounts',
     'worklist',
-    # 'dicom_viewer',  # Temporarily disabled due to syntax issues
+    'dicom_viewer',  # Re-enabled after fixing syntax issues
     'reports',  # Re-enabled to fix model registration
     'admin_panel',
     'chat',  # Re-enabled to fix template URLs
