@@ -1651,11 +1651,14 @@
         
         // Set loading state immediately to prevent UI freezing
         reconstructionInProgress = true;
-        reconStatus.textContent = 'Generating...';
+        reconStatus.textContent = 'Preparing reconstruction...';
         
         // Disable reconstruction buttons during processing
         const reconButtons = document.querySelectorAll('[data-recon], #btnGenerateRecon');
         reconButtons.forEach(btn => btn.style.pointerEvents = 'none');
+        
+        // Show progress indicator
+        showProgressIndicator();
         
         reconMode = null; reconImgs = []; reconIndex = 0; panOffset = {x:0,y:0}; zoom = 1.0;
         const params = new URLSearchParams();
@@ -1669,13 +1672,33 @@
         else { url = `/dicom-viewer/api/series/${currentSeries.id}/bone/?threshold=${boneSlider.value}&mesh=true&quality=high`; }
         
         console.log(`Requesting reconstruction: ${type}, URL: ${url}`);
-        const r = await fetch(url);
+        
+        // Add timeout and progress updates
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+          throw new Error('Reconstruction timeout - please try again');
+        }, 180000); // 3 minute timeout for slow connections
+        
+        reconStatus.textContent = 'Loading reconstruction...';
+        
+        const r = await fetch(url, { 
+          signal: controller.signal,
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        
+        clearTimeout(timeoutId);
         console.log(`Response status: ${r.status}`);
         
         if (!r.ok) {
           const errorText = await r.text();
           throw new Error(`HTTP ${r.status}: ${errorText}`);
         }
+        
+        reconStatus.textContent = 'Processing data...';
         
         const j = await r.json();
         console.log(`Response data:`, j);
