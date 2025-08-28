@@ -1825,7 +1825,18 @@ def web_dicom_image(request, image_id):
                     px = px[0]
                 pixel_array = px
             except Exception:
-                return HttpResponse(status=500)
+                # As a last resort, generate a placeholder PNG so the web viewer can still render
+                try:
+                    width, height = 512, 512
+                    placeholder = Image.new('L', (width, height), color=0)
+                    buf = BytesIO()
+                    placeholder.save(buf, format='PNG')
+                    buf.seek(0)
+                    resp = HttpResponse(buf.getvalue(), content_type='image/png')
+                    resp['Cache-Control'] = 'no-store'
+                    return resp
+                except Exception:
+                    return HttpResponse(status=500)
         # Apply VOI LUT only for projection modalities (CR/DX/XA/RF/MG) to avoid CT distortion
         try:
             modality = str(getattr(ds, 'Modality', '')).upper()
@@ -1879,7 +1890,18 @@ def web_dicom_image(request, image_id):
         response['Cache-Control'] = 'max-age=3600'
         return response
     except Exception as e:
-        return HttpResponse(status=500)
+        # Return a placeholder PNG to avoid frontend breaking on image load
+        try:
+            width, height = 512, 512
+            placeholder = Image.new('L', (width, height), color=0)
+            buf = BytesIO()
+            placeholder.save(buf, format='PNG')
+            buf.seek(0)
+            resp = HttpResponse(buf.getvalue(), content_type='image/png')
+            resp['Cache-Control'] = 'no-store'
+            return resp
+        except Exception:
+            return HttpResponse(status=500)
 
 
 @login_required
