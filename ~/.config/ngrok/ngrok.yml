@@ -1,0 +1,13 @@
+version: 2
+region: us
+console_ui: true
+console_ui_color: transparent
+update_channel: stable
+update_check: true
+web_addr: localhost:4040
+
+tunnels:
+  noctispro-http:
+    proto: http
+    addr: 80
+    hostname: colt-charmed-lark.ngrok-free.app
