@@ -4,6 +4,17 @@
 echo "🔍 NoctisPro System Status Check"
 echo "================================="
 
+# Check if autostart service is running
+if [ -f "/workspace/autostart_noctispro.pid" ] && kill -0 $(cat "/workspace/autostart_noctispro.pid") 2>/dev/null; then
+    echo "✅ Autostart service is running"
+    echo "   PID: $(cat /workspace/autostart_noctispro.pid)"
+    echo "   Static URL: https://colt-charmed-lark.ngrok-free.app"
+else
+    echo "❌ Autostart service is not running"
+    echo "   💡 Start with: ./manage_autostart.sh start"
+fi
+echo ""
+
 # Check if Django server is running
 if pgrep -f "python.*manage.py" > /dev/null; then
     echo "✅ Django server is running"
@@ -50,7 +61,11 @@ fi
 # Quick commands section
 echo ""
 echo "🔧 Quick Commands:"
-echo "   Start system:  ./start_robust_system.sh"
-echo "   Stop system:   ./stop_robust_system.sh"
-echo "   View logs:     tail -f noctispro_complete.log"
-echo "   Django admin:  python manage.py createsuperuser"
+echo "   Start autostart:    ./manage_autostart.sh start"
+echo "   Stop autostart:     ./manage_autostart.sh stop"
+echo "   Restart autostart:  ./manage_autostart.sh restart"
+echo "   View logs:          ./manage_autostart.sh logs"
+echo "   Service status:     ./manage_autostart.sh status"
+echo "   Django admin:       source venv/bin/activate && python manage.py createsuperuser"
+echo ""
+echo "🌍 Static URL: https://colt-charmed-lark.ngrok-free.app"
