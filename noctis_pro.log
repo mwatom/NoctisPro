@@ -501,3 +501,7 @@ Forbidden (CSRF token missing.): /worklist/
 Forbidden (CSRF cookie not set.): /login/
 [31;1mHTTP POST /login/ 403 [0.00, 127.0.0.1:53672][0m
 [mHTTP GET /login/ 200 [0.00, 127.0.0.1:53674][0m
+Watching for file changes with StatReloader
+[32mHTTP GET / 302 [0.01, 127.0.0.1:59564][0m
+[32mHTTP GET /admin/ 302 [0.00, 127.0.0.1:44214][0m
+[mHTTP GET /login/ 200 [0.00, 127.0.0.1:44224][0m
