@@ -193,3 +193,4 @@
 [2025-08-29 03:50:27] 🌐 Get ngrok URL: curl http://localhost:4040/api/tunnels
 [2025-08-29 03:50:27] 
 [2025-08-29 03:50:27] Press Ctrl+C to stop the service
+[2025-08-29 03:53:25] 🔧 Using development settings with SQLite database
