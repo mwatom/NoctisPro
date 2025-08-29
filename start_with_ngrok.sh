@@ -78,7 +78,7 @@ if [ "$USE_DUMMY_CACHE" = "True" ]; then
 else
   echo "   Cache: Redis (localhost:6379)"
 fi
-echo "   Server: http://0.0.0.0:8000"
+echo "   Server: http://0.0.0.0:${DJANGO_PORT:-80}"
 
 # Run migrations
 echo "🔄 Running database migrations..."
@@ -96,19 +96,19 @@ if command -v ngrok &> /dev/null; then
   # Check if a specific static URL is configured
   if [ -n "$NGROK_STATIC_URL" ]; then
     echo "🌐 Starting ngrok with specific static URL: $NGROK_STATIC_URL"
-    nohup ngrok http --url="$NGROK_STATIC_URL" 8000 > /dev/null 2>&1 &
+    nohup ngrok http --url=$NGROK_STATIC_URL ${DJANGO_PORT:-80} > /dev/null 2>&1 &
     sleep 3
     echo "🌍 Ngrok tunnel active (specific static URL): https://$NGROK_STATIC_URL"
     echo "✅ Static URL confirmed: https://$NGROK_STATIC_URL"
   else
     echo "🌐 Starting ngrok with default static URL: colt-charmed-lark.ngrok-free.app"
-    nohup ngrok http --url=colt-charmed-lark.ngrok-free.app 8000 > /dev/null 2>&1 &
+    nohup ngrok http --url=colt-charmed-lark.ngrok-free.app ${DJANGO_PORT:-80} > /dev/null 2>&1 &
     sleep 3
     echo "🌍 Ngrok tunnel active (specific static URL): https://colt-charmed-lark.ngrok-free.app"
     echo "✅ Static URL confirmed: https://colt-charmed-lark.ngrok-free.app"
   fi
   
-  echo "🌍 Local access: http://localhost:8000"
+  echo "🌍 Local access: http://localhost:${DJANGO_PORT:-80}"
 else
   echo "❌ Ngrok not found! Install it first."
   exit 1
@@ -137,4 +137,4 @@ echo "   Press Ctrl+C to stop both Django and ngrok"
 echo ""
 
 # Start Django server
-python manage.py runserver 0.0.0.0:8000
+python manage.py runserver 0.0.0.0:${DJANGO_PORT:-80}

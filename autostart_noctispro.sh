@@ -98,7 +98,7 @@ start_ngrok_with_retries() {
             nohup ngrok http 8000 --log=file > "$WORKSPACE_DIR/ngrok.log" 2>&1 &
         else
             # Start ngrok with custom domain
-            nohup ngrok http --url=https://$STATIC_NGROK_URL 8000 --log=file > "$WORKSPACE_DIR/ngrok.log" 2>&1 &
+            nohup ngrok http --url=$STATIC_NGROK_URL ${DJANGO_PORT:-80} --log=file > "$WORKSPACE_DIR/ngrok.log" 2>&1 &
         fi
         local ngrok_pid=$!
         
