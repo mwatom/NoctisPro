@@ -788,3 +788,8 @@ Traceback (most recent call last):
     raise TemplateDoesNotExist(template_name, chain=chain)
 django.template.exceptions.TemplateDoesNotExist: dicom_viewer/manage_qa_phantoms.html
 Internal Server Error: /dicom-viewer/api/study/1/export-sr/
+Bad Request: /dicom-viewer/api/series/1/bone/
+Internal Server Error: /dicom-viewer/api/series/1/volume/
+Bad Request: /dicom-viewer/api/hu/
+Bad Request: /dicom-viewer/api/series/1/bone/
+Internal Server Error: /dicom-viewer/api/series/1/volume/
