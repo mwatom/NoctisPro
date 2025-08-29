@@ -220,9 +220,9 @@ SESSION_COOKIE_SECURE=False
 CSRF_COOKIE_SECURE=False
 SECURE_PROXY_SSL_HEADER=HTTP_X_FORWARDED_PROTO,https
 
-# Database Configuration (SQLite for simplicity)
-USE_SQLITE=True
-DATABASE_URL=sqlite:///workspace/db.sqlite3
+# Database Configuration (PostgreSQL only)
+USE_POSTGRESQL=True
+DATABASE_URL=postgresql://noctis_user:\$POSTGRES_PASSWORD@localhost:5432/noctis_pro
 
 # Static and Media Files
 STATIC_URL=/static/

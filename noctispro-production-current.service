@@ -9,7 +9,7 @@ User=ubuntu
 Group=ubuntu
 WorkingDirectory=/workspace
 Environment=PATH=/workspace/venv/bin
-Environment=USE_SQLITE=true
+Environment=USE_POSTGRESQL=true
 Environment=DEBUG=false
 ExecStartPre=/bin/bash -c 'cd /workspace && source venv/bin/activate && python manage.py collectstatic --noinput'
 ExecStartPre=/bin/bash -c 'cd /workspace && source venv/bin/activate && python manage.py migrate'
