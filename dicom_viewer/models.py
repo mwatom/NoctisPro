@@ -15,7 +15,7 @@ from django.conf import settings
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
-from django.contrib.postgres.fields import JSONField
+# JSONField import removed - using built-in models.JSONField
 import json
 import uuid
 
@@ -104,8 +104,8 @@ class Measurement(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, db_index=True)
     image = models.ForeignKey(DicomImage, on_delete=models.CASCADE, db_index=True)
-    series = models.ForeignKey(Series, on_delete=models.CASCADE, db_index=True)
-    study = models.ForeignKey(Study, on_delete=models.CASCADE, db_index=True)
+    series = models.ForeignKey(Series, on_delete=models.CASCADE, db_index=True, null=True, blank=True)
+    study = models.ForeignKey(Study, on_delete=models.CASCADE, db_index=True, null=True, blank=True)
     
     measurement_type = models.CharField(max_length=20, choices=MEASUREMENT_TYPES, db_index=True)
     points = models.JSONField(default=list)  # Array of points
@@ -263,7 +263,7 @@ class ReconstructionJob(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, db_index=True)
     series = models.ForeignKey(Series, on_delete=models.CASCADE, db_index=True)
-    study = models.ForeignKey(Study, on_delete=models.CASCADE, db_index=True)
+    study = models.ForeignKey(Study, on_delete=models.CASCADE, db_index=True, null=True, blank=True)
     
     job_type = models.CharField(max_length=20, choices=JOB_TYPES, db_index=True)
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default="normal")
