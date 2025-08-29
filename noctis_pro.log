@@ -618,3 +618,6 @@ Traceback (most recent call last):
 redis.exceptions.ConnectionError: Error 111 connecting to 127.0.0.1:6379. Connection refused.
 HTTP POST /login/ 500 [0.21, 127.0.0.1:34000]
 HTTP GET /worklist/upload/ 302 [0.01, 127.0.0.1:34014]
+/workspace/noctis_pro/settings.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
