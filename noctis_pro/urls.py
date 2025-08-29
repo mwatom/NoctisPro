@@ -37,8 +37,8 @@ def favicon_view(request):
     return HttpResponse(status=204)  # No content
 
 urlpatterns = [
-    # Redirect legacy /admin/ to the worklist dashboard to avoid confusion
-    path('admin/', lambda request: redirect('worklist:dashboard')),
+    # Django admin interface
+    path('admin/', admin.site.urls),
     path('favicon.ico', favicon_view, name='favicon'),
     path('', home_redirect, name='home'),
     path('', include('accounts.urls')),
