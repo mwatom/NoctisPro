@@ -10,7 +10,7 @@ echo "========================================"
 pkill -f "manage.py" 2>/dev/null || true
 pkill -f "ngrok" 2>/dev/null || true
 
-cd /workspace
+cd "$(dirname "$0")"
 
 # Test Django works first
 echo "🧪 Testing Django..."
@@ -23,7 +23,7 @@ echo "✅ Django works"
 echo "📝 Creating autostart script..."
 sudo tee /usr/local/bin/start-noctispro > /dev/null << 'EOF'
 #!/bin/bash
-cd /workspace
+cd "$(dirname "$0")"
 source venv/bin/activate
 export DJANGO_SETTINGS_MODULE=noctis_pro.settings_development
 python manage.py runserver 0.0.0.0:8000 > /tmp/noctispro.log 2>&1 &
