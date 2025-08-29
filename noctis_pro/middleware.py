@@ -321,12 +321,16 @@ class SessionTimeoutMiddleware(MiddlewareMixin):
     """
     
     def process_request(self, request):
-        # Check if user attribute exists (it might not be available in ASGI requests before AuthenticationMiddleware)
-        if not hasattr(request, 'user'):
+        # Skip processing for ASGI requests or when user attribute doesn't exist
+        if not hasattr(request, 'user') or hasattr(request, 'scope'):
             return None
         
         # Check if user is authenticated
-        if not request.user.is_authenticated:
+        try:
+            if not request.user.is_authenticated:
+                return None
+        except AttributeError:
+            # User attribute not properly initialized
             return None
         
         # Skip timeout for AJAX requests to avoid interrupting operations
@@ -375,21 +379,22 @@ class SessionTimeoutWarningMiddleware(MiddlewareMixin):
     
     def process_response(self, request, response):
         # Only inject for authenticated users and HTML responses
-        if (hasattr(request, 'user') and request.user.is_authenticated and 
-            response.get('Content-Type', '').startswith('text/html') and
-            hasattr(response, 'content')):
-            
-            # Get timeout settings
-            timeout_seconds = getattr(settings, 'SESSION_COOKIE_AGE', 1800)
-            warning_seconds = getattr(settings, 'SESSION_TIMEOUT_WARNING', 300)
-            
-            # Get last activity
-            last_activity = request.session.get('last_activity', time.time())
-            current_time = time.time()
-            remaining_time = timeout_seconds - (current_time - last_activity)
-            
-            # Inject session timeout JavaScript
-            timeout_script = f"""
+        # Skip for ASGI requests
+        if (hasattr(request, 'user') and not hasattr(request, 'scope') and 
+            hasattr(response, 'content') and response.get('Content-Type', '').startswith('text/html')):
+            try:
+                if request.user.is_authenticated:
+                    # Get timeout settings
+                    timeout_seconds = getattr(settings, 'SESSION_COOKIE_AGE', 1800)
+                    warning_seconds = getattr(settings, 'SESSION_TIMEOUT_WARNING', 300)
+                    
+                    # Get last activity
+                    last_activity = request.session.get('last_activity', time.time())
+                    current_time = time.time()
+                    remaining_time = timeout_seconds - (current_time - last_activity)
+                    
+                    # Inject session timeout JavaScript
+                    timeout_script = f"""
             <script>
             (function() {{
                 let sessionTimeoutSeconds = {timeout_seconds};
@@ -517,17 +522,20 @@ class SessionTimeoutWarningMiddleware(MiddlewareMixin):
                     setupTimeoutTimers();
                 }}
             }})();
-            </script>
-            """
-            
-            try:
-                content = response.content.decode('utf-8')
-                if '</body>' in content:
-                    content = content.replace('</body>', timeout_script + '</body>')
-                    response.content = content.encode('utf-8')
-                    response['Content-Length'] = len(response.content)
-            except (UnicodeDecodeError, AttributeError):
-                # Skip if we can't decode the content
+                    </script>
+                    """
+                    
+                    try:
+                        content = response.content.decode('utf-8')
+                        if '</body>' in content:
+                            content = content.replace('</body>', timeout_script + '</body>')
+                            response.content = content.encode('utf-8')
+                            response['Content-Length'] = len(response.content)
+                    except (UnicodeDecodeError, AttributeError):
+                        # Skip if we can't decode the content
+                        pass
+            except AttributeError:
+                # Skip if user attribute is not properly initialized
                 pass
         
         return response

@@ -512,3 +512,9 @@ Watching for file changes with StatReloader
 [32mHTTP HEAD /worklist/upload/ 302 [0.00, 127.0.0.1:44550][0m
 [mHTTP GET /login/ 200 [0.01, 127.0.0.1:51802][0m
 [mHTTP GET /login/ 200 [0.00, 127.0.0.1:39434][0m
+Watching for file changes with StatReloader
+[32mHTTP HEAD /worklist/upload/ 302 [0.01, 127.0.0.1:36938][0m
+[32mHTTP HEAD / 302 [0.00, 127.0.0.1:36950][0m
+Not Found: /accounts/login/
+[33mHTTP HEAD /accounts/login/ 404 [0.00, 127.0.0.1:41784][0m
+[mHTTP HEAD /login/ 200 [0.01, 127.0.0.1:35952][0m
