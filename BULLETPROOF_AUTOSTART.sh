@@ -22,6 +22,10 @@ if ! command -v psql &> /dev/null; then
     sudo apt install -y postgresql postgresql-contrib
 fi
 
+# Install Python dependencies
+echo "🐍 Installing Python environment tools..."
+sudo apt install -y python3-full python3-venv python3-pip
+
 # Start PostgreSQL
 echo "🚀 Starting PostgreSQL..."
 sudo service postgresql start || sudo systemctl start postgresql || true
@@ -36,11 +40,47 @@ sudo -u postgres psql -c "CREATE DATABASE noctis_pro;" 2>/dev/null || true
 sudo -u postgres psql -c "CREATE USER noctis_user WITH PASSWORD 'noctis123';" 2>/dev/null || true
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE noctis_pro TO noctis_user;" 2>/dev/null || true
 sudo -u postgres psql -c "ALTER USER noctis_user CREATEDB;" 2>/dev/null || true
+sudo -u postgres psql -d noctis_pro -c "GRANT ALL ON SCHEMA public TO noctis_user;" 2>/dev/null || true
+sudo -u postgres psql -d noctis_pro -c "GRANT CREATE ON SCHEMA public TO noctis_user;" 2>/dev/null || true
+
+# Create virtual environment if it doesn't exist
+if [ ! -d "venv" ]; then
+    echo "🐍 Creating Python virtual environment..."
+    python3 -m venv venv
+    if [ ! -f "venv/bin/activate" ]; then
+        echo "❌ Failed to create virtual environment"
+        exit 1
+    fi
+fi
+
+# Install dependencies
+echo "📦 Installing Python dependencies..."
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+
+echo "✅ Python dependencies installed"
 
 # Test Django works first
 echo "🧪 Testing Django..."
-source venv/bin/activate
-export DJANGO_SETTINGS_MODULE=noctis_pro.settings_production
+
+# Generate a secure SECRET_KEY if not set
+if [ -z "$SECRET_KEY" ]; then
+    echo "🔑 Generating SECRET_KEY..."
+    export SECRET_KEY=$(python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())")
+fi
+
+# Set PostgreSQL database credentials to match our setup
+export POSTGRES_DB=noctis_pro
+export POSTGRES_USER=noctis_user  
+export POSTGRES_PASSWORD=noctis123
+
+# Disable Redis for simpler setup (will use dummy cache and db sessions)
+export DISABLE_REDIS=true
+export USE_DUMMY_CACHE=true
+
+# Use the main settings file instead of production settings
+export DJANGO_SETTINGS_MODULE=noctis_pro.settings
 python manage.py check || exit 1
 echo "✅ Django works"
 
@@ -72,8 +112,33 @@ sleep 3
 
 # Change to the correct directory
 cd $CURRENT_DIR
-source venv/bin/activate
-export DJANGO_SETTINGS_MODULE=noctis_pro.settings_production
+
+# Ensure virtual environment exists
+if [ ! -d "venv" ]; then
+    python3 -m venv venv
+    source venv/bin/activate
+    pip install --upgrade pip
+    pip install -r requirements.txt
+else
+    source venv/bin/activate
+fi
+
+# Generate a secure SECRET_KEY if not set
+if [ -z "\$SECRET_KEY" ]; then
+    export SECRET_KEY=\$(python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())")
+fi
+
+# Set PostgreSQL database credentials to match our setup
+export POSTGRES_DB=noctis_pro
+export POSTGRES_USER=noctis_user  
+export POSTGRES_PASSWORD=noctis123
+
+# Disable Redis for simpler setup (will use dummy cache and db sessions)
+export DISABLE_REDIS=true
+export USE_DUMMY_CACHE=true
+
+# Use the main settings file instead of production settings
+export DJANGO_SETTINGS_MODULE=noctis_pro.settings
 
 # Kill any existing processes
 pkill -f "manage.py runserver" 2>/dev/null || true

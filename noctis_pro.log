@@ -106,3 +106,6 @@ HTTP HEAD /admin/login/ 200 [0.01, 127.0.0.1:56186]
 Service Unavailable: /health/
 HTTP GET /health/ 503 [0.00, 127.0.0.1:38086]
 Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Service Unavailable: /health/
+Service Unavailable: /health/
