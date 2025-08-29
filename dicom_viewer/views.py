@@ -1301,11 +1301,19 @@ def api_calculate_distance(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            start_x = data.get('start_x')
-            start_y = data.get('start_y')
-            end_x = data.get('end_x')
-            end_y = data.get('end_y')
+            # Support both coordinate formats
+            point1 = data.get('point1', {})
+            point2 = data.get('point2', {})
+            
+            start_x = data.get('start_x', point1.get('x'))
+            start_y = data.get('start_y', point1.get('y'))
+            end_x = data.get('end_x', point2.get('x'))
+            end_y = data.get('end_y', point2.get('y'))
             pixel_spacing = data.get('pixel_spacing', [1.0, 1.0])
+            
+            # Validate coordinates
+            if start_x is None or start_y is None or end_x is None or end_y is None:
+                return JsonResponse({'error': 'Missing coordinate data'}, status=400)
             
             # Calculate pixel distance
             pixel_distance = np.sqrt((end_x - start_x)**2 + (end_y - start_y)**2)
