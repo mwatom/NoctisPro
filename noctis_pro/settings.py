@@ -293,20 +293,14 @@ if os.environ.get('USE_DUMMY_CACHE', 'False').lower() == 'true':
     # Use database sessions when Redis is not available
     SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 else:
+    # Use dummy cache and database sessions for development
     CACHES = {
         'default': {
-            'BACKEND': 'django_redis.cache.RedisCache',
-            'LOCATION': os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379/1'),
-            'OPTIONS': {
-                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-            },
-            'KEY_PREFIX': 'noctis',
-            'TIMEOUT': 300,  # 5 minutes default
+            'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
         }
     }
-    # Session backend using Redis for better performance
-    SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
-    SESSION_CACHE_ALIAS = 'default'
+    # Use database sessions when Redis is not available
+    SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 
 # Logging
 LOGGING = {
