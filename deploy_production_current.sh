@@ -59,7 +59,7 @@ mkdir -p /workspace/staticfiles
 # Activate virtual environment and collect static files
 print_status "Collecting static files..."
 source venv/bin/activate
-export USE_SQLITE=true
+export USE_POSTGRESQL=true
 export DEBUG=false
 python manage.py collectstatic --noinput || true
 

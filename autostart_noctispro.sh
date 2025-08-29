@@ -6,7 +6,7 @@
 set -e
 
 # Set environment variables for container deployment
-export USE_SQLITE=true
+export USE_POSTGRESQL=true
 export DISABLE_REDIS=true
 export USE_DUMMY_CACHE=true
 export DEBUG=false

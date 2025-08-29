@@ -255,10 +255,10 @@ SESSION_SAVE_EVERY_REQUEST = True  # Reset timer on every request
 SESSION_TIMEOUT_WARNING = int(os.environ.get('SESSION_WARNING_MINUTES', '5')) * 60  # Warning 5 minutes before timeout
 
 # Database
-# Production database configuration with fallback to SQLite
+# PostgreSQL database configuration - ONLY PostgreSQL supported
 DATABASES = {
     'default': {
-        'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.postgresql'),
+        'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.environ.get('POSTGRES_DB', 'noctis_pro'),
         'USER': os.environ.get('POSTGRES_USER', 'noctis_user'),
         'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
@@ -271,16 +271,6 @@ DATABASES = {
         'CONN_HEALTH_CHECKS': True,
     }
 }
-
-# Fallback to SQLite if PostgreSQL not available
-if os.environ.get('USE_SQLITE', 'False').lower() == 'true':
-    DATABASES['default'] = {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-        'OPTIONS': {
-            'timeout': 60,
-        },
-    }
 
 # Cache configuration
 if os.environ.get('USE_DUMMY_CACHE', 'False').lower() == 'true':

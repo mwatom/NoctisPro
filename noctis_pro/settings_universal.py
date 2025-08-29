@@ -24,15 +24,20 @@ ALLOWED_HOSTS = [
 # Generate secure secret key
 SECRET_KEY = 'django-insecure-universal-deployment-change-in-production-2024-noctispro-professional-grade-security-key'
 
-# Database configuration
+# Database configuration - PostgreSQL only
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('POSTGRES_DB', 'noctis_pro'),
+        'USER': os.environ.get('POSTGRES_USER', 'noctis_user'),
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
+        'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
+        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
         'OPTIONS': {
-            'timeout': 30,
-            'check_same_thread': False,
-        }
+            'sslmode': 'prefer',
+        },
+        'CONN_MAX_AGE': 600,
+        'CONN_HEALTH_CHECKS': True,
     }
 }
 
