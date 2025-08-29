@@ -25,7 +25,9 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-cd /workspace
+# Set working directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
 echo "========================================"
 echo "       NoctisPro Production Status"

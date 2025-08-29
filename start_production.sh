@@ -29,7 +29,8 @@ print_error() {
 }
 
 # Set working directory
-cd /workspace
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
 print_status "🚀 Starting NoctisPro Production Services..."
 
@@ -72,7 +73,7 @@ nohup gunicorn --bind 0.0.0.0:8000 --workers 3 --timeout 120 \
     noctis_pro.wsgi:application > logs/gunicorn.log 2>&1 &
 
 DJANGO_PID=$!
-echo $DJANGO_PID > /workspace/django.pid
+echo $DJANGO_PID > django.pid
 
 # Wait for Django to start
 print_status "Waiting for Django to start..."
@@ -91,7 +92,7 @@ fi
 print_status "Starting ngrok tunnel..."
 nohup ngrok http 8000 --log stdout > logs/ngrok.log 2>&1 &
 NGROK_PID=$!
-echo $NGROK_PID > /workspace/ngrok.pid
+echo $NGROK_PID > ngrok.pid
 
 # Wait for ngrok to start
 print_status "Waiting for ngrok tunnel to establish..."
