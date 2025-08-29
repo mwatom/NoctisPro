@@ -523,3 +523,5 @@ Not Found: /accounts/login/
 [mHTTP GET /login/ 200 [0.00, 127.0.0.1:35554][0m
 Forbidden (CSRF cookie not set.): /login/
 [31;1mHTTP POST /login/ 403 [0.00, 127.0.0.1:58726][0m
+Service Unavailable: /health/
+Service Unavailable: /health/
