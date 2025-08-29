@@ -508,3 +508,7 @@ Watching for file changes with StatReloader
 [32mHTTP HEAD / 302 [0.01, 127.0.0.1:44832][0m
 [mHTTP HEAD /login/ 200 [0.01, 127.0.0.1:47160][0m
 [32mHTTP HEAD /worklist/upload/ 302 [0.00, 127.0.0.1:47168][0m
+[32mHTTP HEAD / 302 [0.01, 127.0.0.1:44544][0m
+[32mHTTP HEAD /worklist/upload/ 302 [0.00, 127.0.0.1:44550][0m
+[mHTTP GET /login/ 200 [0.01, 127.0.0.1:51802][0m
+[mHTTP GET /login/ 200 [0.00, 127.0.0.1:39434][0m
