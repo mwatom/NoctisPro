@@ -1,200 +1,120 @@
 #!/bin/bash
 
 # NoctisPro Service Management Script
+# Usage: ./manage_noctispro.sh [start|stop|restart|status|logs|url]
 
-ACTION="$1"
-WORKSPACE_DIR="/workspace"
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
-case "$ACTION" in
-    start)
-        echo "Starting NoctisPro services..."
-        cd "$WORKSPACE_DIR"
-        ./noctispro_startup.sh
-        ;;
+print_status() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+show_status() {
+    echo "========================================"
+    echo "         NoctisPro Service Status"
+    echo "========================================"
+    echo ""
     
-    stop)
-        echo "Stopping NoctisPro services..."
-        
-        # Stop Django
-        pkill -f "manage.py runserver"
-        echo "Django stopped"
-        
-        # Stop ngrok
-        pkill -f "ngrok"
-        echo "Ngrok stopped"
-        
-        echo "All services stopped"
-        ;;
+    DJANGO_STATUS=$(sudo systemctl is-active noctispro-production-current.service 2>/dev/null || echo "inactive")
+    NGROK_STATUS=$(sudo systemctl is-active noctispro-ngrok-current.service 2>/dev/null || echo "inactive")
     
-    restart)
-        echo "Restarting NoctisPro services..."
-        $0 stop
-        sleep 3
-        $0 start
-        ;;
+    if [ "$DJANGO_STATUS" = "active" ]; then
+        print_success "✅ Django Service: RUNNING"
+    else
+        print_error "❌ Django Service: STOPPED"
+    fi
     
-    status)
-        echo "NoctisPro Service Status:"
-        echo "========================"
-        
-        # Check Django
-        if pgrep -f "manage.py runserver" > /dev/null; then
-            echo "✅ Django: Running (PID: $(pgrep -f 'manage.py runserver'))"
-        else
-            echo "❌ Django: Not running"
-        fi
-        
-        # Check ngrok
-        if pgrep -f "ngrok" > /dev/null; then
-            echo "✅ Ngrok: Running (PID: $(pgrep -f 'ngrok'))"
-            
-            # Try to get ngrok URL
-            NGROK_URL=$(curl -s http://localhost:4040/api/tunnels 2>/dev/null | python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    for tunnel in data['tunnels']:
-        if tunnel['proto'] == 'https':
-            print(tunnel['public_url'])
-            break
-except:
-    pass
-" 2>/dev/null)
-            
-            if [ ! -z "$NGROK_URL" ]; then
-                echo "🌍 Ngrok URL: $NGROK_URL"
-            fi
-        else
-            echo "❌ Ngrok: Not running"
-        fi
-        
-        # Check PostgreSQL
-        if sudo service postgresql status > /dev/null 2>&1; then
-            echo "✅ PostgreSQL: Running"
-        else
-            echo "❌ PostgreSQL: Not running"
-        fi
-        
-        # Check Redis
-        if sudo service redis-server status > /dev/null 2>&1; then
-            echo "✅ Redis: Running"
-        else
-            echo "❌ Redis: Not running"
-        fi
-        
+    if [ "$NGROK_STATUS" = "active" ]; then
+        print_success "✅ Ngrok Service: RUNNING"
+    else
+        print_error "❌ Ngrok Service: STOPPED"
+    fi
+    
+    echo ""
+}
+
+get_ngrok_url() {
+    print_status "Getting ngrok tunnel URL..."
+    NGROK_URL=$(curl -s http://localhost:4040/api/tunnels 2>/dev/null | python3 -c "import json, sys; data = json.load(sys.stdin); print(data['tunnels'][0]['public_url'] if data.get('tunnels') else '')" 2>/dev/null || echo "")
+    
+    if [ ! -z "$NGROK_URL" ]; then
         echo ""
-        echo "Local access: http://localhost:8000"
-        ;;
-    
-    install-autostart)
-        echo "Installing auto-start on boot..."
-        
-        # Add to crontab
-        (crontab -l 2>/dev/null; echo "@reboot $WORKSPACE_DIR/noctispro_startup.sh") | crontab -
-        
-        # Also create a startup script in /etc/init.d (if available)
-        if [ -d /etc/init.d ]; then
-            sudo tee /etc/init.d/noctispro > /dev/null << 'EOF'
-#!/bin/bash
-### BEGIN INIT INFO
-# Provides:          noctispro
-# Required-Start:    $remote_fs $syslog
-# Required-Stop:     $remote_fs $syslog
-# Default-Start:     2 3 4 5
-# Default-Stop:      0 1 6
-# Short-Description: NoctisPro Django Application
-# Description:       Start/stop NoctisPro Django application
-### END INIT INFO
+        print_success "🌐 Your application URLs:"
+        echo "  • Public URL: $NGROK_URL"
+        echo "  • Admin Panel: $NGROK_URL/admin/"
+        echo "  • Local URL: http://localhost:8000"
+        echo ""
+    else
+        print_warning "⚠️  Ngrok tunnel not available. Service may be starting up."
+    fi
+}
 
-WORKSPACE_DIR="/workspace"
-
-case "$1" in
+case "${1:-status}" in
     start)
-        cd "$WORKSPACE_DIR"
-        ./noctispro_startup.sh
+        print_status "Starting NoctisPro services..."
+        sudo systemctl start noctispro-production-current.service
+        sudo systemctl start noctispro-ngrok-current.service
+        sleep 10
+        show_status
+        get_ngrok_url
         ;;
     stop)
-        cd "$WORKSPACE_DIR"
-        ./manage_noctispro.sh stop
+        print_status "Stopping NoctisPro services..."
+        sudo systemctl stop noctispro-ngrok-current.service
+        sudo systemctl stop noctispro-production-current.service
+        print_success "✅ Services stopped"
         ;;
     restart)
-        cd "$WORKSPACE_DIR"
-        ./manage_noctispro.sh restart
+        print_status "Restarting NoctisPro services..."
+        sudo systemctl restart noctispro-production-current.service
+        sudo systemctl restart noctispro-ngrok-current.service
+        sleep 15
+        show_status
+        get_ngrok_url
         ;;
     status)
-        cd "$WORKSPACE_DIR"
-        ./manage_noctispro.sh status
+        show_status
         ;;
-    *)
-        echo "Usage: $0 {start|stop|restart|status}"
-        exit 1
-        ;;
-esac
-
-exit 0
-EOF
-            
-            sudo chmod +x /etc/init.d/noctispro
-            
-            # Try to add to startup (if update-rc.d is available)
-            if command -v update-rc.d > /dev/null; then
-                sudo update-rc.d noctispro defaults
-            fi
-        fi
-        
-        echo "✅ Auto-start configured!"
-        echo "   - Cron job added for @reboot"
-        echo "   - Init script created (if supported)"
-        echo "   - Services will start automatically on system boot"
-        ;;
-    
-    remove-autostart)
-        echo "Removing auto-start configuration..."
-        
-        # Remove from crontab
-        crontab -l 2>/dev/null | grep -v "noctispro_startup.sh" | crontab -
-        
-        # Remove init script
-        if [ -f /etc/init.d/noctispro ]; then
-            if command -v update-rc.d > /dev/null; then
-                sudo update-rc.d noctispro remove
-            fi
-            sudo rm /etc/init.d/noctispro
-        fi
-        
-        echo "✅ Auto-start configuration removed"
-        ;;
-    
     logs)
-        echo "Recent NoctisPro logs:"
-        echo "====================="
-        
-        if [ -f "$WORKSPACE_DIR/noctispro_startup.log" ]; then
-            echo "Startup logs:"
-            tail -20 "$WORKSPACE_DIR/noctispro_startup.log"
-        fi
-        
-        echo ""
-        if [ -f "$WORKSPACE_DIR/ngrok.log" ]; then
-            echo "Ngrok logs:"
-            tail -10 "$WORKSPACE_DIR/ngrok.log"
+        if [ "$2" = "ngrok" ]; then
+            print_status "Showing ngrok logs (Ctrl+C to exit)..."
+            sudo journalctl -u noctispro-ngrok-current.service -f
+        else
+            print_status "Showing Django logs (Ctrl+C to exit)..."
+            sudo journalctl -u noctispro-production-current.service -f
         fi
         ;;
-    
+    url)
+        get_ngrok_url
+        ;;
     *)
-        echo "NoctisPro Service Management"
-        echo "==========================="
-        echo "Usage: $0 {start|stop|restart|status|install-autostart|remove-autostart|logs}"
+        echo "Usage: $0 {start|stop|restart|status|logs [ngrok]|url}"
         echo ""
         echo "Commands:"
-        echo "  start            - Start all NoctisPro services"
-        echo "  stop             - Stop all NoctisPro services"
-        echo "  restart          - Restart all NoctisPro services"
-        echo "  status           - Show service status and URLs"
-        echo "  install-autostart - Configure auto-start on boot"
-        echo "  remove-autostart  - Remove auto-start configuration"
-        echo "  logs             - Show recent logs"
-        echo ""
+        echo "  start    - Start all NoctisPro services"
+        echo "  stop     - Stop all NoctisPro services"
+        echo "  restart  - Restart all NoctisPro services"
+        echo "  status   - Show current service status"
+        echo "  logs     - Show Django application logs"
+        echo "  logs ngrok - Show ngrok tunnel logs"
+        echo "  url      - Display current ngrok URL"
         exit 1
         ;;
 esac
