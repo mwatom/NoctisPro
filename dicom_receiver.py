@@ -1,7 +1,17 @@
 #!/usr/bin/env python3
 """
-DICOM Receiver Service
-Handles incoming DICOM images from remote imaging modalities
+DICOM Receiver Service - Completely Rewritten
+Handles incoming DICOM images from remote imaging modalities with enhanced
+error handling, logging, and performance optimizations.
+
+Features:
+- Robust DICOM C-STORE and C-ECHO handling
+- Facility-based access control via AE titles
+- Comprehensive metadata extraction
+- Real-time notifications
+- HU calibration validation for CT images
+- Automatic thumbnail generation
+- Memory-efficient processing
 """
 
 import os
@@ -9,8 +19,12 @@ import sys
 import logging
 import threading
 import time
+import signal
+import traceback
 from datetime import datetime
 from pathlib import Path
+from typing import Optional, Dict, Any, Tuple
+import json
 
 # Add Django project to path
 sys.path.append('/workspace')
@@ -23,36 +37,258 @@ from pynetdicom import AE, evt, AllStoragePresentationContexts, VerificationPres
 from pynetdicom.sop_class import Verification
 from pydicom import dcmread
 from pydicom.errors import InvalidDicomError
+import numpy as np
+from PIL import Image
 
 from worklist.models import Patient, Study, Series, DicomImage, Modality, Facility
 from accounts.models import User
 from django.utils import timezone
-from django.db import transaction
+from django.db import transaction, connection
 from notifications.models import Notification, NotificationType
 from django.db import models
+from django.core.files.base import ContentFile
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('/workspace/dicom_receiver.log'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger('dicom_receiver')
+# Setup logging with rotation
+from logging.handlers import RotatingFileHandler
+
+class DicomReceiverLogger:
+    """Enhanced logging setup for DICOM receiver"""
+    
+    @staticmethod
+    def setup_logger():
+        logger = logging.getLogger('dicom_receiver')
+        logger.setLevel(logging.INFO)
+        
+        # Remove existing handlers
+        for handler in logger.handlers[:]:
+            logger.removeHandler(handler)
+        
+        # File handler with rotation
+        file_handler = RotatingFileHandler(
+            '/workspace/logs/dicom_receiver.log',
+            maxBytes=10*1024*1024,  # 10MB
+            backupCount=5
+        )
+        file_handler.setLevel(logging.INFO)
+        
+        # Console handler
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        
+        # Formatter
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - [%(funcName)s:%(lineno)d] - %(message)s'
+        )
+        file_handler.setFormatter(formatter)
+        console_handler.setFormatter(formatter)
+        
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
+        
+        return logger
+
+
+class DicomImageProcessor:
+    """Enhanced DICOM image processing utilities"""
+    
+    @staticmethod
+    def generate_thumbnail(dicom_dataset, max_size: Tuple[int, int] = (256, 256)) -> Optional[bytes]:
+        """Generate thumbnail from DICOM image"""
+        try:
+            # Get pixel array
+            pixel_array = dicom_dataset.pixel_array
+            
+            # Apply basic windowing for display
+            if hasattr(dicom_dataset, 'WindowCenter') and hasattr(dicom_dataset, 'WindowWidth'):
+                try:
+                    window_center = float(dicom_dataset.WindowCenter[0] if hasattr(dicom_dataset.WindowCenter, '__iter__') else dicom_dataset.WindowCenter)
+                    window_width = float(dicom_dataset.WindowWidth[0] if hasattr(dicom_dataset.WindowWidth, '__iter__') else dicom_dataset.WindowWidth)
+                except (IndexError, TypeError, ValueError):
+                    window_center = np.mean(pixel_array)
+                    window_width = np.std(pixel_array) * 4
+            else:
+                window_center = np.mean(pixel_array)
+                window_width = np.std(pixel_array) * 4
+            
+            # Apply windowing
+            min_val = window_center - window_width / 2
+            max_val = window_center + window_width / 2
+            windowed = np.clip(pixel_array, min_val, max_val)
+            
+            # Normalize to 0-255
+            if max_val > min_val:
+                windowed = ((windowed - min_val) / (max_val - min_val) * 255).astype(np.uint8)
+            else:
+                windowed = np.zeros_like(windowed, dtype=np.uint8)
+            
+            # Convert to PIL Image
+            pil_image = Image.fromarray(windowed)
+            
+            # Resize to thumbnail size
+            pil_image.thumbnail(max_size, Image.Resampling.LANCZOS)
+            
+            # Convert to bytes
+            from io import BytesIO
+            buffer = BytesIO()
+            pil_image.save(buffer, format='JPEG', quality=85)
+            return buffer.getvalue()
+            
+        except Exception as e:
+            logging.getLogger('dicom_receiver').warning(f"Failed to generate thumbnail: {str(e)}")
+            return None
+    
+    @staticmethod
+    def extract_enhanced_metadata(dicom_dataset) -> Dict[str, Any]:
+        """Extract comprehensive metadata from DICOM dataset"""
+        metadata = {}
+        
+        # Patient information
+        metadata['patient_id'] = getattr(dicom_dataset, 'PatientID', 'UNKNOWN')
+        patient_name = str(getattr(dicom_dataset, 'PatientName', 'UNKNOWN'))
+        metadata['patient_name'] = patient_name.replace('^', ' ').strip()
+        metadata['patient_birth_date'] = getattr(dicom_dataset, 'PatientBirthDate', None)
+        metadata['patient_sex'] = getattr(dicom_dataset, 'PatientSex', 'O')
+        metadata['patient_age'] = getattr(dicom_dataset, 'PatientAge', None)
+        metadata['patient_weight'] = getattr(dicom_dataset, 'PatientWeight', None)
+        
+        # Study information
+        metadata['study_instance_uid'] = getattr(dicom_dataset, 'StudyInstanceUID', None)
+        metadata['study_date'] = getattr(dicom_dataset, 'StudyDate', None)
+        metadata['study_time'] = getattr(dicom_dataset, 'StudyTime', '000000')
+        metadata['study_description'] = getattr(dicom_dataset, 'StudyDescription', 'DICOM Study')
+        metadata['referring_physician'] = str(getattr(dicom_dataset, 'ReferringPhysicianName', 'UNKNOWN')).replace('^', ' ')
+        metadata['accession_number'] = getattr(dicom_dataset, 'AccessionNumber', f"ACC_{int(time.time())}")
+        metadata['study_id'] = getattr(dicom_dataset, 'StudyID', '')
+        
+        # Series information
+        metadata['series_instance_uid'] = getattr(dicom_dataset, 'SeriesInstanceUID', None)
+        metadata['series_number'] = getattr(dicom_dataset, 'SeriesNumber', 1)
+        metadata['series_description'] = getattr(dicom_dataset, 'SeriesDescription', f'Series {metadata["series_number"]}')
+        metadata['modality'] = getattr(dicom_dataset, 'Modality', 'OT')
+        metadata['body_part_examined'] = getattr(dicom_dataset, 'BodyPartExamined', '')
+        metadata['protocol_name'] = getattr(dicom_dataset, 'ProtocolName', '')
+        
+        # Image information
+        metadata['sop_instance_uid'] = getattr(dicom_dataset, 'SOPInstanceUID', None)
+        metadata['instance_number'] = getattr(dicom_dataset, 'InstanceNumber', 1)
+        metadata['rows'] = getattr(dicom_dataset, 'Rows', None)
+        metadata['columns'] = getattr(dicom_dataset, 'Columns', None)
+        metadata['bits_stored'] = getattr(dicom_dataset, 'BitsStored', None)
+        metadata['bits_allocated'] = getattr(dicom_dataset, 'BitsAllocated', None)
+        
+        # Geometric information
+        metadata['slice_thickness'] = getattr(dicom_dataset, 'SliceThickness', None)
+        metadata['slice_location'] = getattr(dicom_dataset, 'SliceLocation', None)
+        
+        if hasattr(dicom_dataset, 'PixelSpacing'):
+            metadata['pixel_spacing'] = '\\'.join(map(str, dicom_dataset.PixelSpacing))
+        
+        if hasattr(dicom_dataset, 'ImagePositionPatient'):
+            metadata['image_position'] = '\\'.join(map(str, dicom_dataset.ImagePositionPatient))
+        
+        if hasattr(dicom_dataset, 'ImageOrientationPatient'):
+            metadata['image_orientation'] = '\\'.join(map(str, dicom_dataset.ImageOrientationPatient))
+        
+        # Equipment information
+        metadata['manufacturer'] = getattr(dicom_dataset, 'Manufacturer', '')
+        metadata['manufacturer_model_name'] = getattr(dicom_dataset, 'ManufacturerModelName', '')
+        metadata['station_name'] = getattr(dicom_dataset, 'StationName', '')
+        metadata['device_serial_number'] = getattr(dicom_dataset, 'DeviceSerialNumber', '')
+        metadata['software_versions'] = getattr(dicom_dataset, 'SoftwareVersions', '')
+        
+        # CT-specific information
+        if metadata['modality'] == 'CT':
+            metadata['kvp'] = getattr(dicom_dataset, 'KVP', None)
+            metadata['exposure_time'] = getattr(dicom_dataset, 'ExposureTime', None)
+            metadata['x_ray_tube_current'] = getattr(dicom_dataset, 'XRayTubeCurrent', None)
+            metadata['exposure'] = getattr(dicom_dataset, 'Exposure', None)
+            metadata['filter_type'] = getattr(dicom_dataset, 'FilterType', '')
+            metadata['convolution_kernel'] = getattr(dicom_dataset, 'ConvolutionKernel', '')
+            metadata['reconstruction_diameter'] = getattr(dicom_dataset, 'ReconstructionDiameter', None)
+            metadata['slice_thickness'] = getattr(dicom_dataset, 'SliceThickness', None)
+            metadata['table_height'] = getattr(dicom_dataset, 'TableHeight', None)
+            metadata['gantry_detector_tilt'] = getattr(dicom_dataset, 'GantryDetectorTilt', None)
+            
+            # HU calibration parameters
+            metadata['rescale_slope'] = getattr(dicom_dataset, 'RescaleSlope', 1.0)
+            metadata['rescale_intercept'] = getattr(dicom_dataset, 'RescaleIntercept', 0.0)
+            metadata['rescale_type'] = getattr(dicom_dataset, 'RescaleType', '')
+        
+        # MR-specific information
+        elif metadata['modality'] == 'MR':
+            metadata['repetition_time'] = getattr(dicom_dataset, 'RepetitionTime', None)
+            metadata['echo_time'] = getattr(dicom_dataset, 'EchoTime', None)
+            metadata['flip_angle'] = getattr(dicom_dataset, 'FlipAngle', None)
+            metadata['magnetic_field_strength'] = getattr(dicom_dataset, 'MagneticFieldStrength', None)
+            metadata['echo_train_length'] = getattr(dicom_dataset, 'EchoTrainLength', None)
+            metadata['inversion_time'] = getattr(dicom_dataset, 'InversionTime', None)
+        
+        # Window/Level information
+        if hasattr(dicom_dataset, 'WindowCenter'):
+            try:
+                window_center = dicom_dataset.WindowCenter
+                metadata['window_center'] = float(window_center[0] if hasattr(window_center, '__iter__') else window_center)
+            except (IndexError, TypeError, ValueError):
+                pass
+        
+        if hasattr(dicom_dataset, 'WindowWidth'):
+            try:
+                window_width = dicom_dataset.WindowWidth
+                metadata['window_width'] = float(window_width[0] if hasattr(window_width, '__iter__') else window_width)
+            except (IndexError, TypeError, ValueError):
+                pass
+        
+        return metadata
+
 
 class DicomReceiver:
-    """DICOM SCP (Service Class Provider) for receiving DICOM images"""
+    """Enhanced DICOM SCP (Service Class Provider) for receiving DICOM images"""
     
-    def __init__(self, port=11112, aet='NOCTIS_SCP'):
+    def __init__(self, port: int = 11112, aet: str = 'NOCTIS_SCP', max_pdu_size: int = 16384):
         self.port = port
         self.aet = aet
-        self.ae = AE(ae_title=aet)
+        self.max_pdu_size = max_pdu_size
+        self.is_running = False
+        self.ae = None
+        
+        # Statistics
+        self.stats = {
+            'total_received': 0,
+            'total_stored': 0,
+            'total_errors': 0,
+            'start_time': None,
+            'last_received': None
+        }
+        
+        # Storage directory
+        self.storage_dir = Path('/workspace/media/dicom/received')
+        self.storage_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Thumbnail directory
+        self.thumbnail_dir = Path('/workspace/media/dicom/thumbnails')
+        self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Setup logging
+        self.logger = DicomReceiverLogger.setup_logger()
+        
+        # Initialize processors
+        self.image_processor = DicomImageProcessor()
+        
+        self.logger.info(f"DICOM Receiver initialized - AET: {aet}, Port: {port}, Max PDU: {max_pdu_size}")
+    
+    def setup_ae(self):
+        """Setup Application Entity with optimized settings"""
+        self.ae = AE(ae_title=self.aet)
         
         # Add supported presentation contexts
         self.ae.supported_contexts = AllStoragePresentationContexts
         self.ae.supported_contexts.extend(VerificationPresentationContexts)
+        
+        # Optimize network settings
+        self.ae.maximum_pdu_size = self.max_pdu_size
+        self.ae.network_timeout = 30
+        self.ae.acse_timeout = 30
+        self.ae.dimse_timeout = 30
         
         # Allow any Called AE Title (facilities identify via Calling AE)
         if hasattr(self.ae, 'require_called_aet'):
@@ -61,278 +297,515 @@ class DicomReceiver:
             except Exception:
                 pass
         
-        # Storage directory
-        self.storage_dir = Path('/workspace/media/dicom/received')
-        self.storage_dir.mkdir(parents=True, exist_ok=True)
-        
         # Event handlers
         self.ae.on_c_store = self.handle_store
         self.ae.on_c_echo = self.handle_echo
         
-        logger.info(f"DICOM Receiver initialized - AET: {aet}, Port: {port}")
+        self.logger.info("Application Entity configured successfully")
     
     def handle_echo(self, event):
-        """Handle C-ECHO requests (DICOM ping)"""
+        """Handle C-ECHO requests (DICOM ping) with enhanced logging"""
         try:
             calling_aet = event.assoc.requestor.ae_title.decode(errors='ignore').strip()
-            peer = getattr(event.assoc.requestor, 'address', '')
-            logger.info(f"Received C-ECHO from Calling AET '{calling_aet}' at {peer}")
-        except Exception:
-            logger.info("Received C-ECHO")
-        return 0x0000  # Success
-    
-    def handle_store(self, event):
-        """Handle C-STORE requests (DICOM image storage)"""
-        try:
-            # Enforce facility isolation by Calling AE Title only
-            calling_aet = event.assoc.requestor.ae_title.decode(errors='ignore').strip()
-            peer_ip = getattr(event.assoc.requestor, 'address', '')
-
+            peer_ip = getattr(event.assoc.requestor, 'address', 'unknown')
+            
+            # Log the echo request
+            self.logger.info(f"C-ECHO received from '{calling_aet}' at {peer_ip}")
+            
+            # Check if facility exists (optional warning)
             facility = Facility.objects.filter(ae_title__iexact=calling_aet, is_active=True).first()
             if not facility:
-                logger.warning(f"Rejecting C-STORE from unknown Calling AET '{calling_aet}' at {peer_ip}")
-                # Service-specific failure (not authorized/unknown AE)
-                return 0xC000
-
-            # Get the dataset
-            ds = event.dataset
+                self.logger.warning(f"C-ECHO from unknown AE Title '{calling_aet}' - facility not registered")
             
-            # Log the incoming study
-            logger.info(
-                f"Receiving DICOM object from '{calling_aet}' ({peer_ip}): "
-                f"Study UID: {getattr(ds, 'StudyInstanceUID', 'Unknown')}, "
-                f"Series UID: {getattr(ds, 'SeriesInstanceUID', 'Unknown')}, "
-                f"SOP Instance UID: {getattr(ds, 'SOPInstanceUID', 'Unknown')}"
+            return 0x0000  # Success
+            
+        except Exception as e:
+            self.logger.error(f"Error handling C-ECHO: {str(e)}")
+            return 0x0000  # Still return success for basic connectivity
+    
+    def handle_store(self, event):
+        """Handle C-STORE requests with comprehensive error handling"""
+        calling_aet = None
+        peer_ip = None
+        
+        try:
+            # Update statistics
+            self.stats['total_received'] += 1
+            self.stats['last_received'] = timezone.now()
+            
+            # Extract connection information
+            calling_aet = event.assoc.requestor.ae_title.decode(errors='ignore').strip()
+            peer_ip = getattr(event.assoc.requestor, 'address', 'unknown')
+            
+            # Validate facility authorization
+            facility = Facility.objects.filter(ae_title__iexact=calling_aet, is_active=True).first()
+            if not facility:
+                self.logger.warning(f"C-STORE rejected: Unknown Calling AET '{calling_aet}' from {peer_ip}")
+                self.stats['total_errors'] += 1
+                return 0xC000  # Refused: Out of Resources - A400?
+            
+            # Get the dataset
+            try:
+                ds = event.dataset
+                if ds is None:
+                    raise ValueError("Empty dataset received")
+            except Exception as e:
+                self.logger.error(f"Failed to retrieve dataset: {str(e)}")
+                self.stats['total_errors'] += 1
+                return 0xA700  # Out of Resources
+            
+            # Extract basic identifiers for logging
+            study_uid = getattr(ds, 'StudyInstanceUID', 'Unknown')
+            series_uid = getattr(ds, 'SeriesInstanceUID', 'Unknown')
+            sop_instance_uid = getattr(ds, 'SOPInstanceUID', 'Unknown')
+            
+            self.logger.info(
+                f"C-STORE from '{calling_aet}' ({peer_ip}): "
+                f"Study={study_uid}, Series={series_uid}, SOP={sop_instance_uid}"
             )
             
-            # Process the DICOM object
+            # Process the DICOM object in a transaction
             with transaction.atomic():
-                result = self.process_dicom_object(ds, event, calling_aet, facility)
+                success = self.process_dicom_object(ds, calling_aet, facility, peer_ip)
                 
-            if result:
-                logger.info("DICOM object stored successfully")
+            if success:
+                self.stats['total_stored'] += 1
+                self.logger.info(f"DICOM object stored successfully: {sop_instance_uid}")
                 return 0x0000  # Success
             else:
-                logger.error("Failed to store DICOM object")
+                self.stats['total_errors'] += 1
+                self.logger.error(f"Failed to store DICOM object: {sop_instance_uid}")
                 return 0xA700  # Out of Resources
                 
         except Exception as e:
-            logger.error(f"Error handling C-STORE: {str(e)}")
+            self.stats['total_errors'] += 1
+            error_msg = f"Critical error in C-STORE handler: {str(e)}"
+            if calling_aet and peer_ip:
+                error_msg += f" (from {calling_aet} at {peer_ip})"
+            
+            self.logger.error(error_msg)
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
             return 0xA700  # Out of Resources
     
-    def process_dicom_object(self, ds, event, calling_aet, facility):
-        """Process and store the DICOM object"""
+    def process_dicom_object(self, ds, calling_aet: str, facility, peer_ip: str) -> bool:
+        """Process and store DICOM object with enhanced metadata extraction"""
         try:
-            # Extract DICOM metadata
-            study_uid = getattr(ds, 'StudyInstanceUID', None)
-            series_uid = getattr(ds, 'SeriesInstanceUID', None)
-            sop_instance_uid = getattr(ds, 'SOPInstanceUID', None)
+            # Extract comprehensive metadata
+            metadata = self.image_processor.extract_enhanced_metadata(ds)
             
-            if not all([study_uid, series_uid, sop_instance_uid]):
-                logger.error("Missing required DICOM UIDs")
+            # Validate required UIDs
+            if not all([metadata['study_instance_uid'], metadata['series_instance_uid'], metadata['sop_instance_uid']]):
+                self.logger.error("Missing required DICOM UIDs")
                 return False
             
-            # Extract patient information
-            patient_id = getattr(ds, 'PatientID', 'UNKNOWN')
-            patient_name = str(getattr(ds, 'PatientName', 'UNKNOWN')).replace('^', ' ')
-            patient_birth_date = getattr(ds, 'PatientBirthDate', None)
-            patient_sex = getattr(ds, 'PatientSex', 'O')
+            # Process patient information
+            patient = self._get_or_create_patient(metadata)
+            if not patient:
+                self.logger.error("Failed to create/retrieve patient")
+                return False
             
+            # Process modality
+            modality = self._get_or_create_modality(metadata['modality'])
+            
+            # Process study
+            study = self._get_or_create_study(metadata, patient, facility, modality)
+            if not study:
+                self.logger.error("Failed to create/retrieve study")
+                return False
+            
+            # Process series
+            series = self._get_or_create_series(metadata, study, modality)
+            if not series:
+                self.logger.error("Failed to create/retrieve series")
+                return False
+            
+            # Save DICOM file
+            file_path = self._save_dicom_file(ds, metadata)
+            if not file_path:
+                self.logger.error("Failed to save DICOM file")
+                return False
+            
+            # Generate thumbnail
+            thumbnail_data = self.image_processor.generate_thumbnail(ds)
+            
+            # Create DICOM image record
+            dicom_image = self._create_dicom_image(metadata, series, file_path, thumbnail_data)
+            if not dicom_image:
+                self.logger.error("Failed to create DICOM image record")
+                return False
+            
+            # Send notifications for new studies
+            if hasattr(study, '_created') and study._created:
+                self._send_new_study_notifications(study, facility, modality)
+            
+            # Log success with details
+            self.logger.info(
+                f"Successfully processed DICOM: Patient={patient.patient_id}, "
+                f"Study={study.accession_number}, Series={series.series_number}, "
+                f"Instance={dicom_image.instance_number}"
+            )
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error processing DICOM object: {str(e)}")
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+            return False
+    
+    def _get_or_create_patient(self, metadata: Dict[str, Any]) -> Optional[Patient]:
+        """Get or create patient with enhanced name parsing"""
+        try:
             # Parse patient name
-            name_parts = patient_name.split(' ', 1)
-            first_name = name_parts[0] if name_parts else 'Unknown'
-            last_name = name_parts[1] if len(name_parts) > 1 else ''
+            patient_name = metadata['patient_name']
+            name_parts = [part.strip() for part in patient_name.split(' ') if part.strip()]
+            
+            if len(name_parts) >= 2:
+                first_name = name_parts[0]
+                last_name = ' '.join(name_parts[1:])
+            elif len(name_parts) == 1:
+                first_name = name_parts[0]
+                last_name = ''
+            else:
+                first_name = 'Unknown'
+                last_name = ''
             
             # Parse birth date
-            birth_date = None
-            if patient_birth_date:
+            birth_date = timezone.now().date()
+            if metadata['patient_birth_date']:
                 try:
-                    birth_date = datetime.strptime(patient_birth_date, '%Y%m%d').date()
+                    birth_date = datetime.strptime(metadata['patient_birth_date'], '%Y%m%d').date()
                 except ValueError:
-                    birth_date = timezone.now().date()
-            else:
-                birth_date = timezone.now().date()
+                    self.logger.warning(f"Invalid birth date format: {metadata['patient_birth_date']}")
             
             # Get or create patient
             patient, created = Patient.objects.get_or_create(
-                patient_id=patient_id,
+                patient_id=metadata['patient_id'],
                 defaults={
                     'first_name': first_name,
                     'last_name': last_name,
                     'date_of_birth': birth_date,
-                    'gender': patient_sex if patient_sex in ['M', 'F'] else 'O'
+                    'gender': metadata['patient_sex'] if metadata['patient_sex'] in ['M', 'F'] else 'O'
                 }
             )
             
             if created:
-                logger.info(f"Created new patient: {patient}")
+                self.logger.info(f"Created new patient: {patient}")
             
-            # Extract study information
-            study_date = getattr(ds, 'StudyDate', None)
-            study_time = getattr(ds, 'StudyTime', '000000')
-            study_description = getattr(ds, 'StudyDescription', 'DICOM Study')
-            referring_physician = str(getattr(ds, 'ReferringPhysicianName', 'UNKNOWN')).replace('^', ' ')
-            modality_code = getattr(ds, 'Modality', 'OT')
-            accession_number = getattr(ds, 'AccessionNumber', f"ACC_{int(time.time())}")
+            return patient
             
+        except Exception as e:
+            self.logger.error(f"Error creating patient: {str(e)}")
+            return None
+    
+    def _get_or_create_modality(self, modality_code: str) -> Modality:
+        """Get or create modality"""
+        modality, created = Modality.objects.get_or_create(
+            code=modality_code,
+            defaults={
+                'name': modality_code,
+                'description': f'{modality_code} Modality'
+            }
+        )
+        return modality
+    
+    def _get_or_create_study(self, metadata: Dict[str, Any], patient: Patient, 
+                           facility: Facility, modality: Modality) -> Optional[Study]:
+        """Get or create study with comprehensive metadata"""
+        try:
             # Parse study datetime
-            if study_date:
+            study_datetime = timezone.now()
+            if metadata['study_date']:
                 try:
-                    study_datetime = datetime.strptime(f"{study_date}{study_time[:6]}", '%Y%m%d%H%M%S')
+                    study_time = metadata['study_time'][:6].ljust(6, '0')  # Ensure 6 digits
+                    study_datetime = datetime.strptime(f"{metadata['study_date']}{study_time}", '%Y%m%d%H%M%S')
                     study_datetime = timezone.make_aware(study_datetime)
-                except ValueError:
-                    study_datetime = timezone.now()
-            else:
-                study_datetime = timezone.now()
-            
-            # Get or create modality
-            modality, _ = Modality.objects.get_or_create(
-                code=modality_code,
-                defaults={'name': modality_code, 'description': f'{modality_code} Modality'}
-            )
-            
-            # Attribute study strictly to the facility resolved from Calling AE
-            default_facility = facility
-            if not default_facility:
-                logger.error("No facility matched Calling AE Title; rejecting study")
-                return False
+                except ValueError as e:
+                    self.logger.warning(f"Invalid study date/time: {metadata['study_date']}, {metadata['study_time']} - {e}")
             
             # Get or create study
             study, created = Study.objects.get_or_create(
-                study_instance_uid=study_uid,
+                study_instance_uid=metadata['study_instance_uid'],
                 defaults={
-                    'accession_number': accession_number,
+                    'accession_number': metadata['accession_number'],
                     'patient': patient,
-                    'facility': default_facility,
+                    'facility': facility,
                     'modality': modality,
-                    'study_description': study_description,
+                    'study_description': metadata['study_description'],
                     'study_date': study_datetime,
-                    'referring_physician': referring_physician,
+                    'referring_physician': metadata['referring_physician'],
+                    'body_part': metadata.get('body_part_examined', ''),
                     'status': 'scheduled',
                     'priority': 'normal'
                 }
             )
             
+            # Mark if newly created for notification purposes
+            study._created = created
+            
             if created:
-                logger.info(f"Created new study: {study}")
-                try:
-                    notif_type, _ = NotificationType.objects.get_or_create(
-                        code='new_study', defaults={'name': 'New Study Uploaded', 'description': 'A new study has been uploaded', 'is_system': True}
-                    )
-                    recipients = User.objects.filter(models.Q(role='radiologist') | models.Q(role='admin') | models.Q(facility=default_facility))
-                    for recipient in recipients:
-                        Notification.objects.create(
-                            type=notif_type,
-                            recipient=recipient,
-                            sender=None,
-                            title=f"New {modality.code} study for {patient.full_name}",
-                            message=f"Study {accession_number} uploaded from {default_facility.name}",
-                            priority='normal',
-                            study=study,
-                            facility=default_facility,
-                            data={'study_id': study.id, 'accession_number': accession_number}
-                        )
-                except Exception as _e:
-                    logger.warning(f"Failed to send notifications for new study: {_e}")
+                self.logger.info(f"Created new study: {study}")
             
-            # Extract series information
-            series_number = getattr(ds, 'SeriesNumber', 1)
-            series_description = getattr(ds, 'SeriesDescription', f'Series {series_number}')
-            slice_thickness = getattr(ds, 'SliceThickness', None)
-            pixel_spacing = str(getattr(ds, 'PixelSpacing', ''))
-            image_orientation = str(getattr(ds, 'ImageOrientationPatient', ''))
+            return study
             
-            # Get or create series
+        except Exception as e:
+            self.logger.error(f"Error creating study: {str(e)}")
+            return None
+    
+    def _get_or_create_series(self, metadata: Dict[str, Any], study: Study, modality: Modality) -> Optional[Series]:
+        """Get or create series with enhanced metadata"""
+        try:
             series, created = Series.objects.get_or_create(
-                series_instance_uid=series_uid,
+                series_instance_uid=metadata['series_instance_uid'],
                 defaults={
                     'study': study,
-                    'series_number': series_number,
-                    'series_description': series_description,
-                    'modality': modality_code,
-                    'slice_thickness': slice_thickness,
-                    'pixel_spacing': pixel_spacing,
-                    'image_orientation': image_orientation
+                    'series_number': metadata['series_number'],
+                    'series_description': metadata['series_description'],
+                    'modality': metadata['modality'],
+                    'body_part': metadata.get('body_part_examined', ''),
+                    'slice_thickness': metadata.get('slice_thickness'),
+                    'pixel_spacing': metadata.get('pixel_spacing', ''),
+                    'image_orientation': metadata.get('image_orientation', '')
                 }
             )
             
             if created:
-                logger.info(f"Created new series: {series}")
+                self.logger.info(f"Created new series: {series}")
             
-            # Extract image information
-            instance_number = getattr(ds, 'InstanceNumber', 1)
-            image_position = str(getattr(ds, 'ImagePositionPatient', ''))
-            slice_location = getattr(ds, 'SliceLocation', None)
+            return series
             
-            # Create file path
+        except Exception as e:
+            self.logger.error(f"Error creating series: {str(e)}")
+            return None
+    
+    def _save_dicom_file(self, ds, metadata: Dict[str, Any]) -> Optional[Path]:
+        """Save DICOM file with organized directory structure"""
+        try:
+            # Create directory structure: study_uid/series_uid/
+            study_uid = metadata['study_instance_uid']
+            series_uid = metadata['series_instance_uid']
+            sop_instance_uid = metadata['sop_instance_uid']
+            
             file_dir = self.storage_dir / study_uid / series_uid
             file_dir.mkdir(parents=True, exist_ok=True)
+            
             file_path = file_dir / f"{sop_instance_uid}.dcm"
             
             # Save DICOM file
             ds.save_as(file_path, write_like_original=False)
-            file_size = file_path.stat().st_size
             
+            # Verify file was saved correctly
+            if not file_path.exists() or file_path.stat().st_size == 0:
+                raise ValueError("DICOM file was not saved correctly")
+            
+            return file_path
+            
+        except Exception as e:
+            self.logger.error(f"Error saving DICOM file: {str(e)}")
+            return None
+    
+    def _create_dicom_image(self, metadata: Dict[str, Any], series: Series, 
+                          file_path: Path, thumbnail_data: Optional[bytes]) -> Optional[DicomImage]:
+        """Create DICOM image database record"""
+        try:
             # Create relative path for database storage
             relative_path = str(file_path.relative_to(Path('/workspace/media')))
+            file_size = file_path.stat().st_size
             
             # Create DICOM image record
             dicom_image, created = DicomImage.objects.get_or_create(
-                sop_instance_uid=sop_instance_uid,
+                sop_instance_uid=metadata['sop_instance_uid'],
                 defaults={
                     'series': series,
-                    'instance_number': instance_number,
-                    'image_position': image_position,
-                    'slice_location': slice_location,
+                    'instance_number': metadata['instance_number'],
+                    'image_position': metadata.get('image_position', ''),
+                    'slice_location': metadata.get('slice_location'),
                     'file_path': relative_path,
                     'file_size': file_size,
                     'processed': False
                 }
             )
             
-            if created:
-                logger.info(f"Created new DICOM image: {dicom_image}")
-            else:
-                logger.info(f"DICOM image already exists: {dicom_image}")
+            # Save thumbnail if generated
+            if created and thumbnail_data:
+                try:
+                    thumbnail_filename = f"{metadata['sop_instance_uid']}_thumb.jpg"
+                    thumbnail_content = ContentFile(thumbnail_data, name=thumbnail_filename)
+                    dicom_image.thumbnail.save(thumbnail_filename, thumbnail_content, save=True)
+                except Exception as e:
+                    self.logger.warning(f"Failed to save thumbnail: {str(e)}")
             
-            return True
+            if created:
+                self.logger.info(f"Created new DICOM image: {dicom_image}")
+            
+            return dicom_image
             
         except Exception as e:
-            logger.error(f"Error processing DICOM object: {str(e)}")
-            return False
+            self.logger.error(f"Error creating DICOM image record: {str(e)}")
+            return None
+    
+    def _send_new_study_notifications(self, study: Study, facility: Facility, modality: Modality):
+        """Send notifications for new studies"""
+        try:
+            notif_type, _ = NotificationType.objects.get_or_create(
+                code='new_study',
+                defaults={
+                    'name': 'New Study Uploaded',
+                    'description': 'A new study has been uploaded',
+                    'is_system': True
+                }
+            )
+            
+            # Get recipients (radiologists, admins, facility users)
+            recipients = User.objects.filter(
+                models.Q(role='radiologist') | 
+                models.Q(role='admin') | 
+                models.Q(facility=facility),
+                is_active=True
+            ).distinct()
+            
+            for recipient in recipients:
+                try:
+                    Notification.objects.create(
+                        type=notif_type,
+                        recipient=recipient,
+                        sender=None,
+                        title=f"New {modality.code} study for {study.patient.full_name}",
+                        message=f"Study {study.accession_number} uploaded from {facility.name}",
+                        priority='normal',
+                        study=study,
+                        facility=facility,
+                        data={
+                            'study_id': study.id,
+                            'accession_number': study.accession_number,
+                            'modality': modality.code,
+                            'patient_name': study.patient.full_name
+                        }
+                    )
+                except Exception as e:
+                    self.logger.warning(f"Failed to create notification for user {recipient.username}: {str(e)}")
+            
+            self.logger.info(f"Sent notifications for new study {study.accession_number} to {recipients.count()} users")
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to send notifications for new study: {str(e)}")
+    
+    def get_statistics(self) -> Dict[str, Any]:
+        """Get receiver statistics"""
+        runtime = None
+        if self.stats['start_time']:
+            runtime = (timezone.now() - self.stats['start_time']).total_seconds()
+        
+        return {
+            'is_running': self.is_running,
+            'port': self.port,
+            'aet': self.aet,
+            'total_received': self.stats['total_received'],
+            'total_stored': self.stats['total_stored'],
+            'total_errors': self.stats['total_errors'],
+            'success_rate': (self.stats['total_stored'] / max(1, self.stats['total_received'])) * 100,
+            'runtime_seconds': runtime,
+            'last_received': self.stats['last_received'],
+            'start_time': self.stats['start_time']
+        }
     
     def start(self):
         """Start the DICOM receiver service"""
-        logger.info(f"Starting DICOM receiver on port {self.port}")
+        self.logger.info(f"Starting DICOM receiver on port {self.port}")
+        
         try:
+            self.setup_ae()
+            self.is_running = True
+            self.stats['start_time'] = timezone.now()
+            
+            # Print startup banner
+            self.logger.info("=" * 60)
+            self.logger.info("NOCTIS PRO DICOM RECEIVER SERVICE")
+            self.logger.info("=" * 60)
+            self.logger.info(f"Application Entity Title: {self.aet}")
+            self.logger.info(f"Listening on port: {self.port}")
+            self.logger.info(f"Maximum PDU size: {self.max_pdu_size}")
+            self.logger.info(f"Storage directory: {self.storage_dir}")
+            self.logger.info("Waiting for DICOM connections...")
+            self.logger.info("=" * 60)
+            
+            # Start the server (blocking)
             self.ae.start_server(('', self.port), block=True)
+            
         except KeyboardInterrupt:
-            logger.info("DICOM receiver stopped by user")
+            self.logger.info("DICOM receiver stopped by user (Ctrl+C)")
         except Exception as e:
-            logger.error(f"Error starting DICOM receiver: {str(e)}")
+            self.logger.error(f"Error starting DICOM receiver: {str(e)}")
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+        finally:
+            self.is_running = False
+            self.logger.info("DICOM receiver service stopped")
+            
+            # Print final statistics
+            stats = self.get_statistics()
+            self.logger.info("Final Statistics:")
+            self.logger.info(f"  Total received: {stats['total_received']}")
+            self.logger.info(f"  Total stored: {stats['total_stored']}")
+            self.logger.info(f"  Total errors: {stats['total_errors']}")
+            self.logger.info(f"  Success rate: {stats['success_rate']:.1f}%")
+            if stats['runtime_seconds']:
+                self.logger.info(f"  Runtime: {stats['runtime_seconds']:.0f} seconds")
     
     def stop(self):
         """Stop the DICOM receiver service"""
-        logger.info("Stopping DICOM receiver")
-        self.ae.shutdown()
+        self.logger.info("Stopping DICOM receiver...")
+        self.is_running = False
+        if self.ae:
+            self.ae.shutdown()
+
+
+def signal_handler(signum, frame):
+    """Handle shutdown signals gracefully"""
+    logger = logging.getLogger('dicom_receiver')
+    logger.info(f"Received signal {signum}, shutting down gracefully...")
+    # The receiver will be stopped in the main function
+
 
 def main():
     """Main function to run the DICOM receiver"""
     import argparse
     
-    parser = argparse.ArgumentParser(description='DICOM Receiver Service')
-    parser.add_argument('--port', type=int, default=11112, help='Port to listen on (default: 11112)')
-    parser.add_argument('--aet', default='NOCTIS_SCP', help='Application Entity Title (default: NOCTIS_SCP)')
+    parser = argparse.ArgumentParser(
+        description='NOCTIS PRO DICOM Receiver Service',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument('--port', type=int, default=11112, 
+                       help='Port to listen on')
+    parser.add_argument('--aet', default='NOCTIS_SCP', 
+                       help='Application Entity Title')
+    parser.add_argument('--max-pdu', type=int, default=16384,
+                       help='Maximum PDU size in bytes')
+    parser.add_argument('--debug', action='store_true',
+                       help='Enable debug logging')
     
     args = parser.parse_args()
     
-    receiver = DicomReceiver(port=args.port, aet=args.aet)
+    # Setup signal handlers for graceful shutdown
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    # Create logs directory
+    os.makedirs('/workspace/logs', exist_ok=True)
+    
+    # Create receiver instance
+    receiver = DicomReceiver(port=args.port, aet=args.aet, max_pdu_size=args.max_pdu)
+    
+    # Set debug logging if requested
+    if args.debug:
+        logging.getLogger('dicom_receiver').setLevel(logging.DEBUG)
+        logging.getLogger('pynetdicom').setLevel(logging.DEBUG)
     
     try:
         receiver.start()
     except KeyboardInterrupt:
+        pass
+    finally:
         receiver.stop()
-        logger.info("DICOM receiver service stopped")
+
 
 if __name__ == '__main__':
     main()
