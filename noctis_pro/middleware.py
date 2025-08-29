@@ -321,7 +321,8 @@ class SessionTimeoutMiddleware(MiddlewareMixin):
     """
     
     def process_request(self, request):
-        if not request.user.is_authenticated:
+        # Check if user attribute exists (it might not be available in ASGI requests before AuthenticationMiddleware)
+        if not hasattr(request, 'user') or not request.user.is_authenticated:
             return None
         
         # Skip timeout for AJAX requests to avoid interrupting operations
@@ -370,7 +371,7 @@ class SessionTimeoutWarningMiddleware(MiddlewareMixin):
     
     def process_response(self, request, response):
         # Only inject for authenticated users and HTML responses
-        if (request.user.is_authenticated and 
+        if (hasattr(request, 'user') and request.user.is_authenticated and 
             response.get('Content-Type', '').startswith('text/html') and
             hasattr(response, 'content')):
             
