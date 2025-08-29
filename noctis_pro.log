@@ -743,3 +743,8 @@ Traceback (most recent call last):
   File "/workspace/venv/lib/python3.13/site-packages/django/template/loader.py", line 19, in get_template
     raise TemplateDoesNotExist(template_name, chain=chain)
 django.template.exceptions.TemplateDoesNotExist: dicom_viewer/hu_calibration_dashboard.html
+Internal Server Error: /dicom-viewer/api/series/1/volume/
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
