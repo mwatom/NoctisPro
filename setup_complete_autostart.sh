@@ -128,7 +128,7 @@ start_ngrok_with_retries() {
         # Start ngrok based on configuration
         if [ "${NGROK_USE_STATIC:-false}" = "true" ] && [ ! -z "${NGROK_STATIC_URL:-}" ]; then
             log "Starting ngrok with static URL: $NGROK_STATIC_URL"
-            nohup ngrok http --url=https://$NGROK_STATIC_URL ${DJANGO_PORT:-80} --log=stdout > "$WORKSPACE_DIR/ngrok.log" 2>&1 &
+            nohup ngrok http --url=$NGROK_STATIC_URL ${DJANGO_PORT:-80} --log=stdout > "$WORKSPACE_DIR/ngrok.log" 2>&1 &
             EXPECTED_URL="https://$NGROK_STATIC_URL"
         else
             log "Starting ngrok with random URL"
@@ -438,7 +438,7 @@ restart_ngrok() {
     
     # Start ngrok
     if [ "${NGROK_USE_STATIC:-false}" = "true" ] && [ ! -z "${NGROK_STATIC_URL:-}" ]; then
-        nohup ngrok http --url=https://$NGROK_STATIC_URL ${DJANGO_PORT:-80} --log=stdout > ngrok.log 2>&1 &
+        nohup ngrok http --url=$NGROK_STATIC_URL ${DJANGO_PORT:-80} --log=stdout > ngrok.log 2>&1 &
     else
         nohup ngrok http ${DJANGO_PORT:-80} --log=stdout > ngrok.log 2>&1 &
     fi

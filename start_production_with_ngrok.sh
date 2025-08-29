@@ -117,7 +117,7 @@ NGROK_CMD="ngrok http 8000"
 if [ "$NGROK_USE_STATIC" = "true" ]; then
     if [ ! -z "$NGROK_STATIC_URL" ]; then
         log "🌐 Using static ngrok URL: https://$NGROK_STATIC_URL"
-        NGROK_CMD="ngrok http --url=$NGROK_STATIC_URL 8000"
+        NGROK_CMD="ngrok http --url=$NGROK_STATIC_URL ${DJANGO_PORT:-80}"
     elif [ ! -z "$NGROK_SUBDOMAIN" ]; then
         log "🌐 Using static subdomain: $NGROK_SUBDOMAIN.ngrok.io"
         NGROK_CMD="ngrok http --subdomain=$NGROK_SUBDOMAIN 8000"

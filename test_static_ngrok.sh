@@ -97,7 +97,7 @@ echo ""
 
 # Test specific ngrok command
 echo "📋 Testing ngrok command syntax..."
-NGROK_CMD="ngrok http --url=https://${NGROK_STATIC_URL:-colt-charmed-lark.ngrok-free.app} ${DJANGO_PORT:-80}"
+NGROK_CMD="ngrok http --url=${NGROK_STATIC_URL:-colt-charmed-lark.ngrok-free.app} ${DJANGO_PORT:-80}"
 echo "Command: $NGROK_CMD"
 
 # Just test the syntax, don't actually run it
