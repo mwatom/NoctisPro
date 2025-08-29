@@ -714,3 +714,4 @@ Bad Request: /dicom-viewer/api/hu/
 Watching for file changes with StatReloader
 [32mHTTP GET / 302 [0.01, 127.0.0.1:55224][0m
 Watching for file changes with StatReloader
+Watching for file changes with StatReloader
