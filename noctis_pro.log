@@ -678,3 +678,7 @@ Watching for file changes with StatReloader
 Watching for file changes with StatReloader
 Bad Request: /dicom-viewer/api/series/1/bone/
 [31;1mHTTP GET /dicom-viewer/api/series/1/bone/ 400 [0.01, 127.0.0.1:47522][0m
+Watching for file changes with StatReloader
+[32mHTTP HEAD / 302 [0.01, 127.0.0.1:45456][0m
+[32mHTTP HEAD /dicom-viewer/upload/ 302 [0.00, 127.0.0.1:45608][0m
+[32mHTTP HEAD /dicom-viewer/web/viewer/ 302 [0.00, 127.0.0.1:45618][0m
