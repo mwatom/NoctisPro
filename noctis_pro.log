@@ -715,3 +715,31 @@ Watching for file changes with StatReloader
 [32mHTTP GET / 302 [0.01, 127.0.0.1:55224][0m
 Watching for file changes with StatReloader
 Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Not Found: /dicom_viewer/web/
+[33mHTTP GET /dicom_viewer/web/ 404 [0.01, 127.0.0.1:44688][0m
+Not Found: /dicom_viewer/web/
+[33mHTTP GET /dicom_viewer/web/ 404 [0.00, 127.0.0.1:44702][0m
+Not Found: /dicom_viewer/
+[33mHTTP GET /dicom_viewer/ 404 [0.00, 127.0.0.1:38790][0m
+[32mHTTP GET /dicom-viewer/ 302 [0.00, 127.0.0.1:34824][0m
+Internal Server Error: /dicom-viewer/api/series/1/volume/
+Internal Server Error: /dicom-viewer/hu-calibration/
+Traceback (most recent call last):
+  File "/workspace/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/workspace/venv/lib/python3.13/site-packages/django/core/handlers/base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/workspace/venv/lib/python3.13/site-packages/django/contrib/auth/decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "/workspace/venv/lib/python3.13/site-packages/django/contrib/auth/decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "/workspace/dicom_viewer/views.py", line 2882, in hu_calibration_dashboard
+    return render(request, 'dicom_viewer/hu_calibration_dashboard.html', context)
+  File "/workspace/venv/lib/python3.13/site-packages/django/shortcuts.py", line 25, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "/workspace/venv/lib/python3.13/site-packages/django/template/loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "/workspace/venv/lib/python3.13/site-packages/django/template/loader.py", line 19, in get_template
+    raise TemplateDoesNotExist(template_name, chain=chain)
+django.template.exceptions.TemplateDoesNotExist: dicom_viewer/hu_calibration_dashboard.html
