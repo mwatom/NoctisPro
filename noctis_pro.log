@@ -91,3 +91,6 @@ Watching for file changes with StatReloader
 Watching for file changes with StatReloader
 [32mHTTP GET / 302 [0.01, 127.0.0.1:55562][0m
 [32mHTTP GET / 302 [0.00, 127.0.0.1:55578][0m
+[32mHTTP GET / 302 [0.00, 127.0.0.1:44430][0m
+[mHTTP GET /login/ 200 [0.01, 127.0.0.1:44430][0m
+[mHTTP GET /favicon.ico 204 [0.00, 127.0.0.1:44442][0m
