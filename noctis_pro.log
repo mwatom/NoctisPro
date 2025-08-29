@@ -658,3 +658,23 @@ Watching for file changes with StatReloader
 Forbidden (CSRF token missing.): /login/
 [31;1mHTTP POST /login/ 403 [0.01, 127.0.0.1:37624][0m
 [mHTTP GET /worklist/upload/ 200 [0.01, 127.0.0.1:37392][0m
+Internal Server Error: /dicom-viewer/api/series/1/mpr/
+[35;1mHTTP GET /dicom-viewer/api/series/1/mpr/ 500 [0.01, 127.0.0.1:44012][0m
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+Internal Server Error: /dicom-viewer/api/series/1/mpr/
+[35;1mHTTP GET /dicom-viewer/api/series/1/mpr/ 500 [0.01, 127.0.0.1:44874][0m
+Bad Request: /dicom-viewer/api/series/1/mip/
+[31;1mHTTP GET /dicom-viewer/api/series/1/mip/ 400 [0.01, 127.0.0.1:44884][0m
+Bad Request: /dicom-viewer/api/series/1/bone/
+[31;1mHTTP GET /dicom-viewer/api/series/1/bone/ 400 [0.01, 127.0.0.1:35222][0m
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+Bad Request: /dicom-viewer/api/series/1/bone/
+[31;1mHTTP GET /dicom-viewer/api/series/1/bone/ 400 [0.01, 127.0.0.1:47522][0m
