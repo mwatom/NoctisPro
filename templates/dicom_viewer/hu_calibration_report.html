@@ -1,0 +1,203 @@
+{% extends "dicom_viewer/base.html" %}
+{% load static %}
+
+{% block title %}HU Calibration Report{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-file-alt"></i> HU Calibration Report</h1>
+                <div>
+                    <a href="{% url 'dicom_viewer:hu_calibration_dashboard' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </a>
+                    <button onclick="window.print()" class="btn btn-primary">
+                        <i class="fas fa-print"></i> Print Report
+                    </button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="mb-0">Calibration Details</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Scanner Information</h5>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>Station Name:</strong></td>
+                                    <td>{{ calibration.station_name|default:"Unknown" }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Manufacturer:</strong></td>
+                                    <td>{{ calibration.manufacturer|default:"Unknown" }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Model:</strong></td>
+                                    <td>{{ calibration.model|default:"Unknown" }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Serial Number:</strong></td>
+                                    <td>{{ calibration.device_serial_number|default:"Unknown" }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>Study Information</h5>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>Patient:</strong></td>
+                                    <td>{{ calibration.study.patient.name }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Study Date:</strong></td>
+                                    <td>{{ calibration.study.study_date|date:"Y-m-d" }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Study Description:</strong></td>
+                                    <td>{{ calibration.study.study_description|default:"Unknown" }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Calibration Date:</strong></td>
+                                    <td>{{ calibration.calibration_date|date:"Y-m-d"|default:"N/A" }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <h5 class="mt-4">Calibration Results</h5>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h6 class="card-title">Status</h6>
+                                    <span class="badge badge-{{ calibration.get_status_color }} badge-lg">
+                                        {{ calibration.get_calibration_status_display }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h6 class="card-title">Water HU</h6>
+                                    <h4 class="{% if calibration.water_deviation <= 5 %}text-success{% elif calibration.water_deviation <= 10 %}text-warning{% else %}text-danger{% endif %}">
+                                        {{ calibration.water_hu|default:"N/A" }}
+                                    </h4>
+                                    {% if calibration.water_deviation %}
+                                    <small class="text-muted">Deviation: ±{{ calibration.water_deviation|floatformat:1 }} HU</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h6 class="card-title">Air HU</h6>
+                                    <h4 class="{% if calibration.air_deviation <= 50 %}text-success{% elif calibration.air_deviation <= 100 %}text-warning{% else %}text-danger{% endif %}">
+                                        {{ calibration.air_hu|default:"N/A" }}
+                                    </h4>
+                                    {% if calibration.air_deviation %}
+                                    <small class="text-muted">Deviation: ±{{ calibration.air_deviation|floatformat:1 }} HU</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if calibration.validation_issues %}
+                    <div class="alert alert-danger mt-4">
+                        <h6><i class="fas fa-exclamation-triangle"></i> Validation Issues</h6>
+                        <ul class="mb-0">
+                            {% for issue in calibration.validation_issues %}
+                            <li>{{ issue }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    {% if calibration.validation_warnings %}
+                    <div class="alert alert-warning mt-4">
+                        <h6><i class="fas fa-exclamation-circle"></i> Validation Warnings</h6>
+                        <ul class="mb-0">
+                            {% for warning in calibration.validation_warnings %}
+                            <li>{{ warning }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    <h5 class="mt-4">Technical Details</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>Rescale Slope:</strong></td>
+                                    <td>{{ calibration.rescale_slope }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Rescale Intercept:</strong></td>
+                                    <td>{{ calibration.rescale_intercept }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Rescale Type:</strong></td>
+                                    <td>{{ calibration.rescale_type|default:"Unknown" }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Noise Level:</strong></td>
+                                    <td>{{ calibration.noise_level|default:"N/A" }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>Phantom Type:</strong></td>
+                                    <td>{{ calibration.phantom_type|default:"Unknown" }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Linearity Check:</strong></td>
+                                    <td>{{ calibration.linearity_check|default:"N/A" }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Validated By:</strong></td>
+                                    <td>{{ calibration.validated_by.username|default:"System" }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Validation Date:</strong></td>
+                                    <td>{{ calibration.created_at|date:"Y-m-d H:i" }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    {% if calibration.notes %}
+                    <h5 class="mt-4">Notes</h5>
+                    <div class="alert alert-info">
+                        {{ calibration.notes|linebreaks }}
+                    </div>
+                    {% endif %}
+
+                    <div class="mt-4 text-center">
+                        <small class="text-muted">
+                            Report generated on {{ "now"|date:"Y-m-d H:i:s" }} by NoctisPro Medical Imaging System
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .btn, .navbar, .sidebar { display: none !important; }
+    .container-fluid { margin: 0; padding: 0; }
+    .card { border: none; box-shadow: none; }
+}
+</style>
+{% endblock %}

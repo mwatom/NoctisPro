@@ -711,3 +711,85 @@ Bad Request: /dicom-viewer/api/hu/
 [mHTTP GET /dicom-viewer/api/hu/?mode=series&image_id=1&x=10&y=10 200 [0.01, 127.0.0.1:56868][0m
 [mHTTP GET /dicom-viewer/print/printers/ 200 [0.01, 127.0.0.1:56870][0m
 [mHTTP GET /dicom-viewer/upload/ 200 [0.01, 127.0.0.1:50286][0m
+Watching for file changes with StatReloader
+[32mHTTP GET / 302 [0.01, 127.0.0.1:55224][0m
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Not Found: /dicom_viewer/web/
+[33mHTTP GET /dicom_viewer/web/ 404 [0.01, 127.0.0.1:44688][0m
+Not Found: /dicom_viewer/web/
+[33mHTTP GET /dicom_viewer/web/ 404 [0.00, 127.0.0.1:44702][0m
+Not Found: /dicom_viewer/
+[33mHTTP GET /dicom_viewer/ 404 [0.00, 127.0.0.1:38790][0m
+[32mHTTP GET /dicom-viewer/ 302 [0.00, 127.0.0.1:34824][0m
+Internal Server Error: /dicom-viewer/api/series/1/volume/
+Internal Server Error: /dicom-viewer/hu-calibration/
+Traceback (most recent call last):
+  File "/workspace/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/workspace/venv/lib/python3.13/site-packages/django/core/handlers/base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/workspace/venv/lib/python3.13/site-packages/django/contrib/auth/decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "/workspace/venv/lib/python3.13/site-packages/django/contrib/auth/decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "/workspace/dicom_viewer/views.py", line 2882, in hu_calibration_dashboard
+    return render(request, 'dicom_viewer/hu_calibration_dashboard.html', context)
+  File "/workspace/venv/lib/python3.13/site-packages/django/shortcuts.py", line 25, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "/workspace/venv/lib/python3.13/site-packages/django/template/loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "/workspace/venv/lib/python3.13/site-packages/django/template/loader.py", line 19, in get_template
+    raise TemplateDoesNotExist(template_name, chain=chain)
+django.template.exceptions.TemplateDoesNotExist: dicom_viewer/hu_calibration_dashboard.html
+Internal Server Error: /dicom-viewer/api/series/1/volume/
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+Bad Request: /dicom-viewer/api/series/1/bone/
+Bad Request: /dicom-viewer/api/series/1/bone/
+Internal Server Error: /dicom-viewer/api/series/1/volume/
+Internal Server Error: /dicom-viewer/api/calculate-distance/
+Traceback (most recent call last):
+  File "/workspace/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/workspace/venv/lib/python3.13/site-packages/django/core/handlers/base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/workspace/venv/lib/python3.13/site-packages/django/contrib/auth/decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "/workspace/venv/lib/python3.13/site-packages/django/views/decorators/csrf.py", line 65, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "/workspace/dicom_viewer/views.py", line 1311, in api_calculate_distance
+    pixel_distance = np.sqrt((end_x - start_x)**2 + (end_y - start_y)**2)
+                              ~~~~~~^~~~~~~~~
+TypeError: unsupported operand type(s) for -: 'NoneType' and 'NoneType'
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+Method Not Allowed: /dicom-viewer/hu-calibration/validate/1/
+Internal Server Error: /dicom-viewer/hu-calibration/phantoms/
+Traceback (most recent call last):
+  File "/workspace/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/workspace/venv/lib/python3.13/site-packages/django/core/handlers/base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/workspace/venv/lib/python3.13/site-packages/django/contrib/auth/decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "/workspace/venv/lib/python3.13/site-packages/django/contrib/auth/decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "/workspace/dicom_viewer/views.py", line 3120, in manage_qa_phantoms
+    return render(request, 'dicom_viewer/manage_qa_phantoms.html', context)
+  File "/workspace/venv/lib/python3.13/site-packages/django/shortcuts.py", line 25, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "/workspace/venv/lib/python3.13/site-packages/django/template/loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "/workspace/venv/lib/python3.13/site-packages/django/template/loader.py", line 19, in get_template
+    raise TemplateDoesNotExist(template_name, chain=chain)
+django.template.exceptions.TemplateDoesNotExist: dicom_viewer/manage_qa_phantoms.html
+Internal Server Error: /dicom-viewer/api/study/1/export-sr/
+Bad Request: /dicom-viewer/api/series/1/bone/
+Internal Server Error: /dicom-viewer/api/series/1/volume/
+Bad Request: /dicom-viewer/api/hu/
+Bad Request: /dicom-viewer/api/series/1/bone/
+Internal Server Error: /dicom-viewer/api/series/1/volume/

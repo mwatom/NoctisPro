@@ -1040,7 +1040,42 @@ def api_measurements(request, study_id=None):
                 request.session['annotations'] = annotations
             else:
                 # Save to database for study-based viewer
-                # For now, store in session as well
+                for measurement_data in measurements:
+                    try:
+                        # Get the image from the measurement data
+                        image_id = measurement_data.get('image_id')
+                        if image_id:
+                            image = DicomImage.objects.get(id=image_id)
+                            measurement = Measurement.objects.create(
+                                user=request.user,
+                                image=image,
+                                measurement_type=measurement_data.get('type', 'length'),
+                                points=json.dumps(measurement_data.get('points', [])),
+                                value=measurement_data.get('value'),
+                                unit=measurement_data.get('unit', 'mm'),
+                                notes=measurement_data.get('notes', '')
+                            )
+                    except (DicomImage.DoesNotExist, KeyError) as e:
+                        logger.warning(f"Failed to save measurement: {e}")
+                
+                for annotation_data in annotations:
+                    try:
+                        # Get the image from the annotation data
+                        image_id = annotation_data.get('image_id')
+                        if image_id:
+                            image = DicomImage.objects.get(id=image_id)
+                            annotation = Annotation.objects.create(
+                                user=request.user,
+                                image=image,
+                                position_x=annotation_data.get('x', 0),
+                                position_y=annotation_data.get('y', 0),
+                                text=annotation_data.get('text', ''),
+                                color=annotation_data.get('color', '#FFFF00')
+                            )
+                    except (DicomImage.DoesNotExist, KeyError) as e:
+                        logger.warning(f"Failed to save annotation: {e}")
+                
+                # Also store in session for backwards compatibility
                 request.session[f'measurements_{study_id}'] = measurements
                 request.session[f'annotations_{study_id}'] = annotations
             
@@ -1054,8 +1089,55 @@ def api_measurements(request, study_id=None):
             measurements = request.session.get('measurements', [])
             annotations = request.session.get('annotations', [])
         else:
-            measurements = request.session.get(f'measurements_{study_id}', [])
-            annotations = request.session.get(f'annotations_{study_id}', [])
+            # Load from database first, fall back to session
+            db_measurements = []
+            db_annotations = []
+            
+            try:
+                study = get_object_or_404(Study, id=study_id)
+                # Get all images in this study
+                study_images = DicomImage.objects.filter(series__study=study)
+                
+                # Get measurements for this study
+                measurements_qs = Measurement.objects.filter(
+                    image__in=study_images,
+                    user=request.user
+                )
+                for m in measurements_qs:
+                    db_measurements.append({
+                        'id': m.id,
+                        'image_id': m.image.id,
+                        'type': m.measurement_type,
+                        'points': m.get_points(),
+                        'value': m.value,
+                        'unit': m.unit,
+                        'notes': m.notes,
+                        'created_at': m.created_at.isoformat()
+                    })
+                
+                # Get annotations for this study
+                annotations_qs = Annotation.objects.filter(
+                    image__in=study_images,
+                    user=request.user
+                )
+                for a in annotations_qs:
+                    db_annotations.append({
+                        'id': a.id,
+                        'image_id': a.image.id,
+                        'x': a.position_x,
+                        'y': a.position_y,
+                        'text': a.text,
+                        'color': a.color,
+                        'created_at': a.created_at.isoformat()
+                    })
+                
+                measurements = db_measurements
+                annotations = db_annotations
+                
+            except Exception as e:
+                logger.warning(f"Failed to load from database, using session: {e}")
+                measurements = request.session.get(f'measurements_{study_id}', [])
+                annotations = request.session.get(f'annotations_{study_id}', [])
         
         return JsonResponse({
             'measurements': measurements,
@@ -1219,11 +1301,19 @@ def api_calculate_distance(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            start_x = data.get('start_x')
-            start_y = data.get('start_y')
-            end_x = data.get('end_x')
-            end_y = data.get('end_y')
+            # Support both coordinate formats
+            point1 = data.get('point1', {})
+            point2 = data.get('point2', {})
+            
+            start_x = data.get('start_x', point1.get('x'))
+            start_y = data.get('start_y', point1.get('y'))
+            end_x = data.get('end_x', point2.get('x'))
+            end_y = data.get('end_y', point2.get('y'))
             pixel_spacing = data.get('pixel_spacing', [1.0, 1.0])
+            
+            # Validate coordinates
+            if start_x is None or start_y is None or end_x is None or end_y is None:
+                return JsonResponse({'error': 'Missing coordinate data'}, status=400)
             
             # Calculate pixel distance
             pixel_distance = np.sqrt((end_x - start_x)**2 + (end_y - start_y)**2)
