@@ -350,199 +350,214 @@ def api_image_data(request, image_id):
 @login_required
 @csrf_exempt
 def api_mpr_reconstruction(request, series_id):
-    """API endpoint for Multiplanar Reconstruction (MPR)
-    - If no plane is provided, returns mid-slice preview images for axial/sagittal/coronal plus counts
-    - If plane is provided (?plane=axial|sagittal|coronal&slice=<idx>), returns that slice image and counts
-    """
-    series = get_object_or_404(Series, id=series_id)
-    user = request.user
-
-    # Check permissions
-    if user.is_facility_user() and getattr(user, 'facility', None) and series.study.facility != user.facility:
-        return JsonResponse({'error': 'Permission denied'}, status=403)
-
+    """Generate MPR (Multiplanar Reconstruction) views with proper HU calibration"""
     try:
-        # Load isotropically-resampled volume from cache or build once
-        volume, _spacing = _get_mpr_volume_and_spacing(series)
+        series = get_object_or_404(Series, id=series_id)
         
-        # Validate volume data
-        if volume is None or volume.size == 0:
-            raise ValueError("Empty volume data")
-        if volume.ndim != 3:
-            raise ValueError(f"Volume must be 3D, got {volume.ndim}D")
-        if np.any(np.isnan(volume)) or np.any(np.isinf(volume)):
-            logger.warning(f"Volume contains NaN or inf values for series {series_id}")
-            volume = np.nan_to_num(volume, nan=0.0, posinf=0.0, neginf=0.0)
-
-        # Windowing params
-        def _derive_window(arr, fallback=(400.0, 40.0)):
+        # Check permissions
+        if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and series.study.facility != request.user.facility:
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        # Get parameters
+        window_width = float(request.GET.get('ww', 400))
+        window_level = float(request.GET.get('wl', 40))
+        invert = request.GET.get('invert', 'false').lower() == 'true'
+        
+        # Get all images in series ordered by instance number
+        images = series.images.all().order_by('instance_number')
+        if not images.exists():
+            return JsonResponse({'error': 'No images found in series'}, status=404)
+        
+        # Load volume data
+        volume_data = []
+        spacing = [1.0, 1.0, 1.0]  # Default spacing
+        origins = []
+        
+        for image in images:
             try:
-                flat = arr.astype(np.float32).flatten()
-                p1 = float(np.percentile(flat, 1))
-                p99 = float(np.percentile(flat, 99))
-                ww = max(1.0, p99 - p1)
-                wl = (p99 + p1) / 2.0
-                return ww, wl
-            except Exception:
-                return fallback
-
-        # Use provided window params if present; otherwise derive once
-        ww_param = request.GET.get('window_width')
-        wl_param = request.GET.get('window_level')
-        inverted = request.GET.get('inverted', 'false').lower() == 'true'
-        if ww_param is None or wl_param is None:
-            default_window_width, default_window_level = _derive_window(volume)
-            window_width = float(ww_param) if ww_param is not None else float(default_window_width)
-            window_level = float(wl_param) if wl_param is not None else float(default_window_level)
-        else:
-            window_width = float(ww_param)
-            window_level = float(wl_param)
-
-        # Counts per plane
-        counts = {
-            'axial': int(volume.shape[0]),
-            'sagittal': int(volume.shape[2]),
-            'coronal': int(volume.shape[1]),
-        }
-
-        plane = request.GET.get('plane')
-        if plane:
-            plane = plane.lower()
-            if plane not in counts:
-                return JsonResponse({'error': 'Invalid plane'}, status=400)
-            # slice index
-            try:
-                slice_index = int(request.GET.get('slice', counts[plane] // 2))
-            except Exception:
-                slice_index = counts[plane] // 2
-            slice_index = max(0, min(counts[plane] - 1, slice_index))
-
-            # Get encoded slice via cache
-            img_b64 = _get_encoded_mpr_slice(series.id, volume, plane, slice_index, window_width, window_level, inverted)
-            return JsonResponse({
-                'plane': plane,
-                'index': slice_index,
-                'count': counts[plane],
-                'image': img_b64,
-                'counts': counts,
-                'volume_shape': tuple(int(x) for x in volume.shape),
-                'series_info': {
-                    'id': series.id,
-                    'description': series.series_description,
-                    'modality': series.modality,
-                },
-            })
-
-        # Default: return mid-slice previews for all planes
+                file_path = os.path.join(settings.MEDIA_ROOT, image.file_path.name)
+                if not os.path.exists(file_path):
+                    continue
+                    
+                ds = _load_dicom_optimized(file_path)
+                if ds is None:
+                    continue
+                
+                # Get pixel data with proper HU calibration
+                pixel_array = ds.pixel_array
+                slope = getattr(ds, 'RescaleSlope', 1.0)
+                intercept = getattr(ds, 'RescaleIntercept', 0.0)
+                pixel_array = pixel_array.astype(np.float32) * float(slope) + float(intercept)
+                
+                volume_data.append(pixel_array)
+                
+                # Get spacing and position
+                if len(volume_data) == 1:  # First image
+                    pixel_spacing = getattr(ds, 'PixelSpacing', [1.0, 1.0])
+                    slice_thickness = getattr(ds, 'SliceThickness', 1.0)
+                    spacing = [float(pixel_spacing[0]), float(pixel_spacing[1]), float(slice_thickness)]
+                
+                # Get image position
+                if hasattr(ds, 'ImagePositionPatient'):
+                    pos = ds.ImagePositionPatient
+                    origins.append([float(pos[0]), float(pos[1]), float(pos[2])])
+                
+            except Exception as e:
+                logger.error(f"Error loading image {image.id}: {e}")
+                continue
+        
+        if not volume_data:
+            return JsonResponse({'error': 'Failed to load volume data'}, status=500)
+        
+        # Create 3D volume
+        volume = np.stack(volume_data, axis=0)
+        
+        # Calculate MPR views
+        processor = DicomProcessor()
         mpr_views = {}
-        axial_idx = volume.shape[0] // 2
-        sagittal_idx = volume.shape[2] // 2
-        coronal_idx = volume.shape[1] // 2
-        mpr_views['axial'] = _get_encoded_mpr_slice(series.id, volume, 'axial', axial_idx, window_width, window_level, inverted)
-        mpr_views['sagittal'] = _get_encoded_mpr_slice(series.id, volume, 'sagittal', sagittal_idx, window_width, window_level, inverted)
-        mpr_views['coronal'] = _get_encoded_mpr_slice(series.id, volume, 'coronal', coronal_idx, window_width, window_level, inverted)
-
+        
+        # Axial view (original slices)
+        axial_slice = volume[volume.shape[0]//2]  # Middle slice
+        axial_windowed = processor.apply_windowing(axial_slice, window_width, window_level, invert)
+        axial_pil = Image.fromarray(axial_windowed)
+        axial_buffer = BytesIO()
+        axial_pil.save(axial_buffer, format='PNG')
+        axial_buffer.seek(0)
+        mpr_views['axial'] = f"data:image/png;base64,{base64.b64encode(axial_buffer.getvalue()).decode()}"
+        
+        # Sagittal view (side view)
+        sagittal_slice = volume[:, :, volume.shape[2]//2]  # Middle column
+        sagittal_windowed = processor.apply_windowing(sagittal_slice, window_width, window_level, invert)
+        sagittal_pil = Image.fromarray(sagittal_windowed)
+        sagittal_buffer = BytesIO()
+        sagittal_pil.save(sagittal_buffer, format='PNG')
+        sagittal_buffer.seek(0)
+        mpr_views['sagittal'] = f"data:image/png;base64,{base64.b64encode(sagittal_buffer.getvalue()).decode()}"
+        
+        # Coronal view (front view)
+        coronal_slice = volume[:, volume.shape[1]//2, :]  # Middle row
+        coronal_windowed = processor.apply_windowing(coronal_slice, window_width, window_level, invert)
+        coronal_pil = Image.fromarray(coronal_windowed)
+        coronal_buffer = BytesIO()
+        coronal_pil.save(coronal_buffer, format='PNG')
+        coronal_buffer.seek(0)
+        mpr_views['coronal'] = f"data:image/png;base64,{base64.b64encode(coronal_buffer.getvalue()).decode()}"
+        
+        # Return MPR data
         return JsonResponse({
+            'success': True,
             'mpr_views': mpr_views,
-            'volume_shape': tuple(int(x) for x in volume.shape),
-            'counts': counts,
-            'series_info': {
-                'id': series.id,
-                'description': series.series_description,
-                'modality': series.modality
-            }
+            'counts': {
+                'axial': volume.shape[0],
+                'sagittal': volume.shape[2],
+                'coronal': volume.shape[1]
+            },
+            'spacing': spacing,
+            'volume_shape': volume.shape
         })
-
+        
     except Exception as e:
-        logger.error(f"MPR reconstruction failed for series {series_id}: {str(e)}")
-        import traceback
-        logger.error(f"MPR traceback: {traceback.format_exc()}")
-        return JsonResponse({'error': f'Error generating MPR: {str(e)}'}, status=500)
+        logger.error(f"Error in MPR reconstruction: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
 
 @login_required
 @csrf_exempt
 def api_mip_reconstruction(request, series_id):
-    """API endpoint for Maximum Intensity Projection (MIP)
-    Optimized to reuse cached 3D volume when available for instant response."""
-    series = get_object_or_404(Series, id=series_id)
-    user = request.user
-    
-    # Check permissions
-    if user.is_facility_user() and getattr(user, 'facility', None) and series.study.facility != user.facility:
-        return JsonResponse({'error': 'Permission denied'}, status=403)
-    
+    """Generate MIP (Maximum Intensity Projection) views with proper HU calibration"""
     try:
-        # Prefer isotropic volume for higher-quality MIP
-        try:
-            volume, _spacing = _get_mpr_volume_and_spacing(series)
-            default_window_width, default_window_level = 400, 40
-        except Exception:
-            # Fallback: build volume from DICOMs (slower)
-            images = series.images.all().order_by('slice_location', 'instance_number')
-            image_count = images.count()
-            if image_count < 2:
-                return JsonResponse({'error': f'MIP requires at least 2 images, but series {series.id} has only {image_count} image(s). Please upload more DICOM images to this series.'}, status=400)
-            volume_data = []
-            default_window_width = 400
-            default_window_level = 40
-            for img in images:
-                try:
-                    dicom_path = os.path.join(settings.MEDIA_ROOT, str(img.file_path))
-                    ds = pydicom.dcmread(dicom_path)
-                    px = ds.pixel_array.astype(np.float32)
-                    if hasattr(ds, 'RescaleSlope') and hasattr(ds, 'RescaleIntercept'):
-                        px = px * float(ds.RescaleSlope) + float(ds.RescaleIntercept)
-                    if not volume_data:
-                        ww = getattr(ds, 'WindowWidth', 400); wl = getattr(ds, 'WindowCenter', 40)
-                        if hasattr(ww, '__iter__') and not isinstance(ww, str): ww = ww[0]
-                        if hasattr(wl, '__iter__') and not isinstance(wl, str): wl = wl[0]
-                        default_window_width, default_window_level = ww, wl
-                    volume_data.append(px)
-                except Exception:
+        series = get_object_or_404(Series, id=series_id)
+        
+        # Check permissions
+        if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and series.study.facility != request.user.facility:
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        # Get parameters
+        window_width = float(request.GET.get('ww', 400))
+        window_level = float(request.GET.get('wl', 40))
+        invert = request.GET.get('invert', 'false').lower() == 'true'
+        
+        # Get all images in series ordered by instance number
+        images = series.images.all().order_by('instance_number')
+        if not images.exists():
+            return JsonResponse({'error': 'No images found in series'}, status=404)
+        
+        # Load volume data
+        volume_data = []
+        
+        for image in images:
+            try:
+                file_path = os.path.join(settings.MEDIA_ROOT, image.file_path.name)
+                if not os.path.exists(file_path):
                     continue
-            if len(volume_data) < 2:
-                return JsonResponse({'error': f'Could not read enough images for MIP. Only {len(volume_data)} image(s) were successfully processed.'}, status=400)
-            volume = np.stack(volume_data, axis=0)
+                    
+                ds = _load_dicom_optimized(file_path)
+                if ds is None:
+                    continue
+                
+                # Get pixel data with proper HU calibration
+                pixel_array = ds.pixel_array
+                slope = getattr(ds, 'RescaleSlope', 1.0)
+                intercept = getattr(ds, 'RescaleIntercept', 0.0)
+                pixel_array = pixel_array.astype(np.float32) * float(slope) + float(intercept)
+                
+                volume_data.append(pixel_array)
+                
+            except Exception as e:
+                logger.error(f"Error loading image {image.id}: {e}")
+                continue
         
-        # Enhanced interpolation for thin stacks - always use high quality for better MIP
-        quality = request.GET.get('quality', '').lower()
-        if volume.shape[0] < 32:  # More aggressive threshold for better MIP quality
-            # Use optimal interpolation factor for minimal images
-            target_slices = max(32, volume.shape[0] * 3)  # Better interpolation ratio
-            factor = target_slices / volume.shape[0]
-            
-            # Use high-quality interpolation for better MIP results
-            volume = ndimage.zoom(volume, (factor, 1, 1), order=3, prefilter=True)
-            logger.info(f"MIP enhanced interpolation: {volume.shape[0]} slices (factor: {factor:.2f})")
+        if not volume_data:
+            return JsonResponse({'error': 'Failed to load volume data'}, status=500)
         
-        # Get windowing parameters from request
-        window_width = float(request.GET.get('window_width', default_window_width))
-        window_level = float(request.GET.get('window_level', default_window_level))
-        inverted = request.GET.get('inverted', 'false').lower() == 'true'
+        # Create 3D volume
+        volume = np.stack(volume_data, axis=0)
         
-        # Generate MIP projections (vectorized)
+        # Calculate MIP views (Maximum Intensity Projection)
+        processor = DicomProcessor()
         mip_views = {}
-        mip_views['axial'] = _array_to_base64_image(np.max(volume, axis=0), window_width, window_level, inverted)
-        mip_views['sagittal'] = _array_to_base64_image(np.max(volume, axis=1), window_width, window_level, inverted)
-        mip_views['coronal'] = _array_to_base64_image(np.max(volume, axis=2), window_width, window_level, inverted)
         
+        # Axial MIP (project through Z axis)
+        axial_mip = np.max(volume, axis=0)
+        axial_windowed = processor.apply_windowing(axial_mip, window_width, window_level, invert)
+        axial_pil = Image.fromarray(axial_windowed)
+        axial_buffer = BytesIO()
+        axial_pil.save(axial_buffer, format='PNG')
+        axial_buffer.seek(0)
+        mip_views['axial'] = f"data:image/png;base64,{base64.b64encode(axial_buffer.getvalue()).decode()}"
+        
+        # Sagittal MIP (project through X axis)
+        sagittal_mip = np.max(volume, axis=2)
+        sagittal_windowed = processor.apply_windowing(sagittal_mip, window_width, window_level, invert)
+        sagittal_pil = Image.fromarray(sagittal_windowed)
+        sagittal_buffer = BytesIO()
+        sagittal_pil.save(sagittal_buffer, format='PNG')
+        sagittal_buffer.seek(0)
+        mip_views['sagittal'] = f"data:image/png;base64,{base64.b64encode(sagittal_buffer.getvalue()).decode()}"
+        
+        # Coronal MIP (project through Y axis)
+        coronal_mip = np.max(volume, axis=1)
+        coronal_windowed = processor.apply_windowing(coronal_mip, window_width, window_level, invert)
+        coronal_pil = Image.fromarray(coronal_windowed)
+        coronal_buffer = BytesIO()
+        coronal_pil.save(coronal_buffer, format='PNG')
+        coronal_buffer.seek(0)
+        mip_views['coronal'] = f"data:image/png;base64,{base64.b64encode(coronal_buffer.getvalue()).decode()}"
+        
+        # Return MIP data
         return JsonResponse({
+            'success': True,
             'mip_views': mip_views,
-            'volume_shape': tuple(int(x) for x in volume.shape),
             'counts': {
-                'axial': int(volume.shape[0]),
-                'sagittal': int(volume.shape[2]),
-                'coronal': int(volume.shape[1]),
+                'axial': volume.shape[0],
+                'sagittal': volume.shape[2],
+                'coronal': volume.shape[1]
             },
-            'series_info': {
-                'id': series.id,
-                'description': series.series_description,
-                'modality': series.modality
-            }
+            'volume_shape': volume.shape
         })
         
     except Exception as e:
-        return JsonResponse({'error': f'Error generating MIP: {str(e)}'}, status=500)
+        logger.error(f"Error in MIP reconstruction: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
 
 @login_required
 @csrf_exempt
@@ -1855,82 +1870,117 @@ def web_series_images(request, series_id):
 
 @login_required
 def web_dicom_image(request, image_id):
-    image = get_object_or_404(DicomImage, id=image_id)
-    if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and image.series.study.facility != request.user.facility:
-        return HttpResponse(status=403)
-    window_width = float(request.GET.get('ww', 400))
-    window_level = float(request.GET.get('wl', 40))
-    inv_param = request.GET.get('invert')
-    invert = (inv_param or '').lower() == 'true'
+    """Display DICOM image with proper windowing and HU calibration"""
     try:
+        image = get_object_or_404(DicomImage, id=image_id)
+        
+        # Check permissions
+        if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and image.series.study.facility != request.user.facility:
+            return HttpResponse(status=403)
+        
+        # Get windowing parameters
+        window_width = float(request.GET.get('ww', 400))
+        window_level = float(request.GET.get('wl', 40))
+        inv_param = request.GET.get('invert')
+        invert = (inv_param or '').lower() == 'true'
+        
+        # Load DICOM file
         file_path = os.path.join(settings.MEDIA_ROOT, image.file_path.name)
-        ds = pydicom.dcmread(file_path)
-        # Robust pixel decode with SimpleITK fallback
+        if not os.path.exists(file_path):
+            logger.error(f"DICOM file not found: {file_path}")
+            return HttpResponse(status=404)
+            
+        ds = _load_dicom_optimized(file_path)
+        if ds is None:
+            return HttpResponse(status=500)
+        
+        # Robust pixel decode
         try:
             pixel_array = ds.pixel_array
-        except Exception:
-            try:
-                import SimpleITK as sitk
-                sitk_image = sitk.ReadImage(file_path)
-                px = sitk.GetArrayFromImage(sitk_image)
-                if px.ndim == 3 and px.shape[0] == 1:
-                    px = px[0]
-                pixel_array = px
-            except Exception:
-                return HttpResponse(status=500)
-        # Apply VOI LUT only for projection modalities (CR/DX/XA/RF/MG) to avoid CT distortion
-        try:
-            modality = str(getattr(ds, 'Modality', '')).upper()
-            if modality in ['DX', 'CR', 'XA', 'RF', 'MG']:
-                from pydicom.pixel_data_handlers.util import apply_voi_lut as _apply_voi_lut
-                pixel_array = _apply_voi_lut(pixel_array, ds)
-        except Exception:
-            pass
-        # apply slope/intercept
+        except Exception as e:
+            logger.error(f"Failed to decode pixel data: {e}")
+            return HttpResponse(status=500)
+        
+        # Apply rescale slope/intercept for proper HU values
         slope = getattr(ds, 'RescaleSlope', 1.0)
         intercept = getattr(ds, 'RescaleIntercept', 0.0)
         pixel_array = pixel_array.astype(np.float32) * float(slope) + float(intercept)
-        # Derive defaults if not provided in query
+        
+        # Get modality and photometric interpretation
         modality = str(getattr(ds, 'Modality', '')).upper()
         photo = str(getattr(ds, 'PhotometricInterpretation', '')).upper()
-        def _derive_window(arr):
-            flat = arr.astype(np.float32).flatten()
-            p1 = float(np.percentile(flat, 1))
-            p99 = float(np.percentile(flat, 99))
-            return max(1.0, p99 - p1), (p99 + p1) / 2.0
+        
+        # Apply VOI LUT for projection modalities
+        if modality in ['DX', 'CR', 'XA', 'RF', 'MG']:
+            try:
+                from pydicom.pixel_data_handlers.util import apply_voi_lut
+                pixel_array = apply_voi_lut(pixel_array, ds)
+            except Exception:
+                pass  # Continue without VOI LUT if it fails
+        
+        # Derive default window values if not provided
         ww_param = request.GET.get('ww')
         wl_param = request.GET.get('wl')
+        
         if ww_param is None or wl_param is None:
+            # Try to get from DICOM tags first
             dw = getattr(ds, 'WindowWidth', None)
             dl = getattr(ds, 'WindowCenter', None)
+            
+            # Handle multi-value window parameters
             if hasattr(dw, '__iter__') and not isinstance(dw, str):
                 dw = dw[0]
             if hasattr(dl, '__iter__') and not isinstance(dl, str):
                 dl = dl[0]
+            
+            # Derive from pixel data if not in DICOM tags
             if dw is None or dl is None:
-                dww, dwl = _derive_window(pixel_array)
-                dw = dw or dww
-                dl = dl or dwl
-            if modality in ['DX','CR','XA','RF']:
-                dw = float(dw) if dw is not None else 3000.0
-                dl = float(dl) if dl is not None else 1500.0
+                flat = pixel_array.flatten()
+                p1 = float(np.percentile(flat, 1))
+                p99 = float(np.percentile(flat, 99))
+                dw = p99 - p1 if p99 > p1 else 1000.0
+                dl = (p99 + p1) / 2.0
+            
+            # Apply modality-specific defaults
+            if modality in ['DX', 'CR', 'XA', 'RF']:
+                dw = 3000.0
+                dl = 1500.0
+            elif modality == 'CT':
+                dw = 400.0
+                dl = 40.0
+            elif modality == 'MR':
+                dw = 200.0
+                dl = 100.0
+            
             if ww_param is None:
                 window_width = float(dw)
             if wl_param is None:
                 window_level = float(dl)
-        # Default invert for MONOCHROME1 when not explicitly provided
+        
+        # Default invert for MONOCHROME1
         if inv_param is None and photo == 'MONOCHROME1':
             invert = True
+        
+        # Apply windowing
         processor = DicomProcessor()
         windowed = processor.apply_windowing(pixel_array, window_width, window_level, invert)
+        
+        # Convert to PIL Image
         pil_image = Image.fromarray(windowed)
+        
+        # Save to buffer
         buffer = BytesIO()
-        pil_image.save(buffer, format='PNG')
+        pil_image.save(buffer, format='PNG', optimize=True)
         buffer.seek(0)
+        
+        # Return response with caching
         response = HttpResponse(buffer.getvalue(), content_type='image/png')
-        response['Cache-Control'] = 'max-age=3600'
+        response['Cache-Control'] = 'public, max-age=3600'
+        response['ETag'] = f'"{image.id}_{window_width}_{window_level}_{invert}"'
         return response
+        
     except Exception as e:
+        logger.error(f"Error in web_dicom_image: {e}")
         return HttpResponse(status=500)
 
 
@@ -2194,7 +2244,7 @@ def process_mri_reconstruction(job_id):
 @login_required
 @csrf_exempt
 def api_hu_value(request):
-    """Return Hounsfield Unit at a given pixel.
+    """Return Hounsfield Unit at a given pixel with standard HU reference values.
     Query params:
     - mode=series&image_id=<id>&x=<col>&y=<row>
     - mode=mpr&series_id=<id>&plane=axial|sagittal|coronal&slice=<idx>&x=<col>&y=<row>
@@ -2205,6 +2255,22 @@ def api_hu_value(request):
     user = request.user
     mode = (request.GET.get('mode') or '').lower()
 
+    # Standard HU reference values (NIST recommendations)
+    hu_references = {
+        'air': -1000,
+        'lung': -500,
+        'fat': -100,
+        'water': 0,
+        'blood': 40,
+        'muscle': 50,
+        'grey_matter': 40,
+        'white_matter': 25,
+        'liver': 60,
+        'bone_spongy': 300,
+        'bone_cortical': 1000,
+        'metal': 3000
+    }
+
     try:
         if mode == 'series':
             image_id = int(request.GET.get('image_id'))
@@ -2213,14 +2279,24 @@ def api_hu_value(request):
             image = get_object_or_404(DicomImage, id=image_id)
             if user.is_facility_user() and getattr(user, 'facility', None) and image.series.study.facility != user.facility:
                 return JsonResponse({'error': 'Permission denied'}, status=403)
+            
+            # Load DICOM file with proper HU calibration
             dicom_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
-            ds = pydicom.dcmread(dicom_path)
+            if not os.path.exists(dicom_path):
+                return JsonResponse({'error': 'DICOM file not found'}, status=404)
+                
+            ds = _load_dicom_optimized(dicom_path)
+            if ds is None:
+                return JsonResponse({'error': 'Failed to load DICOM file'}, status=500)
+            
             arr = ds.pixel_array.astype(np.float32)
             slope = float(getattr(ds, 'RescaleSlope', 1.0))
             intercept = float(getattr(ds, 'RescaleIntercept', 0.0))
             arr = arr * slope + intercept
+            
             h, w = arr.shape[:2]
             shape = (request.GET.get('shape') or '').lower()
+            
             if shape == 'ellipse':
                 cx = int(float(request.GET.get('cx', x)))
                 cy = int(float(request.GET.get('cy', y)))
@@ -2231,18 +2307,49 @@ def api_hu_value(request):
                 roi = arr[mask]
                 if roi.size == 0:
                     return JsonResponse({'error': 'Empty ROI'}, status=400)
+                
+                mean_hu = float(np.mean(roi))
                 stats = {
-                    'mean': float(np.mean(roi)),
+                    'mean': mean_hu,
                     'std': float(np.std(roi)),
                     'min': float(np.min(roi)),
                     'max': float(np.max(roi)),
                     'n': int(roi.size),
                 }
+                
+                # Determine tissue type for ROI
+                tissue_type = 'unknown'
+                for tissue, ref_hu in hu_references.items():
+                    if abs(mean_hu - ref_hu) <= 50:  # Tolerance of ±50 HU
+                        tissue_type = tissue
+                        break
+                
+                stats['tissue_type'] = tissue_type
+                stats['hu_references'] = hu_references
+                
                 return JsonResponse({'mode': 'series', 'image_id': image_id, 'stats': stats})
+            
             if x < 0 or y < 0 or x >= w or y >= h:
                 return JsonResponse({'error': 'Out of bounds'}, status=400)
+            
             hu = float(arr[y, x])
-            return JsonResponse({'mode': 'series', 'image_id': image_id, 'x': x, 'y': y, 'hu': round(hu, 2)})
+            
+            # Determine tissue type
+            tissue_type = 'unknown'
+            for tissue, ref_hu in hu_references.items():
+                if abs(hu - ref_hu) <= 50:  # Tolerance of ±50 HU
+                    tissue_type = tissue
+                    break
+            
+            return JsonResponse({
+                'mode': 'series', 
+                'image_id': image_id, 
+                'x': x, 
+                'y': y, 
+                'hu': round(hu, 1),
+                'tissue_type': tissue_type,
+                'hu_references': hu_references
+            })
 
         elif mode == 'mpr':
             series_id = int(request.GET.get('series_id'))
@@ -2936,11 +3043,12 @@ except ImportError:
 from django.views.decorators.http import require_POST
 
 @login_required
+@login_required
 @require_POST
 def print_dicom_image(request):
     """
-    Print DICOM image with high quality settings optimized for glossy paper.
-    Supports various paper sizes and printer configurations.
+    Print DICOM image with high quality settings optimized for medical printing.
+    Supports various paper sizes and printer configurations with standard medical layout.
     """
     try:
         # Get image data from request
@@ -2968,9 +3076,11 @@ def print_dicom_image(request):
         study_date = request.POST.get('study_date', '')
         modality = request.POST.get('modality', '')
         series_description = request.POST.get('series_description', '')
-        institution_name = request.POST.get('institution_name', request.user.facility.name if hasattr(request.user, 'facility') and request.user.facility else 'Medical Facility')
+        institution_name = request.POST.get('institution_name', 
+            request.user.facility.name if hasattr(request.user, 'facility') and request.user.facility else 'Medical Facility')
         
         # Create temporary files
+        import tempfile
         with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as img_temp:
             img_temp.write(image_bytes)
             img_temp_path = img_temp.name

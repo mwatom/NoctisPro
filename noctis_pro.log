@@ -682,3 +682,32 @@ Watching for file changes with StatReloader
 [32mHTTP HEAD / 302 [0.01, 127.0.0.1:45456][0m
 [32mHTTP HEAD /dicom-viewer/upload/ 302 [0.00, 127.0.0.1:45608][0m
 [32mHTTP HEAD /dicom-viewer/web/viewer/ 302 [0.00, 127.0.0.1:45618][0m
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+[32mHTTP HEAD /dicom-viewer/web/viewer/ 302 [0.01, 127.0.0.1:35832][0m
+Forbidden (CSRF cookie not set.): /login/
+[31;1mHTTP POST /login/ 403 [0.01, 127.0.0.1:36584][0m
+[mHTTP GET /login/ 200 [0.00, 127.0.0.1:36596][0m
+[32mHTTP POST /login/ 302 [0.22, 127.0.0.1:52102][0m
+[mHTTP GET /dicom-viewer/web/viewer/ 200 [0.01, 127.0.0.1:35394][0m
+[mHTTP GET /dicom-viewer/study/1/ 200 [0.01, 127.0.0.1:35402][0m
+[mHTTP GET /dicom-viewer/image/1/ 200 [0.03, 127.0.0.1:60582][0m
+[mHTTP GET /dicom-viewer/api/series/1/mpr/?ww=400&wl=40 200 [0.01, 127.0.0.1:60592][0m
+[mHTTP GET /dicom-viewer/api/series/1/mip/?ww=400&wl=40 200 [0.01, 127.0.0.1:58682][0m
+Bad Request: /dicom-viewer/api/hu/
+[31;1mHTTP GET /dicom-viewer/api/hu/?mode=series&image_id=1&x=100&y=100 400 [0.01, 127.0.0.1:58690][0m
+Bad Request: /dicom-viewer/api/hu/
+[31;1mHTTP GET /dicom-viewer/api/hu/?mode=series&image_id=1&x=100&y=100 400 [0.01, 127.0.0.1:37464][0m
+Bad Request: /dicom-viewer/api/hu/
+[31;1mHTTP GET /dicom-viewer/api/hu/?mode=series&image_id=1&x=100&y=100 400 [0.01, 127.0.0.1:56856][0m
+[mHTTP GET /dicom-viewer/api/hu/?mode=series&image_id=1&x=10&y=10 200 [0.01, 127.0.0.1:56868][0m
+[mHTTP GET /dicom-viewer/print/printers/ 200 [0.01, 127.0.0.1:56870][0m
+[mHTTP GET /dicom-viewer/upload/ 200 [0.01, 127.0.0.1:50286][0m
