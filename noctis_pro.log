@@ -94,3 +94,14 @@ Watching for file changes with StatReloader
 [32mHTTP GET / 302 [0.00, 127.0.0.1:44430][0m
 [mHTTP GET /login/ 200 [0.01, 127.0.0.1:44430][0m
 [mHTTP GET /favicon.ico 204 [0.00, 127.0.0.1:44442][0m
+Watching for file changes with StatReloader
+Service Unavailable: /health/
+HTTP GET /health/ 503 [0.01, 127.0.0.1:44414]
+Watching for file changes with StatReloader
+Service Unavailable: /health/
+HTTP GET /health/ 503 [0.01, 127.0.0.1:51798]
+HTTP GET /admin/ 302 [0.01, 127.0.0.1:51802]
+HTTP HEAD /admin/ 302 [0.00, 127.0.0.1:51816]
+HTTP HEAD /admin/login/ 200 [0.01, 127.0.0.1:56186]
+Service Unavailable: /health/
+HTTP GET /health/ 503 [0.00, 127.0.0.1:38086]
