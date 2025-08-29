@@ -272,8 +272,17 @@ DATABASES = {
     }
 }
 
+# In-memory database configuration
+if os.environ.get('USE_MEMORY_DB', 'False').lower() == 'true':
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': ':memory:',
+        'OPTIONS': {
+            'timeout': 60,
+        },
+    }
 # Fallback to SQLite if PostgreSQL not available
-if os.environ.get('USE_SQLITE', 'False').lower() == 'true':
+elif os.environ.get('USE_SQLITE', 'False').lower() == 'true':
     DATABASES['default'] = {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',

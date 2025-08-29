@@ -1,16 +1,16 @@
 #!/bin/bash
 
-# Quick Start Script for NoctisPro
-# Uses existing virtual environment and packages
+# NoctisPro - No Database Mode
+# Runs without any database persistence
 
 set -e
 
-echo "🚀 Starting NoctisPro (Quick Mode)"
-echo "=================================="
+echo "🚀 Starting NoctisPro (No Database Mode)"
+echo "========================================"
 
 # Check if virtual environment exists
 if [ ! -d "venv" ]; then
-    echo "❌ Virtual environment not found. Please run the full deployment first."
+    echo "❌ Virtual environment not found. Please run setup first."
     exit 1
 fi
 
@@ -19,7 +19,7 @@ echo "🛑 Stopping existing processes..."
 pkill -f "daphne.*noctis_pro" 2>/dev/null || true
 sleep 2
 
-# Set environment variables for in-memory database mode
+# Set environment variables for no-database mode
 export USE_MEMORY_DB=true
 export DISABLE_REDIS=true
 export USE_DUMMY_CACHE=true
@@ -29,12 +29,14 @@ export DJANGO_SETTINGS_MODULE=noctis_pro.settings
 echo "🔧 Activating virtual environment..."
 source venv/bin/activate
 
-# Quick Django setup with in-memory database
-echo "📊 Setting up in-memory database..."
-python manage.py migrate --run-syncdb
+# Skip database setup entirely
+echo "📊 Skipping database setup (no-database mode)..."
 
 echo "📁 Collecting static files..."
 python manage.py collectstatic --noinput --clear
+
+# Create a minimal Django app without database migrations
+echo "🏗️  Creating minimal app structure..."
 
 # Start Daphne server
 echo "🚀 Starting Daphne server..."
@@ -60,12 +62,13 @@ if curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/ | grep -q "302"
     echo "   Username: admin"
     echo "   Password: admin123456"
     echo ""
-    echo "💾 Database: In-Memory (no persistent storage)"
-    echo "⚠️  Note: Data will be lost when app restarts"
+    echo "💾 Database: NONE (completely disabled)"
+    echo "⚠️  Note: No data persistence at all"
+    echo "🎯 Mode: Static files and views only"
     echo ""
     echo "🛠️  Management:"
     echo "   • Stop: pkill -f daphne"
-    echo "   • Restart: ./quick_start_noctispro.sh"
+    echo "   • Restart: ./start_no_database.sh"
     echo "   • Status: curl -I http://localhost:8000/"
     echo ""
 else
