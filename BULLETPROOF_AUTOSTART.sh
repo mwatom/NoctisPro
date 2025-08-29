@@ -14,34 +14,14 @@ pkill -f "gunicorn" 2>/dev/null || true
 
 cd "$(dirname "$0")"
 
-# Install PostgreSQL if not present
-echo "🔍 Checking PostgreSQL..."
-if ! command -v psql &> /dev/null; then
-    echo "📦 Installing PostgreSQL..."
-    sudo apt update
-    sudo apt install -y postgresql postgresql-contrib
-fi
+# Skip PostgreSQL - using SQLite for bulletproof reliability
+echo "🔍 Using SQLite database for bulletproof reliability..."
 
 # Install Python dependencies
 echo "🐍 Installing Python environment tools..."
 sudo apt install -y python3-full python3-venv python3-pip
 
-# Start PostgreSQL
-echo "🚀 Starting PostgreSQL..."
-sudo service postgresql start || sudo systemctl start postgresql || true
-
-# Wait for PostgreSQL to be ready
-echo "⏳ Waiting for PostgreSQL to be ready..."
-sleep 5
-
-# Create database and user
-echo "🗄️ Setting up database..."
-sudo -u postgres psql -c "CREATE DATABASE noctis_pro;" 2>/dev/null || true
-sudo -u postgres psql -c "CREATE USER noctis_user WITH PASSWORD 'noctis123';" 2>/dev/null || true
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE noctis_pro TO noctis_user;" 2>/dev/null || true
-sudo -u postgres psql -c "ALTER USER noctis_user CREATEDB;" 2>/dev/null || true
-sudo -u postgres psql -d noctis_pro -c "GRANT ALL ON SCHEMA public TO noctis_user;" 2>/dev/null || true
-sudo -u postgres psql -d noctis_pro -c "GRANT CREATE ON SCHEMA public TO noctis_user;" 2>/dev/null || true
+echo "✅ SQLite database selected - no authentication issues!"
 
 # Create virtual environment if it doesn't exist
 if [ ! -d "venv" ]; then
@@ -79,10 +59,9 @@ if [ -z "$SECRET_KEY" ]; then
     export SECRET_KEY=$(python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())")
 fi
 
-# Set PostgreSQL database credentials to match our setup
-export POSTGRES_DB=noctis_pro
-export POSTGRES_USER=noctis_user  
-export POSTGRES_PASSWORD=noctis123
+# Use SQLite database for bulletproof reliability
+export USE_SQLITE=true
+export DATABASE_PATH="$(pwd)/db.sqlite3"
 
 # Disable Redis for simpler setup (will use dummy cache and db sessions)
 export DISABLE_REDIS=true
@@ -125,9 +104,8 @@ sudo tee /usr/local/bin/start-noctispro > /dev/null << EOF
 #!/bin/bash
 echo "🚀 Starting NoctisPro..."
 
-# Start PostgreSQL first
-sudo service postgresql start || sudo systemctl start postgresql || true
-sleep 3
+# Using SQLite - no database service needed!
+echo "✅ Using SQLite database - bulletproof and reliable!"
 
 # Change to the correct directory
 cd $CURRENT_DIR
@@ -153,10 +131,9 @@ if [ -z "\$SECRET_KEY" ]; then
     export SECRET_KEY=\$(python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())")
 fi
 
-# Set PostgreSQL database credentials to match our setup
-export POSTGRES_DB=noctis_pro
-export POSTGRES_USER=noctis_user  
-export POSTGRES_PASSWORD=noctis123
+# Use SQLite database for bulletproof reliability
+export USE_SQLITE=true
+export DATABASE_PATH="$(pwd)/db.sqlite3"
 
 # Disable Redis for simpler setup (will use dummy cache and db sessions)
 export DISABLE_REDIS=true
@@ -277,7 +254,7 @@ if curl -s http://localhost:8000/health/ >/dev/null 2>&1; then
     echo "   Stop:   sudo /usr/local/bin/stop-noctispro"
     echo ""
     echo "✅ WILL AUTO-START ON BOOT!"
-    echo "✅ DATABASE CONFIGURED WITH POSTGRESQL!"
+    echo "✅ DATABASE CONFIGURED WITH SQLITE - BULLETPROOF!"
     echo "✅ ADMIN USER READY!"
 else
     echo "❌ Failed to start. Checking logs..."
