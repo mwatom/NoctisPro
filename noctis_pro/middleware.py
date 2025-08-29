@@ -322,7 +322,11 @@ class SessionTimeoutMiddleware(MiddlewareMixin):
     
     def process_request(self, request):
         # Check if user attribute exists (it might not be available in ASGI requests before AuthenticationMiddleware)
-        if not hasattr(request, 'user') or not request.user.is_authenticated:
+        if not hasattr(request, 'user'):
+            return None
+        
+        # Check if user is authenticated
+        if not request.user.is_authenticated:
             return None
         
         # Skip timeout for AJAX requests to avoid interrupting operations
