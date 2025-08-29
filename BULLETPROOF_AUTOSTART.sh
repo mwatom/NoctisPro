@@ -57,7 +57,16 @@ fi
 echo "📦 Installing Python dependencies..."
 source venv/bin/activate
 pip install --upgrade pip
-pip install -r requirements.txt
+
+# Install core dependencies if requirements.txt doesn't exist
+if [ ! -f "requirements.txt" ]; then
+    echo "📋 Installing core dependencies..."
+    pip install django psycopg2-binary redis channels djangorestframework django-cors-headers daphne channels-redis pillow django-redis pydicom requests numpy matplotlib plotly celery gunicorn
+else
+    pip install -r requirements.txt
+    # Ensure critical dependencies are installed
+    pip install psycopg2-binary django gunicorn pydicom pillow
+fi
 
 echo "✅ Python dependencies installed"
 
@@ -89,9 +98,19 @@ echo "🔄 Running database migrations..."
 python manage.py migrate
 echo "✅ Migrations completed"
 
-# Create superuser automatically
+# Create superuser automatically  
 echo "👤 Creating admin user..."
-echo "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='admin').exists() or User.objects.create_superuser('admin', 'admin@example.com', 'admin123')" | python manage.py shell
+echo "
+from django.contrib.auth import get_user_model
+User = get_user_model()
+admin, created = User.objects.get_or_create(username='admin')
+admin.set_password('admin123')
+admin.is_staff = True
+admin.is_superuser = True
+admin.email = 'admin@example.com'
+admin.save()
+print('✅ Admin user ready: admin/admin123')
+" | python manage.py shell
 echo "✅ Admin user created (admin/admin123)"
 
 # Collect static files
@@ -118,9 +137,15 @@ if [ ! -d "venv" ]; then
     python3 -m venv venv
     source venv/bin/activate
     pip install --upgrade pip
-    pip install -r requirements.txt
+    # Install core dependencies
+    pip install django psycopg2-binary redis channels djangorestframework django-cors-headers daphne channels-redis pillow django-redis pydicom requests numpy matplotlib plotly celery gunicorn
+    if [ -f "requirements.txt" ]; then
+        pip install -r requirements.txt
+    fi
 else
     source venv/bin/activate
+    # Ensure critical dependencies are available
+    pip install --upgrade psycopg2-binary django gunicorn pydicom pillow
 fi
 
 # Generate a secure SECRET_KEY if not set

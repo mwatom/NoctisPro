@@ -131,3 +131,6 @@ Watching for file changes with StatReloader
 [32mHTTP HEAD / 302 [0.01, 127.0.0.1:33936][0m
 [mHTTP GET /login/ 200 [0.00, 127.0.0.1:33948][0m
 [32mHTTP GET /admin/ 302 [0.00, 127.0.0.1:33956][0m
+Service Unavailable: /health/
+Service Unavailable: /health/
+Service Unavailable: /health/
