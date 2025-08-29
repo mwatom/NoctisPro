@@ -652,3 +652,9 @@ Bad Request: /dicom-viewer/api/series/1/mip/
 Bad Request: /dicom-viewer/api/series/1/bone/
 [31;1mHTTP GET /dicom-viewer/api/series/1/bone/ 400 [0.01, 127.0.0.1:60448][0m
 Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+[32mHTTP GET / 302 [0.01, 127.0.0.1:37606][0m
+[32mHTTP GET /login/ 302 [0.01, 127.0.0.1:37614][0m
+Forbidden (CSRF token missing.): /login/
+[31;1mHTTP POST /login/ 403 [0.01, 127.0.0.1:37624][0m
+[mHTTP GET /worklist/upload/ 200 [0.01, 127.0.0.1:37392][0m
