@@ -1,8 +1,9 @@
-ERROR:  authentication failed: Usage of ngrok requires a verified account and authtoken.
-ERROR:  
-ERROR:  Sign up for an account: https://dashboard.ngrok.com/signup
-ERROR:  Install your authtoken: https://dashboard.ngrok.com/get-started/your-authtoken
-ERROR:  
-ERROR:  ERR_NGROK_4018
-ERROR:  https://ngrok.com/docs/errors/err_ngrok_4018
-ERROR:  
+t=2025-08-29T01:34:00+0000 lvl=info msg="no configuration paths supplied"
+t=2025-08-29T01:34:00+0000 lvl=info msg="using configuration at default config path" path=/home/ubuntu/.config/ngrok/ngrok.yml
+t=2025-08-29T01:34:00+0000 lvl=info msg="open config file" path=/home/ubuntu/.config/ngrok/ngrok.yml err=nil
+t=2025-08-29T01:34:00+0000 lvl=info msg="starting web service" obj=web addr=127.0.0.1:4040 allow_hosts=[]
+t=2025-08-29T01:34:00+0000 lvl=info msg="client session established" obj=tunnels.session
+t=2025-08-29T01:34:00+0000 lvl=info msg="tunnel session started" obj=tunnels.session
+t=2025-08-29T01:34:00+0000 lvl=info msg="started tunnel" obj=tunnels name=command_line addr=http://localhost:8000 url=https://3ac70ed481e1.ngrok-free.app
+t=2025-08-29T01:34:11+0000 lvl=info msg=start pg=/api/tunnels id=2a2f750f1ca786bc
+t=2025-08-29T01:34:11+0000 lvl=info msg=end pg=/api/tunnels id=2a2f750f1ca786bc status=200 dur=237.847µs
