@@ -140,3 +140,6 @@ Watching for file changes with StatReloader
 Watching for file changes with StatReloader
 [32mHTTP GET /admin/ 302 [0.01, 127.0.0.1:50768][0m
 [mHTTP GET /admin/login/ 200 [0.01, 127.0.0.1:50774][0m
+Service Unavailable: /health/
+Service Unavailable: /health/
+Service Unavailable: /health/
