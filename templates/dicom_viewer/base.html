@@ -1746,7 +1746,22 @@
           const form = new FormData();
           chunk.forEach(f=> form.append('dicom_files', f));
           const resp = await fetch('/dicom-viewer/upload/', { method:'POST', body: form });
-          const data = await resp.json();
+          
+          if (!resp.ok) {
+            console.error('Upload failed with status:', resp.status);
+            errors++;
+            return;
+          }
+          
+          let data;
+          try {
+            data = await resp.json();
+          } catch (e) {
+            console.error('JSON parsing error:', e, 'Response status:', resp.status);
+            errors++;
+            return;
+          }
+          
           if (!data.success){ errors++; return; }
           current += chunk.length;
           if (!lastStudyId && data.study_id) lastStudyId = data.study_id;

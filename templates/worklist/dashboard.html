@@ -964,7 +964,12 @@
                     credentials: 'same-origin'
                 }));
                 
-                const data = await resp.json();
+                let data;
+                try {
+                    data = await resp.json();
+                } catch (e) {
+                    throw new Error(`JSON parsing error: ${e.message}. HTTP ${resp.status}`);
+                }
                 if(!resp.ok || data.error){
                     throw new Error(data.error || `HTTP ${resp.status}: Failed to delete study`);
                 }
