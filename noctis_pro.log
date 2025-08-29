@@ -621,3 +621,60 @@ HTTP GET /worklist/upload/ 302 [0.01, 127.0.0.1:34014]
 /workspace/noctis_pro/settings.py changed, reloading.
 Watching for file changes with StatReloader
 Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+[32mHTTP GET / 302 [0.01, 127.0.0.1:39794][0m
+[mHTTP GET /login/ 200 [0.00, 127.0.0.1:39806][0m
+[32mHTTP GET /worklist/upload/ 302 [0.00, 127.0.0.1:53582][0m
+Not Found: /dicom-viewer/
+[33mHTTP GET /dicom-viewer/ 404 [0.00, 127.0.0.1:53592][0m
+Not Found: /viewer/
+[33mHTTP GET /viewer/ 404 [0.00, 127.0.0.1:53604][0m
+/workspace/noctis_pro/urls.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/noctis_pro/urls.py changed, reloading.
+Watching for file changes with StatReloader
+[32mHTTP GET /dicom-viewer/ 302 [0.01, 127.0.0.1:47974][0m
+/workspace/accounts/admin.py changed, reloading.
+/workspace/accounts/admin.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+[mHTTP GET /login/ 200 [0.01, 127.0.0.1:58676][0m
+[32mHTTP POST /login/ 302 [0.22, 127.0.0.1:58684][0m
+[mHTTP GET /worklist/upload/ 200 [0.02, 127.0.0.1:58696][0m
+[mHTTP GET /worklist/upload/ 200 [0.01, 127.0.0.1:32824][0m
+[32mHTTP GET /dicom-viewer/ 302 [0.01, 127.0.0.1:39000][0m
+Internal Server Error: /dicom-viewer/api/series/1/mpr/
+[35;1mHTTP GET /dicom-viewer/api/series/1/mpr/ 500 [0.01, 127.0.0.1:39006][0m
+Bad Request: /dicom-viewer/api/series/1/mip/
+[31;1mHTTP GET /dicom-viewer/api/series/1/mip/ 400 [0.01, 127.0.0.1:39022][0m
+Bad Request: /dicom-viewer/api/series/1/bone/
+[31;1mHTTP GET /dicom-viewer/api/series/1/bone/ 400 [0.01, 127.0.0.1:60448][0m
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+[32mHTTP GET / 302 [0.01, 127.0.0.1:37606][0m
+[32mHTTP GET /login/ 302 [0.01, 127.0.0.1:37614][0m
+Forbidden (CSRF token missing.): /login/
+[31;1mHTTP POST /login/ 403 [0.01, 127.0.0.1:37624][0m
+[mHTTP GET /worklist/upload/ 200 [0.01, 127.0.0.1:37392][0m
+Internal Server Error: /dicom-viewer/api/series/1/mpr/
+[35;1mHTTP GET /dicom-viewer/api/series/1/mpr/ 500 [0.01, 127.0.0.1:44012][0m
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+Internal Server Error: /dicom-viewer/api/series/1/mpr/
+[35;1mHTTP GET /dicom-viewer/api/series/1/mpr/ 500 [0.01, 127.0.0.1:44874][0m
+Bad Request: /dicom-viewer/api/series/1/mip/
+[31;1mHTTP GET /dicom-viewer/api/series/1/mip/ 400 [0.01, 127.0.0.1:44884][0m
+Bad Request: /dicom-viewer/api/series/1/bone/
+[31;1mHTTP GET /dicom-viewer/api/series/1/bone/ 400 [0.01, 127.0.0.1:35222][0m
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+Bad Request: /dicom-viewer/api/series/1/bone/
+[31;1mHTTP GET /dicom-viewer/api/series/1/bone/ 400 [0.01, 127.0.0.1:47522][0m

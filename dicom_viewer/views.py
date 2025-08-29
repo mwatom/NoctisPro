@@ -479,8 +479,9 @@ def api_mip_reconstruction(request, series_id):
         except Exception:
             # Fallback: build volume from DICOMs (slower)
             images = series.images.all().order_by('slice_location', 'instance_number')
-            if images.count() < 2:
-                return JsonResponse({'error': 'Need at least 2 images for MIP'}, status=400)
+            image_count = images.count()
+            if image_count < 2:
+                return JsonResponse({'error': f'MIP requires at least 2 images, but series {series.id} has only {image_count} image(s). Please upload more DICOM images to this series.'}, status=400)
             volume_data = []
             default_window_width = 400
             default_window_level = 40
@@ -500,7 +501,7 @@ def api_mip_reconstruction(request, series_id):
                 except Exception:
                     continue
             if len(volume_data) < 2:
-                return JsonResponse({'error': 'Could not read enough images for MIP'}, status=400)
+                return JsonResponse({'error': f'Could not read enough images for MIP. Only {len(volume_data)} image(s) were successfully processed.'}, status=400)
             volume = np.stack(volume_data, axis=0)
         
         # Enhanced interpolation for thin stacks - always use high quality for better MIP
@@ -567,8 +568,9 @@ def api_bone_reconstruction(request, series_id):
         except Exception:
             # Fallback: construct volume
             images = series.images.all().order_by('slice_location', 'instance_number')
-            if images.count() < 2:
-                return JsonResponse({'error': 'Need at least 2 images for bone reconstruction'}, status=400)
+            image_count = images.count()
+            if image_count < 2:
+                return JsonResponse({'error': f'Bone reconstruction requires at least 2 images, but series {series.id} has only {image_count} image(s). Please upload more DICOM images to this series.'}, status=400)
             volume_data = []
             for img in images:
                 try:
@@ -581,7 +583,7 @@ def api_bone_reconstruction(request, series_id):
                 except Exception:
                     continue
             if len(volume_data) < 2:
-                return JsonResponse({'error': 'Could not read enough images for bone reconstruction'}, status=400)
+                return JsonResponse({'error': f'Could not read enough images for bone reconstruction. Only {len(volume_data)} image(s) were successfully processed.'}, status=400)
             volume = np.stack(volume_data, axis=0)
         
         # Enhanced stabilization for thin stacks - optimized for bone reconstruction
@@ -2379,8 +2381,9 @@ def _get_mpr_volume_and_spacing(series, force_rebuild=False):
                 return vol, tuple(sp)
 
     images_qs = series.images.all().order_by('instance_number')
-    if images_qs.count() < 2:
-        raise ValueError('Not enough images for MPR')
+    image_count = images_qs.count()
+    if image_count < 2:
+        raise ValueError(f'MPR requires at least 2 images, but series {series.id} has only {image_count} image(s). Please upload more DICOM images to this series.')
 
     # Gather slice data with positional sorting info
     items = []  # (pos_along_normal, pixel_array)
