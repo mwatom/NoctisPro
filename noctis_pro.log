@@ -711,3 +711,6 @@ Bad Request: /dicom-viewer/api/hu/
 [mHTTP GET /dicom-viewer/api/hu/?mode=series&image_id=1&x=10&y=10 200 [0.01, 127.0.0.1:56868][0m
 [mHTTP GET /dicom-viewer/print/printers/ 200 [0.01, 127.0.0.1:56870][0m
 [mHTTP GET /dicom-viewer/upload/ 200 [0.01, 127.0.0.1:50286][0m
+Watching for file changes with StatReloader
+[32mHTTP GET / 302 [0.01, 127.0.0.1:55224][0m
+Watching for file changes with StatReloader
