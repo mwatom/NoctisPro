@@ -175,7 +175,7 @@ class Annotation(models.Model):
         ("roi", "Region of Interest"),
     ]
     
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, db_index=True)
     image = models.ForeignKey(DicomImage, on_delete=models.CASCADE, db_index=True)
     series = models.ForeignKey(Series, on_delete=models.CASCADE, db_index=True)
