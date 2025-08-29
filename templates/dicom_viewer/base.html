@@ -626,6 +626,12 @@
           if (hp && hp.suggested && hp.suggested.layout === 'mpr-3plane') { generateReconstruction('mpr'); }
         } catch(e){}
       } catch (e) {
+        // Graceful placeholder first, then fallback
+        try {
+          ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
+          ctx.fillStyle = '#666'; ctx.font = '14px monospace'; ctx.textAlign = 'center';
+          ctx.fillText('Image failed to load', canvas.width/2, canvas.height/2);
+        } catch(_e){}
         await fallbackToDesktop();
       }
     }
