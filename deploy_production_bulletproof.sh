@@ -106,7 +106,7 @@ create_backup() {
     mkdir -p "$BACKUP_DIR"
     
     # Backup important files
-    local backup_items=("manage.py" "noctis_pro/" "requirements.txt" ".env*" "db.sqlite3")
+    local backup_items=("manage.py" "noctis_pro/" "requirements.txt" ".env*")
     for item in "${backup_items[@]}"; do
         if [ -e "$item" ]; then
             cp -r "$item" "$BACKUP_DIR/" 2>/dev/null || true
@@ -136,25 +136,7 @@ setup_services() {
         log_success "Redis already running"
     fi
     
-    # Start PostgreSQL if available
-    if command -v pg_ctl &> /dev/null; then
-        if ! pgrep postgres > /dev/null; then
-            log_info "Starting PostgreSQL..."
-            sudo service postgresql start 2>/dev/null || {
-                log_warning "PostgreSQL start failed, falling back to SQLite"
-                # Update environment to use SQLite
-                sed -i 's/USE_SQLITE=false/USE_SQLITE=true/' "$ENV_FILE" 2>/dev/null || true
-            }
-        else
-            log_success "PostgreSQL already running"
-        fi
-    else
-        log_info "PostgreSQL not available, using SQLite"
-        # Ensure SQLite is configured
-        if [ -f "$ENV_FILE" ]; then
-            sed -i 's/USE_SQLITE=false/USE_SQLITE=true/' "$ENV_FILE" 2>/dev/null || true
-        fi
-    fi
+    # Database services removed - NoctisPro now runs without SQL databases
     
     # Start Nginx if available
     if command -v nginx &> /dev/null; then
@@ -214,7 +196,6 @@ configure_environment() {
         log_info "Creating production environment file..."
         cat > "$ENV_FILE" << 'EOF'
 # NoctisPro Production Configuration
-USE_SQLITE=true
 DJANGO_DEBUG=false
 DJANGO_SETTINGS_MODULE=noctis_pro.settings
 SECRET_KEY=a7f9d8e2b4c6a1f3e8d7c5b9a2e4f6c8d1b3e5f7a9c2d4e6f8b1c3e5d7a9b2c4
@@ -245,15 +226,8 @@ run_django_commands() {
     # Export environment variables
     export $(grep -v '^#' "$ENV_FILE" | grep -v '^$' | xargs) 2>/dev/null || true
     
-    # Run migrations with error handling
-    log_info "Running database migrations..."
-    python manage.py migrate --noinput 2>/dev/null || {
-        log_warning "Migration failed, trying to create initial migration..."
-        python manage.py makemigrations --noinput 2>/dev/null || true
-        python manage.py migrate --noinput 2>/dev/null || {
-            log_warning "Migration still failed, but continuing..."
-        }
-    }
+    # Database migrations removed - NoctisPro runs without SQL databases
+    log_info "Skipping database migrations (no SQL database required)"
     
     # Collect static files
     log_info "Collecting static files..."
@@ -261,19 +235,8 @@ run_django_commands() {
         log_warning "Static file collection failed, but continuing..."
     }
     
-    # Create superuser if needed
-    log_info "Checking admin user..."
-    python manage.py shell -c "
-from django.contrib.auth import get_user_model
-User = get_user_model()
-if not User.objects.filter(username='admin').exists():
-    User.objects.create_superuser('admin', 'admin@noctispro.local', 'admin123')
-    print('Admin user created: admin/admin123')
-else:
-    print('Admin user already exists')
-" 2>/dev/null || {
-        log_warning "Admin user creation failed, but continuing..."
-    }
+    # Admin user creation removed - NoctisPro runs without user authentication
+    log_info "Skipping admin user creation (no authentication system)"
     
     log_success "Django setup completed"
 }
