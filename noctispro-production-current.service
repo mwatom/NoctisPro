@@ -1,0 +1,24 @@
+[Unit]
+Description=NoctisPro Django Application (Production)
+After=network.target redis-server.service
+Wants=redis-server.service
+
+[Service]
+Type=exec
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/workspace
+Environment=PATH=/workspace/venv/bin
+Environment=USE_SQLITE=true
+Environment=DEBUG=false
+ExecStartPre=/bin/bash -c 'cd /workspace && source venv/bin/activate && python manage.py collectstatic --noinput'
+ExecStartPre=/bin/bash -c 'cd /workspace && source venv/bin/activate && python manage.py migrate'
+ExecStart=/bin/bash -c 'cd /workspace && source venv/bin/activate && source .env.production && gunicorn --bind 0.0.0.0:8000 --workers 3 noctis_pro.wsgi:application'
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target
