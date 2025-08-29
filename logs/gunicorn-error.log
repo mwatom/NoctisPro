@@ -10,3 +10,8 @@
 [2025-08-29 02:17:42 +0000] [2873] [INFO] Booting worker with pid: 2873
 [2025-08-29 02:17:42 +0000] [2874] [INFO] Booting worker with pid: 2874
 [2025-08-29 02:17:42 +0000] [2875] [INFO] Booting worker with pid: 2875
+[2025-08-29 02:21:37 +0000] [2871] [INFO] Handling signal: term
+[2025-08-29 02:21:37 +0000] [2873] [INFO] Worker exiting (pid: 2873)
+[2025-08-29 02:21:37 +0000] [2875] [INFO] Worker exiting (pid: 2875)
+[2025-08-29 02:21:37 +0000] [2874] [INFO] Worker exiting (pid: 2874)
+[2025-08-29 02:21:37 +0000] [2871] [INFO] Shutting down: Master
