@@ -1,11 +1,1 @@
-t=2025-08-29T02:05:17+0000 lvl=info msg="no configuration paths supplied"
-t=2025-08-29T02:05:17+0000 lvl=info msg="using configuration at default config path" path=/home/ubuntu/.config/ngrok/ngrok.yml
-t=2025-08-29T02:05:17+0000 lvl=info msg="open config file" path=/home/ubuntu/.config/ngrok/ngrok.yml err=nil
-t=2025-08-29T02:05:17+0000 lvl=info msg="starting web service" obj=web addr=127.0.0.1:4040 allow_hosts=[]
-t=2025-08-29T02:05:17+0000 lvl=info msg="client session established" obj=tunnels.session
-t=2025-08-29T02:05:17+0000 lvl=info msg="tunnel session started" obj=tunnels.session
-t=2025-08-29T02:05:17+0000 lvl=info msg="started tunnel" obj=tunnels name=command_line addr=http://localhost:8000 url=https://e4cc3e3d4e4d.ngrok-free.app
-t=2025-08-29T02:05:32+0000 lvl=info msg=start pg=/api/tunnels id=8a10775ccb002fad
-t=2025-08-29T02:05:32+0000 lvl=info msg=end pg=/api/tunnels id=8a10775ccb002fad status=200 dur=224.106µs
-t=2025-08-29T02:05:37+0000 lvl=info msg=start pg=/api/tunnels id=a8311dc4cb89071d
-t=2025-08-29T02:05:37+0000 lvl=info msg=end pg=/api/tunnels id=a8311dc4cb89071d status=200 dur=116.6µs
+nohup: failed to run command 'ngrok': No such file or directory
