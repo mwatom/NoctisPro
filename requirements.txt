@@ -16,3 +16,12 @@ plotly
 celery
 gunicorn
 asgiref
+scipy
+scikit-image
+reportlab
+django-widget-tweaks
+python-dotenv
+whitenoise
+django-extensions
+django-health-check
+dj-database-url
