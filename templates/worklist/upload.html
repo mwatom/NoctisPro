@@ -605,7 +605,19 @@ document.addEventListener('DOMContentLoaded', function() {
             if (assignToMe) { formData.append('assign_to_me', assignToMe.checked ? '1' : '0'); }
             try {
                 const res = await fetch(url, { method: 'POST', body: formData, headers: { 'X-CSRFToken': token } });
-                const data = await res.json();
+                
+                if (!res.ok) {
+                    errors.push(`Upload failed with status ${res.status}: ${res.statusText}`);
+                    return;
+                }
+                
+                let data;
+                try {
+                    data = await res.json();
+                } catch (jsonErr) {
+                    errors.push(`JSON parsing error: ${jsonErr.message}. Server returned status ${res.status}`);
+                    return;
+                }
                 
                 if (data.success) {
                     const processed = typeof data.processed_files === 'number' ? data.processed_files : chunk.length;
@@ -623,7 +635,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     errors.push(data.error || 'Unknown error');
                 }
             } catch (err) {
-                errors.push(String(err));
+                errors.push(`Network error: ${String(err)}`);
             }
         }
 
