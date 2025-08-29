@@ -186,14 +186,19 @@ install_dependencies() {
     
     # Install requirements with error handling
     if [ -f "requirements.txt" ]; then
-        log_info "Installing Python packages..."
-        pip install -r requirements.txt --quiet --no-cache-dir || {
-            log_warning "Some packages failed to install, trying essential ones only..."
-            pip install django daphne redis python-dotenv --quiet || {
-                log_error "Failed to install essential packages"
-                exit 1
+        # Check if packages are already installed
+        if pip list | grep -q "Django"; then
+            log_info "Python packages already installed, skipping..."
+        else
+            log_info "Installing Python packages..."
+            pip install -r requirements.txt --quiet --no-cache-dir || {
+                log_warning "Some packages failed to install, trying essential ones only..."
+                pip install django daphne redis python-dotenv --quiet || {
+                    log_error "Failed to install essential packages"
+                    exit 1
+                }
             }
-        }
+        fi
         log_success "Dependencies installed"
     fi
     
