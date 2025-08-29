@@ -636,3 +636,10 @@ Watching for file changes with StatReloader
 /workspace/noctis_pro/urls.py changed, reloading.
 Watching for file changes with StatReloader
 [32mHTTP GET /dicom-viewer/ 302 [0.01, 127.0.0.1:47974][0m
+/workspace/accounts/admin.py changed, reloading.
+/workspace/accounts/admin.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+[mHTTP GET /login/ 200 [0.01, 127.0.0.1:58676][0m
+[32mHTTP POST /login/ 302 [0.22, 127.0.0.1:58684][0m
+[mHTTP GET /worklist/upload/ 200 [0.02, 127.0.0.1:58696][0m
