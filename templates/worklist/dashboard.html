@@ -787,7 +787,19 @@
         async function loadUploadStats() {
             try {
                 const response = await fetch('{% url "worklist:api_get_upload_stats" %}');
-                const data = await response.json();
+                
+                if (!response.ok) {
+                    console.error('Failed to fetch upload stats:', response.status, response.statusText);
+                    return;
+                }
+                
+                let data;
+                try {
+                    data = await response.json();
+                } catch (jsonErr) {
+                    console.error('JSON parsing error in upload stats:', jsonErr.message);
+                    return;
+                }
                 
                 if (data.success) {
                     const stats = data.stats;
