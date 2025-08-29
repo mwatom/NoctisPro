@@ -45,13 +45,59 @@ import gc
 _MPR_CACHE_LOCK = Lock()
 _MPR_CACHE = {}  # series_id -> { 'volume': np.ndarray, 'spacing': tuple, 'timestamp': float }
 _MPR_CACHE_ORDER = []
-_MAX_MPR_CACHE = 6  # Increased cache size for better performance
+_MAX_MPR_CACHE = 10  # Increased cache size for better performance
 
 # Encoded MPR slice cache (LRU) to avoid repeated windowing+encoding per slice/plane/WW/WL
 _MPR_IMG_CACHE_LOCK = Lock()
 _MPR_IMG_CACHE = {}  # key -> base64 data URL
 _MPR_IMG_CACHE_ORDER = []  # list of keys in LRU order
-_MAX_MPR_IMG_CACHE = 800
+_MAX_MPR_IMG_CACHE = 1500  # Significantly increased for better performance
+
+# DICOM file cache for faster loading
+_DICOM_CACHE_LOCK = Lock()
+_DICOM_CACHE = {}  # file_path -> pydicom.Dataset
+_DICOM_CACHE_ORDER = []
+_MAX_DICOM_CACHE = 200  # Cache frequently accessed DICOM files
+
+def _dicom_cache_get(file_path):
+    """Get cached DICOM dataset"""
+    with _DICOM_CACHE_LOCK:
+        dataset = _DICOM_CACHE.get(file_path)
+        if dataset is not None:
+            try:
+                _DICOM_CACHE_ORDER.remove(file_path)
+            except ValueError:
+                pass
+            _DICOM_CACHE_ORDER.append(file_path)
+        return dataset
+
+def _dicom_cache_set(file_path, dataset):
+    """Cache DICOM dataset with LRU eviction"""
+    with _DICOM_CACHE_LOCK:
+        if file_path not in _DICOM_CACHE:
+            while len(_DICOM_CACHE_ORDER) >= _MAX_DICOM_CACHE:
+                evict = _DICOM_CACHE_ORDER.pop(0)
+                _DICOM_CACHE.pop(evict, None)
+        _DICOM_CACHE[file_path] = dataset
+        try:
+            _DICOM_CACHE_ORDER.remove(file_path)
+        except ValueError:
+            pass
+        _DICOM_CACHE_ORDER.append(file_path)
+
+def _load_dicom_optimized(file_path):
+    """Load DICOM file with caching for better performance"""
+    cached = _dicom_cache_get(file_path)
+    if cached is not None:
+        return cached
+    
+    try:
+        dataset = pydicom.dcmread(file_path, force=True)
+        _dicom_cache_set(file_path, dataset)
+        return dataset
+    except Exception as e:
+        logger.error(f"Failed to load DICOM file {file_path}: {e}")
+        return None
 
 def _mpr_cache_key(series_id, plane, slice_index, ww, wl, inverted):
     return f"{series_id}|{plane}|{int(slice_index)}|{int(round(float(ww)))}|{int(round(float(wl)))}|{1 if inverted else 0}"
@@ -140,7 +186,9 @@ def _get_mpr_volume_for_series(series):
     for img in images_qs:
         try:
             dicom_path = _os.path.join(settings.MEDIA_ROOT, str(img.file_path))
-            ds = _pydicom.dcmread(dicom_path)
+            ds = _load_dicom_optimized(dicom_path)
+            if ds is None:
+                continue
             try:
                 pixel_array = ds.pixel_array.astype(_np.float32)
             except Exception:
@@ -684,12 +732,16 @@ def api_study_progress(request, study_id):
     })
 
 def _array_to_base64_image(array, window_width=None, window_level=None, inverted=False):
-    """Convert numpy array to base64 encoded image with proper windowing"""
+    """Convert numpy array to base64 encoded image with proper windowing - OPTIMIZED"""
     try:
         # Validate input
         if array is None or array.size == 0:
             logger.warning("_array_to_base64_image: received empty array")
             return None
+        
+        # Ensure array is contiguous for performance
+        if not array.flags['C_CONTIGUOUS']:
+            array = np.ascontiguousarray(array)
         
         # Ensure array is at least 2D
         if array.ndim == 1:
@@ -704,54 +756,52 @@ def _array_to_base64_image(array, window_width=None, window_level=None, inverted
             logger.warning(f"_array_to_base64_image: array has {array.ndim} dimensions, using first 2D slice")
             array = array[0] if array.ndim == 3 else array.reshape(array.shape[-2:])
             
-        # Convert to float for calculations
-        image_data = array.astype(np.float32)
-        
-        # Check for invalid data
-        if np.any(np.isnan(image_data)) or np.any(np.isinf(image_data)):
+        # Use in-place operations where possible for memory efficiency
+        # Check for invalid data first
+        has_invalid = np.any(np.isnan(array)) or np.any(np.isinf(array))
+        if has_invalid:
             logger.warning("_array_to_base64_image: array contains NaN or inf values")
-            image_data = np.nan_to_num(image_data, nan=0.0, posinf=0.0, neginf=0.0)
+            array = np.nan_to_num(array, nan=0.0, posinf=0.0, neginf=0.0, copy=False)
         
-        # Apply windowing if parameters provided
+        # Apply windowing with optimized operations
         if window_width is not None and window_level is not None:
-            # Apply window/level
-            min_val = window_level - window_width / 2
-            max_val = window_level + window_width / 2
+            # Vectorized windowing operation
+            min_val = window_level - window_width * 0.5
+            max_val = window_level + window_width * 0.5
             
-            # Clip and normalize
-            image_data = np.clip(image_data, min_val, max_val)
+            # Use numpy's optimized clipping and scaling
             if max_val > min_val:
-                image_data = (image_data - min_val) / (max_val - min_val) * 255
+                image_data = np.clip((array - min_val) * (255.0 / (max_val - min_val)), 0, 255)
             else:
-                image_data = np.zeros_like(image_data)
+                image_data = np.zeros_like(array, dtype=np.uint8)
         else:
-            # Default normalization
-            data_min, data_max = image_data.min(), image_data.max()
-            if data_max > data_min:
-                image_data = ((image_data - data_min) / (data_max - data_min) * 255)
+            # Optimized auto-scaling
+            array_min, array_max = array.min(), array.max()
+            if array_max > array_min:
+                image_data = (array - array_min) * (255.0 / (array_max - array_min))
             else:
-                image_data = np.zeros_like(image_data)
+                image_data = np.zeros_like(array, dtype=np.uint8)
         
-        # Apply inversion if requested
+        # Apply inversion efficiently
         if inverted:
-            image_data = 255 - image_data
+            image_data = 255.0 - image_data
         
-        # Convert to uint8
-        normalized = np.clip(image_data, 0, 255).astype(np.uint8)
+        # Convert to uint8 efficiently
+        normalized = image_data.astype(np.uint8, copy=False)
         
-        # Convert to PIL Image
+        # Convert to PIL Image with mode optimized for grayscale
         img = Image.fromarray(normalized, mode='L')
         
-        # Convert to base64
+        # Optimize for speed - use fastest PNG settings
         buffer = BytesIO()
         try:
-            # Favor speed over size
-            img.save(buffer, format='PNG', optimize=False, compress_level=1)
+            # Use fastest PNG compression for real-time viewing
+            img.save(buffer, format='PNG', optimize=False, compress_level=0)
         except Exception as save_err:
             logger.warning(f"PNG save with optimization failed: {save_err}, trying basic save")
             img.save(buffer, format='PNG')
         
-        img_str = base64.b64encode(buffer.getvalue()).decode()
+        img_str = base64.b64encode(buffer.getvalue()).decode('ascii')
         
         return f"data:image/png;base64,{img_str}"
     except Exception as e:
@@ -779,11 +829,11 @@ def api_dicom_image_display(request, image_id):
         window_level_param = request.GET.get('window_level')
         inverted = request.GET.get('inverted', 'false').lower() == 'true'
 
-        # Read DICOM file (best-effort)
+        # Read DICOM file using optimized caching (best-effort)
         ds = None
         try:
             dicom_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
-            ds = pydicom.dcmread(dicom_path, stop_before_pixels=False)
+            ds = _load_dicom_optimized(dicom_path)
         except Exception as e:
             warnings['dicom_read_error'] = str(e)
 
@@ -2355,7 +2405,9 @@ def _get_mpr_volume_and_spacing(series, force_rebuild=False):
                     break
                     
                 dicom_path = _os.path.join(settings.MEDIA_ROOT, str(img.file_path))
-                ds = _pydicom.dcmread(dicom_path)
+                ds = _load_dicom_optimized(dicom_path)
+                if ds is None:
+                    continue
                 try:
                     arr = ds.pixel_array.astype(_np.float32)
                 except Exception:
@@ -2424,18 +2476,21 @@ def _get_mpr_volume_and_spacing(series, force_rebuild=False):
     # Use optimized interpolation to prevent freezing
     original_depth = volume.shape[0]
     
-    # Limit interpolation to prevent memory issues and browser freezing
-    max_volume_size = 512 * 512 * 512  # Limit volume size to prevent freezing
+    # Optimized interpolation with better performance limits
+    max_volume_size = 1024 * 1024 * 256  # Increased limit for better quality
     current_size = volume.shape[0] * volume.shape[1] * volume.shape[2]
     
-    if volume.shape[0] < 32 and current_size < max_volume_size:  # Only if safe to interpolate
+    if volume.shape[0] < 24 and current_size < max_volume_size:  # Only if safe to interpolate
         # Calculate optimal interpolation factor for minimal images
-        if volume.shape[0] < 8:
-            # Very few images - use controlled interpolation
-            target_slices = min(64, volume.shape[0] * 6)  # Reduced factor
+        if volume.shape[0] < 6:
+            # Very few images - use aggressive interpolation for better quality
+            target_slices = min(48, volume.shape[0] * 8)
+        elif volume.shape[0] < 12:
+            # Few images - moderate interpolation
+            target_slices = min(36, volume.shape[0] * 4)
         else:
-            # Moderate number of images
-            target_slices = min(32, volume.shape[0] * 3)  # Reduced factor
+            # Some images - light interpolation
+            target_slices = min(32, volume.shape[0] * 2)
         
         factor = target_slices / volume.shape[0]
         
@@ -2443,17 +2498,18 @@ def _get_mpr_volume_and_spacing(series, force_rebuild=False):
         projected_size = int(volume.shape[0] * factor) * volume.shape[1] * volume.shape[2]
         
         if projected_size < max_volume_size:
-            # Use linear interpolation for speed and stability
+            # Use optimized linear interpolation for speed
             try:
-                volume = ndimage.zoom(volume, (factor, 1, 1), order=1, prefilter=False)
+                # Use mode='nearest' for edges to avoid artifacts
+                volume = ndimage.zoom(volume, (factor, 1, 1), order=1, prefilter=False, mode='nearest')
                 st = st / factor
-                logger.info(f"Safe interpolation: {original_depth} -> {volume.shape[0]} slices (factor: {factor:.2f})")
+                logger.info(f"Optimized interpolation: {original_depth} -> {volume.shape[0]} slices (factor: {factor:.2f})")
             except Exception as e:
                 logger.warning(f"Interpolation failed, using original volume: {e}")
         else:
             logger.info(f"Skipping interpolation - volume would be too large: {projected_size}")
     else:
-        logger.info(f"Skipping interpolation - volume sufficient or too large: {volume.shape}")
+        logger.info(f"Skipping interpolation - volume sufficient or already large: {volume.shape}")
         
     # Garbage collection to free memory
     gc.collect()

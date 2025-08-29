@@ -98,6 +98,50 @@
   <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+    
+    // Performance optimization: Image preloader and cache
+    class ImagePreloader {
+      constructor() {
+        this.cache = new Map();
+        this.preloadQueue = [];
+        this.isPreloading = false;
+        this.maxCacheSize = 100; // Limit cache size
+      }
+      
+      async preloadImage(url) {
+        if (this.cache.has(url)) {
+          return this.cache.get(url);
+        }
+        
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            // Manage cache size
+            if (this.cache.size >= this.maxCacheSize) {
+              const firstKey = this.cache.keys().next().value;
+              this.cache.delete(firstKey);
+            }
+            this.cache.set(url, img);
+            resolve(img);
+          };
+          img.onerror = () => resolve(null);
+          img.src = url;
+        });
+      }
+      
+      async preloadNextImages(currentIndex, images, count = 3) {
+        const preloadPromises = [];
+        for (let i = 1; i <= count && currentIndex + i < images.length; i++) {
+          const nextImage = images[currentIndex + i];
+          if (nextImage && nextImage.url) {
+            preloadPromises.push(this.preloadImage(nextImage.url));
+          }
+        }
+        return Promise.all(preloadPromises);
+      }
+    }
+    
+    const imagePreloader = new ImagePreloader();
     // Expose for existing viewer code without mutating the import namespace
     window.THREE = THREE;
     window.OrbitControls = OrbitControls;
