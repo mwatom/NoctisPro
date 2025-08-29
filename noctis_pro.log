@@ -109,3 +109,9 @@ Watching for file changes with StatReloader
 Watching for file changes with StatReloader
 Service Unavailable: /health/
 Service Unavailable: /health/
+Watching for file changes with StatReloader
+/workspace/noctis_pro/settings.py changed, reloading.
+Watching for file changes with StatReloader
+Service Unavailable: /health/
+[35;1mHTTP GET /health/ 503 [0.01, 127.0.0.1:49886][0m
+[mHTTP GET /login/ 200 [0.00, 127.0.0.1:49902][0m

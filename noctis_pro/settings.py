@@ -47,7 +47,7 @@ INSTALLED_APPS = [
     # Custom apps
     'accounts',
     'worklist',
-    # 'dicom_viewer',  # Temporarily disabled due to syntax issues
+    'dicom_viewer',  # Re-enabled with performance optimizations
     'reports',  # Re-enabled to fix model registration
     'admin_panel',
     'chat',  # Re-enabled to fix template URLs
@@ -255,22 +255,32 @@ SESSION_SAVE_EVERY_REQUEST = True  # Reset timer on every request
 SESSION_TIMEOUT_WARNING = int(os.environ.get('SESSION_WARNING_MINUTES', '5')) * 60  # Warning 5 minutes before timeout
 
 # Database
-# PostgreSQL database configuration - ONLY PostgreSQL supported
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('POSTGRES_DB', 'noctis_pro'),
-        'USER': os.environ.get('POSTGRES_USER', 'noctis_user'),
-        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
-        'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
-        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
-        'OPTIONS': {
-            'sslmode': 'prefer',
-        },
-        'CONN_MAX_AGE': 600,  # Connection pooling
-        'CONN_HEALTH_CHECKS': True,
+# Support both SQLite and PostgreSQL based on environment
+if os.environ.get('USE_SQLITE', 'False').lower() == 'true' or not os.environ.get('POSTGRES_PASSWORD'):
+    # Use SQLite database
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.environ.get('DATABASE_PATH', os.path.join(BASE_DIR, 'db.sqlite3')),
+        }
     }
-}
+else:
+    # Use PostgreSQL database
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('POSTGRES_DB', 'noctis_pro'),
+            'USER': os.environ.get('POSTGRES_USER', 'noctis_user'),
+            'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
+            'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
+            'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+            'OPTIONS': {
+                'sslmode': 'prefer',
+            },
+            'CONN_MAX_AGE': 600,  # Connection pooling
+            'CONN_HEALTH_CHECKS': True,
+        }
+    }
 
 # Cache configuration
 if os.environ.get('USE_DUMMY_CACHE', 'False').lower() == 'true':
