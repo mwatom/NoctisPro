@@ -643,3 +643,12 @@ Watching for file changes with StatReloader
 [mHTTP GET /login/ 200 [0.01, 127.0.0.1:58676][0m
 [32mHTTP POST /login/ 302 [0.22, 127.0.0.1:58684][0m
 [mHTTP GET /worklist/upload/ 200 [0.02, 127.0.0.1:58696][0m
+[mHTTP GET /worklist/upload/ 200 [0.01, 127.0.0.1:32824][0m
+[32mHTTP GET /dicom-viewer/ 302 [0.01, 127.0.0.1:39000][0m
+Internal Server Error: /dicom-viewer/api/series/1/mpr/
+[35;1mHTTP GET /dicom-viewer/api/series/1/mpr/ 500 [0.01, 127.0.0.1:39006][0m
+Bad Request: /dicom-viewer/api/series/1/mip/
+[31;1mHTTP GET /dicom-viewer/api/series/1/mip/ 400 [0.01, 127.0.0.1:39022][0m
+Bad Request: /dicom-viewer/api/series/1/bone/
+[31;1mHTTP GET /dicom-viewer/api/series/1/bone/ 400 [0.01, 127.0.0.1:60448][0m
+Watching for file changes with StatReloader
