@@ -1,0 +1,44 @@
+[Unit]
+Description=NoctisPro Bulletproof Production Service
+Documentation=file:///workspace/README.md
+After=network-online.target redis.service
+Wants=network-online.target redis.service
+Requires=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/workspace
+Environment=PATH=/workspace/venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=HOME=/home/ubuntu
+Environment=PYTHONPATH=/workspace
+Environment=DJANGO_SETTINGS_MODULE=noctis_pro.settings
+
+# Ensure Redis is running
+ExecStartPre=/bin/bash -c 'redis-server --daemonize yes || echo "Redis already running"'
+ExecStartPre=/bin/bash -c 'sleep 2'
+
+# Start the bulletproof deployment
+ExecStart=/workspace/deploy_production_bulletproof.sh
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Graceful shutdown
+ExecStop=/workspace/stop_production_improved.sh
+TimeoutStopSec=30
+
+# Process management
+Restart=always
+RestartSec=10
+TimeoutStartSec=120
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=noctispro-bulletproof
+
+# Resource limits
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
