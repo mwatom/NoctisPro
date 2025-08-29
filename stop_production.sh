@@ -1,4 +1,5 @@
 #!/bin/bash
 echo "🛑 Stopping NoctisPro Production..."
-sudo systemctl stop noctispro-production.service
+pkill -f "manage.py runserver" || echo "Django server not running"
+pkill -f "ngrok" || echo "Ngrok not running"
 echo "✅ Services stopped"
