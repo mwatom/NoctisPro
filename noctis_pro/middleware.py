@@ -424,7 +424,7 @@ class SessionTimeoutWarningMiddleware(MiddlewareMixin):
                     let timeLeft = Math.floor(warningSeconds);
                     warningDiv.innerHTML = `
                         <div style="font-weight: bold; margin-bottom: 8px;">⚠️ Session Timeout Warning</div>
-                        <div>Your session will expire in <span id="countdown">${timeLeft}</span> seconds due to inactivity.</div>
+                        <div>Your session will expire in <span id="countdown">` + timeLeft + `</span> seconds due to inactivity.</div>
                         <div style="margin-top: 10px;">
                             <button onclick="extendSession()" style="background: white; color: #ff6b6b; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;">Stay Logged In</button>
                         </div>
