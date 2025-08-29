@@ -276,19 +276,18 @@ start_services() {
         exit 1
     fi
     
-    # Start ngrok if configured
-    if [ ! -z "${NGROK_AUTHTOKEN:-}" ] && [ ! -z "${NGROK_STATIC_DOMAIN:-}" ]; then
-        log_info "Starting ngrok with static domain..."
-        nohup ngrok http --authtoken="$NGROK_AUTHTOKEN" --url="$NGROK_STATIC_DOMAIN" ${DAPHNE_PORT:-8000} --log stdout > logs/ngrok.log 2>&1 &
-        NGROK_PID=$!
-        echo $NGROK_PID > ngrok.pid
-        log_success "Ngrok started with static domain"
+    # Start ngrok with production script
+    log_info "Starting ngrok with production script..."
+    if [ -f "start_ngrok_production.sh" ]; then
+        ./start_ngrok_production.sh ${DAPHNE_PORT:-8000}
+        if [ -f "ngrok.pid" ]; then
+            NGROK_PID=$(cat ngrok.pid)
+            log_success "Ngrok started successfully"
+        else
+            log_warning "Ngrok startup uncertain"
+        fi
     else
-        log_info "Starting ngrok with dynamic domain..."
-        nohup ngrok http ${DAPHNE_PORT:-8000} --log stdout > logs/ngrok.log 2>&1 &
-        NGROK_PID=$!
-        echo $NGROK_PID > ngrok.pid
-        log_info "Ngrok started (dynamic domain)"
+        log_warning "Production ngrok script not found, skipping ngrok"
     fi
     
     # Wait for ngrok and get URL

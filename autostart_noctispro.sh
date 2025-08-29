@@ -49,6 +49,14 @@ source venv/bin/activate
 log "Running bulletproof deployment..."
 ./deploy_production_bulletproof.sh
 
+log "Deployment completed, checking ngrok status..."
+if [ -f "current_ngrok_url.txt" ]; then
+    NGROK_URL=$(cat current_ngrok_url.txt)
+    log "Ngrok tunnel available at: $NGROK_URL"
+else
+    log "No ngrok URL available"
+fi
+
 # Store our PID
 echo $$ > "$PID_FILE"
 
