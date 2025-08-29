@@ -529,3 +529,92 @@ Watching for file changes with StatReloader
 [32mHTTP HEAD / 302 [0.01, 127.0.0.1:34036][0m
 [32mHTTP GET /worklist/upload/ 302 [0.00, 127.0.0.1:60262][0m
 [mHTTP GET /login/?next=/worklist/upload/ 200 [0.01, 127.0.0.1:60262][0m
+Watching for file changes with StatReloader
+Forbidden (CSRF cookie not set.): /login/
+HTTP POST /login/ 403 [0.01, 127.0.0.1:48038]
+HTTP GET /login/ 200 [0.00, 127.0.0.1:48052]
+HTTP GET /login/ 200 [0.00, 127.0.0.1:33992]
+Internal Server Error: /login/
+Traceback (most recent call last):
+  File "/workspace/venv/lib/python3.13/site-packages/django_redis/cache.py", line 29, in _decorator
+    return method(self, *args, **kwargs)
+  File "/workspace/venv/lib/python3.13/site-packages/django_redis/cache.py", line 138, in has_key
+    return self.client.has_key(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/workspace/venv/lib/python3.13/site-packages/django_redis/client/default.py", line 740, in has_key
+    raise ConnectionInterrupted(connection=client) from e
+django_redis.exceptions.ConnectionInterrupted: Redis ConnectionError: Error 111 connecting to 127.0.0.1:6379. Connection refused.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/workspace/venv/lib/python3.13/site-packages/asgiref/sync.py", line 489, in thread_handler
+    raise exc_info[1]
+  File "/workspace/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/venv/lib/python3.13/site-packages/asgiref/sync.py", line 489, in thread_handler
+    raise exc_info[1]
+  File "/workspace/venv/lib/python3.13/site-packages/django/core/handlers/base.py", line 253, in _get_response_async
+    response = await wrapped_callback(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+        request, *callback_args, **callback_kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/workspace/venv/lib/python3.13/site-packages/asgiref/sync.py", line 439, in __call__
+    ret = await asyncio.shield(exec_coro)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/venv/lib/python3.13/site-packages/asgiref/current_thread_executor.py", line 40, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/workspace/venv/lib/python3.13/site-packages/asgiref/sync.py", line 493, in thread_handler
+    return func(*args, **kwargs)
+  File "/workspace/accounts/views.py", line 34, in login_view
+    login(request, user)
+    ~~~~~^^^^^^^^^^^^^^^
+  File "/workspace/venv/lib/python3.13/site-packages/django/contrib/auth/__init__.py", line 187, in login
+    request.session.cycle_key()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/workspace/venv/lib/python3.13/site-packages/django/contrib/sessions/backends/base.py", line 432, in cycle_key
+    self.create()
+    ~~~~~~~~~~~^^
+  File "/workspace/venv/lib/python3.13/site-packages/django/contrib/sessions/backends/cache.py", line 55, in create
+    self._session_key = self._get_new_session_key()
+                        ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/workspace/venv/lib/python3.13/site-packages/django/contrib/sessions/backends/base.py", line 196, in _get_new_session_key
+    if not self.exists(session_key):
+           ~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/workspace/venv/lib/python3.13/site-packages/django/contrib/sessions/backends/cache.py", line 117, in exists
+    bool(session_key) and (self.cache_key_prefix + session_key) in self._cache
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/venv/lib/python3.13/site-packages/django/core/cache/backends/base.py", line 301, in __contains__
+    return self.has_key(key)
+           ~~~~~~~~~~~~^^^^^
+  File "/workspace/venv/lib/python3.13/site-packages/django_redis/cache.py", line 36, in _decorator
+    raise e.__cause__  # noqa: B904
+    ^^^^^^^^^^^^^^^^^
+  File "/workspace/venv/lib/python3.13/site-packages/django_redis/client/default.py", line 738, in has_key
+    return client.exists(key) == 1
+           ~~~~~~~~~~~~~^^^^^
+  File "/workspace/venv/lib/python3.13/site-packages/redis/commands/core.py", line 1736, in exists
+    return self.execute_command("EXISTS", *names, keys=names)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/venv/lib/python3.13/site-packages/redis/client.py", line 621, in execute_command
+    return self._execute_command(*args, **options)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/workspace/venv/lib/python3.13/site-packages/redis/client.py", line 627, in _execute_command
+    conn = self.connection or pool.get_connection()
+                              ~~~~~~~~~~~~~~~~~~~^^
+  File "/workspace/venv/lib/python3.13/site-packages/redis/utils.py", line 195, in wrapper
+    return func(*args, **kwargs)
+  File "/workspace/venv/lib/python3.13/site-packages/redis/connection.py", line 1533, in get_connection
+    connection.connect()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/workspace/venv/lib/python3.13/site-packages/redis/connection.py", line 380, in connect
+    self.connect_check_health(check_health=True)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "/workspace/venv/lib/python3.13/site-packages/redis/connection.py", line 397, in connect_check_health
+    raise ConnectionError(self._error_message(e))
+redis.exceptions.ConnectionError: Error 111 connecting to 127.0.0.1:6379. Connection refused.
+HTTP POST /login/ 500 [0.21, 127.0.0.1:34000]
+HTTP GET /worklist/upload/ 302 [0.01, 127.0.0.1:34014]
