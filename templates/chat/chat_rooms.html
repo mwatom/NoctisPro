@@ -356,7 +356,7 @@
                     <span>{{ invitation.invited_by.get_full_name }} invited you to join "{{ invitation.room.name }}"</span>
                     <div>
                         <a href="{% url 'chat:join_room' invitation.room.id %}" class="btn-control" style="margin-right: 8px;">Accept</a>
-                        <button class="btn-control">Decline</button>
+                        <button type="button" class="btn-control">Decline</button>
                     </div>
                 </div>
                 {% endfor %}
@@ -460,7 +460,7 @@
                             <span style="color: var(--text-muted); font-size: 10px;">
                                 {{ room.members.count }} member{{ room.members.count|pluralize }}
                             </span>
-                            <button class="btn-control" onclick="event.stopPropagation(); joinRoom('{{ room.id }}')"  >
+                            <button type="button" class="btn-control" onclick="event.stopPropagation(); joinRoom('{{ room.id }}')"  >
                                 <i class="fas fa-sign-in-alt"></i> Join
                             </button>
                         </div>

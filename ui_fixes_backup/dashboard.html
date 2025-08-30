@@ -566,16 +566,16 @@
                         <div style="color: var(--text-muted); font-size: 10px;">Administrator</div>
                     </div>
                 </div>
-                <button type="button" class="worklist-btn" onclick="window.location.href='{% url 'worklist:dashboard' %}'"   title="Go to Worklist Dashboard">
+                <button class="worklist-btn" onclick="window.location.href='{% url 'worklist:dashboard' %}'"   title="Go to Worklist Dashboard">
                     <i class="fas fa-home"></i> WORKLIST
                 </button>
-                <button type="button" class="worklist-btn" onclick="window.location.href='{% url 'admin_panel:facility_management' %}'"   title="Manage Facilities">
+                <button class="worklist-btn" onclick="window.location.href='{% url 'admin_panel:facility_management' %}'"   title="Manage Facilities">
                     <i class="fas fa-hospital"></i> FACILITIES
                 </button>
-                <button type="button" class="worklist-btn" onclick="window.location.href='{% url 'admin_panel:user_management' %}'"   title="Manage Users">
+                <button class="worklist-btn" onclick="window.location.href='{% url 'admin_panel:user_management' %}'"   title="Manage Users">
                     <i class="fas fa-users"></i> USERS
                 </button>
-                <button type="button" class="worklist-btn" onclick="window.open('{% url 'dicom_viewer:launch_standalone_viewer' %}', '_blank')"   title="Open DICOM Viewer">
+                <button class="worklist-btn" onclick="window.open('{% url 'dicom_viewer:launch_standalone_viewer' %}', '_blank')"   title="Open DICOM Viewer">
                     <i class="fas fa-external-link-alt"></i> DICOM VIEWER
                 </button>
             </div>
@@ -610,14 +610,14 @@
                     <option value="technologist">Technologist</option>
                 </select>
             </div>
-            <button type="button" class="btn-control reset" onclick="resetFilters()"  >RESET</button>
-            <button type="button" class="btn-control" onclick="refreshData()"  >
+            <button class="btn-control reset" onclick="resetFilters()"  >RESET</button>
+            <button class="btn-control" onclick="refreshData()"  >
                 <i class="fas fa-sync-alt"></i> REFRESH
             </button>
-            <button type="button" class="btn-control" onclick="exportData()"  >
+            <button class="btn-control" onclick="exportData()"  >
                 <i class="fas fa-download"></i> EXPORT
             </button>
-            <button type="button" class="btn-control danger" onclick="systemBackup()"  >
+            <button class="btn-control danger" onclick="systemBackup()"  >
                 <i class="fas fa-database"></i> BACKUP
             </button>
 
@@ -767,10 +767,10 @@
                     <td class="timestamp">${formatTime(item.created)}</td>
                     <td>
                         <div class="action-buttons">
-                            <button type="button" class="btn-action edit" onclick="editItem('${item.id}')"   title="Edit item">
+                            <button class="btn-action edit" onclick="editItem('${item.id}')"   title="Edit item">
                                 <i class="fas fa-edit"></i> EDIT
                             </button>
-                            <button type="button" class="btn-action delete" onclick="deleteItem('${item.id}')"   title="Delete item">
+                            <button class="btn-action delete" onclick="deleteItem('${item.id}')"   title="Delete item">
                                 <i class="fas fa-trash"></i> DEL
                             </button>
                         </div>
@@ -884,8 +884,8 @@
             notification.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <span>${message}</span>
-                    <button type="button" onclick="this.parentElement.parentElement.remove()" 
-                            style="background: none; border: none; color: var(--text-muted); cursor: pointer; margin-left: 8px;" aria-label="Close">
+                    <button onclick="this.parentElement.parentElement.remove()" 
+                            style="background: none; border: none; color: var(--text-muted); cursor: pointer; margin-left: 8px;">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
