@@ -15,7 +15,7 @@ from django.conf import settings
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
-from django.contrib.postgres.fields import JSONField
+# Remove PostgreSQL-specific import - using Django's built-in JSONField
 import json
 import uuid
 

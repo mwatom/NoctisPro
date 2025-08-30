@@ -3133,7 +3133,6 @@ except ImportError:
 from django.views.decorators.http import require_POST
 
 @login_required
-@login_required
 @require_POST
 def print_dicom_image(request):
     """
