@@ -26,7 +26,7 @@ The bulletproof deployment now includes intelligent ngrok startup:
 
 1. **Static URL (Priority 1)**: If `NGROK_USE_STATIC=true` and `NGROK_STATIC_URL` is set
    ```bash
-   ngrok http --url="https://colt-charmed-lark.ngrok-free.app" 8000
+   ngrok http --url="colt-charmed-lark.ngrok-free.app" 8000
    ```
 
 2. **Authenticated Static Domain (Priority 2)**: If `NGROK_AUTHTOKEN` and `NGROK_STATIC_DOMAIN` are set

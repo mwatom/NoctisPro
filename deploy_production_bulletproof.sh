@@ -381,7 +381,7 @@ start_services() {
     # Start ngrok with static URL configuration
     if [ "${NGROK_USE_STATIC:-false}" = "true" ] && [ ! -z "${NGROK_STATIC_URL:-}" ]; then
         log_info "Starting ngrok with static URL: $NGROK_STATIC_URL"
-        nohup ngrok http --url="https://$NGROK_STATIC_URL" ${DAPHNE_PORT:-8000} --log stdout > logs/ngrok.log 2>&1 &
+        nohup ngrok http --url="$NGROK_STATIC_URL" ${DAPHNE_PORT:-8000} --log stdout > logs/ngrok.log 2>&1 &
         NGROK_PID=$!
         echo $NGROK_PID > ngrok.pid
         log_success "Ngrok started with static URL: https://$NGROK_STATIC_URL"
