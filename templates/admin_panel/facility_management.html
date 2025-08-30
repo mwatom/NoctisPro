@@ -792,43 +792,185 @@ function updateBulkActions() {
     }
 }
 
-// Bulk actions
+// Bulk actions - Fixed with proper error handling and validation
 function bulkAction(action) {
-    const selected = Array.from(document.querySelectorAll('.facility-checkbox:checked')).map(cb => cb.value);
-    
-    if (selected.length === 0) {
-        alert('Please select facilities first');
-        return;
-    }
-    
-    const actionMessages = {
-        'activate': 'activate selected facilities',
-        'deactivate': 'deactivate selected facilities',
-        'export': 'export selected facilities',
-        'delete': 'delete selected facilities (this cannot be undone)'
-    };
-    
-    if (confirm(`Are you sure you want to ${actionMessages[action]}?`)) {
-        // Implement bulk action API call here
-        console.log(`Bulk ${action} for facilities:`, selected);
+    try {
+        const selected = Array.from(document.querySelectorAll('.facility-checkbox:checked')).map(cb => cb.value);
+        
+        if (selected.length === 0) {
+            showToast('Please select facilities first', 'warning');
+            return;
+        }
+        
+        const actionMessages = {
+            'activate': 'activate selected facilities',
+            'deactivate': 'deactivate selected facilities',
+            'export': 'export selected facilities',
+            'delete': 'delete selected facilities (this cannot be undone)'
+        };
+        
+        const message = actionMessages[action] || `${action} selected facilities`;
+        
+        if (!confirm(`Are you sure you want to ${message}?`)) {
+            return;
+        }
+        
+        // Show loading state
+        const actionButtons = document.querySelectorAll('[onclick*="bulkAction"]');
+        actionButtons.forEach(btn => {
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+        });
+        
+        showToast(`Processing ${action} for ${selected.length} facilit${selected.length > 1 ? 'ies' : 'y'}...`, 'info');
         
         if (action === 'export') {
             exportFacilities('csv', selected);
+            // Reset button states for export
+            setTimeout(() => {
+                actionButtons.forEach(btn => {
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                });
+            }, 1000);
         } else {
-            // After successful action, reload the page
-            location.reload();
+            // Use form submission for reliable state changes
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = window.location.href;
+            
+            // Add CSRF token
+            const csrfToken = getCookie('csrftoken');
+            if (csrfToken) {
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrfmiddlewaretoken';
+                csrfInput.value = csrfToken;
+                form.appendChild(csrfInput);
+            }
+            
+            // Add action data
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'bulk_action';
+            actionInput.value = action;
+            form.appendChild(actionInput);
+            
+            selected.forEach(facilityId => {
+                const facilityInput = document.createElement('input');
+                facilityInput.type = 'hidden';
+                facilityInput.name = 'selected_facilities';
+                facilityInput.value = facilityId;
+                form.appendChild(facilityInput);
+            });
+            
+            document.body.appendChild(form);
+            form.submit();
         }
+        
+    } catch (error) {
+        console.error('Bulk action error:', error);
+        showToast(`Error performing bulk action: ${error.message}`, 'error');
+        
+        // Reset button states
+        const actionButtons = document.querySelectorAll('[onclick*="bulkAction"]');
+        actionButtons.forEach(btn => {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        });
     }
 }
 
-// Export functionality
+// Export functionality - Fixed with error handling
 function exportFacilities(format, selectedIds = null) {
-    const params = new URLSearchParams(window.location.search);
-    params.set('export', format);
-    if (selectedIds) {
-        params.set('selected', selectedIds.join(','));
+    try {
+        if (!format) {
+            showToast('Invalid export format', 'error');
+            return;
+        }
+        
+        showToast(`Preparing ${format.toUpperCase()} export...`, 'info');
+        
+        const params = new URLSearchParams(window.location.search);
+        params.set('export', format);
+        if (selectedIds && selectedIds.length > 0) {
+            params.set('selected', selectedIds.join(','));
+        }
+        
+        const exportUrl = `${window.location.pathname}?${params.toString()}`;
+        window.open(exportUrl, '_blank');
+        
+        showToast(`${format.toUpperCase()} export started`, 'success');
+        
+    } catch (error) {
+        console.error('Export error:', error);
+        showToast(`Export failed: ${error.message}`, 'error');
     }
-    window.open(`${window.location.pathname}?${params.toString()}`);
+}
+
+// Toast notification system
+function showToast(message, type = 'info', duration = 3000) {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: var(--card-surface);
+        border: 1px solid var(--border-color);
+        border-left: 4px solid var(--accent-color);
+        color: var(--text-primary);
+        padding: 8px 12px;
+        border-radius: 3px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        z-index: 2000;
+        font-size: 11px;
+        max-width: 280px;
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+        opacity: 0.95;
+    `;
+    
+    if (type === 'error') {
+        toast.style.borderLeftColor = 'var(--danger-color)';
+    } else if (type === 'success') {
+        toast.style.borderLeftColor = 'var(--success-color)';
+    } else if (type === 'warning') {
+        toast.style.borderLeftColor = 'var(--warning-color)';
+    }
+    
+    toast.innerHTML = message;
+    document.body.appendChild(toast);
+    
+    // Slide in
+    setTimeout(() => {
+        toast.style.transform = 'translateX(0)';
+    }, 100);
+    
+    // Slide out and remove
+    setTimeout(() => {
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 300);
+    }, duration);
+}
+
+// Cookie utility function
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
 }
 
 // Analytics functionality
