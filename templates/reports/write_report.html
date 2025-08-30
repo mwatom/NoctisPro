@@ -328,7 +328,7 @@
                             <p class="text-muted mb-0">AI-powered preliminary findings and suggestions</p>
                         </div>
                     </div>
-                    <button class="btn btn-medical" onclick="generateAIFindings()"  >
+                    <button type="button" class="btn btn-medical" onclick="generateAIFindings()"  >
                         <i class="fas fa-magic me-2"></i>Generate AI Findings
                     </button>
                 </div>
@@ -360,8 +360,8 @@
                             <div class="form-section">
                                 <h5><i class="fas fa-history me-2"></i>Clinical History</h5>
                                 <div class="macro-buttons">
-                                    <button class="macro-btn" onclick="insertMacro('clinicalHistory', 'No significant clinical history.')" type="button"  >No History</button>
-                                    <button class="macro-btn" onclick="insertMacro('clinicalHistory', 'Patient presents with...')" type="button"  >Presenting Complaint</button>
+                                    <button type="button" class="macro-btn" onclick="insertMacro('clinicalHistory', 'No significant clinical history.')" type="button"  >No History</button>
+                                    <button type="button" class="macro-btn" onclick="insertMacro('clinicalHistory', 'Patient presents with...')" type="button"  >Presenting Complaint</button>
                                 </div>
                                 <textarea id="clinicalHistory" name="clinical_history" class="form-textarea" placeholder="Enter clinical history and indication for study...">{{ report.clinical_history|default:study.clinical_info }}</textarea>
                             </div>
@@ -370,8 +370,8 @@
                             <div class="form-section">
                                 <h5><i class="fas fa-cogs me-2"></i>Technique</h5>
                                 <div class="macro-buttons">
-                                    <button class="macro-btn" onclick="insertMacro('technique', 'Standard protocol imaging performed.')" type="button"  >Standard Protocol</button>
-                                    <button class="macro-btn" onclick="insertMacro('technique', 'Contrast-enhanced imaging performed.')" type="button"  >With Contrast</button>
+                                    <button type="button" class="macro-btn" onclick="insertMacro('technique', 'Standard protocol imaging performed.')" type="button"  >Standard Protocol</button>
+                                    <button type="button" class="macro-btn" onclick="insertMacro('technique', 'Contrast-enhanced imaging performed.')" type="button"  >With Contrast</button>
                                 </div>
                                 <textarea id="technique" name="technique" class="form-textarea" placeholder="Describe imaging technique and protocols used...">{{ report.technique|default:"" }}</textarea>
                             </div>
@@ -380,8 +380,8 @@
                             <div class="form-section">
                                 <h5><i class="fas fa-exchange-alt me-2"></i>Comparison</h5>
                                 <div class="macro-buttons">
-                                    <button class="macro-btn" onclick="insertMacro('comparison', 'No prior studies available for comparison.')" type="button"  >No Priors</button>
-                                    <button class="macro-btn" onclick="insertMacro('comparison', 'Compared to prior study dated...')" type="button"  >Prior Study</button>
+                                    <button type="button" class="macro-btn" onclick="insertMacro('comparison', 'No prior studies available for comparison.')" type="button"  >No Priors</button>
+                                    <button type="button" class="macro-btn" onclick="insertMacro('comparison', 'Compared to prior study dated...')" type="button"  >Prior Study</button>
                                 </div>
                                 <textarea id="comparison" name="comparison" class="form-textarea" placeholder="Comparison with prior studies...">{{ report.comparison|default:"" }}</textarea>
                             </div>
@@ -390,9 +390,9 @@
                             <div class="form-section">
                                 <h5><i class="fas fa-search me-2"></i>Findings</h5>
                                 <div class="macro-buttons">
-                                    <button class="macro-btn" onclick="insertMacro('findings', 'Study is within normal limits.')" type="button"  >Normal Study</button>
-                                    <button class="macro-btn" onclick="insertMacro('findings', 'No acute findings.')" type="button"  >No Acute Findings</button>
-                                    <button class="macro-btn" onclick="insertMacro('findings', 'Findings consistent with...')" type="button"  >Abnormal Finding</button>
+                                    <button type="button" class="macro-btn" onclick="insertMacro('findings', 'Study is within normal limits.')" type="button"  >Normal Study</button>
+                                    <button type="button" class="macro-btn" onclick="insertMacro('findings', 'No acute findings.')" type="button"  >No Acute Findings</button>
+                                    <button type="button" class="macro-btn" onclick="insertMacro('findings', 'Findings consistent with...')" type="button"  >Abnormal Finding</button>
                                 </div>
                                 <textarea id="findings" name="findings" class="form-textarea" placeholder="Detailed description of findings..." rows="8">{{ report.findings|default:"" }}</textarea>
                             </div>
@@ -401,8 +401,8 @@
                             <div class="form-section">
                                 <h5><i class="fas fa-bullseye me-2"></i>Impression</h5>
                                 <div class="macro-buttons">
-                                    <button class="macro-btn" onclick="insertMacro('impression', 'Normal study.')" type="button"  >Normal</button>
-                                    <button class="macro-btn" onclick="insertMacro('impression', 'No significant abnormality.')" type="button"  >No Abnormality</button>
+                                    <button type="button" class="macro-btn" onclick="insertMacro('impression', 'Normal study.')" type="button"  >Normal</button>
+                                    <button type="button" class="macro-btn" onclick="insertMacro('impression', 'No significant abnormality.')" type="button"  >No Abnormality</button>
                                 </div>
                                 <textarea id="impression" name="impression" class="form-textarea" placeholder="Clinical impression and diagnosis...">{{ report.impression|default:"" }}</textarea>
                             </div>
@@ -411,28 +411,28 @@
                             <div class="form-section">
                                 <h5><i class="fas fa-clipboard-list me-2"></i>Recommendations</h5>
                                 <div class="macro-buttons">
-                                    <button class="macro-btn" onclick="insertMacro('recommendations', 'No further imaging required.')" type="button"  >No Follow-up</button>
-                                    <button class="macro-btn" onclick="insertMacro('recommendations', 'Follow-up imaging recommended.')" type="button"  >Follow-up</button>
-                                    <button class="macro-btn" onclick="insertMacro('recommendations', 'Clinical correlation recommended.')" type="button"  >Clinical Correlation</button>
+                                    <button type="button" class="macro-btn" onclick="insertMacro('recommendations', 'No further imaging required.')" type="button"  >No Follow-up</button>
+                                    <button type="button" class="macro-btn" onclick="insertMacro('recommendations', 'Follow-up imaging recommended.')" type="button"  >Follow-up</button>
+                                    <button type="button" class="macro-btn" onclick="insertMacro('recommendations', 'Clinical correlation recommended.')" type="button"  >Clinical Correlation</button>
                                 </div>
                                 <textarea id="recommendations" name="recommendations" class="form-textarea" placeholder="Recommendations for follow-up or additional studies...">{{ report.recommendations|default:"" }}</textarea>
                             </div>
 
                             <!-- Action Buttons -->
                             <div class="action-buttons">
-                                <button class="btn-control" onclick="previewReport()" type="button"  >
+                                <button type="button" class="btn-control" onclick="previewReport()" type="button"  >
                                     <i class="fas fa-eye me-2"></i>Preview
                                 </button>
-                                <button class="btn-control" onclick="exportDicomSR()" type="button"  >
+                                <button type="button" class="btn-control" onclick="exportDicomSR()" type="button"  >
                                     <i class="fas fa-file-medical me-2"></i>Export DICOM SR
                                 </button>
                                 <a class="btn-control" href="{% url 'reports:print_report' study.id %}" target="_blank">
                                     <i class="fas fa-print me-2"></i>Print/Letterhead View
                                 </a>
-                                <button class="btn-control" onclick="exportPDF()" type="button"  >
+                                <button type="button" class="btn-control" onclick="exportPDF()" type="button"  >
                                     <i class="fas fa-file-pdf me-2"></i>Export PDF
                                 </button>
-                                <button class="btn-control" onclick="exportDOCX()" type="button"  >
+                                <button type="button" class="btn-control" onclick="exportDOCX()" type="button"  >
                                     <i class="fas fa-file-word me-2"></i>Export Word
                                 </button>
                                 <button type="submit" name="action" value="save" class="btn btn-save">

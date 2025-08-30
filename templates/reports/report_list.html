@@ -532,15 +532,15 @@
                     </div>
                 </div>
                 {% if user.is_authenticated and user.role == 'admin' %}
-                <button class="btn-control" onclick="window.location.href='{% url 'admin_panel:dashboard' %}'"   title="Admin Panel">
+                <button type="button" class="btn-control" onclick="window.location.href='{% url 'admin_panel:dashboard' %}'"   title="Admin Panel">
                     <i class="fas fa-shield-alt"></i> ADMIN
                 </button>
                 {% endif %}
-                <button class="btn-control" onclick="window.location.href='{% url 'worklist:dashboard' %}'"   title="Back to Worklist">
+                <button type="button" class="btn-control" onclick="window.location.href='{% url 'worklist:dashboard' %}'"   title="Back to Worklist">
                     <i class="fas fa-arrow-left"></i> WORKLIST
                 </button>
                 {% if user.is_authenticated %}
-                <button class="btn-control" onclick="window.location.href='{% url 'accounts:logout' %}'"   title="Logout">
+                <button type="button" class="btn-control" onclick="window.location.href='{% url 'accounts:logout' %}'"   title="Logout">
                     <i class="fas fa-sign-out-alt"></i> LOGOUT
                 </button>
                 {% endif %}
@@ -573,8 +573,8 @@
                     <option value="US">Ultrasound</option>
                 </select>
             </div>
-            <button class="btn-control reset" onclick="applyFilters()"  >REFRESH</button>
-            <button class="btn-control" onclick="resetFilters()"  >RESET FILTERS</button>
+            <button type="button" class="btn-control reset" onclick="applyFilters()"  >REFRESH</button>
+            <button type="button" class="btn-control" onclick="resetFilters()"  >RESET FILTERS</button>
         </div>
 
         <!-- Main Content -->

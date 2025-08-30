@@ -145,37 +145,37 @@
   <div class="main-container">
     <div class="layout">
     <div class="toolbar">
-      <button type="button" class="tool active" data-tool="window"><i class="fas fa-adjust"></i><span>Window</span></button>
-      <button type="button" class="tool" data-tool="zoom"><i class="fas fa-search-plus"></i><span>Zoom</span></button>
-      <button type="button" class="tool" data-tool="pan"><i class="fas fa-arrows-alt"></i><span>Pan</span></button>
-      <button type="button" class="tool" data-tool="measure"><i class="fas fa-ruler"></i><span>Measure</span></button>
-      <button type="button" class="tool" data-tool="annotate"><i class="fas fa-comment-dots"></i><span>Annotate</span></button>
-      <button type="button" class="tool" data-tool="crosshair"><i class="fas fa-crosshairs"></i><span>Crosshair</span></button>
-      <button type="button" class="tool" data-tool="hu"><i class="fas fa-thermometer-half"></i><span>HU</span></button>
-      <button type="button" class="tool" data-tool="invert"><i class="fas fa-adjust"></i><span>Invert</span></button>
-      <button type="button" class="tool" data-tool="reset"><i class="fas fa-undo"></i><span>Reset</span></button>
-      <button type="button" class="tool" data-tool="fit"><i class="fas fa-compress-arrows-alt"></i><span>Fit</span></button>
-      <button type="button" class="tool" data-tool="one"><i class="fas fa-expand"></i><span>1:1</span></button>
-      <button type="button" class="tool" data-tool="cine"><i class="fas fa-film"></i><span>Cine</span></button>
-      <button type="button" class="tool" data-tool="spyglass"><i class="fas fa-search"></i><span>Spyglass</span></button>
-      <button type="button" class="tool" data-tool="align-center"><i class="fas fa-align-center"></i><span>Center</span></button>
-      <button type="button" class="tool" data-tool="reload"><i class="fas fa-sync"></i><span>Reload</span></button>
-      <button type="button" class="tool" data-tool="ai"><i class="fas fa-robot"></i><span>AI</span></button>
+      <button class="tool active" data-tool="window"><i class="fas fa-adjust"></i><span>Window</span></button>
+      <button class="tool" data-tool="zoom"><i class="fas fa-search-plus"></i><span>Zoom</span></button>
+      <button class="tool" data-tool="pan"><i class="fas fa-arrows-alt"></i><span>Pan</span></button>
+      <button class="tool" data-tool="measure"><i class="fas fa-ruler"></i><span>Measure</span></button>
+      <button class="tool" data-tool="annotate"><i class="fas fa-comment-dots"></i><span>Annotate</span></button>
+      <button class="tool" data-tool="crosshair"><i class="fas fa-crosshairs"></i><span>Crosshair</span></button>
+      <button class="tool" data-tool="hu"><i class="fas fa-thermometer-half"></i><span>HU</span></button>
+      <button class="tool" data-tool="invert"><i class="fas fa-adjust"></i><span>Invert</span></button>
+      <button class="tool" data-tool="reset"><i class="fas fa-undo"></i><span>Reset</span></button>
+      <button class="tool" data-tool="fit"><i class="fas fa-compress-arrows-alt"></i><span>Fit</span></button>
+      <button class="tool" data-tool="one"><i class="fas fa-expand"></i><span>1:1</span></button>
+      <button class="tool" data-tool="cine"><i class="fas fa-film"></i><span>Cine</span></button>
+      <button class="tool" data-tool="spyglass"><i class="fas fa-search"></i><span>Spyglass</span></button>
+      <button class="tool" data-tool="align-center"><i class="fas fa-align-center"></i><span>Center</span></button>
+      <button class="tool" data-tool="reload"><i class="fas fa-sync"></i><span>Reload</span></button>
+      <button class="tool" data-tool="ai"><i class="fas fa-robot"></i><span>AI</span></button>
       <!-- 3D dropdown moved into toolbar -->
       <div class="tool-dropdown">
-        <button type="button" id="btn3D" class="tool"><i class="fas fa-cube"></i><span>3D</span></button>
+        <button id="btn3D" class="tool"><i class="fas fa-cube"></i><span>3D</span></button>
         <div id="menu3D" class="tool-dropdown-menu">
-          <button type="button" data-recon="mpr"><i class="fas fa-layer-group"></i> MPR</button>
-          <button type="button" data-recon="mip"><i class="fas fa-bullseye"></i> MIP</button>
-          <button type="button" data-recon="bone"><i class="fas fa-bone"></i> Bone</button>
+          <button data-recon="mpr"><i class="fas fa-layer-group"></i> MPR</button>
+          <button data-recon="mip"><i class="fas fa-bullseye"></i> MIP</button>
+          <button data-recon="bone"><i class="fas fa-bone"></i> Bone</button>
         </div>
       </div>
     </div>
     <div class="topbar">
-      <button type="button" id="btnLoadLocal" class="btn-control"><i class="fas fa-folder-open"></i> Load Local DICOM</button>
+      <button id="btnLoadLocal" class="btn-control"><i class="fas fa-folder-open"></i> Load Local DICOM</button>
       <a id="btnBackWorklist" class="btn" href="{% url 'worklist:dashboard' %}" onclick="return returnToWorklist(event)"><i class="fas fa-arrow-left"></i> Back to Worklist</a>
       {% if user.is_authenticated and user.can_edit_reports %}
-      <button type="button" id="btnWriteReport" class="btn-control" style="display:none"><i class="fas fa-file-signature"></i> Write Report</button>
+      <button id="btnWriteReport" class="btn-control" style="display:none"><i class="fas fa-file-signature"></i> Write Report</button>
       {% endif %}
       <input id="localDicom" type="file" multiple webkitdirectory directory accept=".dcm,.dicom,application/dicom" style="display:none" />
       <select id="seriesSelect" class="select"><option value="">Select Series</option></select>
@@ -183,10 +183,10 @@
         <option value="">Sort: Instance # (asc)</option>
         <option value="inst_desc">Instance # (desc)</option>
       </select>
-      <button type="button" id="btnToggleTags" class="btn"><i class="fas fa-tags"></i> Tags</button>
-      <button type="button" id="btnShowDicom" class="btn"><i class="fas fa-info-circle"></i> Show DICOM</button>
-      <button type="button" id="btnCapture" class="btn"><i class="fas fa-camera"></i> Capture</button>
-      <button type="button" id="btnPrint" class="btn"><i class="fas fa-print"></i> Print</button>
+      <button id="btnToggleTags" class="btn"><i class="fas fa-tags"></i> Tags</button>
+      <button id="btnShowDicom" class="btn"><i class="fas fa-info-circle"></i> Show DICOM</button>
+      <button id="btnCapture" class="btn"><i class="fas fa-camera"></i> Capture</button>
+      <button id="btnPrint" class="btn"><i class="fas fa-print"></i> Print</button>
       <div id="patientInfo" style="margin-left:auto;color:#ccc;font-size:13px;">Patient: - | Study Date: - | Modality: -</div>
     </div>
     <div class="viewport" id="viewport">
@@ -202,14 +202,14 @@
         <div class="control"><div class="label"><span>Window Level</span><span id="wlVal">40</span></div><input id="wl" type="range" min="-1000" max="1000" value="40"></div>
         <div class="control"><input id="wlNum" type="number" min="-1000" max="1000" step="1" value="40"></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-          <button type="button" class="btn" data-preset="lung">Lung</button>
-          <button type="button" class="btn" data-preset="bone">Bone</button>
-          <button type="button" class="btn" data-preset="soft">Soft</button>
-          <button type="button" class="btn" data-preset="brain">Brain</button>
+          <button class="btn" data-preset="lung">Lung</button>
+          <button class="btn" data-preset="bone">Bone</button>
+          <button class="btn" data-preset="soft">Soft</button>
+          <button class="btn" data-preset="brain">Brain</button>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;">
-          <button type="button" id="btnSavePreset" class="btn"><i class="fas fa-bookmark"></i> Save</button>
-          <button type="button" id="btnLoadPreset" class="btn"><i class="fas fa-list"></i> Load</button>
+          <button id="btnSavePreset" class="btn"><i class="fas fa-bookmark"></i> Save</button>
+          <button id="btnLoadPreset" class="btn"><i class="fas fa-list"></i> Load</button>
         </div>
       </div>
       <div class="panel">
@@ -263,7 +263,7 @@
           <input id="boneThreshold" type="range" min="100" max="1500" value="300">
         </div>
         <div class="control">
-          <button type="button" id="btnGenerateRecon" class="btn-control"><i class="fas fa-cogs"></i> Generate</button>
+          <button id="btnGenerateRecon" class="btn-control"><i class="fas fa-cogs"></i> Generate</button>
         </div>
         <div class="muted" id="reconStatus"></div>
         <div class="row-3" id="reconViews" style="margin-top:8px; display:none;">
@@ -284,7 +284,7 @@
       <div class="panel">
         <h3>Measurements</h3>
         <div class="control">
-          <button type="button" id="btnClearMeasurements" class="btn">Clear All</button>
+          <button id="btnClearMeasurements" class="btn">Clear All</button>
         </div>
         <ul id="measurementsList" style="list-style:none;padding-left:0;margin:0;color:var(--text-secondary);font-size:11px;"></ul>
       </div>
@@ -294,15 +294,15 @@
 
   <!-- Three.js for rotatable bone mesh (loaded only if used) -->
   <!-- Removed deprecated UMD scripts; using ES Modules via importmap -->
-  <div id="threeContainer" role="dialog" aria-modal="true">
-    <button type="button" id="close3d" class="btn">Close 3D</button>
+  <div id="threeContainer">
+    <button id="close3d" class="btn">Close 3D</button>
     <div id="threeMount"></div>
   </div>
   <div id="dicomModal">
-    <div  role="dialog" aria-modal="true">
-      <div  role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
         <h3 style="margin:0;">DICOM Tags</h3>
-        <button type="button" id="closeDicomModal" class="btn">Close</button>
+        <button id="closeDicomModal" class="btn">Close</button>
       </div>
       <pre id="dicomTagsPre" style="white-space:pre-wrap; color:#ddd;"></pre>
     </div>
@@ -310,10 +310,10 @@
 
   <!-- Print Modal -->
   <div id="printModal">
-    <div  role="dialog" aria-modal="true">
-      <div  role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
         <h3>Print DICOM Image</h3>
-        <button type="button" id="closePrintModal" class="btn">Close</button>
+        <button id="closePrintModal" class="btn">Close</button>
       </div>
       <form id="printForm">
         <div class="form-group">
@@ -1518,7 +1518,7 @@
         li.style.cssText = 'margin-bottom: 8px; padding: 4px; background: var(--secondary-bg); border-radius: 4px; display: flex; justify-content: space-between; align-items: center;';
         li.innerHTML = `
           <span style="font-size: 10px; color: var(--text-secondary);">${m.label || `Measurement ${i + 1}`}</span>
-          <button type="button" class="remove-measurement-btn" data-index="${i}" style="background: var(--danger-color); color: white; border: none; padding: 2px 6px; border-radius: 2px; font-size: 9px; cursor: pointer;">Remove</button>
+          <button class="remove-measurement-btn" data-index="${i}" style="background: var(--danger-color); color: white; border: none; padding: 2px 6px; border-radius: 2px; font-size: 9px; cursor: pointer;">Remove</button>
         `;
         measurementsList.appendChild(li);
       });

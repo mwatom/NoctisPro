@@ -1,0 +1,72 @@
+{
+  "verification_summary": {
+    "timestamp": "2025-08-30 17:48:26",
+    "overall_score": 94.3,
+    "individual_scores": {
+      "button_types": 100.0,
+      "aria_labels": 100.0,
+      "modal_roles": 71.4,
+      "css_enhancements": 100.0,
+      "javascript_utilities": 100.0
+    }
+  },
+  "detailed_results": {
+    "button_types": {
+      "total_buttons": 187,
+      "buttons_with_type": 187,
+      "buttons_without_type": 0,
+      "missing_type_buttons": [],
+      "percentage_fixed": 100.0
+    },
+    "aria_labels": {
+      "total_icon_buttons": 12,
+      "icon_buttons_with_labels": 12,
+      "icon_buttons_without_labels": 0,
+      "missing_label_buttons": [],
+      "percentage_fixed": 100.0
+    },
+    "modal_roles": {
+      "total_modals": 7,
+      "modals_with_roles": 5,
+      "modals_without_roles": 2,
+      "missing_role_modals": [
+        {
+          "file": "templates/dicom_viewer/base.html",
+          "modal": "<div id=\"dicomModal\">"
+        },
+        {
+          "file": "templates/dicom_viewer/base.html",
+          "modal": "<div id=\"printModal\">"
+        }
+      ],
+      "percentage_fixed": 71.42857142857143
+    },
+    "css_enhancements": {
+      "hover_states": true,
+      "disabled_states": true,
+      "focus_states": true,
+      "loading_states": true,
+      "animations": true
+    },
+    "javascript_utilities": {
+      "file_exists": true,
+      "click_protection": true,
+      "keyboard_support": true,
+      "loading_states": true,
+      "error_handling": true,
+      "modal_handling": true
+    },
+    "ui_patterns": {
+      "form_buttons": 15,
+      "navigation_buttons": 69,
+      "action_buttons": 225,
+      "modal_triggers": 3,
+      "interactive_elements": 274
+    }
+  },
+  "recommendations": [
+    "Add proper ARIA roles to modal dialogs",
+    "Good progress! Minor improvements needed"
+  ],
+  "status": "PASS"
+}
