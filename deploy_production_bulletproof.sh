@@ -99,6 +99,50 @@ validate_environment() {
     log_success "Sufficient disk space available"
 }
 
+# Install system dependencies
+install_system_dependencies() {
+    log_header "🔧 Installing System Dependencies"
+    
+    # Update package lists
+    log_info "Updating package lists..."
+    apt update -qq || {
+        log_warning "Failed to update package lists, continuing..."
+    }
+    
+    # Install essential system packages
+    log_info "Installing system packages..."
+    apt install -y \
+        python3 \
+        python3-pip \
+        python3-venv \
+        python3.13-venv \
+        redis-server \
+        jq \
+        curl \
+        wget \
+        git \
+        build-essential \
+        libpq-dev \
+        libssl-dev \
+        libffi-dev \
+        libjpeg-dev \
+        libpng-dev \
+        libfreetype6-dev \
+        liblcms2-dev \
+        libwebp-dev \
+        libtiff5-dev \
+        libopenjp2-7-dev \
+        zlib1g-dev \
+        cups \
+        cups-client \
+        cups-filters \
+        libcups2-dev || {
+        log_warning "Some system packages failed to install, but continuing..."
+    }
+    
+    log_success "System dependencies installed"
+}
+
 # Create backup
 create_backup() {
     log_header "📦 Creating Backup"
@@ -138,6 +182,29 @@ setup_services() {
     
     # Database services removed - NoctisPro now runs without SQL databases
     
+    # Start CUPS printing service
+    if command -v cupsd &> /dev/null; then
+        log_info "Configuring CUPS printing service..."
+        if ! pgrep cupsd > /dev/null; then
+            service cups start 2>/dev/null || {
+                log_warning "CUPS start failed, but continuing..."
+            }
+        fi
+        
+        # Configure CUPS for network access
+        cupsctl --remote-any 2>/dev/null || {
+            log_warning "CUPS network configuration failed, but continuing..."
+        }
+        
+        if pgrep cupsd > /dev/null; then
+            log_success "CUPS printing service running"
+        else
+            log_warning "CUPS not running, printing may not work"
+        fi
+    else
+        log_warning "CUPS not installed, printing functionality disabled"
+    fi
+    
     # Start Nginx if available
     if command -v nginx &> /dev/null; then
         if ! pgrep nginx > /dev/null; then
@@ -155,6 +222,16 @@ setup_services() {
 install_dependencies() {
     log_header "📚 Installing Dependencies"
     
+    # Create virtual environment if it doesn't exist
+    if [ ! -d "venv" ]; then
+        log_info "Creating virtual environment..."
+        python3 -m venv venv || {
+            log_error "Failed to create virtual environment"
+            exit 1
+        }
+        log_success "Virtual environment created"
+    fi
+    
     # Activate virtual environment
     source venv/bin/activate || {
         log_error "Failed to activate virtual environment"
@@ -169,9 +246,9 @@ install_dependencies() {
     # Install requirements with error handling
     if [ -f "requirements.txt" ]; then
         log_info "Installing Python packages..."
-        pip install -r requirements.txt --quiet --no-cache-dir || {
+        pip install -r requirements.txt || {
             log_warning "Some packages failed to install, trying essential ones only..."
-            pip install django daphne redis python-dotenv --quiet || {
+            pip install django daphne redis python-dotenv pillow pydicom numpy scipy matplotlib || {
                 log_error "Failed to install essential packages"
                 exit 1
             }
@@ -359,6 +436,7 @@ validate_deployment() {
 # Main deployment flow
 main() {
     validate_environment
+    install_system_dependencies
     create_backup
     setup_services
     install_dependencies
