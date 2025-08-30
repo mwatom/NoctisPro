@@ -141,6 +141,25 @@ install_system_dependencies() {
     }
     
     log_success "System dependencies installed"
+    
+    # Install ngrok
+    log_info "Installing ngrok..."
+    if ! command -v ngrok &> /dev/null; then
+        curl -fsSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc | gpg --dearmor -o /usr/share/keyrings/ngrok.gpg
+        echo "deb [signed-by=/usr/share/keyrings/ngrok.gpg] https://ngrok-agent.s3.amazonaws.com buster main" | tee /etc/apt/sources.list.d/ngrok.list
+        apt update -qq && apt install -y ngrok || {
+            log_warning "Failed to install ngrok via apt, trying direct download..."
+            curl -sSL https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz | tar xz -C /usr/local/bin/ || {
+                log_warning "Ngrok installation failed, tunnel will not be available"
+            }
+        }
+    fi
+    
+    if command -v ngrok &> /dev/null; then
+        log_success "Ngrok installed successfully"
+    else
+        log_warning "Ngrok not available, public tunnel disabled"
+    fi
 }
 
 # Create backup
@@ -276,10 +295,16 @@ configure_environment() {
 DJANGO_DEBUG=false
 DJANGO_SETTINGS_MODULE=noctis_pro.settings
 SECRET_KEY=a7f9d8e2b4c6a1f3e8d7c5b9a2e4f6c8d1b3e5f7a9c2d4e6f8b1c3e5d7a9b2c4
-ALLOWED_HOSTS=localhost,127.0.0.1,*.ngrok.io,*.ngrok-free.app
+ALLOWED_HOSTS=localhost,127.0.0.1,*.ngrok.io,*.ngrok-free.app,colt-charmed-lark.ngrok-free.app
 REDIS_URL=redis://127.0.0.1:6379/0
 DAPHNE_PORT=8000
 DAPHNE_BIND=0.0.0.0
+
+# Ngrok Static URL Configuration
+NGROK_USE_STATIC=true
+NGROK_STATIC_URL=colt-charmed-lark.ngrok-free.app
+NGROK_STATIC_DOMAIN=colt-charmed-lark.ngrok-free.app
+NGROK_REGION=us
 EOF
         log_success "Environment file created"
     fi
@@ -353,9 +378,16 @@ start_services() {
         exit 1
     fi
     
-    # Start ngrok if configured
-    if [ ! -z "${NGROK_AUTHTOKEN:-}" ] && [ ! -z "${NGROK_STATIC_DOMAIN:-}" ]; then
-        log_info "Starting ngrok with static domain..."
+    # Start ngrok with static URL configuration
+    if [ "${NGROK_USE_STATIC:-false}" = "true" ] && [ ! -z "${NGROK_STATIC_URL:-}" ]; then
+        log_info "Starting ngrok with static URL: $NGROK_STATIC_URL"
+        nohup ngrok http --url="https://$NGROK_STATIC_URL" ${DAPHNE_PORT:-8000} --log stdout > logs/ngrok.log 2>&1 &
+        NGROK_PID=$!
+        echo $NGROK_PID > ngrok.pid
+        log_success "Ngrok started with static URL: https://$NGROK_STATIC_URL"
+        echo "https://$NGROK_STATIC_URL" > current_ngrok_url.txt
+    elif [ ! -z "${NGROK_AUTHTOKEN:-}" ] && [ ! -z "${NGROK_STATIC_DOMAIN:-}" ]; then
+        log_info "Starting ngrok with static domain (authenticated)..."
         nohup ngrok http --authtoken="$NGROK_AUTHTOKEN" --url="$NGROK_STATIC_DOMAIN" ${DAPHNE_PORT:-8000} --log stdout > logs/ngrok.log 2>&1 &
         NGROK_PID=$!
         echo $NGROK_PID > ngrok.pid
