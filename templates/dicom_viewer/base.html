@@ -31,17 +31,20 @@
     .main-container { height: 100vh; width: 100vw; position: fixed; top: 0; left: 0; overflow: hidden; }
     .layout { display: grid; grid-template-columns: 82px 1fr 320px; grid-template-rows: 60px 1fr; height: 100%; width: 100%; }
     .toolbar { grid-row: 1 / span 2; grid-column: 1; background: var(--secondary-bg); border-right: 1px solid var(--border-color); padding: 8px 6px; display: flex; flex-direction: column; gap: 6px; overflow:auto; }
-    .tool { width: 52px; height: 46px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 2px; color: var(--text-primary); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 9px; transition: all 0.2s ease; font-weight: 500; }
-    .tool.active { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); }
-    .tool:hover:not(.active) { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); }
+    .tool { width: 52px; height: 46px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 2px; color: var(--text-primary); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 9px; transition: all 0.2s ease; font-weight: 500; position: relative; }
+    .tool.active { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); box-shadow: 0 0 8px rgba(0, 212, 255, 0.3); }
+    .tool:hover:not(.active) { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); }
+    .tool:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
     .tool i { font-size: 16px; margin-bottom: 2px; }
     .topbar { grid-row: 1; grid-column: 2 / span 2; display: flex; align-items: center; gap: 8px; padding: 0 16px; background: var(--header-bg); border-bottom: 1px solid var(--border-color); }
-    .btn { padding: 3px 8px; border: 1px solid var(--border-color); border-radius: 2px; cursor: pointer; font-size: 10px; background: var(--card-bg); color: var(--text-primary); transition: all 0.2s ease; font-weight: 500; display: inline-flex; align-items: center; gap: 3px; text-decoration: none; }
-    .btn:hover { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); }
+    .btn { padding: 3px 8px; border: 1px solid var(--border-color); border-radius: 2px; cursor: pointer; font-size: 10px; background: var(--card-bg); color: var(--text-primary); transition: all 0.2s ease; font-weight: 500; display: inline-flex; align-items: center; gap: 3px; text-decoration: none; min-width: 60px; justify-content: center; }
+    .btn:hover:not(:disabled) { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; pointer-events: none; }
     .btn-primary { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); }
-    .btn-primary:hover { background: #00b8d4; border-color: #00b8d4; }
-    .btn-control { padding: 3px 8px; border: 1px solid var(--border-color); border-radius: 2px; cursor: pointer; font-size: 10px; background: var(--card-bg); color: var(--text-primary); transition: all 0.2s ease; font-weight: 500; display: inline-flex; align-items: center; gap: 3px; text-decoration: none; }
-    .btn-control:hover { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); }
+    .btn-primary:hover:not(:disabled) { background: #00b8d4; border-color: #00b8d4; }
+    .btn-control { padding: 3px 8px; border: 1px solid var(--border-color); border-radius: 2px; cursor: pointer; font-size: 10px; background: var(--card-bg); color: var(--text-primary); transition: all 0.2s ease; font-weight: 500; display: inline-flex; align-items: center; gap: 3px; text-decoration: none; min-width: 80px; justify-content: center; }
+    .btn-control:hover:not(:disabled) { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); }
+    .btn-control:disabled { opacity: 0.6; cursor: not-allowed; pointer-events: none; }
     .select { padding: 4px 6px; background: var(--secondary-bg); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); min-width: 160px; font-size: 10px; }
     .select:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 1px var(--accent-color); }
     .viewport { grid-row: 2; grid-column: 2; background: #000000; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
@@ -410,24 +413,42 @@
     const btn3D = document.getElementById('btn3D');
     const menu3D = document.getElementById('menu3D');
     
-    // 3D dropdown functionality
+    // 3D dropdown functionality - Fixed with better state management
     if (btn3D && menu3D) {
+      let dropdownOpen = false;
+      
       btn3D.addEventListener('click', (e) => {
         e.stopPropagation();
-        menu3D.style.display = menu3D.style.display === 'flex' ? 'none' : 'flex';
+        dropdownOpen = !dropdownOpen;
+        menu3D.style.display = dropdownOpen ? 'flex' : 'none';
+        btn3D.classList.toggle('active', dropdownOpen);
       });
       
       menu3D.addEventListener('click', (e) => {
+        e.stopPropagation();
         const button = e.target.closest('button');
         if (button && button.dataset.recon) {
-          generateReconstruction(button.dataset.recon);
+          const reconType = button.dataset.recon;
+          try {
+            generateReconstruction(reconType);
+            showToast(`Starting ${reconType.toUpperCase()} reconstruction`, 'info');
+          } catch (error) {
+            console.error('3D reconstruction error:', error);
+            showToast(`Failed to start ${reconType.toUpperCase()} reconstruction`, 'error');
+          }
+          dropdownOpen = false;
           menu3D.style.display = 'none';
+          btn3D.classList.remove('active');
         }
       });
       
       // Close dropdown when clicking outside
-      document.addEventListener('click', () => {
-        menu3D.style.display = 'none';
+      document.addEventListener('click', (e) => {
+        if (!btn3D.contains(e.target) && !menu3D.contains(e.target)) {
+          dropdownOpen = false;
+          menu3D.style.display = 'none';
+          btn3D.classList.remove('active');
+        }
       });
     }
     
@@ -447,36 +468,61 @@
     
     
     
-    // Capture button handler
+    // Capture button handler - Fixed with proper error handling
     if (btnCapture) {
       btnCapture.addEventListener('click', () => {
-        // Create a download link for the current canvas
-        const link = document.createElement('a');
-        link.download = `dicom_capture_${Date.now()}.png`;
-        link.href = canvas.toDataURL();
-        link.click();
-        showToast('Image captured successfully', 'success');
+        try {
+          if (!canvas || !canvas.getContext) {
+            showToast('Canvas not available for capture', 'error');
+            return;
+          }
+          
+          // Create a download link for the current canvas
+          const link = document.createElement('a');
+          link.download = `dicom_capture_${Date.now()}.png`;
+          link.href = canvas.toDataURL('image/png', 1.0);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          showToast('Image captured successfully', 'success');
+        } catch (error) {
+          console.error('Capture error:', error);
+          showToast('Failed to capture image', 'error');
+        }
       });
     }
     
-    // Show DICOM tags button handler
+    // Show DICOM tags button handler - Fixed with better error handling
     if (btnShowDicom) {
       btnShowDicom.addEventListener('click', async () => {
-        if (!currentSeries) {
-          showToast('No series loaded', 'error');
-          return;
-        }
         try {
-          const response = await fetch(`/dicom-viewer/api/series/${currentSeries.id}/tags/`);
+          const imageId = getCurrentImageId();
+          if (!imageId) {
+            showToast('No image loaded', 'error');
+            return;
+          }
+          
+          showProgressIndicator();
+          const response = await fetch(`/dicom-viewer/api/image/${imageId}/data/`);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
           const data = await response.json();
-          if (data.tags) {
-            dicomTagsPre.textContent = JSON.stringify(data.tags, null, 2);
+          hideProgressIndicator();
+          
+          if (data && Object.keys(data).length > 0) {
+            dicomTagsPre.textContent = JSON.stringify(data, null, 2);
             dicomModal.style.display = 'flex';
+            showToast('DICOM tags loaded successfully', 'success');
           } else {
-            showToast('No DICOM tags available', 'error');
+            showToast('No DICOM tags available', 'warning');
           }
         } catch (error) {
-          showToast('Failed to load DICOM tags', 'error');
+          hideProgressIndicator();
+          console.error('DICOM tags error:', error);
+          showToast(`Failed to load DICOM tags: ${error.message}`, 'error');
         }
       });
     }
@@ -711,15 +757,53 @@
       }
     }
 
+    // Canvas sizing - Fixed with proper error handling and validation
     function setCanvasSize(){
-      const vp = document.getElementById('viewport');
-      const rect = vp.getBoundingClientRect();
-      canvas.width = Math.max(100, Math.floor(rect.width - 20));
-      canvas.height = Math.max(100, Math.floor(rect.height - 20));
-      canvas.style.maxWidth = '100%';
-      canvas.style.maxHeight = '100%';
+      try {
+        const vp = document.getElementById('viewport');
+        if (!vp) {
+          console.error('Viewport element not found');
+          return;
+        }
+        
+        const rect = vp.getBoundingClientRect();
+        const newWidth = Math.max(100, Math.floor(rect.width - 20));
+        const newHeight = Math.max(100, Math.floor(rect.height - 20));
+        
+        // Only update if dimensions actually changed to avoid unnecessary redraws
+        if (canvas.width !== newWidth || canvas.height !== newHeight) {
+          canvas.width = newWidth;
+          canvas.height = newHeight;
+          canvas.style.maxWidth = '100%';
+          canvas.style.maxHeight = '100%';
+          
+          // Ensure canvas context is preserved
+          if (!canvas.getContext) {
+            console.error('Canvas context not available');
+            return;
+          }
+          
+          // Clear canvas after resize
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#000000';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          
+          console.log(`Canvas resized to ${newWidth}x${newHeight}`);
+        }
+      } catch (error) {
+        console.error('Canvas resize error:', error);
+      }
     }
-    window.addEventListener('resize', ()=>{ setCanvasSize(); requestDraw(); });
+    
+    // Debounced resize handler to prevent excessive redraws
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        setCanvasSize();
+        requestDraw();
+      }, 100);
+    });
 
     function q(name){ return new URLSearchParams(window.location.search).get(name); }
     
@@ -1457,52 +1541,243 @@
     wlSlider.addEventListener('input', e=>{ wl = +e.target.value; wlNum.value = Math.round(wl); document.getElementById('wlVal').textContent = wl; imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw(); });
     sliceSlider.addEventListener('input', e=>{ index = +e.target.value; document.getElementById('sliceVal').textContent = index+1; requestDraw(); debouncedLoadOverlaysForCurrentImage(); prefetchAround(index, 3); });
     zoomSlider.addEventListener('input', e=>{ zoom = (+e.target.value)/100; document.getElementById('zoomVal').textContent = `${e.target.value}%`; requestDraw(); });
-    document.querySelectorAll('[data-preset]').forEach(btn=>btn.addEventListener('click', ()=>{
-      const p = btn.getAttribute('data-preset');
-      const map = { lung:{ww:1500,wl:-600}, bone:{ww:2000,wl:300}, soft:{ww:400,wl:40}, brain:{ww:100,wl:50} };
-      if (map[p]){ ww = map[p].ww; wl = map[p].wl; wwSlider.value = ww; wlSlider.value = wl; wwNum.value = Math.round(ww); wlNum.value = Math.round(wl); document.getElementById('wwVal').textContent = ww; document.getElementById('wlVal').textContent = wl; imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw(); }
-    }));
-    document.querySelectorAll('.tool').forEach(t=>t.addEventListener('click', ()=>{
-      const tool = t.getAttribute('data-tool');
-      document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active')); t.classList.add('active');
-      if (tool === 'invert'){ inverted = !inverted; imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw(); return; }
-      if (tool === 'reset'){ zoom = 1.0; panOffset = {x:0,y:0}; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; requestDraw(); return; }
-      if (tool === 'fit'){ panOffset = {x:0,y:0}; zoom = 1.0; zoomSlider.value = 100; document.getElementById('zoomVal').textContent = '100%'; requestDraw(); return; }
-      if (tool === 'one'){
-        if (lastVp){
-          const baseFit = Math.min(canvas.width / lastVp.imgW, canvas.height / lastVp.imgH);
-          zoom = 1 / baseFit; zoomSlider.value = Math.min(500, Math.max(25, Math.round(zoom*100))); document.getElementById('zoomVal').textContent = `${Math.round(zoom*100)}%`; panOffset={x:0,y:0}; requestDraw();
+    // Window/Level preset buttons - Fixed with enhanced functionality and feedback
+    document.querySelectorAll('[data-preset]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        try {
+          const preset = btn.getAttribute('data-preset');
+          const presetMap = {
+            lung: { ww: 1500, wl: -600, name: 'Lung' },
+            bone: { ww: 2000, wl: 300, name: 'Bone' },
+            soft: { ww: 400, wl: 40, name: 'Soft Tissue' },
+            brain: { ww: 100, wl: 50, name: 'Brain' }
+          };
+          
+          const presetData = presetMap[preset];
+          if (!presetData) {
+            showToast('Invalid window/level preset', 'error');
+            return;
+          }
+          
+          // Apply preset values
+          ww = presetData.ww;
+          wl = presetData.wl;
+          
+          // Update UI controls
+          wwSlider.value = ww;
+          wlSlider.value = wl;
+          wwNum.value = Math.round(ww);
+          wlNum.value = Math.round(wl);
+          document.getElementById('wwVal').textContent = ww;
+          document.getElementById('wlVal').textContent = wl;
+          
+          // Clear caches and redraw
+          imageCache.clear();
+          mprImageCache.clear();
+          mprImgs = { axial: null, sagittal: null, coronal: null };
+          requestDraw();
+          
+          // Provide user feedback
+          showToast(`${presetData.name} preset applied (WW: ${ww}, WL: ${wl})`, 'success', 2000);
+          
+          // Highlight the selected preset button temporarily
+          btn.style.background = 'var(--success-color)';
+          btn.style.color = 'var(--primary-bg)';
+          setTimeout(() => {
+            btn.style.background = '';
+            btn.style.color = '';
+          }, 1000);
+          
+        } catch (error) {
+          console.error('Preset button error:', error);
+          showToast(`Failed to apply preset: ${error.message}`, 'error');
         }
-        return;
-      }
-      if (tool === 'cine'){
-        cineActive = !cineActive;
-        if (cineActive){
-          if (cineTimer) clearInterval(cineTimer);
-          cineTimer = setInterval(()=>{
-            if (!images.length) return; index = (index + 1) % images.length; sliceSlider.value = index; document.getElementById('sliceVal').textContent = index+1; requestDraw(); debouncedLoadOverlaysForCurrentImage();
-          }, Math.max(30, Math.round(1000/cineFps)));
-        } else { if (cineTimer) { clearInterval(cineTimer); cineTimer = null; } }
-        return;
-      }
-      if (tool === 'spyglass'){ spyglass.active = !spyglass.active; requestDraw(); return; }
-      if (tool === 'align-center'){ panOffset = {x:0,y:0}; requestDraw(); return; }
-      if (tool === 'reload'){ ww = defaultWw; wl = defaultWl; inverted = false; panOffset={x:0,y:0}; zoom=1.0; wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); zoomSlider.value=100; document.getElementById('zoomVal').textContent='100%'; imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw(); return; }
-      if (tool === 'ai'){ console.info('AI analysis: stub'); return; }
-      if (tool === 'crosshair'){ if (activeTool === 'crosshair'){ crosshair = false; activeTool = 'window'; } else { activeTool = 'crosshair'; crosshair = true; } requestDraw(); return; }
-      if (tool === 'hu'){ showHuProbe = true; huEllipse = null; requestDraw(); return; }
-             if (tool === 'measure') { showHuProbe = false; if (mprMode) document.getElementById('mprMeasurePanel').style.display=''; }
-      // remove old inline MPR toggle from tool button; handled by 3D dropdown now
-             if (tool === 'mpr'){
-         return; // no-op
-       }
-       if (mprMode){
-         // In MPR, toggle measure panel visibility based on tool
-         document.getElementById('mprMeasurePanel').style.display = (tool === 'measure') ? '' : document.getElementById('mprMeasurePanel').style.display;
-         return;
-       }
-       activeTool = tool;
-     }));
+      });
+    });
+    // Tool button handlers - Fixed with comprehensive error handling and validation
+    document.querySelectorAll('.tool').forEach(t => {
+      t.addEventListener('click', () => {
+        try {
+          const tool = t.getAttribute('data-tool');
+          
+          if (!tool) {
+            console.warn('Tool button missing data-tool attribute');
+            return;
+          }
+          
+          // Update active state
+          document.querySelectorAll('.tool').forEach(x => x.classList.remove('active'));
+          t.classList.add('active');
+          
+          // Handle specific tools with improved functionality
+          switch (tool) {
+            case 'invert':
+              inverted = !inverted;
+              imageCache.clear();
+              mprImageCache.clear();
+              mprImgs = { axial: null, sagittal: null, coronal: null };
+              requestDraw();
+              showToast('Image inverted', 'info', 1000);
+              return;
+              
+            case 'reset':
+              zoom = 1.0;
+              panOffset = { x: 0, y: 0 };
+              ww = defaultWw;
+              wl = defaultWl;
+              inverted = false;
+              zoomSlider.value = 100;
+              wwSlider.value = Math.round(ww);
+              wlSlider.value = Math.round(wl);
+              document.getElementById('zoomVal').textContent = '100%';
+              document.getElementById('wwVal').textContent = Math.round(ww);
+              document.getElementById('wlVal').textContent = Math.round(wl);
+              imageCache.clear();
+              mprImageCache.clear();
+              mprImgs = { axial: null, sagittal: null, coronal: null };
+              requestDraw();
+              showToast('View reset to defaults', 'success', 1000);
+              return;
+              
+            case 'fit':
+              panOffset = { x: 0, y: 0 };
+              zoom = 1.0;
+              zoomSlider.value = 100;
+              document.getElementById('zoomVal').textContent = '100%';
+              requestDraw();
+              showToast('Image fitted to viewport', 'info', 1000);
+              return;
+              
+            case 'one':
+              if (lastVp) {
+                const baseFit = Math.min(canvas.width / lastVp.imgW, canvas.height / lastVp.imgH);
+                zoom = 1 / baseFit;
+                zoomSlider.value = Math.min(500, Math.max(25, Math.round(zoom * 100)));
+                document.getElementById('zoomVal').textContent = `${Math.round(zoom * 100)}%`;
+                panOffset = { x: 0, y: 0 };
+                requestDraw();
+                showToast('Zoom set to 1:1', 'info', 1000);
+              }
+              return;
+              
+            case 'cine':
+              cineActive = !cineActive;
+              if (cineActive) {
+                if (!images.length) {
+                  showToast('No images available for cine mode', 'warning');
+                  cineActive = false;
+                  return;
+                }
+                if (cineTimer) clearInterval(cineTimer);
+                cineTimer = setInterval(() => {
+                  if (!images.length) return;
+                  index = (index + 1) % images.length;
+                  sliceSlider.value = index;
+                  document.getElementById('sliceVal').textContent = index + 1;
+                  requestDraw();
+                  debouncedLoadOverlaysForCurrentImage();
+                }, Math.max(30, Math.round(1000 / cineFps)));
+                showToast('Cine mode started', 'success', 1000);
+              } else {
+                if (cineTimer) {
+                  clearInterval(cineTimer);
+                  cineTimer = null;
+                }
+                showToast('Cine mode stopped', 'info', 1000);
+              }
+              return;
+              
+            case 'spyglass':
+              spyglass.active = !spyglass.active;
+              requestDraw();
+              showToast(`Spyglass ${spyglass.active ? 'enabled' : 'disabled'}`, 'info', 1000);
+              return;
+              
+            case 'align-center':
+              panOffset = { x: 0, y: 0 };
+              requestDraw();
+              showToast('Image centered', 'info', 1000);
+              return;
+              
+            case 'reload':
+              // Reset all parameters
+              ww = defaultWw;
+              wl = defaultWl;
+              inverted = false;
+              panOffset = { x: 0, y: 0 };
+              zoom = 1.0;
+              wwSlider.value = Math.round(ww);
+              wlSlider.value = Math.round(wl);
+              document.getElementById('wwVal').textContent = Math.round(ww);
+              document.getElementById('wlVal').textContent = Math.round(wl);
+              zoomSlider.value = 100;
+              document.getElementById('zoomVal').textContent = '100%';
+              imageCache.clear();
+              mprImageCache.clear();
+              mprImgs = { axial: null, sagittal: null, coronal: null };
+              requestDraw();
+              showToast('All settings reloaded', 'success', 1000);
+              return;
+              
+            case 'ai':
+              showToast('AI analysis feature coming soon', 'info');
+              return;
+              
+            case 'crosshair':
+              if (activeTool === 'crosshair') {
+                crosshair = false;
+                activeTool = 'window';
+                showToast('Crosshair disabled', 'info', 1000);
+              } else {
+                activeTool = 'crosshair';
+                crosshair = true;
+                showToast('Crosshair enabled', 'info', 1000);
+              }
+              requestDraw();
+              return;
+              
+            case 'hu':
+              showHuProbe = true;
+              huEllipse = null;
+              requestDraw();
+              showToast('HU probe enabled', 'info', 1000);
+              return;
+              
+            case 'measure':
+              showHuProbe = false;
+              if (mprMode) {
+                document.getElementById('mprMeasurePanel').style.display = '';
+              }
+              showToast('Measurement tool selected', 'info', 1000);
+              break;
+              
+            case 'mpr':
+              // No-op, handled by 3D dropdown
+              return;
+              
+            default:
+              // Generic tool activation
+              break;
+          }
+          
+          // Handle MPR mode specifics
+          if (mprMode) {
+            const mprPanel = document.getElementById('mprMeasurePanel');
+            if (mprPanel) {
+              mprPanel.style.display = (tool === 'measure') ? '' : mprPanel.style.display;
+            }
+            return;
+          }
+          
+          // Set active tool
+          activeTool = tool;
+          
+        } catch (error) {
+          console.error('Tool button error:', error);
+          showToast(`Tool error: ${error.message}`, 'error');
+        }
+      });
+    });
 
     // Mouse interactions on viewport
     const viewport = document.getElementById('viewport');
@@ -1885,80 +2160,157 @@
     // Local DICOM upload with debounce protection
     let uploadInProgress = false;
     
-    btnLoadLocal.addEventListener('click', ()=> {
-      if (uploadInProgress) {
-        console.warn('Upload already in progress');
-        return;
-      }
-      inputLocal.click();
-    });
-    
-    inputLocal.addEventListener('change', async (e)=>{
-      try {
+    // Load Local DICOM button - Fixed with better state management
+    if (btnLoadLocal && inputLocal) {
+      btnLoadLocal.addEventListener('click', () => {
         if (uploadInProgress) {
-          console.warn('Upload already in progress');
+          showToast('Upload already in progress', 'warning');
           return;
         }
-        
-        const files = e.target.files ? Array.from(e.target.files) : [];
-        if (!files.length) return;
-        
-        // Set upload state immediately
-        uploadInProgress = true;
-        btnLoadLocal.disabled = true;
-        btnLoadLocal.style.pointerEvents = 'none';
-        reconStatus.textContent = 'Uploading DICOM files...';
-        
-        const CHUNK_SIZE = 80;
-        const MAX_PARALLEL = 2;
-        const chunks = [];
-        for (let i=0; i<files.length; i+=CHUNK_SIZE){ chunks.push(files.slice(i, i+CHUNK_SIZE)); }
-        let current = 0; let lastStudyId = null; let errors = 0;
-        async function uploadChunk(chunk){
-          const form = new FormData();
-          chunk.forEach(f=> form.append('dicom_files', f));
-          const resp = await fetch('/dicom-viewer/upload/', { method:'POST', body: form });
-          
-          if (!resp.ok) {
-            console.error('Upload failed with status:', resp.status);
-            errors++;
-            return;
-          }
-          
-          let data;
-          try {
-            data = await resp.json();
-          } catch (e) {
-            console.error('JSON parsing error:', e, 'Response status:', resp.status);
-            errors++;
-            return;
-          }
-          
-          if (!data.success){ errors++; return; }
-          current += chunk.length;
-          if (!lastStudyId && data.study_id) lastStudyId = data.study_id;
-          reconStatus.textContent = `Uploading... ${current}/${files.length}`;
+        try {
+          inputLocal.click();
+        } catch (error) {
+          console.error('File input error:', error);
+          showToast('Failed to open file dialog', 'error');
         }
-        let idx = 0;
-        const workers = Array.from({length: Math.min(MAX_PARALLEL, chunks.length)}).map(async ()=>{
-          while (true){ const i = idx++; if (i >= chunks.length) break; await uploadChunk(chunks[i]); }
-        });
-        await Promise.all(workers);
-        if (errors > 0 && current === 0) throw new Error('Upload failed');
-        reconStatus.textContent = 'Upload complete. Loading study...';
-        if (lastStudyId) { await loadStudy(lastStudyId); }
-        reconStatus.textContent = '';
-      } catch (err){
-        reconStatus.textContent = `Error: ${err.message}`;
-        await fallbackToDesktop();
-      } finally {
-        // Reset upload state
-        uploadInProgress = false;
-        btnLoadLocal.disabled = false;
-        btnLoadLocal.style.pointerEvents = '';
-        e.target.value = '';
-      }
-    });
+      });
+    }
+    
+    // File input change handler - Fixed with comprehensive error handling
+    if (inputLocal) {
+      inputLocal.addEventListener('change', async (e) => {
+        try {
+          if (uploadInProgress) {
+            showToast('Upload already in progress', 'warning');
+            return;
+          }
+          
+          const files = e.target.files ? Array.from(e.target.files) : [];
+          if (!files.length) {
+            showToast('No files selected', 'warning');
+            return;
+          }
+          
+          // Validate file types
+          const validFiles = files.filter(file => {
+            const name = file.name.toLowerCase();
+            return name.endsWith('.dcm') || name.endsWith('.dicom') || file.type === 'application/dicom' || file.size > 132;
+          });
+          
+          if (validFiles.length === 0) {
+            showToast('No valid DICOM files found', 'error');
+            return;
+          }
+          
+          if (validFiles.length < files.length) {
+            showToast(`${files.length - validFiles.length} non-DICOM files filtered out`, 'warning');
+          }
+          
+          // Set upload state immediately
+          uploadInProgress = true;
+          btnLoadLocal.disabled = true;
+          btnLoadLocal.style.pointerEvents = 'none';
+          btnLoadLocal.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+          reconStatus.textContent = `Uploading ${validFiles.length} DICOM files...`;
+          showProgressIndicator();
+          
+          const CHUNK_SIZE = 50; // Reduced for better reliability
+          const MAX_PARALLEL = 2;
+          const chunks = [];
+          for (let i = 0; i < validFiles.length; i += CHUNK_SIZE) {
+            chunks.push(validFiles.slice(i, i + CHUNK_SIZE));
+          }
+          
+          let current = 0;
+          let lastStudyId = null;
+          let errors = 0;
+          
+          async function uploadChunk(chunk) {
+            try {
+              const form = new FormData();
+              chunk.forEach(f => form.append('dicom_files', f));
+              
+              const resp = await fetch('/dicom-viewer/upload/', { 
+                method: 'POST', 
+                body: form,
+                headers: {
+                  'X-Requested-With': 'XMLHttpRequest'
+                }
+              });
+              
+              if (!resp.ok) {
+                const errorText = await resp.text();
+                console.error('Upload failed with status:', resp.status, errorText);
+                errors++;
+                return;
+              }
+              
+              const data = await resp.json();
+              
+              if (!data.success) {
+                console.error('Upload chunk failed:', data.error);
+                errors++;
+                return;
+              }
+              
+              current += chunk.length;
+              if (!lastStudyId && data.study_id) lastStudyId = data.study_id;
+              reconStatus.textContent = `Uploading... ${current}/${validFiles.length} (${Math.round(current/validFiles.length*100)}%)`;
+              
+            } catch (error) {
+              console.error('Upload chunk error:', error);
+              errors++;
+            }
+          }
+          
+          // Process chunks with controlled parallelism
+          let chunkIndex = 0;
+          const workers = Array.from({length: Math.min(MAX_PARALLEL, chunks.length)}).map(async () => {
+            while (chunkIndex < chunks.length) {
+              const currentChunk = chunkIndex++;
+              if (currentChunk < chunks.length) {
+                await uploadChunk(chunks[currentChunk]);
+              }
+            }
+          });
+          
+          await Promise.all(workers);
+          
+          if (errors > 0 && current === 0) {
+            throw new Error('All upload chunks failed');
+          }
+          
+          if (errors > 0) {
+            showToast(`Upload completed with ${errors} errors`, 'warning');
+          }
+          
+          reconStatus.textContent = 'Upload complete. Loading study...';
+          
+          if (lastStudyId) {
+            await loadStudy(lastStudyId);
+            showToast('DICOM files uploaded and loaded successfully', 'success');
+          } else {
+            throw new Error('No study ID returned from upload');
+          }
+          
+          reconStatus.textContent = '';
+          
+        } catch (err) {
+          console.error('Upload error:', err);
+          reconStatus.textContent = `Error: ${err.message}`;
+          showToast(`Upload failed: ${err.message}`, 'error');
+          // Don't fallback to desktop for upload errors
+        } finally {
+          // Reset upload state
+          uploadInProgress = false;
+          btnLoadLocal.disabled = false;
+          btnLoadLocal.style.pointerEvents = '';
+          btnLoadLocal.innerHTML = '<i class="fas fa-folder-open"></i> Load Local DICOM';
+          hideProgressIndicator();
+          e.target.value = '';
+        }
+      });
+    }
 
     // Recon controls
     reconType.addEventListener('change', ()=>{
@@ -2099,7 +2451,18 @@
       }
     }
  
-           btnGenerateRecon.addEventListener('click', ()=>{ generateReconstruction(); });
+           // Generate reconstruction button - Fixed with proper reconstruction type detection
+           if (btnGenerateRecon) {
+             btnGenerateRecon.addEventListener('click', () => {
+               const selectedType = reconType.value || 'mpr';
+               try {
+                 generateReconstruction(selectedType);
+               } catch (error) {
+                 console.error('Reconstruction button error:', error);
+                 showToast(`Failed to start reconstruction: ${error.message}`, 'error');
+               }
+             });
+           }
 
       // Worklist navigation that prefers returning to the original/mother worklist window
       function returnToWorklist(e){
@@ -2133,11 +2496,46 @@
  
      // 3D dropdown interactions (already handled above)
  
-     // Clear measurements
-     btnClearMeasurements.addEventListener('click', ()=>{
-       if (mprMode){ mprMeasurements.axial = []; mprMeasurements.sagittal = []; mprMeasurements.coronal = []; draw(); }
-       else { measurements = []; imageIdToMeasurements.set(getCurrentImageId(), measurements); renderMeasurementsList(); draw(); }
-     });
+     // Clear measurements - Fixed with confirmation and feedback
+     if (btnClearMeasurements) {
+       btnClearMeasurements.addEventListener('click', () => {
+         try {
+           const hasMeasurements = mprMode ? 
+             (mprMeasurements.axial.length > 0 || mprMeasurements.sagittal.length > 0 || mprMeasurements.coronal.length > 0) :
+             (measurements.length > 0);
+           
+           if (!hasMeasurements) {
+             showToast('No measurements to clear', 'info');
+             return;
+           }
+           
+           if (!confirm('Are you sure you want to clear all measurements?')) {
+             return;
+           }
+           
+           if (mprMode) {
+             mprMeasurements.axial = [];
+             mprMeasurements.sagittal = [];
+             mprMeasurements.coronal = [];
+             showToast('MPR measurements cleared', 'success');
+           } else {
+             measurements = [];
+             const imageId = getCurrentImageId();
+             if (imageId) {
+               imageIdToMeasurements.set(imageId, measurements);
+             }
+             renderMeasurementsList();
+             showToast('Measurements cleared', 'success');
+           }
+           
+           draw();
+           
+         } catch (error) {
+           console.error('Clear measurements error:', error);
+           showToast(`Failed to clear measurements: ${error.message}`, 'error');
+         }
+       });
+     }
 
      // Sorting
      sortSelect.addEventListener('change', async ()=>{
@@ -2154,25 +2552,11 @@
        showTagsOverlay = !showTagsOverlay; await loadOverlaysForCurrentImage();
      });
 
-     // Show DICOM modal
-     btnShowDicom.addEventListener('click', async ()=>{
-       try {
-         const imageId = getCurrentImageId(); if (!imageId) return;
-                   const r = await fetch(`/dicom-viewer/api/image/${imageId}/data/`); const j = await r.json();
-         dicomTagsPre.textContent = JSON.stringify(j, null, 2);
-         dicomModal.style.display = 'flex';
-       } catch(e){}
-     });
+     // Show DICOM modal - Removed duplicate handler (handled above with better error handling)
      closeDicomModal.addEventListener('click', ()=>{ dicomModal.style.display = 'none'; });
      dicomModal.addEventListener('click', (e)=>{ if (e.target === dicomModal) dicomModal.style.display = 'none'; });
 
-     // Capture canvas
-     btnCapture.addEventListener('click', ()=>{
-       try {
-         const url = canvas.toDataURL('image/jpeg', 0.92);
-         const a = document.createElement('a'); a.href = url; a.download = `dicom_capture_${Date.now()}.jpg`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-       } catch(e){}
-     });
+     // Capture canvas - Removed duplicate handler (handled above with better error handling)
 
      // Print functionality
      const btnPrint = document.getElementById('btnPrint');
@@ -2260,18 +2644,28 @@
        window.detectedPrintCapabilities = printCapabilities;
      }
 
-     // Load available printers and layouts when modal opens
-     btnPrint.addEventListener('click', async ()=>{
-       try {
-         // Auto-detect client machine printers using Web API
-         await loadClientPrinters();
-         
-         // Also load server printers as fallback
+     // Print button - Fixed with comprehensive error handling
+     if (btnPrint && printModal) {
+       btnPrint.addEventListener('click', async () => {
          try {
-           const printersResponse = await fetch('/dicom-viewer/print/printers/');
-           const printersData = await printersResponse.json();
+           if (!canvas || !canvas.getContext) {
+             showToast('No image available for printing', 'error');
+             return;
+           }
            
-           if (printersData.success && printersData.printers.length > 0) {
+           // Show loading state
+           btnPrint.disabled = true;
+           btnPrint.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+           
+           // Auto-detect client machine printers using Web API
+           await loadClientPrinters();
+           
+           // Also load server printers as fallback
+           try {
+             const printersResponse = await fetch('/dicom-viewer/print/printers/');
+             const printersData = await printersResponse.json();
+             
+             if (printersData.success && printersData.printers.length > 0) {
              // Add server printers with indication
              printersData.printers.forEach(printer => {
                const option = document.createElement('option');
@@ -2307,11 +2701,19 @@
            }
          }
          
-         printModal.style.display = 'flex';
-       } catch(e) {
-         console.error('Error loading print options:', e.message);
-       }
-     });
+           printModal.style.display = 'flex';
+           showToast('Print options loaded', 'success');
+           
+         } catch(error) {
+           console.error('Error loading print options:', error);
+           showToast(`Failed to load print options: ${error.message}`, 'error');
+         } finally {
+           // Reset button state
+           btnPrint.disabled = false;
+           btnPrint.innerHTML = '<i class="fas fa-print"></i> Print';
+         }
+       });
+     }
 
      // Handle print medium changes
      const printMedium = document.getElementById('printMedium');
@@ -2869,10 +3271,80 @@
       });
     });
     
-    // Init
-    setCanvasSize();
-    const studyId = q('study_id');
-    if (studyId) loadStudy(studyId);
+    // Comprehensive initialization - Fixed with validation and error handling
+    function initializeViewer() {
+      try {
+        console.log('Initializing DICOM viewer...');
+        
+        // Validate essential elements
+        const essentialElements = {
+          canvas: document.getElementById('dicomCanvas'),
+          viewport: document.getElementById('viewport'),
+          seriesSelect: document.getElementById('seriesSelect'),
+          wwSlider: document.getElementById('ww'),
+          wlSlider: document.getElementById('wl')
+        };
+        
+        const missingElements = Object.entries(essentialElements)
+          .filter(([name, element]) => !element)
+          .map(([name]) => name);
+        
+        if (missingElements.length > 0) {
+          console.error('Missing essential elements:', missingElements);
+          showToast(`Viewer initialization failed: missing ${missingElements.join(', ')}`, 'error');
+          return;
+        }
+        
+        // Set initial canvas size
+        setCanvasSize();
+        
+        // Validate canvas context
+        if (!canvas.getContext) {
+          console.error('Canvas context not available');
+          showToast('Canvas not supported in this browser', 'error');
+          return;
+        }
+        
+        // Initialize canvas
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Load study if specified
+        const studyId = q('study_id');
+        if (studyId) {
+          console.log(`Loading study ID: ${studyId}`);
+          loadStudy(studyId);
+        } else {
+          showToast('DICOM viewer ready - load a study to begin', 'info', 3000);
+        }
+        
+        // Validate all button elements
+        const buttons = [
+          'btnLoadLocal', 'btnBackWorklist', 'btnWriteReport', 'btnToggleTags', 
+          'btnShowDicom', 'btnCapture', 'btnPrint', 'btnClearMeasurements',
+          'btnSavePreset', 'btnLoadPreset', 'btnGenerateRecon'
+        ];
+        
+        const missingButtons = buttons.filter(id => !document.getElementById(id));
+        if (missingButtons.length > 0) {
+          console.warn('Some buttons not found:', missingButtons);
+        }
+        
+        console.log('DICOM viewer initialized successfully');
+        
+      } catch (error) {
+        console.error('Viewer initialization error:', error);
+        showToast(`Initialization failed: ${error.message}`, 'error');
+      }
+    }
+    
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initializeViewer);
+    } else {
+      initializeViewer();
+    }
 
      // Unit selector wiring
      const unitSelect = document.getElementById('unitSelect');
@@ -2913,27 +3385,116 @@
      document.getElementById('mprMeasurePlane').addEventListener('change', (e)=>{ mprMeasurePlaneMode = e.target.value; });
      document.getElementById('mprMeasureType').addEventListener('change', (e)=>{ mprMeasureType = e.target.value; });
 
-     // Preset handlers
-     if (btnSavePreset) btnSavePreset.addEventListener('click', async()=>{
-       try {
-         const name = `Preset_${Date.now()}`; // Auto-generate preset name
-         const payload = { name, modality: (currentStudy&&currentStudy.modality)||'', window_width: ww, window_level: wl, inverted };
-         await fetch('/dicom-viewer/api/presets/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-         showToast('Preset saved', 'success', 2000);
-       } catch(_){}
-     });
-     if (btnLoadPreset) btnLoadPreset.addEventListener('click', async()=>{
-       try {
-         const r = await fetch(`/dicom-viewer/api/presets/?modality=${encodeURIComponent((currentStudy&&currentStudy.modality)||'')}`);
-         const j = await r.json();
-         const presets = (j.presets||[]);
-         if (!presets.length) return;
-         // Load the most recent preset automatically
-         const p = presets[presets.length - 1];
-         ww = p.window_width; wl = p.window_level; inverted = !!p.inverted; wwSlider.value=ww; wlSlider.value=wl; wwNum.value=Math.round(ww); wlNum.value=Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl); imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw();
-         showToast(`Preset "${p.name}" loaded`, 'success', 2000);
-       } catch(_){}
-     });
+     // Preset handlers - Fixed with comprehensive error handling and user feedback
+     if (btnSavePreset) {
+       btnSavePreset.addEventListener('click', async () => {
+         try {
+           if (!currentStudy) {
+             showToast('No study loaded to save preset for', 'warning');
+             return;
+           }
+           
+           const name = prompt('Enter preset name:', `${currentStudy.modality || 'Custom'}_Preset_${Date.now()}`);
+           if (!name) {
+             showToast('Preset save cancelled', 'info');
+             return;
+           }
+           
+           const payload = {
+             name: name.trim(),
+             modality: (currentStudy && currentStudy.modality) || '',
+             window_width: ww,
+             window_level: wl,
+             inverted: inverted
+           };
+           
+           btnSavePreset.disabled = true;
+           btnSavePreset.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+           
+           const response = await fetch('/dicom-viewer/api/presets/', {
+             method: 'POST',
+             headers: {
+               'Content-Type': 'application/json',
+               'X-CSRFToken': getCookie('csrftoken')
+             },
+             body: JSON.stringify(payload)
+           });
+           
+           if (!response.ok) {
+             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+           }
+           
+           const result = await response.json();
+           if (result.success) {
+             showToast(`Preset "${name}" saved successfully`, 'success', 2000);
+           } else {
+             throw new Error(result.error || 'Failed to save preset');
+           }
+           
+         } catch (error) {
+           console.error('Save preset error:', error);
+           showToast(`Failed to save preset: ${error.message}`, 'error');
+         } finally {
+           btnSavePreset.disabled = false;
+           btnSavePreset.innerHTML = '<i class="fas fa-bookmark"></i> Save';
+         }
+       });
+     }
+     
+     if (btnLoadPreset) {
+       btnLoadPreset.addEventListener('click', async () => {
+         try {
+           btnLoadPreset.disabled = true;
+           btnLoadPreset.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+           
+           const modality = (currentStudy && currentStudy.modality) || '';
+           const response = await fetch(`/dicom-viewer/api/presets/?modality=${encodeURIComponent(modality)}`);
+           
+           if (!response.ok) {
+             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+           }
+           
+           const data = await response.json();
+           const presets = data.presets || [];
+           
+           if (!presets.length) {
+             showToast('No presets found for this modality', 'info');
+             return;
+           }
+           
+           // Load the most recent preset automatically
+           const preset = presets[presets.length - 1];
+           
+           // Apply preset values
+           ww = preset.window_width;
+           wl = preset.window_level;
+           inverted = !!preset.inverted;
+           
+           // Update UI controls
+           wwSlider.value = ww;
+           wlSlider.value = wl;
+           wwNum.value = Math.round(ww);
+           wlNum.value = Math.round(wl);
+           document.getElementById('wwVal').textContent = Math.round(ww);
+           document.getElementById('wlVal').textContent = Math.round(wl);
+           
+           // Clear caches and redraw
+           imageCache.clear();
+           mprImageCache.clear();
+           mprImgs = { axial: null, sagittal: null, coronal: null };
+           requestDraw();
+           
+           showToast(`Preset "${preset.name}" loaded successfully`, 'success', 2000);
+           
+         } catch (error) {
+           console.error('Load preset error:', error);
+           showToast(`Failed to load preset: ${error.message}`, 'error');
+         } finally {
+           btnLoadPreset.disabled = false;
+           btnLoadPreset.innerHTML = '<i class="fas fa-list"></i> Load';
+         }
+       });
+     }
    })();
   </script>
 </body>
