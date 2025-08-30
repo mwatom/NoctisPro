@@ -174,7 +174,7 @@
       {% if user.is_authenticated and user.can_edit_reports %}
       <button id="btnWriteReport" class="btn-control" style="display:none"><i class="fas fa-file-signature"></i> Write Report</button>
       {% endif %}
-      <input id="localDicom" type="file" multiple webkitdirectory directory accept=".dcm,.dicom,application/dicom" style="display:none" />
+      <input id="localDicom" type="file" multiple accept=".dcm,.dicom,application/dicom" style="display:none" />
       <select id="seriesSelect" class="select"><option value="">Select Series</option></select>
       <select id="sortSelect" class="select">
         <option value="">Sort: Instance # (asc)</option>

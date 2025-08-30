@@ -795,3 +795,21 @@ Bad Request: /dicom-viewer/api/series/1/bone/
 Internal Server Error: /dicom-viewer/api/series/1/volume/
 Service Unavailable: /health/
 [35;1mHTTP GET /health/ 503 [0.01, 127.0.0.1:59914][0m
+Watching for file changes with StatReloader
+[32mHTTP GET / 302 [0.01, 127.0.0.1:60224][0m
+[32mHTTP GET /dicom-viewer/ 302 [0.00, 127.0.0.1:60230][0m
+[32mHTTP GET /dicom-viewer/web/viewer/ 302 [0.00, 127.0.0.1:38508][0m
+[32mHTTP GET /admin/ 302 [0.01, 127.0.0.1:57368][0m
+Internal Server Error: /dicom-viewer/api/series/3/mpr/
+Bad Request: /dicom-viewer/api/series/3/bone/
+Service Unavailable: /health/
+[32mHTTP HEAD /admin/ 302 [0.00, 127.0.0.1:51696][0m
+[mHTTP GET /health/simple/ 200 [0.00, 127.0.0.1:48836][0m
+/workspace/noctis_pro/settings.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/noctis_pro/settings.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+[mHTTP GET /health/ 200 [0.01, 127.0.0.1:60812][0m
+[mHTTP GET /health/ 200 [0.00, 127.0.0.1:35006][0m
+[32mHTTP GET /dicom-viewer/web/viewer/ 302 [0.01, 127.0.0.1:35018][0m
