@@ -1,17 +1,2 @@
 {% load static %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DICOM Web Viewer</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-</head>
-<body>
-    {% include 'dicom_viewer/base.html' %}
-    <script>
-    // Minimal loader to use the embedded script logic in included base
-    // The included base.html contains the full viewer UI and JS.
-    </script>
-</body>
-</html>
+{% include 'dicom_viewer/base.html' %}

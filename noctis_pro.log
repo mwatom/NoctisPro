@@ -793,3 +793,5 @@ Internal Server Error: /dicom-viewer/api/series/1/volume/
 Bad Request: /dicom-viewer/api/hu/
 Bad Request: /dicom-viewer/api/series/1/bone/
 Internal Server Error: /dicom-viewer/api/series/1/volume/
+Service Unavailable: /health/
+[35;1mHTTP GET /health/ 503 [0.01, 127.0.0.1:59914][0m
