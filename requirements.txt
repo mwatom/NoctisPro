@@ -1,27 +1,50 @@
-Django
-psycopg2-binary
-redis
-channels
+# Core Django Framework
+Django>=4.2
 djangorestframework
 django-cors-headers
-daphne
-channels-redis
-pillow
-django-redis
-pydicom
-requests
-numpy
-matplotlib
-plotly
-celery
-gunicorn
-asgiref
-scipy
-scikit-image
-reportlab
-django-widget-tweaks
-python-dotenv
-whitenoise
 django-extensions
 django-health-check
-dj-database-url
+django-redis
+django-widget-tweaks
+
+# ASGI Server and WebSocket Support
+daphne
+channels
+channels-redis
+
+# Database and Caching
+redis
+
+# Authentication and Security
+cryptography
+
+# Image Processing and Medical Imaging
+Pillow
+pydicom
+scikit-image
+SimpleITK
+
+# Scientific Computing
+numpy
+scipy
+matplotlib
+plotly
+
+# Async Task Processing
+celery
+
+# PDF Generation
+reportlab
+
+# HTTP Requests
+requests
+
+# Environment Configuration
+python-dotenv
+
+# Production Server
+gunicorn
+whitenoise
+
+# Development Tools
+django-extensions

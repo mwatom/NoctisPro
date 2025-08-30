@@ -99,6 +99,69 @@ validate_environment() {
     log_success "Sufficient disk space available"
 }
 
+# Install system dependencies
+install_system_dependencies() {
+    log_header "🔧 Installing System Dependencies"
+    
+    # Update package lists
+    log_info "Updating package lists..."
+    apt update -qq || {
+        log_warning "Failed to update package lists, continuing..."
+    }
+    
+    # Install essential system packages
+    log_info "Installing system packages..."
+    apt install -y \
+        python3 \
+        python3-pip \
+        python3-venv \
+        python3.13-venv \
+        redis-server \
+        jq \
+        curl \
+        wget \
+        git \
+        build-essential \
+        libpq-dev \
+        libssl-dev \
+        libffi-dev \
+        libjpeg-dev \
+        libpng-dev \
+        libfreetype6-dev \
+        liblcms2-dev \
+        libwebp-dev \
+        libtiff5-dev \
+        libopenjp2-7-dev \
+        zlib1g-dev \
+        cups \
+        cups-client \
+        cups-filters \
+        libcups2-dev || {
+        log_warning "Some system packages failed to install, but continuing..."
+    }
+    
+    log_success "System dependencies installed"
+    
+    # Install ngrok
+    log_info "Installing ngrok..."
+    if ! command -v ngrok &> /dev/null; then
+        curl -fsSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc | gpg --dearmor -o /usr/share/keyrings/ngrok.gpg
+        echo "deb [signed-by=/usr/share/keyrings/ngrok.gpg] https://ngrok-agent.s3.amazonaws.com buster main" | tee /etc/apt/sources.list.d/ngrok.list
+        apt update -qq && apt install -y ngrok || {
+            log_warning "Failed to install ngrok via apt, trying direct download..."
+            curl -sSL https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz | tar xz -C /usr/local/bin/ || {
+                log_warning "Ngrok installation failed, tunnel will not be available"
+            }
+        }
+    fi
+    
+    if command -v ngrok &> /dev/null; then
+        log_success "Ngrok installed successfully"
+    else
+        log_warning "Ngrok not available, public tunnel disabled"
+    fi
+}
+
 # Create backup
 create_backup() {
     log_header "📦 Creating Backup"
@@ -138,6 +201,29 @@ setup_services() {
     
     # Database services removed - NoctisPro now runs without SQL databases
     
+    # Start CUPS printing service
+    if command -v cupsd &> /dev/null; then
+        log_info "Configuring CUPS printing service..."
+        if ! pgrep cupsd > /dev/null; then
+            service cups start 2>/dev/null || {
+                log_warning "CUPS start failed, but continuing..."
+            }
+        fi
+        
+        # Configure CUPS for network access
+        cupsctl --remote-any 2>/dev/null || {
+            log_warning "CUPS network configuration failed, but continuing..."
+        }
+        
+        if pgrep cupsd > /dev/null; then
+            log_success "CUPS printing service running"
+        else
+            log_warning "CUPS not running, printing may not work"
+        fi
+    else
+        log_warning "CUPS not installed, printing functionality disabled"
+    fi
+    
     # Start Nginx if available
     if command -v nginx &> /dev/null; then
         if ! pgrep nginx > /dev/null; then
@@ -155,6 +241,16 @@ setup_services() {
 install_dependencies() {
     log_header "📚 Installing Dependencies"
     
+    # Create virtual environment if it doesn't exist
+    if [ ! -d "venv" ]; then
+        log_info "Creating virtual environment..."
+        python3 -m venv venv || {
+            log_error "Failed to create virtual environment"
+            exit 1
+        }
+        log_success "Virtual environment created"
+    fi
+    
     # Activate virtual environment
     source venv/bin/activate || {
         log_error "Failed to activate virtual environment"
@@ -169,9 +265,9 @@ install_dependencies() {
     # Install requirements with error handling
     if [ -f "requirements.txt" ]; then
         log_info "Installing Python packages..."
-        pip install -r requirements.txt --quiet --no-cache-dir || {
+        pip install -r requirements.txt || {
             log_warning "Some packages failed to install, trying essential ones only..."
-            pip install django daphne redis python-dotenv --quiet || {
+            pip install django daphne redis python-dotenv pillow pydicom numpy scipy matplotlib || {
                 log_error "Failed to install essential packages"
                 exit 1
             }
@@ -199,10 +295,16 @@ configure_environment() {
 DJANGO_DEBUG=false
 DJANGO_SETTINGS_MODULE=noctis_pro.settings
 SECRET_KEY=a7f9d8e2b4c6a1f3e8d7c5b9a2e4f6c8d1b3e5f7a9c2d4e6f8b1c3e5d7a9b2c4
-ALLOWED_HOSTS=localhost,127.0.0.1,*.ngrok.io,*.ngrok-free.app
+ALLOWED_HOSTS=localhost,127.0.0.1,*.ngrok.io,*.ngrok-free.app,colt-charmed-lark.ngrok-free.app
 REDIS_URL=redis://127.0.0.1:6379/0
 DAPHNE_PORT=8000
 DAPHNE_BIND=0.0.0.0
+
+# Ngrok Static URL Configuration
+NGROK_USE_STATIC=true
+NGROK_STATIC_URL=colt-charmed-lark.ngrok-free.app
+NGROK_STATIC_DOMAIN=colt-charmed-lark.ngrok-free.app
+NGROK_REGION=us
 EOF
         log_success "Environment file created"
     fi
@@ -276,9 +378,16 @@ start_services() {
         exit 1
     fi
     
-    # Start ngrok if configured
-    if [ ! -z "${NGROK_AUTHTOKEN:-}" ] && [ ! -z "${NGROK_STATIC_DOMAIN:-}" ]; then
-        log_info "Starting ngrok with static domain..."
+    # Start ngrok with static URL configuration
+    if [ "${NGROK_USE_STATIC:-false}" = "true" ] && [ ! -z "${NGROK_STATIC_URL:-}" ]; then
+        log_info "Starting ngrok with static URL: $NGROK_STATIC_URL"
+        nohup ngrok http --url="$NGROK_STATIC_URL" ${DAPHNE_PORT:-8000} --log stdout > logs/ngrok.log 2>&1 &
+        NGROK_PID=$!
+        echo $NGROK_PID > ngrok.pid
+        log_success "Ngrok started with static URL: https://$NGROK_STATIC_URL"
+        echo "https://$NGROK_STATIC_URL" > current_ngrok_url.txt
+    elif [ ! -z "${NGROK_AUTHTOKEN:-}" ] && [ ! -z "${NGROK_STATIC_DOMAIN:-}" ]; then
+        log_info "Starting ngrok with static domain (authenticated)..."
         nohup ngrok http --authtoken="$NGROK_AUTHTOKEN" --url="$NGROK_STATIC_DOMAIN" ${DAPHNE_PORT:-8000} --log stdout > logs/ngrok.log 2>&1 &
         NGROK_PID=$!
         echo $NGROK_PID > ngrok.pid
@@ -359,6 +468,7 @@ validate_deployment() {
 # Main deployment flow
 main() {
     validate_environment
+    install_system_dependencies
     create_backup
     setup_services
     install_dependencies
