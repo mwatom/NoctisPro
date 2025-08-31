@@ -244,14 +244,23 @@ def _get_mpr_volume_for_series(series):
 
 @login_required
 def viewer(request):
-    """Entry: if ?study=<id> is provided, open that study in desktop viewer; else open launcher."""
+    """Main DICOM web viewer entry point"""
     study_id = request.GET.get('study')
     if study_id:
+        # Mark study as in progress if user can edit reports
         try:
-            return redirect('dicom_viewer:launch_study_in_desktop_viewer', study_id=int(study_id))
+            study = get_object_or_404(Study, id=int(study_id))
+            if hasattr(request.user, 'can_edit_reports') and request.user.can_edit_reports():
+                if study.status in ['scheduled', 'suspended']:
+                    study.status = 'in_progress'
+                    study.save(update_fields=['status'])
         except Exception:
-            return redirect('dicom_viewer:launch_standalone_viewer')
-    return redirect('dicom_viewer:launch_standalone_viewer')
+            pass
+        # Serve web viewer with study ID
+        return render(request, 'dicom_viewer/base.html', {'study_id': study_id})
+    
+    # Serve web viewer without study ID
+    return render(request, 'dicom_viewer/base.html')
 
 @login_required
 def advanced_standalone_viewer(request):
@@ -1880,9 +1889,10 @@ def web_index(request):
 @login_required
 def web_viewer(request):
     """Render the web viewer page. Expects ?study_id in query."""
+    study_id_param = request.GET.get('study_id')
+    
     # If an admin/radiologist opens a specific study, mark it in_progress
     try:
-        study_id_param = request.GET.get('study_id')
         if study_id_param and hasattr(request.user, 'can_edit_reports') and request.user.can_edit_reports():
             try:
                 study = get_object_or_404(Study, id=int(study_id_param))
@@ -1894,7 +1904,10 @@ def web_viewer(request):
                 pass
     except Exception:
         pass
-    return render(request, 'dicom_viewer/base.html')
+    
+    # Pass study_id to template for JavaScript initialization
+    context = {'study_id': study_id_param} if study_id_param else {}
+    return render(request, 'dicom_viewer/base.html', context)
 
 
 @login_required
@@ -1974,11 +1987,31 @@ def web_dicom_image(request, image_id):
         inv_param = request.GET.get('invert')
         invert = (inv_param or '').lower() == 'true'
         
-        # Load DICOM file
-        file_path = os.path.join(settings.MEDIA_ROOT, image.file_path.name)
+        # Load DICOM file - handle both absolute and relative paths
+        if hasattr(image.file_path, 'name'):
+            # FileField object
+            file_path = os.path.join(settings.MEDIA_ROOT, image.file_path.name)
+        else:
+            # String path
+            if os.path.isabs(str(image.file_path)):
+                file_path = str(image.file_path)
+            else:
+                # Try both with and without MEDIA_ROOT prefix
+                file_path = os.path.join('/workspace', str(image.file_path))
+                if not os.path.exists(file_path):
+                    file_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
+        
         if not os.path.exists(file_path):
             logger.error(f"DICOM file not found: {file_path}")
-            return HttpResponse(status=404)
+            # Try to find the file by SOP Instance UID as fallback
+            import glob
+            pattern = f'/workspace/media/**/*{image.sop_instance_uid}*.dcm'
+            matches = glob.glob(pattern, recursive=True)
+            if matches:
+                file_path = matches[0]
+                logger.info(f"Found DICOM file at alternative location: {file_path}")
+            else:
+                return HttpResponse(status=404)
             
         ds = _load_dicom_optimized(file_path)
         if ds is None:

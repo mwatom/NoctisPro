@@ -795,3 +795,12 @@ Bad Request: /dicom-viewer/api/series/1/bone/
 Internal Server Error: /dicom-viewer/api/series/1/volume/
 Service Unavailable: /health/
 [35;1mHTTP GET /health/ 503 [0.01, 127.0.0.1:59914][0m
+Watching for file changes with StatReloader
+[32mHTTP HEAD /dicom-viewer/ 302 [0.01, 127.0.0.1:43372][0m
+[mHTTP GET /login/ 200 [0.00, 127.0.0.1:33590][0m
+Forbidden (CSRF token from POST has incorrect length.): /login/
+[31;1mHTTP POST /login/ 403 [0.00, 127.0.0.1:33606][0m
+[32mHTTP GET /dicom-viewer/?study=1 302 [0.00, 127.0.0.1:58420][0m
+Not Found: /dicom-viewer/image/1/
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
