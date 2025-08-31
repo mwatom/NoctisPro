@@ -176,7 +176,7 @@
     </div>
     <div class="topbar">
       <button type="button" id="btnLoadLocal" class="btn-control"><i class="fas fa-folder-open"></i> Load Local DICOM</button>
-      <a id="btnBackWorklist" class="btn" href="{% url 'worklist:dashboard' %}"><i class="fas fa-arrow-left"></i> Back to Worklist</a>
+      <a id="btnBackWorklist" class="btn" href="{% url 'worklist:dashboard' %}" onclick="return returnToWorklist(event)"><i class="fas fa-arrow-left"></i> Back to Worklist</a>
       {% if user.is_authenticated and user.can_edit_reports %}
       <button type="button" id="btnWriteReport" class="btn-control" style="display:none"><i class="fas fa-file-signature"></i> Write Report</button>
       {% endif %}
@@ -1216,18 +1216,10 @@
              });
            }
 
-            // Simple worklist navigation - direct redirect
+            // Simple back navigation
       function returnToWorklist(e){
         if (e) e.preventDefault();
-        // Check if we came from a specific page
-        const referrer = document.referrer;
-        if (referrer && referrer.includes('/worklist/')) {
-          // Go back to the referring page
-          window.location.href = referrer;
-        } else {
-          // Default to worklist dashboard
-          window.location.href = '{% url 'worklist:dashboard' %}';
-        }
+        window.history.back();
         return false;
       }
       // expose for inline onclick
