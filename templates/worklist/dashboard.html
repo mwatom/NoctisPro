@@ -753,6 +753,9 @@
     </div>
 
     <script>
+        // CSRF token from Django template context
+        const csrf_token = '{{ csrf_token }}';
+        
         // Data loading and management
         let studiesData = [];
         let filteredData = [];
@@ -760,25 +763,58 @@
         // Enhanced studies loading with better support for uploaded studies
         async function loadStudiesData() {
             try {
+                // Show loading state
+                const tbody = document.getElementById('studiesTableBody');
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="12" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                            <i class="fas fa-spinner fa-spin" style="font-size: 48px; opacity: 0.3; margin-bottom: 16px; display: block;"></i>
+                            <div style="font-size: 14px; margin-bottom: 8px;">Loading studies...</div>
+                            <div style="font-size: 12px;">Please wait while we fetch the latest data</div>
+                        </td>
+                    </tr>
+                `;
+                
                 // Fetch studies from the enhanced API
-                const response = await fetch('{% url "worklist:api_studies" %}');
+                const response = await fetch('{% url "worklist:api_studies" %}', {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const data = await response.json();
                 
                 if (data.success) {
                     studiesData = data.studies || [];
                     filteredData = [...studiesData];
-                    renderStudiesTable();
-                    updateStatusCounts();
+                    
+                    if (studiesData.length === 0) {
+                        showNoDataMessage();
+                        showToast('No studies found. Upload DICOM files to get started.', 'info', 5000);
+                    } else {
+                        renderStudiesTable();
+                        updateStatusCounts();
+                        showToast(`Loaded ${studiesData.length} studies`, 'success', 2000);
+                    }
                     
                     // Show upload stats if available
                     await loadUploadStats();
                 } else {
-                    console.error('Error loading studies:', data.error);
+                    console.error('API returned error:', data.error);
+                    showToast(data.message || 'Failed to load studies', 'error');
                     showNoDataMessage();
                 }
                 
             } catch (error) {
                 console.error('Error loading studies data:', error);
+                showToast(`Connection error: ${error.message}`, 'error');
                 showNoDataMessage();
             }
         }
@@ -920,7 +956,12 @@
 
         // CSRF helper - improved to check multiple sources
         function getCSRFToken(){
-            // First try to get from cookie
+            // First try to get from template context (most reliable)
+            if (typeof csrf_token !== 'undefined' && csrf_token) {
+                return csrf_token;
+            }
+            
+            // Try to get from cookie
             const name = 'csrftoken=';
             const cookies = document.cookie.split(';');
             for (let c of cookies){
@@ -949,9 +990,18 @@
         }
 
         async function deleteStudy(studyId, accession){
+            // Confirm deletion
+            if (!confirm(`Are you sure you want to delete study ${accession}?\n\nThis action cannot be undone and will permanently remove all associated data including:\n• DICOM images\n• Series data\n• Reports\n• Measurements\n• Annotations`)) {
+                return;
+            }
+            
             try{
-                // Get CSRF token (optional since API is CSRF exempt)
+                // Get CSRF token (required for delete operations)
                 const csrfToken = getCSRFToken();
+                if (!csrfToken) {
+                    showToast('Security token missing. Please refresh the page.', 'error');
+                    return;
+                }
                 
                 // Show loading state
                 const deleteButton = document.querySelector(`button[onclick*="deleteStudy('${studyId}'"]`);
@@ -960,21 +1010,18 @@
                     deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> DELETING...';
                 }
                 
-                // Prepare headers - only include CSRF token if available
-                const headers = {};
-                if (csrfToken) {
-                    headers['X-CSRFToken'] = csrfToken;
-                }
+                // Prepare headers with CSRF token
+                const headers = {
+                    'X-CSRFToken': csrfToken,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                };
                 
                 const resp = await fetch(`/worklist/api/study/${studyId}/delete/`, {
                     method: 'DELETE',
                     headers: headers,
                     credentials: 'same-origin'
-                }).catch(()=> fetch(`/worklist/api/study/${studyId}/delete/`, {
-                    method: 'POST',
-                    headers: headers,
-                    credentials: 'same-origin'
-                }));
+                });
                 
                 let data;
                 try {
@@ -982,8 +1029,19 @@
                 } catch (e) {
                     throw new Error(`JSON parsing error: ${e.message}. HTTP ${resp.status}`);
                 }
-                if(!resp.ok || data.error){
-                    throw new Error(data.error || `HTTP ${resp.status}: Failed to delete study`);
+                
+                if(!resp.ok) {
+                    if (resp.status === 403) {
+                        throw new Error('Permission denied. Only administrators can delete studies.');
+                    } else if (resp.status === 404) {
+                        throw new Error('Study not found. It may have already been deleted.');
+                    } else {
+                        throw new Error(data.error || `HTTP ${resp.status}: Failed to delete study`);
+                    }
+                }
+                
+                if (data.error) {
+                    throw new Error(data.error);
                 }
                 
                 // Success - remove from table and local arrays
@@ -993,13 +1051,13 @@
                 updateStatusCounts();
                 
                 // Show success toast
-                showToast(`Study ${accession} deleted`, 'success');
+                showToast(`Study ${accession} deleted successfully`, 'success');
                 
             }catch(err){
                 console.error('Delete failed:', err);
                 
-                // Show error toast
-                showToast(`Failed to delete study`, 'error');
+                // Show error toast with specific message
+                showToast(`Failed to delete study: ${err.message}`, 'error', 5000);
                 
                 // Reset button state
                 const deleteButton = document.querySelector(`button[onclick*="deleteStudy('${studyId}'"]`);
@@ -1061,12 +1119,29 @@
 
         // DICOM Viewer Functions
         async function openStudyInViewer(studyId) {
-            const url = `/dicom-viewer/web/viewer/?study_id=${studyId}`;
-            window.location.href = url;
+            try {
+                // First check if study exists and user has permission
+                const checkResponse = await fetch(`/worklist/api/study/${studyId}/`);
+                if (!checkResponse.ok) {
+                    showToast('Study not found or access denied', 'error');
+                    return;
+                }
+                
+                const url = `/dicom-viewer/web/viewer/?study_id=${studyId}`;
+                window.open(url, '_blank');
+            } catch (error) {
+                console.error('Error opening DICOM viewer:', error);
+                showToast('Failed to open DICOM viewer', 'error');
+            }
         }
 
         async function launchDicomViewer() {
-            window.location.href = '/dicom-viewer/web/viewer/';
+            try {
+                window.open('/dicom-viewer/web/viewer/', '_blank');
+            } catch (error) {
+                console.error('Error launching DICOM viewer:', error);
+                showToast('Failed to launch DICOM viewer', 'error');
+            }
         }
 
         function uploadStudies() {

@@ -804,3 +804,31 @@ Forbidden (CSRF token from POST has incorrect length.): /login/
 Not Found: /dicom-viewer/image/1/
 /workspace/dicom_viewer/views.py changed, reloading.
 Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+[32mHTTP GET / 302 [0.01, 127.0.0.1:41720][0m
+Watching for file changes with StatReloader
+[32mHTTP GET /worklist/api/studies/ 302 [0.00, 127.0.0.1:52494][0m
+/workspace/worklist/urls.py changed, reloading.
+/workspace/worklist/urls.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+/workspace/worklist/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/worklist/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/worklist/views.py changed, reloading.
+/workspace/worklist/views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+/workspace/noctis_pro/settings.py changed, reloading.
+/workspace/noctis_pro/settings.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader

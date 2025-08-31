@@ -858,8 +858,20 @@ def api_dicom_image_display(request, image_id):
         # Read DICOM file using optimized caching (best-effort)
         ds = None
         try:
-            dicom_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
-            ds = _load_dicom_optimized(dicom_path)
+            # Handle both absolute and relative file paths
+            if image.file_path:
+                if os.path.isabs(str(image.file_path)):
+                    dicom_path = str(image.file_path)
+                else:
+                    dicom_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
+                
+                # Ensure the file exists before trying to read it
+                if os.path.exists(dicom_path):
+                    ds = _load_dicom_optimized(dicom_path)
+                else:
+                    warnings['file_not_found'] = f'DICOM file not found: {dicom_path}'
+            else:
+                warnings['no_file_path'] = 'No file path specified for this image'
         except Exception as e:
             warnings['dicom_read_error'] = str(e)
 
@@ -957,6 +969,43 @@ def api_dicom_image_display(request, image_id):
             except Exception as e:
                 warnings['render_error'] = str(e)
                 image_data_url = None
+        
+        # If no image data available, create a placeholder
+        if image_data_url is None:
+            try:
+                # Create a simple placeholder image
+                placeholder_img = Image.new('RGB', (512, 512), color=(40, 40, 40))
+                from PIL import ImageDraw, ImageFont
+                draw = ImageDraw.Draw(placeholder_img)
+                
+                # Draw placeholder text
+                text_lines = [
+                    "DICOM Image",
+                    "Not Available",
+                    "",
+                    f"Study: {image.series.study.accession_number}",
+                    f"Series: {image.series.series_number}",
+                    f"Image: {image.instance_number}"
+                ]
+                
+                y_offset = 200
+                for line in text_lines:
+                    # Use default font since custom fonts might not be available
+                    try:
+                        draw.text((256, y_offset), line, fill=(200, 200, 200), anchor="mm")
+                    except:
+                        draw.text((200, y_offset), line, fill=(200, 200, 200))
+                    y_offset += 30
+                
+                # Convert to base64
+                buffer = BytesIO()
+                placeholder_img.save(buffer, format='PNG')
+                img_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                image_data_url = f'data:image/png;base64,{img_data}'
+                warnings['using_placeholder'] = 'DICOM data not available, showing placeholder'
+                
+            except Exception as e:
+                warnings['placeholder_error'] = str(e)
         
         # Build image_info from ds if possible, otherwise from model/series
         def safe_float(v, fallback):

@@ -433,46 +433,101 @@ def modern_dashboard(request):
 @login_required
 def api_studies(request):
 	"""API endpoint for studies data"""
-	user = request.user
-	
-	if user.is_facility_user() and getattr(user, 'facility', None):
-		studies = Study.objects.filter(facility=user.facility)
-	else:
-		studies = Study.objects.all()
-	
-	studies_data = []
-	for study in studies.order_by('-study_date')[:100]:  # Increased limit to show more studies
-		# Use real study data with fallback to reasonable defaults
-		study_time = study.study_date
-		scheduled_time = study.study_date
+	try:
+		user = request.user
 		
-		# If study has upload_date, use it for better tracking
-		if hasattr(study, 'upload_date') and study.upload_date:
-			upload_date = study.upload_date.isoformat()
+		if user.is_facility_user() and getattr(user, 'facility', None):
+			studies = Study.objects.filter(facility=user.facility)
 		else:
-			upload_date = study.study_date.isoformat()
+			studies = Study.objects.all()
 		
-		studies_data.append({
-			'id': study.id,
-			'accession_number': study.accession_number,
-			'patient_name': study.patient.full_name,
-			'patient_id': study.patient.patient_id,
-			'modality': study.modality.code,
-			'status': study.status,
-			'priority': study.priority,
-			'study_date': study.study_date.isoformat(),
-			'study_time': study_time.isoformat(),
-			'scheduled_time': scheduled_time.isoformat(),
-			'upload_date': upload_date,
-			'facility': study.facility.name,
-			'image_count': study.get_image_count(),
-			'series_count': study.get_series_count(),
-			'study_description': study.study_description,
-			'clinical_info': study.clinical_info,
-			'uploaded_by': study.uploaded_by.get_full_name() if study.uploaded_by else 'Unknown',
+		studies_data = []
+		for study in studies.select_related('patient', 'modality', 'facility', 'uploaded_by').order_by('-study_date')[:100]:  # Increased limit to show more studies
+			try:
+				# Use real study data with fallback to reasonable defaults
+				study_time = study.study_date
+				scheduled_time = study.study_date
+				
+				# If study has upload_date, use it for better tracking
+				if hasattr(study, 'upload_date') and study.upload_date:
+					upload_date = study.upload_date.isoformat()
+				else:
+					upload_date = study.study_date.isoformat()
+				
+				# Get image and series counts safely
+				try:
+					image_count = study.get_image_count()
+					series_count = study.get_series_count()
+				except:
+					image_count = 0
+					series_count = 0
+				
+				studies_data.append({
+					'id': study.id,
+					'accession_number': study.accession_number or f'ACC{study.id:06d}',
+					'patient_name': study.patient.full_name if study.patient else 'Unknown Patient',
+					'patient_id': study.patient.patient_id if study.patient else f'PID{study.id:06d}',
+					'modality': study.modality.code if study.modality else 'OT',
+					'status': study.status or 'pending',
+					'priority': study.priority or 'normal',
+					'study_date': study.study_date.isoformat() if study.study_date else timezone.now().isoformat(),
+					'study_time': study_time.isoformat() if study_time else timezone.now().isoformat(),
+					'scheduled_time': scheduled_time.isoformat() if scheduled_time else timezone.now().isoformat(),
+					'upload_date': upload_date,
+					'facility': study.facility.name if study.facility else 'Unknown Facility',
+					'image_count': image_count,
+					'series_count': series_count,
+					'study_description': study.study_description or 'No description',
+					'clinical_info': study.clinical_info or '',
+					'uploaded_by': study.uploaded_by.get_full_name() if study.uploaded_by else 'Unknown',
+				})
+			except Exception as e:
+				# Log the error but continue processing other studies
+				print(f"Error processing study {study.id}: {e}")
+				continue
+		
+		return JsonResponse({
+			'success': True, 
+			'studies': studies_data,
+			'total_count': len(studies_data),
+			'message': f'Found {len(studies_data)} studies' if studies_data else 'No studies found'
 		})
+		
+	except Exception as e:
+		return JsonResponse({
+			'success': False, 
+			'error': str(e),
+			'studies': [],
+			'message': 'Failed to load studies'
+		}, status=500)
+
+@login_required
+def api_study_detail(request, study_id):
+	"""API endpoint to get study detail for permission checking"""
+	user = request.user
+	study = get_object_or_404(Study, id=study_id)
 	
-	return JsonResponse({'success': True, 'studies': studies_data})
+	# Check permissions
+	if user.is_facility_user() and getattr(user, 'facility', None) and study.facility != user.facility:
+		return JsonResponse({'error': 'Permission denied'}, status=403)
+	
+	study_data = {
+		'id': study.id,
+		'accession_number': study.accession_number,
+		'patient_name': study.patient.full_name,
+		'patient_id': study.patient.patient_id,
+		'modality': study.modality.code,
+		'status': study.status,
+		'priority': study.priority,
+		'study_date': study.study_date.isoformat(),
+		'facility': study.facility.name,
+		'image_count': study.get_image_count(),
+		'series_count': study.get_series_count(),
+		'study_description': study.study_description,
+		'clinical_info': study.clinical_info,
+	}
+	
+	return JsonResponse({'success': True, 'study': study_data})
 
 @login_required
 @csrf_exempt
