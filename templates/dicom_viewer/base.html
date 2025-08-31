@@ -853,15 +853,22 @@ const reconStatus = document.getElementById('reconStatus');
           }
           
           if (needsUpdate) {
-            // Force refresh of all plane images when crosshair moves
-            mprImgs = { axial: null, sagittal: null, coronal: null };
+            // Optimized crosshair update - only refresh affected planes
+            const changedPlanes = [];
+            if (mprCross.x !== oldCross.x) changedPlanes.push('sagittal');
+            if (mprCross.y !== oldCross.y) changedPlanes.push('coronal');
+            if (mprCross.z !== oldCross.z) changedPlanes.push('axial');
             
-            // Prefetch the new slice positions for smooth interaction
-            prefetchMprSlices('axial', mprScroll.axial, 2);
-            prefetchMprSlices('sagittal', mprScroll.sagittal, 2);
-            prefetchMprSlices('coronal', mprScroll.coronal, 2);
+            // Clear only changed plane images for faster update
+            changedPlanes.forEach(p => mprImgs[p] = null);
             
-            draw();
+            // Prefetch with optimized parallel loading
+            Promise.all(changedPlanes.map(p => 
+              prefetchMprSlices(p, mprScroll[p], 1)
+            ));
+            
+            // Use requestDraw for smoother animation
+            requestDraw();
           }
         }
       }
@@ -1403,6 +1410,7 @@ const reconStatus = document.getElementById('reconStatus');
           reconImgs = [j.mpr_views.axial, j.mpr_views.sagittal, j.mpr_views.coronal]; 
           console.log('MPR images:', reconImgs.map(img => img ? 'loaded' : 'null'));
           mprMode = true; 
+          showCrosshair = true; // Enable crosshair by default for MPR
           document.getElementById('mprMeasurePanel').style.display=''; 
           if (j.counts){ 
             mprScroll.counts = j.counts; 
@@ -2766,25 +2774,45 @@ const reconStatus = document.getElementById('reconStatus');
       ctx.lineWidth = 1;
       ctx.setLineDash([5, 5]);
       
-      // Draw crosshairs on each plane
+      // Optimized crosshair drawing with proper coordinate mapping
       for (const plane in mprRegionVps) {
         const vp = mprRegionVps[plane];
         if (!vp) continue;
         
-        const centerX = vp.x + vp.imgW * vp.scale / 2;
-        const centerY = vp.y + vp.imgH * vp.scale / 2;
+        let crossX, crossY;
         
-        // Horizontal line
+        // Calculate crosshair position based on plane and current MPR coordinates
+        if (plane === 'axial') {
+          // Axial view shows X and Y coordinates
+          crossX = vp.x + mprCross.x * vp.scale;
+          crossY = vp.y + mprCross.y * vp.scale;
+        } else if (plane === 'sagittal') {
+          // Sagittal view shows Y (vertical) and Z (horizontal)
+          crossX = vp.x + mprCross.z * vp.scale;
+          crossY = vp.y + mprCross.y * vp.scale;
+        } else if (plane === 'coronal') {
+          // Coronal view shows X (horizontal) and Z (vertical)
+          crossX = vp.x + mprCross.x * vp.scale;
+          crossY = vp.y + mprCross.z * vp.scale;
+        }
+        
+        // Draw horizontal line
         ctx.beginPath();
-        ctx.moveTo(vp.x, centerY);
-        ctx.lineTo(vp.x + vp.imgW * vp.scale, centerY);
+        ctx.moveTo(vp.x, crossY);
+        ctx.lineTo(vp.x + vp.imgW * vp.scale, crossY);
         ctx.stroke();
         
-        // Vertical line
+        // Draw vertical line
         ctx.beginPath();
-        ctx.moveTo(centerX, vp.y);
-        ctx.lineTo(centerX, vp.y + vp.imgH * vp.scale);
+        ctx.moveTo(crossX, vp.y);
+        ctx.lineTo(crossX, vp.y + vp.imgH * vp.scale);
         ctx.stroke();
+        
+        // Draw intersection point
+        ctx.fillStyle = '#ffff00';
+        ctx.beginPath();
+        ctx.arc(crossX, crossY, 3, 0, Math.PI * 2);
+        ctx.fill();
       }
       
       ctx.restore();
