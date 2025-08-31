@@ -151,7 +151,7 @@ def _array_to_base64_image(array, window_width=None, window_level=None, inverted
 
 @login_required
 def viewer(request):
-    """Main DICOM viewer entry point"""
+    """Main DICOM viewer entry point with improved error handling"""
     study_id = request.GET.get('study')
     context = {'study_id': study_id} if study_id else {}
     
@@ -163,10 +163,11 @@ def viewer(request):
                 if study.status in ['scheduled', 'suspended']:
                     study.status = 'in_progress'
                     study.save(update_fields=['status'])
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Could not update study status: {e}")
     
-    return render(request, 'dicom_viewer/base.html', context)
+    # Use improved viewer template
+    return render(request, 'dicom_viewer/viewer_improved.html', context)
 
 @login_required
 @csrf_exempt
@@ -966,7 +967,7 @@ def api_hu_value(request):
 @login_required
 @csrf_exempt
 def upload_dicom(request):
-    """Professional DICOM upload with enhanced processing"""
+    """Professional DICOM upload with enhanced processing and error handling"""
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
