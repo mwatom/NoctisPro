@@ -95,9 +95,16 @@
     #printModal .btn-group { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
   </style>
   
-  <!-- Three.js CDN for 3D functionality -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r160/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+  <!-- Three.js local files for 3D functionality -->
+  {% load static %}
+  <script src="{% static 'js/vendor/three/three.min.js' %}"></script>
+  <script type="module">
+    import { OrbitControls } from '{% static "js/vendor/three/OrbitControls.js" %}';
+    window.THREE.OrbitControls = OrbitControls;
+  </script>
+  
+  <!-- Button utilities for enhanced functionality -->
+  <script src="{% static 'js/button-utils.js' %}"></script>
   
   <!-- Performance optimization: Image preloader and cache -->
   <script>
@@ -2255,7 +2262,7 @@ const reconStatus = document.getElementById('reconStatus');
           three.camera = new THREE.PerspectiveCamera(45, mount.clientWidth / mount.clientHeight, 0.1, 10000);
           three.camera.position.set(0, 0, 400);
           
-          three.controls = new THREE.OrbitControls(three.camera, three.renderer.domElement);
+          three.controls = new window.THREE.OrbitControls(three.camera, three.renderer.domElement);
           three.controls.enableDamping = true;
           three.controls.dampingFactor = 0.05;
           
@@ -3346,6 +3353,51 @@ const reconStatus = document.getElementById('reconStatus');
        });
      }
 
+    // Toast notification system
+    function showToast(message, type = 'info', duration = 3000) {
+      const toast = document.createElement('div');
+      toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-left: 4px solid ${type === 'error' ? 'var(--danger-color)' : type === 'success' ? 'var(--success-color)' : type === 'warning' ? 'var(--warning-color)' : 'var(--accent-color)'};
+        color: var(--text-primary);
+        padding: 12px 16px;
+        border-radius: 4px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 10000;
+        font-size: 12px;
+        max-width: 300px;
+        transition: all 0.3s ease;
+      `;
+      
+      toast.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <span>${message}</span>
+          <button type="button" onclick="this.parentElement.parentElement.remove()" 
+                  style="background: none; border: none; color: var(--text-muted); cursor: pointer; margin-left: 8px;" aria-label="Close">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+      `;
+      
+      document.body.appendChild(toast);
+      
+      // Auto-remove after duration
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.remove();
+        }
+      }, duration);
+    }
+
+    // Fallback to desktop function (placeholder)
+    async function fallbackToDesktop() {
+      console.warn('Fallback to desktop mode');
+      showToast('Operation failed. Please try refreshing the page.', 'error');
+    }
 
   })();
   </script>

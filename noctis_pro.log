@@ -848,3 +848,38 @@ Watching for file changes with StatReloader
 [mHTTP GET /health/simple/ 200 [0.00, 127.0.0.1:37506][0m
 [32mHTTP GET /api/admin/dashboard/ 302 [0.01, 127.0.0.1:58342][0m
 [32mHTTP GET /api/admin/dashboard/ 302 [0.00, 127.0.0.1:49612][0m
+Watching for file changes with StatReloader
+Not Found: /accounts/login/
+Not Found: /static/js/button-utils.js
+Watching for file changes with StatReloader
+[32mHTTP HEAD / 302 [0.02, 127.0.0.1:35526][0m
+Watching for file changes with StatReloader
+[32mHTTP GET / 302 [0.01, 127.0.0.1:34606][0m
+[mHTTP GET /login/ 200 [0.01, 127.0.0.1:34606][0m
+Not Found: /static/js/vendor/three/three.min.js
+[33mHTTP GET /static/js/vendor/three/three.min.js 404 [0.00, 127.0.0.1:34620][0m
+Not Found: /static/js/vendor/three/OrbitControls.js
+[33mHTTP GET /static/js/vendor/three/OrbitControls.js 404 [0.00, 127.0.0.1:34636][0m
+Not Found: /static/js/button-utils.js
+[33mHTTP GET /static/js/button-utils.js 404 [0.00, 127.0.0.1:34648][0m
+[32mHTTP GET /dicom-viewer/ 302 [0.00, 127.0.0.1:34658][0m
+[mHTTP GET /login/?next=/dicom-viewer/ 200 [0.00, 127.0.0.1:34658][0m
+Not Found: /static/js/vendor/three/three.min.js
+[33mHTTP HEAD /static/js/vendor/three/three.min.js 404 [0.00, 127.0.0.1:38714][0m
+/workspace/noctis_pro/settings.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/noctis_pro/settings.py changed, reloading.
+/workspace/noctis_pro/settings.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+/workspace/noctis_pro/settings.py changed, reloading.
+/workspace/noctis_pro/settings.py changed, reloading.
+/workspace/noctis_pro/settings.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+[mHTTP HEAD /static/js/vendor/three/three.min.js 200 [0.01, 127.0.0.1:44596][0m
+[mHTTP HEAD /static/js/vendor/three/OrbitControls.js 200 [0.00, 127.0.0.1:44608][0m
+[mHTTP HEAD /static/js/button-utils.js 200 [0.00, 127.0.0.1:44618][0m
+[32mHTTP GET /dicom-viewer/ 302 [0.01, 127.0.0.1:47920][0m
