@@ -423,8 +423,8 @@ def api_study_data(request, study_id):
             'modality': study.modality.code,
             'description': study.study_description,
             'body_part': study.body_part,
-            'priority': study.priority,
-            'clinical_info': study.clinical_info,
+            'priority': str(study.priority or 'normal'),
+            'clinical_info': str(study.clinical_info or ''),
         },
         'series': []
     }
@@ -440,8 +440,8 @@ def api_study_data(request, study_id):
             'slice_thickness': series.slice_thickness,
             'pixel_spacing': series.pixel_spacing,
             'image_orientation': series.image_orientation,
-            'priority': series.study.priority,
-            'clinical_info': series.study.clinical_info,
+            'priority': str(series.study.priority or 'normal'),
+            'clinical_info': str(series.study.clinical_info or ''),
             'images': []
         }
         

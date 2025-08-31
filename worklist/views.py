@@ -469,7 +469,7 @@ def api_studies(request):
 					'patient_id': study.patient.patient_id if study.patient else f'PID{study.id:06d}',
 					'modality': study.modality.code if study.modality else 'OT',
 					'status': study.status or 'pending',
-					'priority': study.priority or 'normal',
+					'priority': str(study.priority or 'normal'),
 					'study_date': study.study_date.isoformat() if study.study_date else timezone.now().isoformat(),
 					'study_time': study_time.isoformat() if study_time else timezone.now().isoformat(),
 					'scheduled_time': scheduled_time.isoformat() if scheduled_time else timezone.now().isoformat(),
@@ -478,7 +478,7 @@ def api_studies(request):
 					'image_count': image_count,
 					'series_count': series_count,
 					'study_description': study.study_description or 'No description',
-					'clinical_info': study.clinical_info or '',
+					'clinical_info': str(study.clinical_info or ''),
 					'uploaded_by': study.uploaded_by.get_full_name() if study.uploaded_by else 'Unknown',
 				})
 			except Exception as e:
@@ -518,13 +518,13 @@ def api_study_detail(request, study_id):
 		'patient_id': study.patient.patient_id,
 		'modality': study.modality.code,
 		'status': study.status,
-		'priority': study.priority,
+		'priority': str(study.priority or 'normal'),
 		'study_date': study.study_date.isoformat(),
 		'facility': study.facility.name,
 		'image_count': study.get_image_count(),
 		'series_count': study.get_series_count(),
 		'study_description': study.study_description,
-		'clinical_info': study.clinical_info,
+		'clinical_info': str(study.clinical_info or ''),
 	}
 	
 	return JsonResponse({'success': True, 'study': study_data})
