@@ -883,3 +883,15 @@ Watching for file changes with StatReloader
 [mHTTP HEAD /static/js/vendor/three/OrbitControls.js 200 [0.00, 127.0.0.1:44608][0m
 [mHTTP HEAD /static/js/button-utils.js 200 [0.00, 127.0.0.1:44618][0m
 [32mHTTP GET /dicom-viewer/ 302 [0.01, 127.0.0.1:47920][0m
+Watching for file changes with StatReloader
+[32mHTTP GET / 302 [0.01, 127.0.0.1:58878][0m
+[32mHTTP GET / 302 [0.00, 127.0.0.1:51174][0m
+[mHTTP GET /login/ 200 [0.00, 127.0.0.1:51176][0m
+[32mHTTP GET /worklist/api/studies/ 302 [0.00, 127.0.0.1:40740][0m
+/workspace/noctis_pro/settings.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/noctis_pro/settings.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+HTTP GET /login/ 200 [0.01, 127.0.0.1:57680]
+Not Found: /accounts/check-session/

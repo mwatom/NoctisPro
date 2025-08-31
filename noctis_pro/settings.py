@@ -27,7 +27,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-7x!8k@m$z9h#4p&x3w2v6
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = ['*', 'colt-charmed-lark.ngrok-free.app', 'localhost', '127.0.0.1']
 
 
 # Application definition
@@ -220,6 +220,7 @@ CSRF_TRUSTED_ORIGINS = [
     'https://*.ngrok.io',
     'https://*.ngrok-free.app',
     'https://*.ngrok.app',
+    'https://colt-charmed-lark.ngrok-free.app',
     'http://localhost:8000',
     'http://127.0.0.1:8000',
 ]
