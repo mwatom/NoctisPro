@@ -683,7 +683,8 @@
         return typeof val.then === 'function' ? await val : val;
       }
       const url = `/dicom-viewer/image/${imgMeta.id}/?ww=${ww}&wl=${wl}&invert=${inverted}`;
-      const promise = loadHtmlImage(url).then(im=>{ imageCache.set(key, im); return im; }).catch(err=>{ imageCache.delete(key); throw err; });
+      console.log(`Loading image: ${url}`); // Debug log
+      const promise = loadHtmlImage(url).then(im=>{ imageCache.set(key, im); return im; }).catch(err=>{ console.error('Image load error:', err); imageCache.delete(key); throw err; });
       imageCache.set(key, promise);
       return await promise;
     }
@@ -817,11 +818,30 @@
       return null;
     }
 
+    async function loadAvailableStudies(){
+      try {
+        console.log('Loading available studies...');
+        const r = await fetch('/dicom-viewer/web/');
+        if (r.ok) {
+          // This would redirect to the index page, but for now just populate series selector
+          seriesSelect.innerHTML = '<option value="">Load a study first or use "Load Local DICOM"</option>';
+        }
+      } catch (e) {
+        console.warn('Could not load available studies:', e);
+        seriesSelect.innerHTML = '<option value="">Use "Load Local DICOM" to get started</option>';
+      }
+    }
+
     async function loadStudy(studyId){
       try {
+        console.log(`Loading study ID: ${studyId}`);
         const r = await fetch(`/dicom-viewer/study/${studyId}/`);
-        if (!r.ok) throw new Error('study fetch failed');
+        if (!r.ok) {
+          console.error(`Study fetch failed: ${r.status} ${r.statusText}`);
+          throw new Error(`study fetch failed: ${r.status} ${r.statusText}`);
+        }
         const data = await r.json();
+        console.log('Study data loaded:', data);
         currentStudy = data.study;
         // Enable write report button when study is known
         const wr = document.getElementById('btnWriteReport');
@@ -845,11 +865,29 @@
             });
           }
         } catch (_) { /* non-blocking */ }
-        document.getElementById('patientInfo').textContent = `Patient: ${currentStudy.patient_name} | Study Date: ${currentStudy.study_date} | Modality: ${currentStudy.modality}`;
-        // Show clinical info and priority
-        const clin = (currentStudy.clinical_info && currentStudy.clinical_info.trim()) ? currentStudy.clinical_info : '-';
-        document.getElementById('clinicalInfo').textContent = `Clinical Info: ${clin}`;
-        document.getElementById('priorityInfo').textContent = `Priority: ${currentStudy.priority ? currentStudy.priority.toUpperCase() : '-'}`;
+        // Update patient info in topbar
+        const patientInfoEl = document.getElementById('patientInfo');
+        if (patientInfoEl) {
+          const patientName = currentStudy.patient_name || 'Unknown Patient';
+          const studyDate = currentStudy.study_date || 'Unknown Date';
+          const modality = currentStudy.modality || 'Unknown Modality';
+          patientInfoEl.textContent = `Patient: ${patientName} | Study Date: ${studyDate} | Modality: ${modality}`;
+        }
+        
+        // Show clinical info and priority in sidebar
+        const clinicalInfoEl = document.getElementById('clinicalInfo');
+        const priorityInfoEl = document.getElementById('priorityInfo');
+        
+        if (clinicalInfoEl) {
+          const clin = (currentStudy.clinical_info && currentStudy.clinical_info.trim()) ? currentStudy.clinical_info : '-';
+          clinicalInfoEl.textContent = `Clinical Info: ${clin}`;
+        }
+        
+        if (priorityInfoEl) {
+          priorityInfoEl.textContent = `Priority: ${currentStudy.priority ? currentStudy.priority.toUpperCase() : '-'}`;
+        }
+        
+        console.log('Patient details updated:', { patientName: currentStudy.patient_name, studyDate: currentStudy.study_date, modality: currentStudy.modality });
         seriesSelect.innerHTML = '<option value="">Select Series</option>';
         (data.series_list || []).forEach(s=>{
           const opt = document.createElement('option');
@@ -867,15 +905,26 @@
           if (hp && hp.suggested && hp.suggested.layout === 'mpr-3plane') { generateReconstruction('mpr'); }
         } catch(e){}
       } catch (e) {
-        await fallbackToDesktop();
+        console.error('Study loading error:', e);
+        showToast(`Failed to load study: ${e.message}`, 'error');
+        // Reset to initial state
+        currentStudy = null;
+        currentSeries = null;
+        images = [];
+        seriesSelect.innerHTML = '<option value="">Study load failed - try "Load Local DICOM"</option>';
       }
     }
 
     async function loadSeries(seriesId){
       try {
+        console.log(`Loading series ID: ${seriesId}`);
         const r = await fetch(`/dicom-viewer/series/${seriesId}/images/`);
-        if (!r.ok) throw new Error('series fetch failed');
+        if (!r.ok) {
+          console.error(`Series fetch failed: ${r.status} ${r.statusText}`);
+          throw new Error(`series fetch failed: ${r.status} ${r.statusText}`);
+        }
         const data = await r.json();
+        console.log('Series data loaded:', data);
         currentSeries = data.series; images = data.images || []; index = 0;
         imageCache.clear();
         sliceSlider.max = Math.max(0, images.length - 1); sliceSlider.value = 0; document.getElementById('sliceVal').textContent = '1';
@@ -911,7 +960,12 @@
         // Warm up MPR mid-slices so first MPR is instant
         try { warmupMpr(); } catch(e) {}
       } catch (e) {
-        await fallbackToDesktop();
+        console.error('Series loading error:', e);
+        showToast(`Failed to load series: ${e.message}`, 'error');
+        // Reset series state
+        currentSeries = null;
+        images = [];
+        seriesSelect.innerHTML = '<option value="">Series load failed</option>';
       }
     }
 
@@ -2307,6 +2361,10 @@
           btnLoadLocal.style.pointerEvents = '';
           btnLoadLocal.innerHTML = '<i class="fas fa-folder-open"></i> Load Local DICOM';
           hideProgressIndicator();
+          
+          // Reset file input and clear any lingering progress indicators
+          inputLocal.value = '';
+          reconStatus.textContent = '';
           e.target.value = '';
         }
       });
@@ -3311,12 +3369,14 @@
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         // Load study if specified
-        const studyId = q('study_id');
+        const studyId = q('study_id') || q('study') || {% if study_id %}'{{ study_id }}'{% else %}null{% endif %};
         if (studyId) {
           console.log(`Loading study ID: ${studyId}`);
           loadStudy(studyId);
         } else {
-          showToast('DICOM viewer ready - load a study to begin', 'info', 3000);
+          // Show available studies for selection if no study ID specified
+          loadAvailableStudies();
+          showToast('DICOM viewer ready - select a study or load local DICOM files', 'info', 5000);
         }
         
         // Validate all button elements
@@ -3333,11 +3393,143 @@
         
         console.log('DICOM viewer initialized successfully');
         
+        // Initialize all button event handlers
+        initializeButtonHandlers();
+        
       } catch (error) {
         console.error('Viewer initialization error:', error);
         showToast(`Initialization failed: ${error.message}`, 'error');
+        // Reset all button states on error
+        resetAllButtonStates();
       }
     }
+    
+    // Function to reset all button states - fixes stuck loading spinners
+    function resetAllButtonStates() {
+      try {
+        // Reset Load Local button
+        if (btnLoadLocal) {
+          btnLoadLocal.disabled = false;
+          btnLoadLocal.style.pointerEvents = '';
+          btnLoadLocal.innerHTML = '<i class="fas fa-folder-open"></i> Load Local DICOM';
+        }
+        
+        // Reset Print button
+        const btnPrint = document.getElementById('btnPrint');
+        if (btnPrint) {
+          btnPrint.disabled = false;
+          btnPrint.innerHTML = '<i class="fas fa-print"></i> Print';
+        }
+        
+        // Reset Generate Reconstruction button
+        if (btnGenerateRecon) {
+          btnGenerateRecon.disabled = false;
+          btnGenerateRecon.innerHTML = '<i class="fas fa-cogs"></i> Generate';
+        }
+        
+        // Reset Save/Load Preset buttons
+        if (btnSavePreset) {
+          btnSavePreset.disabled = false;
+          btnSavePreset.innerHTML = '<i class="fas fa-bookmark"></i> Save';
+        }
+        
+        if (btnLoadPreset) {
+          btnLoadPreset.disabled = false;
+          btnLoadPreset.innerHTML = '<i class="fas fa-list"></i> Load';
+        }
+        
+        // Reset upload state
+        uploadInProgress = false;
+        
+        console.log('All button states reset');
+      } catch (error) {
+        console.error('Error resetting button states:', error);
+      }
+    }
+    
+    // Function to initialize all button handlers - fixes button interaction issues
+    function initializeButtonHandlers() {
+      try {
+        // Ensure all critical buttons have proper event handlers
+        
+        // Load Local DICOM button
+        if (btnLoadLocal && !btnLoadLocal.hasAttribute('data-initialized')) {
+          btnLoadLocal.setAttribute('data-initialized', 'true');
+          btnLoadLocal.addEventListener('click', () => {
+            if (uploadInProgress) {
+              showToast('Upload already in progress', 'warning');
+              return;
+            }
+            try {
+              inputLocal.click();
+            } catch (error) {
+              console.error('File input error:', error);
+              showToast('Failed to open file dialog', 'error');
+            }
+          });
+        }
+        
+        // Clear Measurements button
+        if (btnClearMeasurements && !btnClearMeasurements.hasAttribute('data-initialized')) {
+          btnClearMeasurements.setAttribute('data-initialized', 'true');
+          btnClearMeasurements.addEventListener('click', () => {
+            try {
+              const hasMeasurements = mprMode ? 
+                (mprMeasurements.axial.length > 0 || mprMeasurements.sagittal.length > 0 || mprMeasurements.coronal.length > 0) :
+                (measurements.length > 0);
+              
+              if (!hasMeasurements) {
+                showToast('No measurements to clear', 'info');
+                return;
+              }
+              
+              if (!confirm('Are you sure you want to clear all measurements?')) {
+                return;
+              }
+              
+              if (mprMode) {
+                mprMeasurements.axial = [];
+                mprMeasurements.sagittal = [];
+                mprMeasurements.coronal = [];
+                showToast('MPR measurements cleared', 'success');
+              } else {
+                measurements = [];
+                const imageId = getCurrentImageId();
+                if (imageId) {
+                  imageIdToMeasurements.set(imageId, measurements);
+                }
+                renderMeasurementsList();
+                showToast('Measurements cleared', 'success');
+              }
+              
+              requestDraw();
+              
+            } catch (error) {
+              console.error('Clear measurements error:', error);
+              showToast(`Failed to clear measurements: ${error.message}`, 'error');
+            }
+          });
+        }
+        
+        console.log('Button handlers initialized successfully');
+      } catch (error) {
+        console.error('Error initializing button handlers:', error);
+      }
+    }
+    
+    // Global error handler to prevent UI from getting stuck
+    window.addEventListener('error', (event) => {
+      console.error('Global error caught:', event.error);
+      resetAllButtonStates();
+      hideProgressIndicator();
+      showToast('An error occurred. Interface reset.', 'warning');
+    });
+    
+    window.addEventListener('unhandledrejection', (event) => {
+      console.error('Unhandled promise rejection:', event.reason);
+      resetAllButtonStates();
+      hideProgressIndicator();
+    });
     
     // Initialize when DOM is ready
     if (document.readyState === 'loading') {
