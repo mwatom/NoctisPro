@@ -535,8 +535,8 @@ const reconStatus = document.getElementById('reconStatus');
     let reconstructionCache = new Map();
     let activeReconstruction = null;
     
-    // First generateReconstruction function removed to avoid duplicate
-    // The main function is defined later in the code
+    // generateReconstruction function is defined later in the code (line 1334)
+    // to avoid duplicate function definitions
     
     function showReconstructionProgress(type) {
       const overlay = document.getElementById('progressOverlay') || createProgressOverlay();
