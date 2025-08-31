@@ -27,6 +27,7 @@ cd "$PROJECT_DIR"
 # Set environment
 export PATH=$PATH:/home/ubuntu/.local/bin
 export DJANGO_SETTINGS_MODULE=noctis_pro.settings
+export PYTHONPATH=$PYTHONPATH:/workspace
 
 log_info "Starting Professional Noctis Pro PACS deployment..."
 
