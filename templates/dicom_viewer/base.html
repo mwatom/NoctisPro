@@ -176,7 +176,7 @@
     </div>
     <div class="topbar">
       <button type="button" id="btnLoadLocal" class="btn-control"><i class="fas fa-folder-open"></i> Load Local DICOM</button>
-      <a id="btnBackWorklist" class="btn" href="{% url 'worklist:dashboard' %}" onclick="return returnToWorklist(event)"><i class="fas fa-arrow-left"></i> Back to Worklist</a>
+      <button type="button" id="btnBackWorklist" class="btn" onclick="window.location.href='{% url 'worklist:dashboard' %}'"><i class="fas fa-arrow-left"></i> Back to Worklist</button>
       {% if user.is_authenticated and user.can_edit_reports %}
       <button type="button" id="btnWriteReport" class="btn-control" style="display:none"><i class="fas fa-file-signature"></i> Write Report</button>
       {% endif %}
@@ -191,9 +191,7 @@
       <button type="button" id="btnCapture" class="btn"><i class="fas fa-camera"></i> Capture</button>
       <button type="button" id="btnPrint" class="btn"><i class="fas fa-print"></i> Print</button>
       
-      {% if user.is_superuser %}
-      <button type="button" id="btnDeleteStudy" class="btn btn-danger" style="margin-left: auto;"><i class="fas fa-trash"></i> Delete Study</button>
-      {% endif %}
+
       <div id="patientInfo" style="margin-left:auto;color:#ccc;font-size:13px;">Patient: - | Study Date: - | Modality: -</div>
     </div>
     <div class="viewport" id="viewport">
@@ -435,7 +433,6 @@
     const sortSelect = document.getElementById('sortSelect');
     const btnSavePreset = document.getElementById('btnSavePreset');
     const btnLoadPreset = document.getElementById('btnLoadPreset');
-    const btnClearMeasurements = document.getElementById('btnClearMeasurements');
     let currentModality = 'CT';
     let showTagsOverlay = false;
 const reconStatus = document.getElementById('reconStatus');
@@ -661,15 +658,11 @@ const reconStatus = document.getElementById('reconStatus');
     [viewAxial, viewSagittal, viewCoronal].forEach(img=>{ if(img){ img.loading='eager'; img.decoding='async'; }});
 
     // Topbar extras
-    const sortSelect = document.getElementById('sortSelect');
-    const btnToggleTags = document.getElementById('btnToggleTags');
     const btnShowDicom = document.getElementById('btnShowDicom');
     const btnCapture = document.getElementById('btnCapture');
     const dicomModal = document.getElementById('dicomModal');
     const dicomTagsPre = document.getElementById('dicomTagsPre');
     const closeDicomModal = document.getElementById('closeDicomModal');
-    const btnSavePreset = document.getElementById('btnSavePreset');
-    const btnLoadPreset = document.getElementById('btnLoadPreset');
 
     // Capture button handler - Fixed with proper error handling
     if (btnCapture) {
@@ -1480,7 +1473,7 @@ const reconStatus = document.getElementById('reconStatus');
      // Capture canvas - Removed duplicate handler (handled above with better error handling)
 
      // Print functionality
-     const btnPrint = document.getElementById('btnPrint');
+     // btnPrint already declared above
      const printModal = document.getElementById('printModal');
      const closePrintModal = document.getElementById('closePrintModal');
      const cancelPrint = document.getElementById('cancelPrint');
@@ -2278,7 +2271,6 @@ const reconStatus = document.getElementById('reconStatus');
         }
         
         // Reset Print button
-        const btnPrint = document.getElementById('btnPrint');
         if (btnPrint) {
           btnPrint.disabled = false;
           btnPrint.innerHTML = '<i class="fas fa-print"></i> Print';
@@ -2551,48 +2543,7 @@ const reconStatus = document.getElementById('reconStatus');
        });
      }
 
-    // Admin delete study functionality
-    if (document.getElementById('btnDeleteStudy')) {
-      document.getElementById('btnDeleteStudy').addEventListener('click', async function() {
-        if (!currentStudy) {
-          showToast('No study loaded', 'warning');
-          return;
-        }
-        
-        const confirmDelete = confirm('Delete this study? This cannot be undone.');
-        
-        if (!confirmDelete) return;
-        
-        try {
-          showProgressIndicator();
-          
-          const response = await fetch(`/worklist/api/studies/${currentStudy}/delete/`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-CSRFToken': getCookie('csrftoken')
-            }
-          });
-          
-          hideProgressIndicator();
-          
-          if (response.ok) {
-            showToast('Study deleted successfully', 'success');
-            // Redirect to worklist after 2 seconds
-            setTimeout(() => {
-              window.location.href = '/worklist/dashboard/';
-            }, 2000);
-          } else {
-            const error = await response.json();
-            showToast(`Failed to delete study: ${error.error || 'Unknown error'}`, 'error');
-          }
-        } catch (error) {
-          hideProgressIndicator();
-          console.error('Delete error:', error);
-          showToast(`Delete failed: ${error.message}`, 'error');
-        }
-      });
-    }
+
   })();
   </script>
 </body>

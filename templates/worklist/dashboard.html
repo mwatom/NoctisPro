@@ -1127,6 +1127,7 @@
                     return;
                 }
                 
+                // Open in same tab instead of new tab
                 const url = `/dicom-viewer/web/viewer/?study_id=${studyId}`;
                 window.location.href = url;
             } catch (error) {
@@ -1137,7 +1138,8 @@
 
         async function launchDicomViewer() {
             try {
-                window.open('/dicom-viewer/web/viewer/', '_blank');
+                // Open in same tab instead of new tab
+                window.location.href = '/dicom-viewer/web/viewer/';
             } catch (error) {
                 console.error('Error launching DICOM viewer:', error);
                 showToast('Failed to launch DICOM viewer', 'error');
@@ -1212,8 +1214,11 @@
             // Highlight selected row
             row.style.background = 'rgba(0, 212, 255, 0.15)';
             
-            // In a real app, this would open the study viewer
-            console.log('Selected study:', row.children[2].textContent);
+            // Open the study in viewer when row is clicked
+            const studyId = row.getAttribute('data-study-id');
+            if (studyId) {
+                openStudyInViewer(studyId);
+            }
         }
 
         function resetFilters() {
