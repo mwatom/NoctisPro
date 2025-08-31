@@ -7,7 +7,7 @@
       <ul>
         {% for s in studies %}
           <li style="margin: 8px 0;">
-            <a href="{% url 'dicom_viewer:web_viewer' %}?study_id={{ s.id }}">{{ s.accession_number }} - {{ s.patient.full_name }} ({{ s.modality.code }})</a>
+            <a href="{% url 'dicom_viewer:viewer' %}?study={{ s.id }}">{{ s.accession_number }} - {{ s.patient.full_name }} ({{ s.modality.code }})</a>
           </li>
         {% endfor %}
       </ul>
