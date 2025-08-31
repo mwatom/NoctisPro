@@ -42,9 +42,6 @@
     .btn:disabled { opacity: 0.6; cursor: not-allowed; pointer-events: none; }
     .btn-primary { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); }
     .btn-primary:hover:not(:disabled) { background: #00b8d4; border-color: #00b8d4; }
-    .btn-danger { background: var(--danger-color); color: var(--text-primary); border-color: var(--danger-color); }
-    .btn-danger:hover:not(:disabled) { background: #ff6666; border-color: #ff6666; transform: translateY(-1px); box-shadow: 0 2px 4px rgba(255, 68, 68, 0.3); }
-    
     .btn-control { padding: 3px 8px; border: 1px solid var(--border-color); border-radius: 2px; cursor: pointer; font-size: 10px; background: var(--card-bg); color: var(--text-primary); transition: all 0.2s ease; font-weight: 500; display: inline-flex; align-items: center; gap: 3px; text-decoration: none; min-width: 80px; justify-content: center; }
     .btn-control:hover:not(:disabled) { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); }
     .btn-control:disabled { opacity: 0.6; cursor: not-allowed; pointer-events: none; }
@@ -190,10 +187,6 @@
       <button type="button" id="btnShowDicom" class="btn"><i class="fas fa-info-circle"></i> Show DICOM</button>
       <button type="button" id="btnCapture" class="btn"><i class="fas fa-camera"></i> Capture</button>
       <button type="button" id="btnPrint" class="btn"><i class="fas fa-print"></i> Print</button>
-      
-      {% if user.is_superuser %}
-      <button type="button" id="btnDeleteStudy" class="btn btn-danger" style="margin-left: auto;"><i class="fas fa-trash"></i> Delete Study</button>
-      {% endif %}
       <div id="patientInfo" style="margin-left:auto;color:#ccc;font-size:13px;">Patient: - | Study Date: - | Modality: -</div>
     </div>
     <div class="viewport" id="viewport">
@@ -1655,214 +1648,18 @@
         }
       });
     });
-    
-    // Enhanced tool button handlers with comprehensive functionality
-    function initializeToolButtons() {
-      const toolButtons = document.querySelectorAll('.tool[data-tool]');
-      
-      toolButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-          e.preventDefault();
-          e.stopPropagation();
+    // Tool button handlers - Fixed with comprehensive error handling and validation
+    document.querySelectorAll('.tool').forEach(t => {
+      t.addEventListener('click', () => {
+        try {
+          const tool = t.getAttribute('data-tool');
           
-          const tool = this.getAttribute('data-tool');
-          if (!tool) return;
-          
-          // Handle tool activation
-          handleToolAction(tool, this);
-        });
-      });
-    }
-    
-    function handleToolAction(tool, button) {
-      try {
-        // Action tools that don't change the active state
-        const actionTools = ['invert', 'reset', 'fit', 'one', 'reload', 'align-center'];
-        
-        // Toggle tools that maintain their own state
-        const toggleTools = ['cine', 'crosshair', 'spyglass'];
-        
-        // State-changing tools
-        const stateTools = ['window', 'zoom', 'pan', 'measure', 'annotate', 'hu'];
-        
-        if (actionTools.includes(tool)) {
-          // Execute action without changing active tool
-          executeToolAction(tool);
-        } else if (toggleTools.includes(tool)) {
-          // Toggle the tool state
-          executeToggleTool(tool, button);
-        } else if (stateTools.includes(tool)) {
-          // Change active tool
-          document.querySelectorAll('.tool').forEach(t => t.classList.remove('active'));
-          button.classList.add('active');
-          activeTool = tool;
-          
-          // Special handling for specific tools
-          if (tool === 'hu') {
-            showHuProbe = true;
-          } else {
-            showHuProbe = false;
+          if (!tool) {
+            console.warn('Tool button missing data-tool attribute');
+            return;
           }
           
-          // Clear any temporary states
-          measureDraft = null;
-          spyglass.isPress = false;
-          
-          showToast(`${tool.charAt(0).toUpperCase() + tool.slice(1)} tool selected`, 'info', 1000);
-        } else if (tool === 'ai') {
-          showAiAnalysis();
-        }
-        
-        requestDraw();
-      } catch (error) {
-        console.error(`Tool action error for ${tool}:`, error);
-        showToast(`Error: ${error.message}`, 'error');
-      }
-    }
-    
-    function executeToolAction(tool) {
-      switch(tool) {
-        case 'invert':
-          inverted = !inverted;
-          imageCache.clear();
-          mprImageCache.clear();
-          mprImgs = { axial: null, sagittal: null, coronal: null };
-          showToast('Image inverted', 'info', 1000);
-          break;
-          
-        case 'reset':
-          resetViewport();
-          break;
-          
-        case 'fit':
-          fitToWindow();
-          break;
-          
-        case 'one':
-          setOneToOneZoom();
-          break;
-          
-        case 'reload':
-          reloadCurrentImage();
-          break;
-          
-        case 'align-center':
-          centerImage();
-          break;
-      }
-    }
-    
-    function executeToggleTool(tool, button) {
-      switch(tool) {
-        case 'cine':
-          cineActive = !cineActive;
-          button.classList.toggle('active', cineActive);
-          if (cineActive) {
-            startCine();
-          } else {
-            stopCine();
-          }
-          break;
-          
-        case 'crosshair':
-          crosshair = !crosshair;
-          button.classList.toggle('active', crosshair);
-          showToast(crosshair ? 'Crosshair enabled' : 'Crosshair disabled', 'info', 1000);
-          break;
-          
-        case 'spyglass':
-          spyglass.active = !spyglass.active;
-          button.classList.toggle('active', spyglass.active);
-          showToast(spyglass.active ? 'Spyglass enabled' : 'Spyglass disabled', 'info', 1000);
-          break;
-      }
-    }
-    
-    function resetViewport() {
-      zoom = 1.0;
-      panOffset = { x: 0, y: 0 };
-      ww = defaultWw;
-      wl = defaultWl;
-      inverted = false;
-      
-      // Update UI controls
-      if (zoomSlider) zoomSlider.value = 100;
-      if (wwSlider) wwSlider.value = Math.round(ww);
-      if (wlSlider) wlSlider.value = Math.round(wl);
-      if (wwNum) wwNum.value = Math.round(ww);
-      if (wlNum) wlNum.value = Math.round(wl);
-      
-      // Update display values
-      const zoomVal = document.getElementById('zoomVal');
-      const wwVal = document.getElementById('wwVal');
-      const wlVal = document.getElementById('wlVal');
-      
-      if (zoomVal) zoomVal.textContent = '100%';
-      if (wwVal) wwVal.textContent = Math.round(ww);
-      if (wlVal) wlVal.textContent = Math.round(wl);
-      
-      // Clear caches
-      imageCache.clear();
-      mprImageCache.clear();
-      mprImgs = { axial: null, sagittal: null, coronal: null };
-      
-      showToast('View reset to defaults', 'success', 1500);
-    }
-    
-    function fitToWindow() {
-      panOffset = { x: 0, y: 0 };
-      zoom = 1.0;
-      if (zoomSlider) zoomSlider.value = 100;
-      const zoomVal = document.getElementById('zoomVal');
-      if (zoomVal) zoomVal.textContent = '100%';
-      showToast('Image fitted to viewport', 'info', 1000);
-    }
-    
-    function setOneToOneZoom() {
-      if (lastVp && lastVp.imgW && lastVp.imgH) {
-        const baseFit = Math.min(canvas.width / lastVp.imgW, canvas.height / lastVp.imgH);
-        zoom = 1 / baseFit;
-        const zoomPercent = Math.round(zoom * 100);
-        
-        if (zoomSlider) {
-          zoomSlider.value = Math.min(500, Math.max(25, zoomPercent));
-        }
-        
-        const zoomVal = document.getElementById('zoomVal');
-        if (zoomVal) {
-          zoomVal.textContent = `${zoomPercent}%`;
-        }
-        
-        panOffset = { x: 0, y: 0 };
-        showToast('Zoom set to 1:1', 'info', 1000);
-      } else {
-        showToast('Image not loaded', 'warning');
-      }
-    }
-    
-    function reloadCurrentImage() {
-      if (images.length > 0) {
-        const currentUrl = getCurrentImageUrl();
-        if (currentUrl) {
-          imageCache.delete(currentUrl);
-          showToast('Image reloaded', 'info', 1000);
-        }
-      } else {
-        showToast('No image to reload', 'warning');
-      }
-    }
-    
-    function centerImage() {
-      panOffset = { x: 0, y: 0 };
-      showToast('Image centered', 'info', 1000);
-    }
-    
-    // Initialize tool buttons when DOM is ready
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initializeToolButtons);
-    } else {
-      initializeToolButtons();
-    }// Update active state
+          // Update active state
           document.querySelectorAll('.tool').forEach(x => x.classList.remove('active'));
           t.classList.add('active');
           
@@ -3890,51 +3687,7 @@
          }
        });
      }
-   
-    
-    // Admin delete study functionality
-    if (document.getElementById('btnDeleteStudy')) {
-      document.getElementById('btnDeleteStudy').addEventListener('click', async function() {
-        if (!currentStudy) {
-          showToast('No study loaded', 'warning');
-          return;
-        }
-        
-        const confirmDelete = confirm(`Are you sure you want to delete this study?\n\nStudy: ${currentStudy}\nPatient: ${document.getElementById('patientInfo').textContent}\n\nThis action cannot be undone!`);
-        
-        if (!confirmDelete) return;
-        
-        try {
-          showProgressIndicator();
-          
-          const response = await fetch(`/worklist/api/studies/${currentStudy}/delete/`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-CSRFToken': getCookie('csrftoken')
-            }
-          });
-          
-          hideProgressIndicator();
-          
-          if (response.ok) {
-            showToast('Study deleted successfully', 'success');
-            // Redirect to worklist after 2 seconds
-            setTimeout(() => {
-              window.location.href = '/worklist/dashboard/';
-            }, 2000);
-          } else {
-            const error = await response.json();
-            showToast(`Failed to delete study: ${error.error || 'Unknown error'}`, 'error');
-          }
-        } catch (error) {
-          hideProgressIndicator();
-          console.error('Delete error:', error);
-          showToast(`Delete failed: ${error.message}`, 'error');
-        }
-      });
-    }
-  })();
+   })();
   </script>
 </body>
 </html>
