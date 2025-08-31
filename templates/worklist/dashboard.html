@@ -619,17 +619,17 @@
                     </div>
                 </div>
                 {% if user.is_authenticated and user.role == 'admin' %}
-                <button type="button" class="admin-btn" onclick="window.location.href='{% url 'admin_panel:dashboard' %}'">
-                    <i class="fas fa-shield-alt"></i> ADMIN
+                <button type="button" class="admin-btn" onclick="window.location.href='{% url 'admin_panel:dashboard' %}'" title="Administrator Dashboard">
+                    <i class="fas fa-shield-alt"></i> ADMIN PANEL
                 </button>
-                <button type="button" class="btn-control" onclick="window.location.href='{% url 'admin_panel:user_create' %}'" title="Create User">
-                    <i class="fas fa-user-plus"></i> ADD USER
+                <button type="button" class="btn-control" onclick="window.location.href='{% url 'admin_panel:user_create' %}'" title="ADMIN ONLY: Create New User">
+                    <i class="fas fa-user-plus"></i> CREATE USER
                 </button>
-                <button type="button" class="btn-control" onclick="window.location.href='{% url 'admin_panel:facility_create' %}'" title="Create Facility">
-                    <i class="fas fa-hospital"></i> ADD FACILITY
+                <button type="button" class="btn-control" onclick="window.location.href='{% url 'admin_panel:facility_create' %}'" title="ADMIN ONLY: Create New Facility">
+                    <i class="fas fa-hospital"></i> CREATE FACILITY
                 </button>
-                <button type="button" class="btn-control" onclick="window.location.href='{% url 'admin_panel:user_management' %}'" title="Manage Users">
-                    <i class="fas fa-users-cog"></i> USERS
+                <button type="button" class="btn-control" onclick="window.location.href='{% url 'admin_panel:user_management' %}'" title="ADMIN ONLY: Manage All Users">
+                    <i class="fas fa-users-cog"></i> MANAGE USERS
                 </button>
                 {% endif %}
                 <button type="button" class="btn-control" onclick="window.location.href='{% url 'notifications:notification_list' %}'" title="Notifications">
@@ -736,10 +736,10 @@
         <!-- Footer Status Bar -->
         <div class="footer-status">
             <div class="status-left">
-                <span>Total Studies: <strong>247</strong></span>
-                <span>Urgent: <strong style="color: var(--urgent-color);">12</strong></span>
-                <span>In Progress: <strong style="color: var(--in-progress-color);">8</strong></span>
-                <span>Completed: <strong style="color: var(--completed-color);">189</strong></span>
+                <span>Total Studies: <strong>{{ total_studies|default:0 }}</strong></span>
+                <span>Urgent: <strong style="color: var(--urgent-color);">{{ urgent_studies|default:0 }}</strong></span>
+                <span>In Progress: <strong style="color: var(--in-progress-color);">{{ in_progress_studies|default:0 }}</strong></span>
+                <span>Completed: <strong style="color: var(--completed-color);">{{ completed_studies|default:0 }}</strong></span>
             </div>
             <div class="status-right">
                 <div class="connection-status">

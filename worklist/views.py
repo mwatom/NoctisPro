@@ -26,11 +26,29 @@ from reports.models import Report
 
 @login_required
 def dashboard(request):
-	"""Render the exact provided dashboard UI template"""
+	"""Professional dashboard with enhanced functionality"""
 	from django.middleware.csrf import get_token
+	
+	# Get user-specific statistics
+	user = request.user
+	if user.is_facility_user() and getattr(user, 'facility', None):
+		studies = Study.objects.filter(facility=user.facility)
+	else:
+		studies = Study.objects.all()
+	
+	# Calculate dashboard statistics
+	total_studies = studies.count()
+	urgent_studies = studies.filter(priority='urgent').count()
+	in_progress_studies = studies.filter(status='in_progress').count()
+	completed_studies = studies.filter(status='completed').count()
+	
 	return render(request, 'worklist/dashboard.html', {
 		'user': request.user,
-		'csrf_token': get_token(request)
+		'csrf_token': get_token(request),
+		'total_studies': total_studies,
+		'urgent_studies': urgent_studies,
+		'in_progress_studies': in_progress_studies,
+		'completed_studies': completed_studies,
 	})
 
 @login_required
@@ -483,7 +501,7 @@ def api_studies(request):
 				})
 			except Exception as e:
 				# Log the error but continue processing other studies
-				print(f"Error processing study {study.id}: {e}")
+				logger.warning(f"Error processing study {study.id}: {e}")
 				continue
 		
 		return JsonResponse({
@@ -1113,3 +1131,130 @@ def generate_attachment_thumbnail(attachment):
     except Exception:
         # If thumbnail generation fails, continue silently
         pass
+
+@login_required
+def api_refresh_worklist(request):
+	"""API endpoint for worklist refresh"""
+	try:
+		user = request.user
+		
+		if user.is_facility_user() and getattr(user, 'facility', None):
+			recent_studies = Study.objects.filter(facility=user.facility, upload_date__gte=timezone.now() - timezone.timedelta(hours=1))
+		else:
+			recent_studies = Study.objects.filter(upload_date__gte=timezone.now() - timezone.timedelta(hours=1))
+		
+		return JsonResponse({
+			'success': True,
+			'total_recent': recent_studies.count(),
+			'refresh_time': timezone.now().isoformat()
+		})
+	except Exception as e:
+		return JsonResponse({'success': False, 'error': str(e)})
+
+@login_required
+def api_get_upload_stats(request):
+	"""API endpoint for upload statistics"""
+	try:
+		user = request.user
+		
+		if user.is_facility_user() and getattr(user, 'facility', None):
+			studies = Study.objects.filter(facility=user.facility)
+		else:
+			studies = Study.objects.all()
+		
+		total_studies = studies.count()
+		total_series = sum(study.get_series_count() for study in studies[:100])  # Limit for performance
+		total_images = sum(study.get_image_count() for study in studies[:100])  # Limit for performance
+		
+		return JsonResponse({
+			'success': True,
+			'stats': {
+				'total_studies': total_studies,
+				'total_series': total_series,
+				'total_images': total_images
+			}
+		})
+	except Exception as e:
+		return JsonResponse({'success': False, 'error': str(e)})
+
+@login_required
+@csrf_exempt
+def api_delete_study(request, study_id):
+	"""API endpoint to delete a study (ADMIN ONLY)"""
+	if request.method != 'DELETE':
+		return JsonResponse({'error': 'Method not allowed'}, status=405)
+	
+	user = request.user
+	
+	# STRICT admin-only check
+	if not (user.is_authenticated and 
+			hasattr(user, 'role') and 
+			user.role == 'admin' and 
+			user.is_verified and 
+			user.is_active):
+		return JsonResponse({
+			'error': 'UNAUTHORIZED: Only verified administrators can delete studies',
+			'code': 'ADMIN_ONLY_DELETE',
+			'user_role': getattr(user, 'role', 'unknown')
+		}, status=403)
+	
+	try:
+		study = get_object_or_404(Study, id=study_id)
+		accession = study.accession_number
+		
+		# Delete study and all related data
+		study.delete()
+		
+		return JsonResponse({
+			'success': True,
+			'message': f'Study {accession} deleted successfully'
+		})
+	except Exception as e:
+		logger.error(f"Error deleting study {study_id}: {e}")
+		return JsonResponse({'error': str(e)}, status=500)
+
+def generate_attachment_thumbnail(attachment):
+	"""Generate thumbnail for supported file types"""
+	try:
+		if attachment.file_type == 'image':
+			# Generate thumbnail for images
+			image = Image.open(attachment.file.path)
+			image.thumbnail((200, 200), Image.Resampling.LANCZOS)
+			
+			# Save thumbnail
+			thumb_io = BytesIO()
+			image.save(thumb_io, format='PNG')
+			thumb_file = ContentFile(thumb_io.getvalue())
+			
+			thumb_name = f"thumb_{attachment.id}.png"
+			attachment.thumbnail.save(thumb_name, thumb_file, save=True)
+			
+		elif attachment.file_type == 'dicom_study':
+			# Generate thumbnail for DICOM images
+			try:
+				ds = pydicom.dcmread(attachment.file.path)
+				if hasattr(ds, 'pixel_array'):
+					pixel_array = ds.pixel_array
+					
+					# Normalize pixel values
+					pixel_array = ((pixel_array - pixel_array.min()) * 255 / 
+								 (pixel_array.max() - pixel_array.min())).astype('uint8')
+					
+					# Create PIL image
+					pil_image = Image.fromarray(pixel_array)
+					pil_image.thumbnail((200, 200), Image.Resampling.LANCZOS)
+					
+					# Save thumbnail
+					thumb_io = BytesIO()
+					pil_image.save(thumb_io, format='PNG')
+					thumb_file = ContentFile(thumb_io.getvalue())
+					
+					thumb_name = f"dicom_thumb_{attachment.id}.png"
+					attachment.thumbnail.save(thumb_name, thumb_file, save=True)
+					
+			except Exception:
+				pass
+				
+	except Exception:
+		# If thumbnail generation fails, continue silently
+		pass
