@@ -10,9 +10,20 @@ urlpatterns = [
     # API endpoints for professional DICOM viewer
     path('api/study/<int:study_id>/', views.api_study_data, name='api_study_data'),
     path('api/image/<int:image_id>/display/', views.api_image_display, name='api_image_display'),
+    
+    # Basic reconstruction
     path('api/mpr/<int:series_id>/', views.api_mpr_reconstruction, name='api_mpr_reconstruction'),
     path('api/mip/<int:series_id>/', views.api_mip_reconstruction, name='api_mip_reconstruction'),
     path('api/bone/<int:series_id>/', views.api_bone_reconstruction, name='api_bone_reconstruction'),
+    
+    # Advanced modality-specific reconstruction
+    path('api/mri/<int:series_id>/', views.api_mri_reconstruction, name='api_mri_reconstruction'),
+    path('api/pet/<int:series_id>/', views.api_pet_reconstruction, name='api_pet_reconstruction'),
+    path('api/spect/<int:series_id>/', views.api_spect_reconstruction, name='api_spect_reconstruction'),
+    path('api/nuclear/<int:series_id>/', views.api_nuclear_reconstruction, name='api_nuclear_reconstruction'),
+    path('api/modality-options/<int:series_id>/', views.api_modality_reconstruction_options, name='api_modality_options'),
+    
+    # Utility endpoints
     path('api/hounsfield/', views.api_hounsfield_units, name='api_hounsfield_units'),
     path('api/calculate-distance/', views.api_calculate_distance, name='api_calculate_distance'),
     path('api/measurements/<int:study_id>/', views.api_measurements, name='api_measurements'),

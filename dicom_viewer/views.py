@@ -29,7 +29,10 @@ from worklist.models import Study, Series, DicomImage, Patient, Modality
 from accounts.models import User, Facility
 from .models import ViewerSession, Measurement, Annotation, ReconstructionJob
 from .dicom_utils import DicomProcessor
-from .reconstruction import MPRProcessor, MIPProcessor, Bone3DProcessor
+from .reconstruction import (MPRProcessor, MIPProcessor, Bone3DProcessor, 
+                             MRI3DProcessor, PETProcessor, SPECTProcessor, 
+                             NuclearMedicineProcessor, create_processor, 
+                             get_modality_specific_processor, get_available_reconstruction_types)
 
 logger = logging.getLogger(__name__)
 
@@ -1162,6 +1165,472 @@ def api_calculate_distance(request):
         
     except Exception as e:
         logger.error(f"Error calculating distance: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+@csrf_exempt
+def api_mri_reconstruction(request, series_id):
+    """Professional MRI reconstruction with tissue-specific analysis"""
+    try:
+        series = get_object_or_404(Series, id=series_id)
+        
+        # Check permissions
+        if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and series.study.facility != request.user.facility:
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        # Get parameters
+        tissue_type = request.GET.get('tissue_type', 'brain')
+        window_width = float(request.GET.get('ww', 200))
+        window_level = float(request.GET.get('wl', 100))
+        invert = request.GET.get('invert', 'false').lower() == 'true'
+        
+        # Load volume data
+        images = series.images.all().order_by('instance_number')
+        if not images.exists():
+            return JsonResponse({'error': 'No images found in series'}, status=404)
+        
+        volume_data = []
+        spacing = [1.0, 1.0, 1.0]
+        
+        for image in images:
+            try:
+                file_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
+                if not os.path.exists(file_path):
+                    continue
+                
+                ds = _load_dicom_optimized(file_path)
+                if ds is None:
+                    continue
+                
+                pixel_array = ds.pixel_array.astype(np.float32)
+                
+                # MRI typically doesn't need HU conversion
+                # but may need intensity normalization
+                volume_data.append(pixel_array)
+                
+                # Get spacing from first image
+                if len(volume_data) == 1:
+                    pixel_spacing = getattr(ds, 'PixelSpacing', [1.0, 1.0])
+                    slice_thickness = getattr(ds, 'SliceThickness', 1.0)
+                    spacing = [float(slice_thickness), float(pixel_spacing[0]), float(pixel_spacing[1])]
+                
+            except Exception as e:
+                logger.error(f"Error loading MRI image: {e}")
+                continue
+        
+        if not volume_data:
+            return JsonResponse({'error': 'Failed to load MRI volume data'}, status=500)
+        
+        # Create 3D volume
+        volume = np.stack(volume_data, axis=0)
+        
+        # Create metadata
+        from .reconstruction import VolumeMetadata, ReconstructionParameters
+        metadata = VolumeMetadata(
+            dimensions=volume.shape,
+            spacing=tuple(spacing),
+            origin=(0.0, 0.0, 0.0),
+            orientation=[1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+            modality='MR',
+            patient_id=series.study.patient.patient_id,
+            study_uid=series.study.study_instance_uid,
+            series_uid=series.series_instance_uid
+        )
+        
+        params = ReconstructionParameters(algorithm='mri_3d', quality='normal')
+        
+        # Create MRI processor and reconstruct
+        processor = MRI3DProcessor()
+        results = processor.create_mri_reconstruction(volume, metadata, params, tissue_type)
+        
+        # Convert projections to base64
+        mri_views = {}
+        for view_name, projection in results['projections'].items():
+            mri_views[view_name] = _array_to_base64_image(projection, window_width, window_level, invert)
+        
+        return JsonResponse({
+            'success': True,
+            'mri_views': mri_views,
+            'tissue_type': tissue_type,
+            'contrast_analysis': results.get('contrast_analysis', {}),
+            'volume_shape': list(volume.shape),
+            'modality': 'MRI'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in MRI reconstruction: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+@csrf_exempt
+def api_pet_reconstruction(request, series_id):
+    """Professional PET reconstruction with SUV analysis"""
+    try:
+        series = get_object_or_404(Series, id=series_id)
+        
+        # Check permissions
+        if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and series.study.facility != request.user.facility:
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        # Get parameters
+        window_width = float(request.GET.get('ww', 1000))
+        window_level = float(request.GET.get('wl', 500))
+        invert = request.GET.get('invert', 'false').lower() == 'true'
+        
+        # Load volume data
+        images = series.images.all().order_by('instance_number')
+        if not images.exists():
+            return JsonResponse({'error': 'No images found in series'}, status=404)
+        
+        volume_data = []
+        spacing = [1.0, 1.0, 1.0]
+        
+        for image in images:
+            try:
+                file_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
+                if not os.path.exists(file_path):
+                    continue
+                
+                ds = _load_dicom_optimized(file_path)
+                if ds is None:
+                    continue
+                
+                pixel_array = ds.pixel_array.astype(np.float32)
+                
+                # PET data is typically in counts, may need calibration
+                slope = float(getattr(ds, 'RescaleSlope', 1.0))
+                intercept = float(getattr(ds, 'RescaleIntercept', 0.0))
+                pixel_array = pixel_array * slope + intercept
+                
+                volume_data.append(pixel_array)
+                
+                # Get spacing
+                if len(volume_data) == 1:
+                    pixel_spacing = getattr(ds, 'PixelSpacing', [1.0, 1.0])
+                    slice_thickness = getattr(ds, 'SliceThickness', 1.0)
+                    spacing = [float(slice_thickness), float(pixel_spacing[0]), float(pixel_spacing[1])]
+                
+            except Exception as e:
+                logger.error(f"Error loading PET image: {e}")
+                continue
+        
+        if not volume_data:
+            return JsonResponse({'error': 'Failed to load PET volume data'}, status=500)
+        
+        # Create 3D volume
+        volume = np.stack(volume_data, axis=0)
+        
+        # Create metadata
+        from .reconstruction import VolumeMetadata, ReconstructionParameters
+        metadata = VolumeMetadata(
+            dimensions=volume.shape,
+            spacing=tuple(spacing),
+            origin=(0.0, 0.0, 0.0),
+            orientation=[1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+            modality='PT',
+            patient_id=series.study.patient.patient_id,
+            study_uid=series.study.study_instance_uid,
+            series_uid=series.series_instance_uid
+        )
+        
+        params = ReconstructionParameters(algorithm='pet', quality='normal')
+        
+        # Create PET processor and reconstruct
+        processor = PETProcessor()
+        results = processor.create_pet_reconstruction(volume, metadata, params)
+        
+        # Convert projections to base64 (PET projections are already colored)
+        pet_views = {}
+        for view_name, projection in results['projections'].items():
+            if projection.ndim == 3:  # Colored projection
+                # Convert RGB to grayscale for windowing, then back to RGB
+                gray = np.dot(projection, [0.299, 0.587, 0.114])
+                windowed = _apply_windowing_fast(gray, window_width, window_level, invert)
+                # Convert back to RGB
+                rgb_windowed = np.stack([windowed, windowed, windowed], axis=-1)
+                pet_views[view_name] = _array_to_base64_image(rgb_windowed)
+            else:
+                pet_views[view_name] = _array_to_base64_image(projection, window_width, window_level, invert)
+        
+        return JsonResponse({
+            'success': True,
+            'pet_views': pet_views,
+            'hotspots': results.get('hotspots', []),
+            'volume_shape': list(volume.shape),
+            'modality': 'PET'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in PET reconstruction: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+@csrf_exempt
+def api_spect_reconstruction(request, series_id):
+    """Professional SPECT reconstruction with perfusion analysis"""
+    try:
+        series = get_object_or_404(Series, id=series_id)
+        
+        # Check permissions
+        if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and series.study.facility != request.user.facility:
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        # Get parameters
+        tracer_type = request.GET.get('tracer', 'tc99m')
+        window_width = float(request.GET.get('ww', 800))
+        window_level = float(request.GET.get('wl', 400))
+        invert = request.GET.get('invert', 'false').lower() == 'true'
+        
+        # Load volume data
+        images = series.images.all().order_by('instance_number')
+        if not images.exists():
+            return JsonResponse({'error': 'No images found in series'}, status=404)
+        
+        volume_data = []
+        spacing = [1.0, 1.0, 1.0]
+        
+        for image in images:
+            try:
+                file_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
+                if not os.path.exists(file_path):
+                    continue
+                
+                ds = _load_dicom_optimized(file_path)
+                if ds is None:
+                    continue
+                
+                pixel_array = ds.pixel_array.astype(np.float32)
+                
+                # SPECT data calibration
+                slope = float(getattr(ds, 'RescaleSlope', 1.0))
+                intercept = float(getattr(ds, 'RescaleIntercept', 0.0))
+                pixel_array = pixel_array * slope + intercept
+                
+                volume_data.append(pixel_array)
+                
+                # Get spacing
+                if len(volume_data) == 1:
+                    pixel_spacing = getattr(ds, 'PixelSpacing', [1.0, 1.0])
+                    slice_thickness = getattr(ds, 'SliceThickness', 1.0)
+                    spacing = [float(slice_thickness), float(pixel_spacing[0]), float(pixel_spacing[1])]
+                
+            except Exception as e:
+                logger.error(f"Error loading SPECT image: {e}")
+                continue
+        
+        if not volume_data:
+            return JsonResponse({'error': 'Failed to load SPECT volume data'}, status=500)
+        
+        # Create 3D volume
+        volume = np.stack(volume_data, axis=0)
+        
+        # Create metadata
+        from .reconstruction import VolumeMetadata, ReconstructionParameters
+        metadata = VolumeMetadata(
+            dimensions=volume.shape,
+            spacing=tuple(spacing),
+            origin=(0.0, 0.0, 0.0),
+            orientation=[1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+            modality='NM',
+            patient_id=series.study.patient.patient_id,
+            study_uid=series.study.study_instance_uid,
+            series_uid=series.series_instance_uid
+        )
+        
+        params = ReconstructionParameters(algorithm='spect', quality='normal')
+        
+        # Create SPECT processor and reconstruct
+        processor = SPECTProcessor()
+        results = processor.create_spect_reconstruction(volume, metadata, params, tracer_type)
+        
+        # Convert projections to base64
+        spect_views = {}
+        for view_name, projection in results['projections'].items():
+            if projection.ndim == 3:  # Colored projection
+                # Convert RGB to base64
+                img = Image.fromarray(projection.astype(np.uint8))
+                buffer = BytesIO()
+                img.save(buffer, format='PNG')
+                img_str = base64.b64encode(buffer.getvalue()).decode('ascii')
+                spect_views[view_name] = f"data:image/png;base64,{img_str}"
+            else:
+                spect_views[view_name] = _array_to_base64_image(projection, window_width, window_level, invert)
+        
+        return JsonResponse({
+            'success': True,
+            'spect_views': spect_views,
+            'tracer_type': tracer_type,
+            'defects': results.get('defects', []),
+            'polar_maps': results.get('polar_maps', {}),
+            'volume_shape': list(volume.shape),
+            'modality': 'SPECT'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in SPECT reconstruction: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+@csrf_exempt
+def api_nuclear_reconstruction(request, series_id):
+    """Professional Nuclear Medicine reconstruction for various isotopes"""
+    try:
+        series = get_object_or_404(Series, id=series_id)
+        
+        # Check permissions
+        if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and series.study.facility != request.user.facility:
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        # Get parameters
+        isotope = request.GET.get('isotope', 'tc99m')
+        window_width = float(request.GET.get('ww', 600))
+        window_level = float(request.GET.get('wl', 300))
+        invert = request.GET.get('invert', 'false').lower() == 'true'
+        
+        # Load volume data
+        images = series.images.all().order_by('instance_number')
+        if not images.exists():
+            return JsonResponse({'error': 'No images found in series'}, status=404)
+        
+        volume_data = []
+        spacing = [1.0, 1.0, 1.0]
+        
+        for image in images:
+            try:
+                file_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
+                if not os.path.exists(file_path):
+                    continue
+                
+                ds = _load_dicom_optimized(file_path)
+                if ds is None:
+                    continue
+                
+                pixel_array = ds.pixel_array.astype(np.float32)
+                
+                # Nuclear medicine calibration
+                slope = float(getattr(ds, 'RescaleSlope', 1.0))
+                intercept = float(getattr(ds, 'RescaleIntercept', 0.0))
+                pixel_array = pixel_array * slope + intercept
+                
+                volume_data.append(pixel_array)
+                
+                # Get spacing
+                if len(volume_data) == 1:
+                    pixel_spacing = getattr(ds, 'PixelSpacing', [1.0, 1.0])
+                    slice_thickness = getattr(ds, 'SliceThickness', 1.0)
+                    spacing = [float(slice_thickness), float(pixel_spacing[0]), float(pixel_spacing[1])]
+                
+            except Exception as e:
+                logger.error(f"Error loading nuclear medicine image: {e}")
+                continue
+        
+        if not volume_data:
+            return JsonResponse({'error': 'Failed to load nuclear medicine volume data'}, status=500)
+        
+        # Create 3D volume
+        volume = np.stack(volume_data, axis=0)
+        
+        # Create metadata
+        from .reconstruction import VolumeMetadata, ReconstructionParameters
+        metadata = VolumeMetadata(
+            dimensions=volume.shape,
+            spacing=tuple(spacing),
+            origin=(0.0, 0.0, 0.0),
+            orientation=[1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+            modality='NM',
+            patient_id=series.study.patient.patient_id,
+            study_uid=series.study.study_instance_uid,
+            series_uid=series.series_instance_uid
+        )
+        
+        params = ReconstructionParameters(algorithm='nuclear', quality='normal')
+        
+        # Create Nuclear Medicine processor and reconstruct
+        processor = NuclearMedicineProcessor()
+        results = processor.create_nuclear_reconstruction(volume, metadata, params, isotope)
+        
+        # Convert projections to base64
+        nuclear_views = {}
+        for view_name, projection in results['projections'].items():
+            nuclear_views[view_name] = _array_to_base64_image(projection, window_width, window_level, invert)
+        
+        return JsonResponse({
+            'success': True,
+            'nuclear_views': nuclear_views,
+            'isotope': isotope,
+            'energy_window': results.get('energy_window', 'N/A'),
+            'volume_shape': list(volume.shape),
+            'modality': 'Nuclear Medicine'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in nuclear medicine reconstruction: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+@csrf_exempt
+def api_modality_reconstruction_options(request, series_id):
+    """Get available reconstruction options for a specific modality"""
+    try:
+        series = get_object_or_404(Series, id=series_id)
+        
+        # Check permissions
+        if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and series.study.facility != request.user.facility:
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        modality = series.modality.upper()
+        available_types = get_available_reconstruction_types(modality)
+        recommended_processor = get_modality_specific_processor(modality)
+        
+        # Modality-specific parameters
+        modality_params = {
+            'CT': {
+                'default_ww': 400,
+                'default_wl': 40,
+                'presets': ['lung', 'bone', 'soft', 'brain'],
+                'features': ['MPR', 'MIP', 'Bone 3D', 'Volume Rendering']
+            },
+            'MR': {
+                'default_ww': 200,
+                'default_wl': 100,
+                'presets': ['brain', 'spine', 'cardiac'],
+                'features': ['MPR', 'MIP', 'Tissue Segmentation', 'T1/T2 Analysis']
+            },
+            'PT': {
+                'default_ww': 1000,
+                'default_wl': 500,
+                'presets': ['suv', 'hotspot'],
+                'features': ['SUV Analysis', 'Hotspot Detection', 'MIP', 'Fusion']
+            },
+            'NM': {
+                'default_ww': 600,
+                'default_wl': 300,
+                'presets': ['perfusion', 'cardiac'],
+                'features': ['Perfusion Analysis', 'Polar Maps', 'Defect Detection']
+            }
+        }
+        
+        params = modality_params.get(modality, {
+            'default_ww': 400,
+            'default_wl': 40,
+            'presets': ['standard'],
+            'features': ['MPR', 'MIP']
+        })
+        
+        return JsonResponse({
+            'modality': modality,
+            'available_reconstructions': available_types,
+            'recommended_processor': recommended_processor,
+            'parameters': params,
+            'series_info': {
+                'id': series.id,
+                'description': series.series_description,
+                'image_count': series.images.count()
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting reconstruction options: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
 # Redirect old endpoints to new professional viewer

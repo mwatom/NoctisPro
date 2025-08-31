@@ -895,3 +895,15 @@ Watching for file changes with StatReloader
 Watching for file changes with StatReloader
 HTTP GET /login/ 200 [0.01, 127.0.0.1:57680]
 Not Found: /accounts/check-session/
+/workspace/dicom_viewer/reconstruction.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/reconstruction.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/urls.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+HTTP GET /login/ 200 [0.01, 127.0.0.1:33868]

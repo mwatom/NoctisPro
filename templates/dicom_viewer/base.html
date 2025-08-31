@@ -1017,21 +1017,46 @@
                 </div>
             </div>
 
-            <!-- 3D Reconstruction -->
+            <!-- Advanced Reconstruction -->
             <div class="panel">
-                <h3>3D Reconstruction</h3>
-                <button class="btn" onclick="generateMPR()" style="width: 100%; margin-bottom: 6px;">
-                    <i class="fas fa-cube"></i> MPR Views
-                </button>
-                <button class="btn" onclick="generateMIP()" style="width: 100%; margin-bottom: 6px;">
-                    <i class="fas fa-layer-group"></i> MIP Views
-                </button>
-                <button class="btn" onclick="generateBone3D()" style="width: 100%; margin-bottom: 6px;">
-                    <i class="fas fa-bone"></i> Bone 3D
-                </button>
-                <button class="btn" onclick="generateVolumeRender()" style="width: 100%;">
-                    <i class="fas fa-cubes"></i> Volume Render
-                </button>
+                <h3>Reconstruction</h3>
+                <div id="reconstructionButtons">
+                    <!-- Basic reconstruction -->
+                    <button class="btn" onclick="generateMPR()" style="width: 100%; margin-bottom: 6px;">
+                        <i class="fas fa-cube"></i> MPR Views
+                    </button>
+                    <button class="btn" onclick="generateMIP()" style="width: 100%; margin-bottom: 6px;">
+                        <i class="fas fa-layer-group"></i> MIP Views
+                    </button>
+                    
+                    <!-- Modality-specific reconstruction (populated dynamically) -->
+                    <div id="modalitySpecificButtons" style="margin-top: 8px;">
+                        <!-- Buttons will be added based on detected modality -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Crosshair Controls -->
+            <div class="panel">
+                <h3>Crosshair Control</h3>
+                <div class="control">
+                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <input type="checkbox" id="orthogonalSync" checked onchange="toggleOrthogonalSync()">
+                        <span>Orthogonal Sync</span>
+                    </label>
+                </div>
+                <div class="control">
+                    <div class="control-label">
+                        <span>Active Plane</span>
+                        <span id="activePlaneLabel">Axial</span>
+                    </div>
+                </div>
+                <div class="control">
+                    <div class="control-label">
+                        <span>Crosshair Position</span>
+                        <span id="crosshairPosition">-</span>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1142,12 +1167,16 @@
             setupMouseEvents();
             setupKeyboardShortcuts();
             setupFileInput();
+            setupMPRInteractions();
             
             // Initialize UI state
             updateOverlayInfo();
             updateZoomInfo();
             
-            showToast('DICOM Viewer initialized', 'success');
+            // Initialize crosshair system
+            mprCrosshair = { x: 50, y: 50, z: 50 }; // Center position
+            
+            showToast('Professional DICOM Viewer initialized', 'success');
         }
 
         function setupMouseEvents() {
@@ -1580,6 +1609,9 @@
                         <div>Thickness: ${currentSeries.slice_thickness || 'N/A'}</div>
                     `;
                     
+                    // Load modality-specific reconstruction options
+                    await loadModalityReconstructionOptions(seriesId);
+                    
                     // Load first image
                     await updateImageDisplay();
                     
@@ -1594,6 +1626,67 @@
                 hideLoading();
                 console.error('Error loading series:', error);
                 showToast('Error loading series', 'error');
+            }
+        }
+
+        async function loadModalityReconstructionOptions(seriesId) {
+            try {
+                const response = await fetch(`/dicom-viewer/api/modality-options/${seriesId}/`);
+                const data = await response.json();
+                
+                if (data.modality) {
+                    const modalityButtons = document.getElementById('modalitySpecificButtons');
+                    modalityButtons.innerHTML = '';
+                    
+                    // Add modality-specific reconstruction buttons
+                    const modality = data.modality;
+                    
+                    if (modality === 'CT') {
+                        modalityButtons.innerHTML = `
+                            <button class="btn" onclick="generateBone3D()" style="width: 100%; margin-bottom: 6px;">
+                                <i class="fas fa-bone"></i> Bone 3D
+                            </button>
+                            <button class="btn" onclick="generateVolumeRender()" style="width: 100%; margin-bottom: 6px;">
+                                <i class="fas fa-cubes"></i> Volume Render
+                            </button>
+                        `;
+                    } else if (modality === 'MR' || modality === 'MRI') {
+                        modalityButtons.innerHTML = `
+                            <button class="btn" onclick="generateMRI('brain')" style="width: 100%; margin-bottom: 6px;">
+                                <i class="fas fa-brain"></i> MRI Brain
+                            </button>
+                            <button class="btn" onclick="generateMRI('spine')" style="width: 100%; margin-bottom: 6px;">
+                                <i class="fas fa-spine"></i> MRI Spine
+                            </button>
+                            <button class="btn" onclick="generateMRI('cardiac')" style="width: 100%; margin-bottom: 6px;">
+                                <i class="fas fa-heart"></i> MRI Cardiac
+                            </button>
+                        `;
+                    } else if (modality === 'PT' || modality === 'PET') {
+                        modalityButtons.innerHTML = `
+                            <button class="btn" onclick="generatePET()" style="width: 100%; margin-bottom: 6px;">
+                                <i class="fas fa-radiation"></i> PET SUV
+                            </button>
+                            <button class="btn" onclick="generatePETHotspots()" style="width: 100%; margin-bottom: 6px;">
+                                <i class="fas fa-fire"></i> PET Hotspots
+                            </button>
+                        `;
+                    } else if (modality === 'NM' || modality === 'SPECT') {
+                        modalityButtons.innerHTML = `
+                            <button class="btn" onclick="generateSPECT('tc99m')" style="width: 100%; margin-bottom: 6px;">
+                                <i class="fas fa-heart-pulse"></i> SPECT Cardiac
+                            </button>
+                            <button class="btn" onclick="generateSPECT('tl201')" style="width: 100%; margin-bottom: 6px;">
+                                <i class="fas fa-lungs"></i> SPECT Perfusion
+                            </button>
+                            <button class="btn" onclick="generateNuclear('tc99m')" style="width: 100%; margin-bottom: 6px;">
+                                <i class="fas fa-atom"></i> Nuclear Med
+                            </button>
+                        `;
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading modality options:', error);
             }
         }
 
@@ -1878,6 +1971,341 @@
 
         function generateVolumeRender() {
             showToast('Volume rendering feature coming soon', 'info');
+        }
+
+        // Professional MRI Reconstruction
+        async function generateMRI(tissueType = 'brain') {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading(`Generating MRI ${tissueType} reconstruction...`);
+                
+                const response = await fetch(`/dicom-viewer/api/mri/${currentSeries.id}/?tissue_type=${tissueType}&ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
+                const data = await response.json();
+                
+                if (data.success && data.mri_views) {
+                    // Display MRI views in MPR grid
+                    document.getElementById('mprAxial').src = data.mri_views.axial;
+                    document.getElementById('mprSagittal').src = data.mri_views.sagittal;
+                    document.getElementById('mprCoronal').src = data.mri_views.coronal;
+                    
+                    // Switch to MPR view
+                    document.getElementById('singleView').style.display = 'none';
+                    document.getElementById('mprView').style.display = 'grid';
+                    mprMode = true;
+                    
+                    // Update crosshairs
+                    updateAllCrosshairs();
+                    
+                    hideLoading();
+                    showToast(`MRI ${tissueType} reconstruction completed`, 'success');
+                    
+                    // Display contrast analysis if available
+                    if (data.contrast_analysis) {
+                        console.log('MRI Contrast Analysis:', data.contrast_analysis);
+                    }
+                } else {
+                    hideLoading();
+                    showToast('Failed to generate MRI reconstruction', 'error');
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error('Error generating MRI:', error);
+                showToast('Error generating MRI reconstruction', 'error');
+            }
+        }
+
+        // Professional PET Reconstruction
+        async function generatePET() {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading('Generating PET SUV reconstruction...');
+                
+                const response = await fetch(`/dicom-viewer/api/pet/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
+                const data = await response.json();
+                
+                if (data.success && data.pet_views) {
+                    // Display PET views in MPR grid
+                    document.getElementById('mprAxial').src = data.pet_views.axial;
+                    document.getElementById('mprSagittal').src = data.pet_views.sagittal;
+                    document.getElementById('mprCoronal').src = data.pet_views.coronal;
+                    
+                    // Switch to MPR view
+                    document.getElementById('singleView').style.display = 'none';
+                    document.getElementById('mprView').style.display = 'grid';
+                    mprMode = true;
+                    
+                    // Update crosshairs
+                    updateAllCrosshairs();
+                    
+                    hideLoading();
+                    showToast('PET SUV reconstruction completed', 'success');
+                    
+                    // Display hotspots if detected
+                    if (data.hotspots && data.hotspots.length > 0) {
+                        showToast(`Detected ${data.hotspots.length} PET hotspots`, 'info');
+                        console.log('PET Hotspots:', data.hotspots);
+                    }
+                } else {
+                    hideLoading();
+                    showToast('Failed to generate PET reconstruction', 'error');
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error('Error generating PET:', error);
+                showToast('Error generating PET reconstruction', 'error');
+            }
+        }
+
+        async function generatePETHotspots() {
+            await generatePET(); // Same as PET SUV for now
+        }
+
+        // Professional SPECT Reconstruction
+        async function generateSPECT(tracerType = 'tc99m') {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading(`Generating SPECT ${tracerType.toUpperCase()} reconstruction...`);
+                
+                const response = await fetch(`/dicom-viewer/api/spect/${currentSeries.id}/?tracer=${tracerType}&ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
+                const data = await response.json();
+                
+                if (data.success && data.spect_views) {
+                    // Display SPECT views in MPR grid
+                    document.getElementById('mprAxial').src = data.spect_views.axial;
+                    document.getElementById('mprSagittal').src = data.spect_views.sagittal;
+                    document.getElementById('mprCoronal').src = data.spect_views.coronal;
+                    
+                    // Switch to MPR view
+                    document.getElementById('singleView').style.display = 'none';
+                    document.getElementById('mprView').style.display = 'grid';
+                    mprMode = true;
+                    
+                    // Update crosshairs
+                    updateAllCrosshairs();
+                    
+                    hideLoading();
+                    showToast(`SPECT ${tracerType.toUpperCase()} reconstruction completed`, 'success');
+                    
+                    // Display defects if detected
+                    if (data.defects && data.defects.length > 0) {
+                        showToast(`Detected ${data.defects.length} perfusion defects`, 'warning');
+                        console.log('SPECT Defects:', data.defects);
+                    }
+                } else {
+                    hideLoading();
+                    showToast('Failed to generate SPECT reconstruction', 'error');
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error('Error generating SPECT:', error);
+                showToast('Error generating SPECT reconstruction', 'error');
+            }
+        }
+
+        // Professional Nuclear Medicine Reconstruction
+        async function generateNuclear(isotope = 'tc99m') {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading(`Generating ${isotope.toUpperCase()} nuclear medicine reconstruction...`);
+                
+                const response = await fetch(`/dicom-viewer/api/nuclear/${currentSeries.id}/?isotope=${isotope}&ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
+                const data = await response.json();
+                
+                if (data.success && data.nuclear_views) {
+                    // Display nuclear medicine views in MPR grid
+                    document.getElementById('mprAxial').src = data.nuclear_views.axial;
+                    document.getElementById('mprSagittal').src = data.nuclear_views.sagittal;
+                    document.getElementById('mprCoronal').src = data.nuclear_views.coronal;
+                    
+                    // Switch to MPR view
+                    document.getElementById('singleView').style.display = 'none';
+                    document.getElementById('mprView').style.display = 'grid';
+                    mprMode = true;
+                    
+                    // Update crosshairs
+                    updateAllCrosshairs();
+                    
+                    hideLoading();
+                    showToast(`${isotope.toUpperCase()} nuclear medicine reconstruction completed`, 'success');
+                } else {
+                    hideLoading();
+                    showToast('Failed to generate nuclear medicine reconstruction', 'error');
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error('Error generating nuclear medicine:', error);
+                showToast('Error generating nuclear medicine reconstruction', 'error');
+            }
+        }
+
+        // Fast Orthogonal Crosshair System (PyQt-inspired)
+        function setActivePlane(plane) {
+            activePlane = plane;
+            
+            // Update visual state
+            document.querySelectorAll('.mpr-viewport').forEach(vp => {
+                vp.classList.remove('active');
+            });
+            document.querySelector(`[data-plane="${plane}"]`).classList.add('active');
+            
+            // Update label
+            document.getElementById('activePlaneLabel').textContent = 
+                plane.charAt(0).toUpperCase() + plane.slice(1);
+            
+            // Update crosshairs if orthogonal sync is enabled
+            if (orthogonalSync) {
+                updateAllCrosshairs();
+            }
+        }
+
+        function toggleOrthogonalSync() {
+            orthogonalSync = document.getElementById('orthogonalSync').checked;
+            
+            if (orthogonalSync) {
+                updateAllCrosshairs();
+                showToast('Orthogonal sync enabled', 'success');
+            } else {
+                hideAllCrosshairs();
+                showToast('Orthogonal sync disabled', 'info');
+            }
+        }
+
+        function updateAllCrosshairs() {
+            if (!orthogonalSync || !mprMode) return;
+            
+            // Show crosshairs on all MPR viewports
+            const planes = ['axial', 'sagittal', 'coronal'];
+            planes.forEach(plane => {
+                const crosshair = document.getElementById(`crosshair${plane.charAt(0).toUpperCase() + plane.slice(1)}`);
+                if (crosshair) {
+                    crosshair.classList.add('active');
+                }
+            });
+            
+            // Update crosshair position display
+            document.getElementById('crosshairPosition').textContent = 
+                `X:${mprCrosshair.x} Y:${mprCrosshair.y} Z:${mprCrosshair.z}`;
+        }
+
+        function hideAllCrosshairs() {
+            const planes = ['axial', 'sagittal', 'coronal'];
+            planes.forEach(plane => {
+                const crosshair = document.getElementById(`crosshair${plane.charAt(0).toUpperCase() + plane.slice(1)}`);
+                if (crosshair) {
+                    crosshair.classList.remove('active');
+                }
+            });
+        }
+
+        function updateCrosshairOverlay(plane) {
+            if (!orthogonalSync) return;
+            
+            // This function is called when MPR images load
+            // It ensures crosshairs are properly positioned
+            const crosshair = document.getElementById(`crosshair${plane.charAt(0).toUpperCase() + plane.slice(1)}`);
+            if (crosshair && mprMode) {
+                crosshair.classList.add('active');
+            }
+        }
+
+        // Enhanced MPR viewport mouse interactions for fast crosshair updates
+        function setupMPRInteractions() {
+            const mprViewports = document.querySelectorAll('.mpr-viewport');
+            
+            mprViewports.forEach(viewport => {
+                const plane = viewport.getAttribute('data-plane');
+                if (plane === '3d') return; // Skip 3D viewport
+                
+                viewport.addEventListener('mousemove', function(e) {
+                    if (orthogonalSync && mprMode) {
+                        const rect = viewport.getBoundingClientRect();
+                        const x = ((e.clientX - rect.left) / rect.width) * 100;
+                        const y = ((e.clientY - rect.top) / rect.height) * 100;
+                        
+                        // Update crosshair position based on plane
+                        updateCrosshairPosition(plane, x, y);
+                    }
+                });
+                
+                viewport.addEventListener('click', function(e) {
+                    setActivePlane(plane);
+                    
+                    if (orthogonalSync) {
+                        const rect = viewport.getBoundingClientRect();
+                        const x = ((e.clientX - rect.left) / rect.width) * 100;
+                        const y = ((e.clientY - rect.top) / rect.height) * 100;
+                        
+                        // Lock crosshair position
+                        updateCrosshairPosition(plane, x, y, true);
+                    }
+                });
+            });
+        }
+
+        function updateCrosshairPosition(plane, x, y, lock = false) {
+            // Update crosshair coordinates based on plane
+            if (plane === 'axial') {
+                mprCrosshair.x = x;
+                mprCrosshair.y = y;
+            } else if (plane === 'sagittal') {
+                mprCrosshair.z = x;
+                mprCrosshair.y = y;
+            } else if (plane === 'coronal') {
+                mprCrosshair.x = x;
+                mprCrosshair.z = y;
+            }
+            
+            // Update crosshair display on all planes
+            if (lock) {
+                updateCrosshairDisplay();
+            }
+            
+            // Update position display
+            document.getElementById('crosshairPosition').textContent = 
+                `X:${Math.round(mprCrosshair.x)} Y:${Math.round(mprCrosshair.y)} Z:${Math.round(mprCrosshair.z)}`;
+        }
+
+        function updateCrosshairDisplay() {
+            const planes = ['axial', 'sagittal', 'coronal'];
+            
+            planes.forEach(plane => {
+                const crosshair = document.getElementById(`crosshair${plane.charAt(0).toUpperCase() + plane.slice(1)}`);
+                if (!crosshair) return;
+                
+                const hLine = crosshair.querySelector('.crosshair-line-h-mpr');
+                const vLine = crosshair.querySelector('.crosshair-line-v-mpr');
+                
+                if (plane === 'axial') {
+                    if (hLine) hLine.style.top = `${mprCrosshair.y}%`;
+                    if (vLine) vLine.style.left = `${mprCrosshair.x}%`;
+                } else if (plane === 'sagittal') {
+                    if (hLine) hLine.style.top = `${mprCrosshair.y}%`;
+                    if (vLine) vLine.style.left = `${mprCrosshair.z}%`;
+                } else if (plane === 'coronal') {
+                    if (hLine) hLine.style.top = `${mprCrosshair.z}%`;
+                    if (vLine) vLine.style.left = `${mprCrosshair.x}%`;
+                }
+            });
         }
 
         function launch3DViewer() {
