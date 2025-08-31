@@ -15,6 +15,7 @@ urlpatterns = [
     path('api/mpr/<int:series_id>/', views.api_mpr_reconstruction, name='api_mpr_reconstruction'),
     path('api/mip/<int:series_id>/', views.api_mip_reconstruction, name='api_mip_reconstruction'),
     path('api/bone/<int:series_id>/', views.api_bone_reconstruction, name='api_bone_reconstruction'),
+    path('api/series/<int:series_id>/volume/', views.api_volume_reconstruction, name='api_volume_reconstruction'),
     
     # Advanced modality-specific reconstruction
     path('api/mri/<int:series_id>/', views.api_mri_reconstruction, name='api_mri_reconstruction'),
@@ -25,6 +26,7 @@ urlpatterns = [
     
     # Utility endpoints
     path('api/hounsfield/', views.api_hounsfield_units, name='api_hounsfield_units'),
+    path('api/hu/', views.api_hu_value, name='api_hu_value'),
     path('api/calculate-distance/', views.api_calculate_distance, name='api_calculate_distance'),
     path('api/measurements/<int:study_id>/', views.api_measurements, name='api_measurements'),
     path('api/measurements/', views.api_measurements, name='api_measurements_standalone'),
@@ -34,6 +36,10 @@ urlpatterns = [
     
     # Web viewer endpoints
     path('web/series/<int:series_id>/images/', views.web_series_images, name='web_series_images'),
+    
+    # HU Calibration endpoints
+    path('hu-calibration/', views.hu_calibration_dashboard, name='hu_calibration_dashboard'),
+    path('hu-calibration/phantoms/', views.manage_qa_phantoms, name='manage_qa_phantoms'),
     
     # Legacy redirects to new viewer
     path('standalone/', views.launch_standalone_viewer, name='launch_standalone_viewer'),

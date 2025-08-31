@@ -322,7 +322,7 @@ class SessionTimeoutMiddleware(MiddlewareMixin):
     
     def process_request(self, request):
         # Skip processing for ASGI requests or when user attribute doesn't exist
-        if not hasattr(request, 'user') or hasattr(request, 'scope'):
+        if hasattr(request, 'scope') or not hasattr(request, 'user'):
             return None
         
         # Check if user is authenticated
