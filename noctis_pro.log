@@ -915,3 +915,15 @@ Watching for file changes with StatReloader
 Watching for file changes with StatReloader
 /workspace/admin_panel/views.py changed, reloading.
 Watching for file changes with StatReloader
+/workspace/admin_panel/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/admin_panel/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/admin_panel/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/admin_panel/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/worklist/views.py changed, reloading.
+Watching for file changes with StatReloader
+HTTP GET /admin-panel/users/create/ 302 [0.01, 127.0.0.1:54494]
+HTTP HEAD /admin-panel/users/create/ 302 [0.00, 127.0.0.1:41250]

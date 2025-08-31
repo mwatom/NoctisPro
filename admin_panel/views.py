@@ -9,14 +9,19 @@ from django.utils import timezone
 from accounts.models import User, Facility
 from worklist.models import Study, Modality
 from .models import SystemConfiguration, AuditLog, SystemUsageStatistics
+from .decorators import admin_only_strict, admin_only_api, check_admin_privileges, log_admin_action
 import json
 import re
 from django.utils.crypto import get_random_string
 
 
 def is_admin(user):
-    """Strict admin check - only admin role users can access admin functions"""
-    return user.is_authenticated and hasattr(user, 'role') and user.role == 'admin' and user.is_verified
+    """STRICT ADMIN CHECK - ONLY admin role users can access admin functions"""
+    return (user.is_authenticated and 
+            hasattr(user, 'role') and 
+            user.role == 'admin' and 
+            user.is_verified and 
+            user.is_active)
 
 def _standardize_aetitle(source: str) -> str:
     """Generate a DICOM-compliant AE Title (<=16 chars, A-Z 0-9 _), ensure uniqueness."""
@@ -80,7 +85,12 @@ def settings_view(request):
 @login_required
 @user_passes_test(is_admin)
 def user_management(request):
-    """User management interface with search and filtering"""
+    """ADMIN ONLY: User management interface with search and filtering"""
+    # Triple-check admin access
+    if not request.user.is_admin():
+        messages.error(request, 'UNAUTHORIZED: Only administrators can manage users.')
+        return redirect('worklist:dashboard')
+    
     users = User.objects.select_related('facility').all()
     
     # Search functionality
@@ -331,7 +341,12 @@ def user_delete(request, user_id):
 @login_required
 @user_passes_test(is_admin)
 def facility_management(request):
-    """Enhanced facility management interface"""
+    """ADMIN ONLY: Enhanced facility management interface"""
+    # Triple-check admin access
+    if not request.user.is_admin():
+        messages.error(request, 'UNAUTHORIZED: Only administrators can manage facilities.')
+        return redirect('worklist:dashboard')
+    
     facilities = Facility.objects.all()
     
     # Search functionality

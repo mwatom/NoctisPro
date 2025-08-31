@@ -1180,13 +1180,23 @@ def api_get_upload_stats(request):
 @login_required
 @csrf_exempt
 def api_delete_study(request, study_id):
-	"""API endpoint to delete a study (admin only)"""
+	"""API endpoint to delete a study (ADMIN ONLY)"""
 	if request.method != 'DELETE':
 		return JsonResponse({'error': 'Method not allowed'}, status=405)
 	
 	user = request.user
-	if not user.is_admin():
-		return JsonResponse({'error': 'Permission denied - admin access required'}, status=403)
+	
+	# STRICT admin-only check
+	if not (user.is_authenticated and 
+			hasattr(user, 'role') and 
+			user.role == 'admin' and 
+			user.is_verified and 
+			user.is_active):
+		return JsonResponse({
+			'error': 'UNAUTHORIZED: Only verified administrators can delete studies',
+			'code': 'ADMIN_ONLY_DELETE',
+			'user_role': getattr(user, 'role', 'unknown')
+		}, status=403)
 	
 	try:
 		study = get_object_or_404(Study, id=study_id)

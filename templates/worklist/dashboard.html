@@ -619,17 +619,17 @@
                     </div>
                 </div>
                 {% if user.is_authenticated and user.role == 'admin' %}
-                <button type="button" class="admin-btn" onclick="window.location.href='{% url 'admin_panel:dashboard' %}'">
-                    <i class="fas fa-shield-alt"></i> ADMIN
+                <button type="button" class="admin-btn" onclick="window.location.href='{% url 'admin_panel:dashboard' %}'" title="Administrator Dashboard">
+                    <i class="fas fa-shield-alt"></i> ADMIN PANEL
                 </button>
-                <button type="button" class="btn-control" onclick="window.location.href='{% url 'admin_panel:user_create' %}'" title="Create User">
-                    <i class="fas fa-user-plus"></i> ADD USER
+                <button type="button" class="btn-control" onclick="window.location.href='{% url 'admin_panel:user_create' %}'" title="ADMIN ONLY: Create New User">
+                    <i class="fas fa-user-plus"></i> CREATE USER
                 </button>
-                <button type="button" class="btn-control" onclick="window.location.href='{% url 'admin_panel:facility_create' %}'" title="Create Facility">
-                    <i class="fas fa-hospital"></i> ADD FACILITY
+                <button type="button" class="btn-control" onclick="window.location.href='{% url 'admin_panel:facility_create' %}'" title="ADMIN ONLY: Create New Facility">
+                    <i class="fas fa-hospital"></i> CREATE FACILITY
                 </button>
-                <button type="button" class="btn-control" onclick="window.location.href='{% url 'admin_panel:user_management' %}'" title="Manage Users">
-                    <i class="fas fa-users-cog"></i> USERS
+                <button type="button" class="btn-control" onclick="window.location.href='{% url 'admin_panel:user_management' %}'" title="ADMIN ONLY: Manage All Users">
+                    <i class="fas fa-users-cog"></i> MANAGE USERS
                 </button>
                 {% endif %}
                 <button type="button" class="btn-control" onclick="window.location.href='{% url 'notifications:notification_list' %}'" title="Notifications">
