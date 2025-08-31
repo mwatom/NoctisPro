@@ -286,7 +286,8 @@
             width: 100%;
             top: 50%;
             left: 0;
-            opacity: 0.7;
+            opacity: 0.8;
+            box-shadow: 0 0 2px rgba(0, 255, 255, 0.5);
         }
 
         .crosshair-line-v {
@@ -296,7 +297,64 @@
             height: 100%;
             left: 50%;
             top: 0;
-            opacity: 0.7;
+            opacity: 0.8;
+            box-shadow: 0 0 2px rgba(0, 255, 255, 0.5);
+        }
+
+        /* Professional MPR Crosshair System */
+        .crosshair-overlay-mpr {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 15;
+            display: none;
+        }
+
+        .crosshair-overlay-mpr.active {
+            display: block;
+        }
+
+        .crosshair-line-h-mpr {
+            position: absolute;
+            height: 2px;
+            background: #00ffff;
+            width: 100%;
+            top: 50%;
+            left: 0;
+            opacity: 0.9;
+            box-shadow: 0 0 4px rgba(0, 255, 255, 0.6);
+            transform: translateY(-1px);
+        }
+
+        .crosshair-line-v-mpr {
+            position: absolute;
+            width: 2px;
+            background: #00ffff;
+            height: 100%;
+            left: 50%;
+            top: 0;
+            opacity: 0.9;
+            box-shadow: 0 0 4px rgba(0, 255, 255, 0.6);
+            transform: translateX(-1px);
+        }
+
+        /* Enhanced MPR viewport interactions */
+        .mpr-viewport {
+            cursor: crosshair;
+            transition: all 0.1s ease;
+        }
+
+        .mpr-viewport:hover {
+            border-color: var(--accent-color);
+            box-shadow: inset 0 0 0 1px var(--accent-color);
+        }
+
+        .mpr-viewport.active {
+            border-color: var(--accent-color);
+            box-shadow: inset 0 0 0 3px var(--accent-color);
         }
 
         /* Right Panel */
@@ -751,8 +809,8 @@
                 <select class="select" id="studySelect">
                     <option value="">Select Study from System</option>
                 </select>
-                <button class="btn btn-primary" onclick="loadDicomFiles()">
-                    <i class="fas fa-folder-open"></i> Load DICOM
+                <button class="btn btn-primary" onclick="loadFromExternalMedia()" title="Load DICOM from USB/DVD">
+                    <i class="fas fa-compact-disc"></i> Load from USB/DVD
                 </button>
                 <button class="btn" onclick="saveMeasurements()">
                     <i class="fas fa-save"></i> Save
@@ -844,21 +902,33 @@
                 </div>
             </div>
 
-            <!-- MPR Grid View -->
+            <!-- Professional 2x2 Orthogonal View Grid -->
             <div class="mpr-grid" id="mprView" style="display: none;">
-                <div class="mpr-viewport" data-plane="axial">
-                    <div class="mpr-label">Axial</div>
-                    <img id="mprAxial" alt="Axial View">
+                <div class="mpr-viewport" data-plane="axial" onclick="setActivePlane('axial')">
+                    <div class="mpr-label">Axial (Z)</div>
+                    <img id="mprAxial" alt="Axial View" onload="updateCrosshairOverlay('axial')">
+                    <div class="crosshair-overlay-mpr" id="crosshairAxial">
+                        <div class="crosshair-line-h-mpr"></div>
+                        <div class="crosshair-line-v-mpr"></div>
+                    </div>
                 </div>
-                <div class="mpr-viewport" data-plane="sagittal">
-                    <div class="mpr-label">Sagittal</div>
-                    <img id="mprSagittal" alt="Sagittal View">
+                <div class="mpr-viewport" data-plane="sagittal" onclick="setActivePlane('sagittal')">
+                    <div class="mpr-label">Sagittal (X)</div>
+                    <img id="mprSagittal" alt="Sagittal View" onload="updateCrosshairOverlay('sagittal')">
+                    <div class="crosshair-overlay-mpr" id="crosshairSagittal">
+                        <div class="crosshair-line-h-mpr"></div>
+                        <div class="crosshair-line-v-mpr"></div>
+                    </div>
                 </div>
-                <div class="mpr-viewport" data-plane="coronal">
-                    <div class="mpr-label">Coronal</div>
-                    <img id="mprCoronal" alt="Coronal View">
+                <div class="mpr-viewport" data-plane="coronal" onclick="setActivePlane('coronal')">
+                    <div class="mpr-label">Coronal (Y)</div>
+                    <img id="mprCoronal" alt="Coronal View" onload="updateCrosshairOverlay('coronal')">
+                    <div class="crosshair-overlay-mpr" id="crosshairCoronal">
+                        <div class="crosshair-line-h-mpr"></div>
+                        <div class="crosshair-line-v-mpr"></div>
+                    </div>
                 </div>
-                <div class="mpr-viewport" data-plane="3d">
+                <div class="mpr-viewport" data-plane="3d" onclick="setActivePlane('3d')">
                     <div class="mpr-label">3D Volume</div>
                     <div id="threeDContainer" class="three-container"></div>
                 </div>
@@ -1035,16 +1105,24 @@
             'mediastinum': { ww: 350, wl: 50 }
         };
         
-        // MPR and 3D state
+        // MPR and 3D state - Enhanced for fast orthogonal transforms
         let mprMode = false;
         let mprImages = { axial: null, sagittal: null, coronal: null };
         let mprIndices = { axial: 0, sagittal: 0, coronal: 0 };
+        let mprCrosshair = { x: 0, y: 0, z: 0 };
+        let activePlane = 'axial';
         let volumeData = null;
         let volumeMetadata = null;
+        let orthogonalSync = true;
         
-        // Caching for performance
+        // Professional caching for performance (PyQt-inspired)
         let imageCache = new Map();
         let mprCache = new Map();
+        let volumeCache = new Map();
+        
+        // Fast rendering optimization
+        let renderingQueue = [];
+        let isRendering = false;
         
         // Professional initialization
         document.addEventListener('DOMContentLoaded', function() {
@@ -1519,9 +1597,76 @@
             }
         }
 
-        // File Loading
-        function loadDicomFiles() {
+        // Professional External Media Loading (USB/DVD)
+        function loadFromExternalMedia() {
+            // Show professional media selection dialog
+            showMediaSelectionDialog();
+        }
+
+        function showMediaSelectionDialog() {
+            const dialog = document.createElement('div');
+            dialog.className = 'modal-overlay';
+            dialog.innerHTML = `
+                <div class="modal-content" style="width: 500px; height: auto;">
+                    <div class="modal-header">
+                        <div class="modal-title">
+                            <i class="fas fa-compact-disc"></i> Load DICOM from External Media
+                        </div>
+                        <button class="close-btn" onclick="this.closest('.modal-overlay').remove()">
+                            <i class="fas fa-times"></i> Close
+                        </button>
+                    </div>
+                    <div style="padding: 20px;">
+                        <div style="text-align: center; margin-bottom: 20px;">
+                            <div style="font-size: 48px; color: var(--accent-color); margin-bottom: 16px;">
+                                <i class="fas fa-compact-disc"></i>
+                            </div>
+                            <h3 style="color: var(--text-primary); margin-bottom: 8px;">Select DICOM Source</h3>
+                            <p style="color: var(--text-secondary); font-size: 12px;">Choose DICOM files from USB drive, DVD, or local storage</p>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+                            <button class="btn btn-primary" onclick="selectUSBDrive()" style="padding: 16px; flex-direction: column; gap: 8px;">
+                                <i class="fas fa-usb" style="font-size: 24px;"></i>
+                                <span>USB Drive</span>
+                            </button>
+                            <button class="btn btn-primary" onclick="selectDVD()" style="padding: 16px; flex-direction: column; gap: 8px;">
+                                <i class="fas fa-compact-disc" style="font-size: 24px;"></i>
+                                <span>DVD/CD</span>
+                            </button>
+                        </div>
+                        
+                        <div style="text-align: center;">
+                            <button class="btn" onclick="selectLocalFiles()" style="width: 100%;">
+                                <i class="fas fa-folder-open"></i> Browse Local Files
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            dialog.classList.add('active');
+            document.body.appendChild(dialog);
+        }
+
+        function selectUSBDrive() {
+            showToast('Please ensure USB drive is connected and contains DICOM files', 'info');
+            document.getElementById('fileInput').setAttribute('webkitdirectory', '');
             document.getElementById('fileInput').click();
+            document.querySelector('.modal-overlay').remove();
+        }
+
+        function selectDVD() {
+            showToast('Please ensure DVD/CD is inserted and contains DICOM files', 'info');
+            document.getElementById('fileInput').setAttribute('webkitdirectory', '');
+            document.getElementById('fileInput').click();
+            document.querySelector('.modal-overlay').remove();
+        }
+
+        function selectLocalFiles() {
+            document.getElementById('fileInput').removeAttribute('webkitdirectory');
+            document.getElementById('fileInput').click();
+            document.querySelector('.modal-overlay').remove();
         }
 
         async function processDicomFiles(files) {
