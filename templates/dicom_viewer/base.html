@@ -669,36 +669,66 @@ const reconStatus = document.getElementById('reconStatus');
       btnCapture.addEventListener('click', () => {
         try {
           if (!canvas || !canvas.getContext) {
-            
-              break;
-              
-            case 'mpr':
-              // No-op, handled by 3D dropdown
-              return;
-              
-            default:
-              // Generic tool activation
-              break;
-          }
-          
-          // Handle MPR mode specifics
-          if (mprMode) {
-            const mprPanel = document.getElementById('mprMeasurePanel');
-            if (mprPanel) {
-              mprPanel.style.display = (tool === 'measure') ? '' : mprPanel.style.display;
-            }
+            showToast('Canvas not available', 'error');
             return;
           }
           
-          // Set active tool
-          activeTool = tool;
+          // Create a download link for the current canvas content
+          canvas.toBlob(blob => {
+            if (!blob) {
+              showToast('Failed to capture image', 'error');
+              return;
+            }
+            
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `dicom_capture_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Image captured successfully', 'success');
+          }, 'image/png');
           
         } catch (error) {
-          console.error('Tool button error:', error);
-          showToast(`Tool error: ${error.message}`, 'error');
+          console.error('Capture error:', error);
+          showToast(`Capture failed: ${error.message}`, 'error');
         }
       });
-    });
+    }
+    
+    // Show DICOM button handler
+    if (btnShowDicom) {
+      btnShowDicom.addEventListener('click', async () => {
+        try {
+          if (!currentImageId && images.length > 0) {
+            showToast('No image loaded', 'warning');
+            return;
+          }
+          
+          const imageId = getCurrentImageId();
+          if (!imageId) {
+            showToast('No DICOM data available', 'warning');
+            return;
+          }
+          
+          // Fetch DICOM tags
+          const response = await fetch(`/dicom-viewer/api/image/${encodeURIComponent(imageId)}/tags/`);
+          if (!response.ok) {
+            throw new Error('Failed to fetch DICOM tags');
+          }
+          
+          const tags = await response.json();
+          dicomTagsPre.textContent = JSON.stringify(tags, null, 2);
+          dicomModal.style.display = 'flex';
+          
+        } catch (error) {
+          console.error('Show DICOM error:', error);
+          showToast(`Failed to load DICOM tags: ${error.message}`, 'error');
+        }
+      });
+    }
 
     // Mouse interactions on viewport
     const viewport = document.getElementById('viewport');
