@@ -1859,7 +1859,297 @@ const reconStatus = document.getElementById('reconStatus');
 
     // Clean toast notification system (duplicate removed)
 
-        // Utils
+        // Main draw function for rendering DICOM images
+    async function draw() {
+      try {
+        if (!ctx || !canvas) return;
+        
+        // Clear canvas
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Handle different rendering modes
+        if (mprMode) {
+          await drawMPR();
+        } else if (reconMode && reconImgs.length > 0) {
+          await drawReconstruction();
+        } else if (images.length > 0 && index >= 0 && index < images.length) {
+          await drawDicomImage();
+        }
+        
+        // Draw overlays
+        drawMeasurements();
+        drawAnnotations();
+        if (showTagsOverlay) drawTags();
+        if (showHuProbe && huEllipse) drawHuEllipse();
+        if (spyglass.active) drawSpyglass();
+        
+        // Update overlay info
+        updateOverlayInfo();
+        
+      } catch (error) {
+        console.error('Draw error:', error);
+      }
+    }
+    
+    // Draw single DICOM image
+    async function drawDicomImage() {
+      try {
+        const currentImage = images[index];
+        if (!currentImage || !currentImage.url) return;
+        
+        let img;
+        if (imageCache.has(currentImage.url)) {
+          img = imageCache.get(currentImage.url);
+        } else {
+          img = await loadImage(currentImage.url);
+          imageCache.set(currentImage.url, img);
+        }
+        
+        if (!img) return;
+        
+        // Calculate viewport
+        const scale = zoom;
+        const imgW = img.width * scale;
+        const imgH = img.height * scale;
+        const x = (canvas.width - imgW) / 2 + panOffset.x;
+        const y = (canvas.height - imgH) / 2 + panOffset.y;
+        
+        // Apply window/level
+        ctx.save();
+        if (inverted) {
+          ctx.filter = `invert(1) brightness(${wl/1000 + 1}) contrast(${ww/400})`;
+        } else {
+          ctx.filter = `brightness(${wl/1000 + 1}) contrast(${ww/400})`;
+        }
+        
+        ctx.drawImage(img, x, y, imgW, imgH);
+        ctx.restore();
+        
+        // Store viewport for interactions
+        lastVp = { x, y, scale, imgW: img.width, imgH: img.height };
+        
+      } catch (error) {
+        console.error('Error drawing DICOM image:', error);
+      }
+    }
+    
+    // Draw MPR views
+    async function drawMPR() {
+      if (!mprImgs || !currentSeries) return;
+      
+      const halfW = Math.floor(canvas.width / 2);
+      const halfH = Math.floor(canvas.height / 2);
+      
+      // Draw three planes
+      const planes = ['sagittal', 'coronal', 'axial'];
+      const positions = [
+        { x: 0, y: 0, w: halfW, h: halfH },
+        { x: halfW, y: 0, w: halfW, h: halfH },
+        { x: 0, y: halfH, w: halfW, h: halfH }
+      ];
+      
+      for (let i = 0; i < planes.length; i++) {
+        const plane = planes[i];
+        const pos = positions[i];
+        
+        if (mprFullPlane === plane) {
+          // Full screen mode for this plane
+          await drawMPRPlane(plane, 0, 0, canvas.width, canvas.height);
+        } else if (!mprFullPlane) {
+          // Normal quad view
+          await drawMPRPlane(plane, pos.x, pos.y, pos.w, pos.h);
+        }
+      }
+      
+      // Draw crosshairs
+      if (!mprFullPlane) {
+        drawMPRCrosshairs();
+      }
+    }
+    
+    // Draw single MPR plane
+    async function drawMPRPlane(plane, x, y, w, h) {
+      try {
+        ctx.save();
+        ctx.fillStyle = '#000';
+        ctx.fillRect(x, y, w, h);
+        
+        const sliceIndex = mprScroll[plane] || 0;
+        const key = mprKey(currentSeries.id, plane, sliceIndex, ww, wl, inverted);
+        
+        let img;
+        if (mprImageCache.has(key)) {
+          img = mprImageCache.get(key);
+        } else {
+          const url = `/dicom-viewer/api/series/${currentSeries.id}/mpr/${plane}/${sliceIndex}/?window_width=${ww}&window_level=${wl}&inverted=${inverted}`;
+          img = await loadImage(url);
+          mprImageCache.set(key, img);
+        }
+        
+        if (!img) return;
+        
+        // Scale to fit
+        const scale = Math.min(w / img.width, h / img.height) * zoom;
+        const imgW = img.width * scale;
+        const imgH = img.height * scale;
+        const imgX = x + (w - imgW) / 2;
+        const imgY = y + (h - imgH) / 2;
+        
+        ctx.drawImage(img, imgX, imgY, imgW, imgH);
+        
+        // Store viewport info
+        mprRegionVps[plane] = { x: imgX, y: imgY, scale, imgW: img.width, imgH: img.height };
+        
+        // Draw plane label
+        ctx.fillStyle = '#00d4ff';
+        ctx.font = '14px Arial';
+        ctx.fillText(plane.toUpperCase(), x + 10, y + 25);
+        
+        ctx.restore();
+      } catch (error) {
+        console.error(`Error drawing MPR ${plane}:`, error);
+      }
+    }
+    
+    // Draw measurements
+    function drawMeasurements() {
+      ctx.save();
+      ctx.strokeStyle = '#00ff00';
+      ctx.lineWidth = 2;
+      ctx.font = '14px Arial';
+      ctx.fillStyle = '#00ff00';
+      
+      if (mprMode) {
+        // Draw MPR measurements
+        for (const plane in mprMeasurements) {
+          if (mprFullPlane && plane !== mprFullPlane) continue;
+          
+          const vp = mprRegionVps[plane];
+          if (!vp) continue;
+          
+          for (const m of mprMeasurements[plane]) {
+            const p1 = imageToCanvasCoords(vp, m.start);
+            const p2 = imageToCanvasCoords(vp, m.end);
+            
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+            
+            if (m.label) {
+              const midX = (p1.x + p2.x) / 2;
+              const midY = (p1.y + p2.y) / 2;
+              ctx.fillText(m.label, midX + 5, midY - 5);
+            }
+          }
+        }
+      } else {
+        // Draw regular measurements
+        const vp = lastVp;
+        if (!vp) return;
+        
+        for (const m of measurements) {
+          const p1 = imageToCanvasCoords(vp, m.start);
+          const p2 = imageToCanvasCoords(vp, m.end);
+          
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.stroke();
+          
+          if (m.label) {
+            const midX = (p1.x + p2.x) / 2;
+            const midY = (p1.y + p2.y) / 2;
+            ctx.fillText(m.label, midX + 5, midY - 5);
+          }
+        }
+      }
+      
+      // Draw draft measurement
+      if (measureDraft) {
+        ctx.strokeStyle = '#ffff00';
+        ctx.setLineDash([5, 5]);
+        
+        const vp = measureDraft.plane ? mprRegionVps[measureDraft.plane] : lastVp;
+        if (vp) {
+          const p1 = imageToCanvasCoords(vp, measureDraft.start);
+          const p2 = imageToCanvasCoords(vp, measureDraft.end);
+          
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+      }
+      
+      ctx.restore();
+    }
+    
+    // Draw annotations
+    function drawAnnotations() {
+      if (!annotations.length || !lastVp) return;
+      
+      ctx.save();
+      ctx.fillStyle = '#ffff00';
+      ctx.font = '14px Arial';
+      
+      for (const ann of annotations) {
+        const pos = imageToCanvasCoords(lastVp, ann.pos);
+        ctx.fillText(ann.text, pos.x + 10, pos.y);
+        
+        // Draw marker
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      ctx.restore();
+    }
+    
+    // Update overlay information
+    function updateOverlayInfo() {
+      const overlay = document.getElementById('overlay');
+      if (!overlay) return;
+      
+      let info = `WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}`;
+      
+      if (images.length > 0) {
+        info += `<br>Slice: ${index + 1}/${images.length}`;
+      }
+      
+      if (currentStudy) {
+        const series = currentStudy.series || [];
+        const totalImages = series.reduce((sum, s) => sum + (s.image_count || 0), 0);
+        info += `<br>Series: ${series.length} | Images: ${totalImages}`;
+      }
+      
+      overlay.innerHTML = info;
+      
+      // Update zoom info
+      const zoomInfo = document.getElementById('zoominfo');
+      if (zoomInfo) {
+        zoomInfo.textContent = `Zoom: ${Math.round(zoom * 100)}%`;
+      }
+    }
+    
+    // Coordinate conversion functions
+    function imageToCanvasCoords(vp, imgPt) {
+      return {
+        x: vp.x + imgPt.x * vp.scale,
+        y: vp.y + imgPt.y * vp.scale
+      };
+    }
+    
+    function canvasToImageCoords(vp, x, y) {
+      return {
+        x: (x - vp.x) / vp.scale,
+        y: (y - vp.y) / vp.scale
+      };
+    }
+    
+    // Utils
     function loadImage(src) {
       return new Promise((res, rej) => {
         const im = new Image();
