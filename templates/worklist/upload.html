@@ -38,9 +38,53 @@
     .upload-header { text-align: center; margin-bottom: 2rem; }
     .upload-icon { background: var(--gradient-accent); border-radius: 50%; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: white; margin: 0 auto 1rem; }
 
-    .drop-zone { border: 2px dashed var(--border-color); border-radius: 12px; padding: 3rem 2rem; text-align: center; cursor: pointer; transition: all 0.3s ease; background: rgba(255, 255, 255, 0.02); }
-    .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent-color); background: rgba(14, 165, 233, 0.05); }
-    .drop-zone.uploading { cursor: not-allowed; opacity: 0.7; }
+    .drop-zone { 
+        border: 2px dashed var(--border-color); 
+        border-radius: 12px; 
+        padding: 3rem 2rem; 
+        text-align: center; 
+        cursor: pointer; 
+        transition: all 0.3s ease; 
+        background: linear-gradient(135deg, rgba(0, 212, 255, 0.05) 0%, rgba(0, 212, 255, 0.02) 100%);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .drop-zone::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, var(--accent-color) 0%, transparent 70%);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+    }
+    
+    .drop-zone:hover::before, .drop-zone.dragover::before { 
+        opacity: 0.1;
+    }
+    
+    .drop-zone:hover, .drop-zone.dragover { 
+        border-color: var(--accent-color); 
+        background: linear-gradient(135deg, rgba(0, 212, 255, 0.1) 0%, rgba(0, 212, 255, 0.05) 100%);
+        transform: scale(1.01);
+        box-shadow: 0 10px 30px rgba(0, 212, 255, 0.2);
+    }
+    
+    .drop-zone.uploading { 
+        cursor: not-allowed; 
+        opacity: 0.7; 
+        animation: pulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(0, 212, 255, 0.4); }
+        70% { box-shadow: 0 0 0 20px rgba(0, 212, 255, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(0, 212, 255, 0); }
+    }
 
     .file-input { display: none; }
 
@@ -74,13 +118,73 @@
     .progress-section { margin-top: 2rem; display: none; }
 
     .file-list { margin-top: 2rem; }
-    .file-item { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; }
+    
+    .file-item { 
+        background: rgba(255, 255, 255, 0.05); 
+        border: 1px solid var(--border-color); 
+        border-radius: 8px; 
+        padding: 1rem; 
+        margin-bottom: 1rem; 
+        display: flex; 
+        align-items: center; 
+        justify-content: space-between;
+        animation: slideIn 0.3s ease-out;
+        transition: all 0.3s ease;
+    }
+    
+    .file-item:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: var(--accent-color);
+        transform: translateX(5px);
+    }
+    
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
     .file-info { display: flex; align-items: center; gap: 1rem; }
-    .file-icon { color: var(--accent-color); font-size: 1.5rem; }
-    .file-details h6 { margin: 0; color: var(--text-primary); }
+    
+    .file-icon { 
+        color: var(--accent-color); 
+        font-size: 1.5rem;
+        animation: fadeIn 0.5s ease-out;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: scale(0.8); }
+        to { opacity: 1; transform: scale(1); }
+    }
+    
+    .file-details h6 { margin: 0; color: var(--text-primary); font-weight: 600; }
     .file-size { color: var(--text-secondary); font-size: 0.9rem; }
-    .remove-file { background: var(--danger-color); border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: white; cursor: pointer; transition: all 0.3s ease; }
-    .remove-file:hover { background: #dc2626; transform: scale(1.1); }
+    
+    .remove-file { 
+        background: var(--danger-color); 
+        border: none; 
+        border-radius: 50%; 
+        width: 32px; 
+        height: 32px; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        color: white; 
+        cursor: pointer; 
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(255, 68, 68, 0.3);
+    }
+    
+    .remove-file:hover { 
+        background: #dc2626; 
+        transform: scale(1.1) rotate(90deg);
+        box-shadow: 0 4px 12px rgba(255, 68, 68, 0.5);
+    }
 
     .upload-stats {
         background: rgba(0, 212, 255, 0.1);

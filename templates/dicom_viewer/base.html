@@ -101,6 +101,47 @@
   
   <!-- Performance optimization: Image preloader and cache -->
   <script>
+    // Global variables
+    let currentStudy = null;
+    let currentSeries = null;
+    let images = [];
+    let index = 0;
+    let ww = 400, wl = 40;
+    let defaultWw = 400, defaultWl = 40;
+    let zoom = 1.0;
+    let panOffset = { x: 0, y: 0 };
+    let activeTool = 'window';
+    let isDragging = false;
+    let dragStart = { x: 0, y: 0 };
+    let measurements = [];
+    let annotations = [];
+    let inverted = false;
+    let showCrosshair = false;
+    let showTagsOverlay = false;
+    let showHuProbe = false;
+    let huEllipse = null;
+    let measureDraft = null;
+    let lastVp = null;
+    let imageCache = new Map();
+    let mprImageCache = new Map();
+    let mprMode = false;
+    let mprImgs = { axial: null, sagittal: null, coronal: null };
+    let mprScroll = { axial: 0, sagittal: 0, coronal: 0, counts: {} };
+    let mprCross = { x: 0, y: 0, z: 0 };
+    let mprFullPlane = null;
+    let mprRegionVps = {};
+    let mprMeasurements = { axial: [], sagittal: [], coronal: [] };
+    let reconMode = false;
+    let reconImgs = [];
+    let reconIndex = 0;
+    let reconstructionInProgress = false;
+    let imageIdToMeasurements = new Map();
+    let imageIdToAnnotations = new Map();
+    let spyglass = { active: false, isPress: false, cx: 0, cy: 0, radius: 100 };
+    let measureUnit = 'mm';
+    let mprMeasurePlaneMode = 'auto';
+    let mprMeasureType = 'distance';
+    
     class ImagePreloader {
       constructor() {
         this.cache = new Map();
@@ -198,6 +239,12 @@
       <canvas id="dicomCanvas"></canvas>
       <div class="overlay" id="overlay">WW: 400<br>WL: 40<br>Slice: 1/1</div>
       <div class="zoominfo" id="zoominfo">Zoom: 100%</div>
+      <div id="progressIndicator" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none;">
+        <div style="background: rgba(0,0,0,0.8); padding: 20px; border-radius: 8px; border: 1px solid var(--accent-color);">
+          <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: var(--accent-color);"></i>
+          <div style="margin-top: 10px; color: var(--text-primary);">Loading...</div>
+        </div>
+      </div>
     </div>
     <div class="right">
       <div class="panel">
@@ -2544,6 +2591,421 @@ const reconStatus = document.getElementById('reconStatus');
         }
       });
     });
+    
+    // Cine playback functions
+    let cineInterval = null;
+    let cineSpeed = 100; // ms per frame
+    
+    function startCine() {
+      if (images.length <= 1) {
+        showToast('Need multiple images for cine mode', 'warning');
+        return;
+      }
+      
+      stopCine(); // Stop any existing cine
+      
+      cineInterval = setInterval(() => {
+        index = (index + 1) % images.length;
+        sliceSlider.value = index;
+        document.getElementById('sliceVal').textContent = index + 1;
+        requestDraw();
+      }, cineSpeed);
+      
+      showToast('Cine mode started', 'success');
+    }
+    
+    function stopCine() {
+      if (cineInterval) {
+        clearInterval(cineInterval);
+        cineInterval = null;
+        showToast('Cine mode stopped', 'info');
+      }
+    }
+    
+    // AI Analysis function
+    async function triggerAIAnalysis() {
+      try {
+        if (!currentStudy || !currentSeries) {
+          showToast('No study loaded for AI analysis', 'warning');
+          return;
+        }
+        
+        showToast('Starting AI analysis...', 'info');
+        showProgressIndicator();
+        
+        const response = await fetch(`/dicom-viewer/api/series/${currentSeries.id}/ai-analysis/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('AI analysis failed');
+        }
+        
+        const result = await response.json();
+        
+        // Display AI results
+        if (result.findings) {
+          showAIResults(result.findings);
+        }
+        
+        hideProgressIndicator();
+        showToast('AI analysis complete', 'success');
+        
+      } catch (error) {
+        console.error('AI analysis error:', error);
+        hideProgressIndicator();
+        showToast('AI analysis failed: ' + error.message, 'error');
+      }
+    }
+    
+    function showAIResults(findings) {
+      // Create or update AI results panel
+      let aiPanel = document.getElementById('aiResultsPanel');
+      if (!aiPanel) {
+        aiPanel = document.createElement('div');
+        aiPanel.id = 'aiResultsPanel';
+        aiPanel.className = 'panel';
+        aiPanel.innerHTML = '<h3>AI Analysis Results</h3><div id="aiFindings"></div>';
+        document.querySelector('.right').appendChild(aiPanel);
+      }
+      
+      const findingsDiv = document.getElementById('aiFindings');
+      findingsDiv.innerHTML = findings.map(f => `
+        <div style="margin-bottom: 8px; padding: 8px; background: var(--secondary-bg); border-radius: 4px;">
+          <strong>${f.finding}</strong>
+          <span style="color: var(--accent-color); margin-left: 8px;">${(f.confidence * 100).toFixed(1)}%</span>
+          <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">${f.description || ''}</div>
+        </div>
+      `).join('');
+    }
+    
+    // Add missing draw functions
+    function drawTags() {
+      if (!showTagsOverlay || !currentImage || !currentImage.tags) return;
+      
+      ctx.save();
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(10, 50, 300, 200);
+      
+      ctx.fillStyle = '#00d4ff';
+      ctx.font = '12px monospace';
+      
+      let y = 70;
+      for (const [key, value] of Object.entries(currentImage.tags)) {
+        ctx.fillText(`${key}: ${value}`, 20, y);
+        y += 15;
+        if (y > 230) break;
+      }
+      
+      ctx.restore();
+    }
+    
+    function drawHuEllipse() {
+      if (!huEllipse) return;
+      
+      ctx.save();
+      ctx.strokeStyle = '#ff00ff';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      
+      const vp = huEllipse.plane ? mprRegionVps[huEllipse.plane] : lastVp;
+      if (vp) {
+        const center = imageToCanvasCoords(vp, { x: huEllipse.cx, y: huEllipse.cy });
+        ctx.beginPath();
+        ctx.ellipse(center.x, center.y, huEllipse.rx * vp.scale, huEllipse.ry * vp.scale, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      
+      ctx.restore();
+    }
+    
+    function drawSpyglass() {
+      if (!spyglass.active || !lastVp) return;
+      
+      ctx.save();
+      
+      // Create circular clipping path
+      ctx.beginPath();
+      ctx.arc(spyglass.cx, spyglass.cy, spyglass.radius, 0, Math.PI * 2);
+      ctx.clip();
+      
+      // Draw magnified view
+      const mag = 2.0; // Magnification factor
+      const srcX = (spyglass.cx - lastVp.x) / lastVp.scale - spyglass.radius / (lastVp.scale * mag);
+      const srcY = (spyglass.cy - lastVp.y) / lastVp.scale - spyglass.radius / (lastVp.scale * mag);
+      const srcW = (spyglass.radius * 2) / (lastVp.scale * mag);
+      const srcH = (spyglass.radius * 2) / (lastVp.scale * mag);
+      
+      if (images[index] && images[index].element) {
+        ctx.drawImage(images[index].element, 
+          srcX, srcY, srcW, srcH,
+          spyglass.cx - spyglass.radius, spyglass.cy - spyglass.radius, 
+          spyglass.radius * 2, spyglass.radius * 2
+        );
+      }
+      
+      // Draw spyglass border
+      ctx.strokeStyle = '#00d4ff';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(spyglass.cx, spyglass.cy, spyglass.radius, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      ctx.restore();
+    }
+    
+    function drawMPRCrosshairs() {
+      if (!showCrosshair || !mprRegionVps) return;
+      
+      ctx.save();
+      ctx.strokeStyle = '#ffff00';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([5, 5]);
+      
+      // Draw crosshairs on each plane
+      for (const plane in mprRegionVps) {
+        const vp = mprRegionVps[plane];
+        if (!vp) continue;
+        
+        const centerX = vp.x + vp.imgW * vp.scale / 2;
+        const centerY = vp.y + vp.imgH * vp.scale / 2;
+        
+        // Horizontal line
+        ctx.beginPath();
+        ctx.moveTo(vp.x, centerY);
+        ctx.lineTo(vp.x + vp.imgW * vp.scale, centerY);
+        ctx.stroke();
+        
+        // Vertical line
+        ctx.beginPath();
+        ctx.moveTo(centerX, vp.y);
+        ctx.lineTo(centerX, vp.y + vp.imgH * vp.scale);
+        ctx.stroke();
+      }
+      
+      ctx.restore();
+    }
+    
+    function drawReconstruction() {
+      // Implementation for reconstruction drawing
+      if (!reconImgs || reconImgs.length === 0) return;
+      
+      const img = reconImgs[reconIndex];
+      if (!img) return;
+      
+      const scale = zoom;
+      const imgW = img.width * scale;
+      const imgH = img.height * scale;
+      const x = (canvas.width - imgW) / 2 + panOffset.x;
+      const y = (canvas.height - imgH) / 2 + panOffset.y;
+      
+      ctx.drawImage(img, x, y, imgW, imgH);
+      
+      // Update overlay
+      const overlay = document.getElementById('overlay');
+      if (overlay) {
+        overlay.innerHTML = `Reconstruction View<br>Image: ${reconIndex + 1}/${reconImgs.length}`;
+      }
+    }
+    
+    // Update patient info display
+    function updatePatientInfo() {
+      const patientInfoEl = document.getElementById('patientInfo');
+      if (!patientInfoEl || !currentStudy) return;
+      
+      const patient = currentStudy.patient_name || 'Unknown';
+      const studyDate = currentStudy.study_date ? new Date(currentStudy.study_date).toLocaleDateString() : '-';
+      const modality = currentStudy.modality || '-';
+      const studyDesc = currentStudy.study_description || '';
+      const clinicalInfo = currentStudy.clinical_info || '';
+      
+      patientInfoEl.innerHTML = `
+        Patient: <strong>${patient}</strong> | 
+        Study Date: <strong>${studyDate}</strong> | 
+        Modality: <strong>${modality}</strong>
+        ${studyDesc ? ` | ${studyDesc}` : ''}
+        ${clinicalInfo ? ` | <span style="color: var(--warning-color);" title="${clinicalInfo}">⚠️ Clinical Info</span>` : ''}
+      `;
+    }
+    
+    // Set canvas size for optimal performance
+    function setCanvasSize() {
+      const viewport = document.getElementById('viewport');
+      if (!viewport || !canvas) return;
+      
+      const rect = viewport.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+      
+      // Request redraw after resize
+      if (typeof draw === 'function') {
+        requestDraw();
+      }
+    }
+    
+    // Optimized study loading
+    async function loadStudy(studyId) {
+      try {
+        showProgressIndicator();
+        
+        // Fetch study details
+        const response = await fetch(`/dicom-viewer/api/study/${studyId}/`);
+        if (!response.ok) throw new Error('Failed to load study');
+        
+        const study = await response.json();
+        currentStudy = study;
+        
+        // Update patient info immediately
+        updatePatientInfo();
+        
+        // Load first series automatically
+        if (study.series && study.series.length > 0) {
+          // Populate series select
+          seriesSelect.innerHTML = study.series.map(s => 
+            `<option value="${s.id}">${s.series_number} - ${s.series_description || 'Series'} (${s.image_count} images)</option>`
+          ).join('');
+          
+          // Load first series
+          await loadSeries(study.series[0].id);
+        }
+        
+        hideProgressIndicator();
+        showToast('Study loaded successfully', 'success');
+        
+      } catch (error) {
+        console.error('Error loading study:', error);
+        hideProgressIndicator();
+        showToast('Failed to load study', 'error');
+      }
+    }
+    
+    // Optimized series loading with prefetching
+    async function loadSeries(seriesId) {
+      try {
+        if (!seriesId) return;
+        
+        showProgressIndicator();
+        stopCine(); // Stop any ongoing cine
+        
+        // Clear caches for memory management
+        if (imageCache.size > 50) {
+          imageCache.clear();
+        }
+        if (mprImageCache.size > 30) {
+          mprImageCache.clear();
+        }
+        
+        // Fetch series details
+        const response = await fetch(`/dicom-viewer/api/series/${seriesId}/`);
+        if (!response.ok) throw new Error('Failed to load series');
+        
+        const series = await response.json();
+        currentSeries = series;
+        
+        // Load images
+        images = series.images || [];
+        index = 0;
+        
+        // Update UI
+        if (sliceSlider) {
+          sliceSlider.max = Math.max(0, images.length - 1);
+          sliceSlider.value = 0;
+        }
+        if (document.getElementById('sliceVal')) {
+          document.getElementById('sliceVal').textContent = images.length > 0 ? '1' : '0';
+        }
+        
+        // Set window/level presets based on modality
+        setModalityPresets(series.modality);
+        
+        // Initial draw
+        await draw();
+        
+        // Prefetch nearby images for smooth scrolling
+        if (images.length > 0) {
+          prefetchAround(0, 5);
+        }
+        
+        // Warm up MPR if available
+        if (series.has_mpr) {
+          warmupMpr();
+        }
+        
+        hideProgressIndicator();
+        
+      } catch (error) {
+        console.error('Error loading series:', error);
+        hideProgressIndicator();
+        showToast('Failed to load series', 'error');
+      }
+    }
+    
+    // Prefetch images around current index
+    function prefetchAround(centerIndex, radius = 3) {
+      for (let i = Math.max(0, centerIndex - radius); i <= Math.min(images.length - 1, centerIndex + radius); i++) {
+        if (images[i] && images[i].url && !imageCache.has(images[i].url)) {
+          imagePreloader.preloadImage(images[i].url);
+        }
+      }
+    }
+    
+    // Set modality-specific presets
+    function setModalityPresets(modality) {
+      switch (modality) {
+        case 'CT':
+          defaultWw = 400;
+          defaultWl = 40;
+          break;
+        case 'MR':
+          defaultWw = 800;
+          defaultWl = 400;
+          break;
+        case 'XR':
+        case 'CR':
+        case 'DX':
+          defaultWw = 2000;
+          defaultWl = 1000;
+          break;
+        default:
+          defaultWw = 400;
+          defaultWl = 40;
+      }
+      
+      // Apply defaults if not already customized
+      if (ww === 400 && wl === 40) {
+        ww = defaultWw;
+        wl = defaultWl;
+        wwSlider.value = ww;
+        wlSlider.value = wl;
+        wwNum.value = ww;
+        wlNum.value = wl;
+        document.getElementById('wwVal').textContent = ww;
+        document.getElementById('wlVal').textContent = wl;
+      }
+    }
+    
+    // Progress indicator functions
+    function showProgressIndicator() {
+      const indicator = document.getElementById('progressIndicator');
+      if (indicator) indicator.style.display = 'block';
+    }
+    
+    function hideProgressIndicator() {
+      const indicator = document.getElementById('progressIndicator');
+      if (indicator) indicator.style.display = 'none';
+    }
+    
+    // Get current image ID
+    function getCurrentImageId() {
+      if (images.length > 0 && index >= 0 && index < images.length) {
+        return images[index].id || images[index].url;
+      }
+      return null;
+    }
     
     // Comprehensive initialization - Fixed with validation and error handling
     function initializeViewer() {
