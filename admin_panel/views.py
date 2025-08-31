@@ -12,7 +12,10 @@ from .models import SystemConfiguration, AuditLog, SystemUsageStatistics
 from .decorators import admin_only_strict, admin_only_api, check_admin_privileges, log_admin_action
 import json
 import re
+import logging
 from django.utils.crypto import get_random_string
+
+logger = logging.getLogger(__name__)
 
 
 def is_admin(user):
@@ -155,7 +158,12 @@ def user_management(request):
 @user_passes_test(is_admin)
 def user_create(request):
     """ADMIN ONLY: Create new user with enhanced form validation and privilege assignment"""
-    from .forms import CustomUserCreationForm
+    try:
+        from .forms import CustomUserCreationForm
+    except ImportError as e:
+        logger.error(f"Error importing CustomUserCreationForm: {e}")
+        messages.error(request, 'Form configuration error. Please contact administrator.')
+        return redirect('admin_panel:dashboard')
     
     # Double-check admin privileges
     if not request.user.is_admin():
@@ -191,6 +199,7 @@ def user_create(request):
                 return redirect('admin_panel:user_management')
                 
             except Exception as e:
+                logger.error(f'Error creating user: {str(e)}', exc_info=True)
                 messages.error(request, f'Error creating user: {str(e)}')
         else:
             # Form validation errors
@@ -235,7 +244,12 @@ def user_create(request):
 @user_passes_test(is_admin)
 def user_edit(request, user_id):
     """ADMIN ONLY: Edit existing user with enhanced form validation and privilege assignment"""
-    from .forms import CustomUserUpdateForm
+    try:
+        from .forms import CustomUserUpdateForm
+    except ImportError as e:
+        logger.error(f"Error importing CustomUserUpdateForm: {e}")
+        messages.error(request, 'Form configuration error. Please contact administrator.')
+        return redirect('admin_panel:dashboard')
     
     # Double-check admin privileges
     if not request.user.is_admin():
@@ -280,6 +294,7 @@ def user_edit(request, user_id):
                 return redirect('admin_panel:user_management')
                 
             except Exception as e:
+                logger.error(f'Error updating user: {str(e)}', exc_info=True)
                 messages.error(request, f'Error updating user: {str(e)}')
         else:
             # Form validation errors
@@ -593,6 +608,7 @@ def bulk_user_action(request):
         return JsonResponse({'success': True, 'message': message})
         
     except Exception as e:
+        logger.error(f'Error in bulk user action: {str(e)}', exc_info=True)
         return JsonResponse({'error': str(e)}, status=500)
 
 @csrf_exempt
@@ -629,13 +645,19 @@ def bulk_facility_action(request):
         return JsonResponse({'success': True, 'message': message})
         
     except Exception as e:
+        logger.error(f'Error in bulk facility action: {str(e)}', exc_info=True)
         return JsonResponse({'error': str(e)}, status=500)
 
 @login_required
 @user_passes_test(is_admin)
 def facility_create(request):
     """Create new facility with enhanced form validation"""
-    from .forms import FacilityForm
+    try:
+        from .forms import FacilityForm
+    except ImportError as e:
+        logger.error(f"Error importing FacilityForm: {e}")
+        messages.error(request, 'Form configuration error. Please contact administrator.')
+        return redirect('admin_panel:dashboard')
     
     if request.method == 'POST':
         form = FacilityForm(request.POST, request.FILES)
@@ -709,6 +731,7 @@ def facility_create(request):
                 return redirect('admin_panel:facility_management')
                 
             except Exception as e:
+                logger.error(f'Error creating facility: {str(e)}', exc_info=True)
                 messages.error(request, f'Error creating facility: {str(e)}')
         else:
             # Form validation errors
@@ -733,7 +756,12 @@ def facility_create(request):
 @user_passes_test(is_admin)
 def facility_edit(request, facility_id):
     """Edit existing facility with enhanced form validation"""
-    from .forms import FacilityForm
+    try:
+        from .forms import FacilityForm
+    except ImportError as e:
+        logger.error(f"Error importing FacilityForm: {e}")
+        messages.error(request, 'Form configuration error. Please contact administrator.')
+        return redirect('admin_panel:dashboard')
     
     facility = get_object_or_404(Facility, id=facility_id)
     
@@ -809,6 +837,7 @@ def facility_edit(request, facility_id):
                 return redirect('admin_panel:facility_management')
                 
             except Exception as e:
+                logger.error(f'Error updating facility: {str(e)}', exc_info=True)
                 messages.error(request, f'Error updating facility: {str(e)}')
         else:
             # Form validation errors
