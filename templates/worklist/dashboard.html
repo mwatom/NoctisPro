@@ -911,7 +911,7 @@
                         <td><span class="status-badge status-${study.status}">
                             ${getStatusIcon(study.status)}${study.status.toUpperCase().replace('_', ' ')}
                         </span></td>
-                        <td class="priority-${study.priority}" title="${(study.clinical_info||'').replace(/"/g,'&quot;')}">${study.priority.toUpperCase()}</td>
+                        <td class="priority-${study.priority}" title="${(study.clinical_info||'').toString().replace(/"/g,'&quot;')}">${(study.priority||'normal').toString().toUpperCase()}</td>
                         <td class="timestamp">${scheduledTime}</td>
                         <td title="${seriesCount} series, ${imageCount} images">
                             ${imageCount} <small style="color: var(--text-secondary);">(${seriesCount}s)</small>
@@ -1128,7 +1128,7 @@
                 }
                 
                 // Open in same tab instead of new tab
-                const url = `/dicom-viewer/web/viewer/?study_id=${studyId}`;
+                const url = `/dicom-viewer/?study=${studyId}`;
                 window.location.href = url;
             } catch (error) {
                 console.error('Error opening DICOM viewer:', error);
@@ -1139,7 +1139,7 @@
         async function launchDicomViewer() {
             try {
                 // Open in same tab instead of new tab
-                window.location.href = '/dicom-viewer/web/viewer/';
+                window.location.href = '/dicom-viewer/';
             } catch (error) {
                 console.error('Error launching DICOM viewer:', error);
                 showToast('Failed to launch DICOM viewer', 'error');

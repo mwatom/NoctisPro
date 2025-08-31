@@ -2834,7 +2834,7 @@ const reconStatus = document.getElementById('reconStatus');
         showProgressIndicator();
         
         // Fetch study details
-        const response = await fetch(`/dicom-viewer/api/study/${studyId}/`);
+        const response = await fetch(`/dicom-viewer/api/study/${studyId}/data/`);
         if (!response.ok) throw new Error('Failed to load study');
         
         const study = await response.json();

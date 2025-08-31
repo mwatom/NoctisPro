@@ -20,6 +20,9 @@ urlpatterns = [
     path('facilities/delete/<int:facility_id>/', views.facility_delete, name='facility_delete'),
     path('facilities/bulk-action/', views.bulk_facility_action, name='bulk_facility_action'),
 
+    # API endpoints
+    path('api/dashboard/', views.api_admin_dashboard, name='api_admin_dashboard'),
+    
     # Placeholder routes referenced by templates
     path('logs/', views.system_logs, name='system_logs'),
     path('settings/', views.settings_view, name='settings'),

@@ -825,3 +825,44 @@ def facility_delete(request, facility_id):
     
     context = {'facility': facility}
     return render(request, 'admin_panel/facility_confirm_delete.html', context)
+
+@login_required
+@user_passes_test(is_admin)
+@csrf_exempt
+def api_admin_dashboard(request):
+    """API endpoint for admin dashboard data"""
+    try:
+        # Get recent studies with proper string handling
+        studies = Study.objects.select_related('patient', 'facility', 'modality', 'uploaded_by').order_by('-upload_date')[:50]
+        
+        items = []
+        for study in studies:
+            # Ensure all fields are properly converted to strings
+            priority = str(study.priority or 'normal')
+            clinical_info = str(study.clinical_info or '')
+            
+            items.append({
+                'id': study.id,
+                'name': f"{study.patient.full_name} - {study.accession_number}",
+                'type': 'study',
+                'role': str(study.modality.code if study.modality else 'OT'),
+                'facility': str(study.facility.name if study.facility else 'Unknown'),
+                'status': str(study.status or 'scheduled'),
+                'priority': priority,
+                'clinical_info': clinical_info,
+                'last_login': study.upload_date.isoformat() if study.upload_date else None,
+                'created': study.upload_date.isoformat() if study.upload_date else None,
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'items': items,
+            'total_count': len(items)
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'items': []
+        }, status=500)

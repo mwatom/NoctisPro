@@ -531,7 +531,7 @@
 
     async function loadStudy(studyId){
       try {
-        const r = await fetch(`/dicom-viewer/study/${studyId}/`);
+        const r = await fetch(`/dicom-viewer/api/study/${studyId}/data/`);
         if (!r.ok) throw new Error('study fetch failed');
         const data = await r.json();
         currentStudy = data.study;
@@ -561,7 +561,7 @@
         // Show clinical info and priority
         const clin = (currentStudy.clinical_info && currentStudy.clinical_info.trim()) ? currentStudy.clinical_info : '-';
         document.getElementById('clinicalInfo').textContent = `Clinical Info: ${clin}`;
-        document.getElementById('priorityInfo').textContent = `Priority: ${currentStudy.priority ? currentStudy.priority.toUpperCase() : '-'}`;
+        document.getElementById('priorityInfo').textContent = `Priority: ${currentStudy.priority ? currentStudy.priority.toString().toUpperCase() : '-'}`;
         seriesSelect.innerHTML = '<option value="">Select Series</option>';
         (data.series_list || []).forEach(s=>{
           const opt = document.createElement('option');

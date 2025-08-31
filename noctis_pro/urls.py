@@ -22,6 +22,7 @@ from . import views
 from django.shortcuts import redirect
 from django.http import HttpResponse
 from worklist import views as worklist_views
+from admin_panel import views as admin_views
 from django.views.generic.base import RedirectView
 from . import health
 
@@ -45,6 +46,7 @@ urlpatterns = [
     path('worklist/', include('worklist.urls')),
     # Alias endpoints expected by the dashboard UI
     path('api/studies/', worklist_views.api_studies, name='api_studies_root'),
+    path('api/admin/dashboard/', admin_views.api_admin_dashboard, name='api_admin_dashboard'),
     path('dicom-viewer/', include(('dicom_viewer.urls','dicom_viewer'), namespace='dicom_viewer')),
     path('viewer/', RedirectView.as_view(url='/dicom-viewer/', permanent=False, query_string=True)),
     path('viewer/<path:subpath>/', RedirectView.as_view(url='/dicom-viewer/%(subpath)s/', permanent=False, query_string=True)),
