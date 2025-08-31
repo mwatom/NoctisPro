@@ -608,7 +608,7 @@
                 <div class="nav-tab{% if request.resolver_match and request.resolver_match.namespace == 'worklist' %} active{% endif %}" onclick="window.location.href='{% url 'worklist:dashboard' %}'">WORKLIST</div>
                 <div class="nav-tab" onclick="window.location.href='{% url 'worklist:study_list' %}'">STUDIES</div>
                 <div class="nav-tab" onclick="window.location.href='{% url 'reports:report_list' %}'">REPORTS</div>
-                <div class="nav-tab" onclick="window.location.href='{% url 'dicom_viewer:standalone_viewer' %}'"><i class="fas fa-eye"></i> VIEWER</div>
+                <div class="nav-tab" onclick="window.location.href='{% url 'dicom_viewer:viewer' %}'"><i class="fas fa-eye"></i> VIEWER</div>
                 {% if user.is_authenticated and user.role == 'admin' %}
                 <div class="nav-tab" onclick="window.location.href='{% url 'admin_panel:user_management' %}'"><i class="fas fa-user-cog"></i> MANAGE USERS</div>
                 {% endif %}

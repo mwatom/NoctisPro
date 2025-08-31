@@ -736,10 +736,10 @@
         <!-- Footer Status Bar -->
         <div class="footer-status">
             <div class="status-left">
-                <span>Total Studies: <strong>247</strong></span>
-                <span>Urgent: <strong style="color: var(--urgent-color);">12</strong></span>
-                <span>In Progress: <strong style="color: var(--in-progress-color);">8</strong></span>
-                <span>Completed: <strong style="color: var(--completed-color);">189</strong></span>
+                <span>Total Studies: <strong>{{ total_studies|default:0 }}</strong></span>
+                <span>Urgent: <strong style="color: var(--urgent-color);">{{ urgent_studies|default:0 }}</strong></span>
+                <span>In Progress: <strong style="color: var(--in-progress-color);">{{ in_progress_studies|default:0 }}</strong></span>
+                <span>Completed: <strong style="color: var(--completed-color);">{{ completed_studies|default:0 }}</strong></span>
             </div>
             <div class="status-right">
                 <div class="connection-status">
