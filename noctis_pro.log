@@ -927,3 +927,13 @@ Watching for file changes with StatReloader
 Watching for file changes with StatReloader
 HTTP GET /admin-panel/users/create/ 302 [0.01, 127.0.0.1:54494]
 HTTP HEAD /admin-panel/users/create/ 302 [0.00, 127.0.0.1:41250]
+Watching for file changes with StatReloader
+HTTP GET /login/ 200 [0.01, 127.0.0.1:50400]
+HTTP GET / 302 [0.01, 127.0.0.1:50402]
+HTTP GET /login/ 200 [0.00, 127.0.0.1:53244]
+HTTP GET /login/ 200 [0.00, 127.0.0.1:53246]
+HTTP GET /login/ 200 [0.00, 127.0.0.1:33356]
+HTTP GET /admin-panel/ 302 [0.00, 127.0.0.1:59980]
+HTTP GET /dicom-viewer/ 302 [0.00, 127.0.0.1:59984]
+HTTP GET /worklist/ 302 [0.00, 127.0.0.1:45116]
+HTTP GET /dicom-viewer/ 302 [0.01, 127.0.0.1:47202]

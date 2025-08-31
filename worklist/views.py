@@ -11,10 +11,13 @@ from django.core.files.base import ContentFile
 import os
 import mimetypes
 import json
+import logging
 from pathlib import Path
 import pydicom
 from PIL import Image
 from io import BytesIO
+
+logger = logging.getLogger(__name__)
 
 from .models import (
     Study, Patient, Modality, Series, DicomImage, StudyAttachment, 
