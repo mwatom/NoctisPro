@@ -66,7 +66,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     # Temporarily disabled problematic middleware for debugging
     # 'noctis_pro.middleware.SlowConnectionOptimizationMiddleware',  # Connection detection
-    # 'noctis_pro.middleware.SessionTimeoutMiddleware',  # Session timeout handling - moved after auth
+    'noctis_pro.middleware.SessionTimeoutMiddleware',  # Session timeout handling - moved after auth
     # 'noctis_pro.middleware.ImageOptimizationMiddleware',  # Image optimization
     # 'noctis_pro.middleware.SessionTimeoutWarningMiddleware',  # Session timeout warnings
 ]
@@ -251,7 +251,7 @@ if not DEBUG:
 
 # Session timeout and auto-logout settings
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
-SESSION_COOKIE_AGE = int(os.environ.get('SESSION_TIMEOUT_MINUTES', '30')) * 60  # Default 30 minutes
+SESSION_COOKIE_AGE = int(os.environ.get('SESSION_TIMEOUT_MINUTES', '10')) * 60  # Default 10 minutes
 SESSION_SAVE_EVERY_REQUEST = True  # Reset timer on every request
 SESSION_TIMEOUT_WARNING = int(os.environ.get('SESSION_WARNING_MINUTES', '5')) * 60  # Warning 5 minutes before timeout
 
