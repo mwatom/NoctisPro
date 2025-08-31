@@ -62,7 +62,7 @@
 			<div class="d-flex gap-2">
 				<a href="{% url 'worklist:study_list' %}" class="btn-control"><i class="fas fa-arrow-left"></i> Back</a>
 				<a href="{% url 'worklist:upload_attachment' study.id %}" class="btn-control"><i class="fas fa-paperclip"></i> Attach</a>
-				<a href="{% url 'dicom_viewer:viewer' %}?study={{ study.id }}" class="btn-control"><i class="fas fa-eye"></i> View</a>
+				<a href="{% url 'dicom_viewer:viewer' %}?study={{ study.id }}" class="btn-dicom-viewer"><i class="fas fa-eye"></i> DICOM Viewer</a>
 			</div>
 		</div>
 		<div class="card-body">

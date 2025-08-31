@@ -740,6 +740,102 @@ def api_bone_reconstruction(request, series_id):
 
 @login_required
 @csrf_exempt
+def api_volume_reconstruction(request, series_id):
+    """Professional volume rendering reconstruction"""
+    try:
+        series = get_object_or_404(Series, id=series_id)
+        
+        # Check permissions
+        if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and series.study.facility != request.user.facility:
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        # Get parameters
+        window_width = float(request.GET.get('ww', 400))
+        window_level = float(request.GET.get('wl', 40))
+        invert = request.GET.get('invert', 'false').lower() == 'true'
+        opacity = float(request.GET.get('opacity', 0.8))
+        
+        # Load volume data
+        images = series.images.all().order_by('instance_number')
+        if images.count() < 3:
+            return JsonResponse({'error': 'Volume rendering requires at least 3 images'}, status=400)
+        
+        volume_data = []
+        spacing = [1.0, 1.0, 1.0]
+        
+        for image in images:
+            try:
+                file_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
+                if not os.path.exists(file_path):
+                    continue
+                
+                ds = _load_dicom_optimized(file_path)
+                if ds is None:
+                    continue
+                
+                pixel_array = ds.pixel_array.astype(np.float32)
+                slope = float(getattr(ds, 'RescaleSlope', 1.0))
+                intercept = float(getattr(ds, 'RescaleIntercept', 0.0))
+                pixel_array = pixel_array * slope + intercept
+                
+                volume_data.append(pixel_array)
+                
+                # Get spacing from first image
+                if len(volume_data) == 1:
+                    pixel_spacing = getattr(ds, 'PixelSpacing', [1.0, 1.0])
+                    slice_thickness = getattr(ds, 'SliceThickness', 1.0)
+                    spacing = [float(slice_thickness), float(pixel_spacing[0]), float(pixel_spacing[1])]
+                
+            except Exception as e:
+                logger.error(f"Error loading image for volume rendering: {e}")
+                continue
+        
+        if len(volume_data) < 3:
+            return JsonResponse({'error': 'Failed to load sufficient volume data'}, status=500)
+        
+        # Create 3D volume
+        volume = np.stack(volume_data, axis=0)
+        
+        # Generate volume renderings (simplified version)
+        slices, rows, cols = volume.shape
+        
+        # Calculate center indices for volume views
+        axial_idx = slices // 2
+        sagittal_idx = cols // 2
+        coronal_idx = rows // 2
+        
+        # Create volume projections
+        volume_views = {}
+        
+        # Use maximum intensity projection for volume rendering effect
+        volume_views['axial'] = _array_to_base64_image(
+            np.max(volume[max(0, axial_idx-5):min(slices, axial_idx+5)], axis=0), 
+            window_width, window_level, invert
+        )
+        volume_views['sagittal'] = _array_to_base64_image(
+            np.max(volume[:, :, max(0, sagittal_idx-5):min(cols, sagittal_idx+5)], axis=2), 
+            window_width, window_level, invert
+        )
+        volume_views['coronal'] = _array_to_base64_image(
+            np.max(volume[:, max(0, coronal_idx-5):min(rows, coronal_idx+5), :], axis=1), 
+            window_width, window_level, invert
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'volume_views': volume_views,
+            'volume_shape': list(volume.shape),
+            'spacing': spacing,
+            'opacity': opacity,
+            'modality': series.modality
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in volume reconstruction: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+@csrf_exempt
 def api_hounsfield_units(request):
     """Professional HU calculation"""
     if request.method != 'POST':
@@ -791,6 +887,80 @@ def api_hounsfield_units(request):
         
     except Exception as e:
         logger.error(f"Error calculating HU: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def api_hu_value(request):
+    """Get HU value at specific coordinates - supports both GET and POST"""
+    try:
+        if request.method == 'GET':
+            # GET request with query parameters
+            x = request.GET.get('x')
+            y = request.GET.get('y')
+            image_id = request.GET.get('image_id')
+            mode = request.GET.get('mode', 'image')
+        elif request.method == 'POST':
+            # POST request with JSON body
+            data = json.loads(request.body)
+            x = data.get('x')
+            y = data.get('y')
+            image_id = data.get('image_id')
+            mode = data.get('mode', 'image')
+        else:
+            return JsonResponse({'error': 'Method not allowed'}, status=405)
+        
+        # Validate parameters
+        if x is None or y is None or image_id is None:
+            return JsonResponse({'error': 'Missing required parameters: x, y, image_id'}, status=400)
+        
+        try:
+            x = int(x)
+            y = int(y)
+            image_id = int(image_id)
+        except (ValueError, TypeError):
+            return JsonResponse({'error': 'Invalid parameter values'}, status=400)
+        
+        # Get image
+        image = get_object_or_404(DicomImage, id=image_id)
+        
+        # Check permissions
+        if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and image.series.study.facility != request.user.facility:
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        # Load DICOM and calculate HU
+        file_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
+        if not os.path.exists(file_path):
+            return JsonResponse({'error': 'DICOM file not found'}, status=404)
+        
+        ds = _load_dicom_optimized(file_path)
+        if ds is None:
+            return JsonResponse({'error': 'Failed to load DICOM data'}, status=500)
+        
+        pixel_array = ds.pixel_array
+        
+        # Validate coordinates
+        if y >= pixel_array.shape[0] or x >= pixel_array.shape[1] or x < 0 or y < 0:
+            return JsonResponse({'error': 'Coordinates out of bounds'}, status=400)
+        
+        # Get raw pixel value
+        raw_value = int(pixel_array[y, x])
+        
+        # Apply rescaling for HU
+        slope = float(getattr(ds, 'RescaleSlope', 1.0))
+        intercept = float(getattr(ds, 'RescaleIntercept', 0.0))
+        hu_value = raw_value * slope + intercept
+        
+        return JsonResponse({
+            'hu_value': round(float(hu_value), 1),
+            'raw_value': raw_value,
+            'position': {'x': x, 'y': y},
+            'rescale_slope': slope,
+            'rescale_intercept': intercept,
+            'mode': mode
+        })
+        
+    except Exception as e:
+        logger.error(f"Error calculating HU value: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
 @login_required
@@ -1131,10 +1301,24 @@ def api_calculate_distance(request):
     
     try:
         data = json.loads(request.body)
-        start_x = float(data.get('start_x', 0))
-        start_y = float(data.get('start_y', 0))
-        end_x = float(data.get('end_x', 0))
-        end_y = float(data.get('end_y', 0))
+        start_x = data.get('start_x')
+        start_y = data.get('start_y')
+        end_x = data.get('end_x')
+        end_y = data.get('end_y')
+        
+        # Validate that all required parameters are provided
+        if start_x is None or start_y is None or end_x is None or end_y is None:
+            return JsonResponse({'error': 'Missing required parameters: start_x, start_y, end_x, end_y'}, status=400)
+        
+        # Convert to float with error handling
+        try:
+            start_x = float(start_x)
+            start_y = float(start_y)
+            end_x = float(end_x)
+            end_y = float(end_y)
+        except (ValueError, TypeError):
+            return JsonResponse({'error': 'Invalid coordinate values'}, status=400)
+        
         pixel_spacing = data.get('pixel_spacing', [1.0, 1.0])
         
         # Calculate pixel distance
@@ -1656,3 +1840,125 @@ def web_viewer(request):
     if study_id:
         return redirect(f'/dicom-viewer/?study={study_id}')
     return redirect('dicom_viewer:viewer')
+
+# Additional missing functions for HU calibration and QA phantoms
+from django.contrib.auth.decorators import user_passes_test
+
+@login_required
+@user_passes_test(lambda u: hasattr(u, 'is_admin') and u.is_admin() or hasattr(u, 'is_technician') and u.is_technician())
+def hu_calibration_dashboard(request):
+    """Hounsfield Unit calibration dashboard"""
+    try:
+        from .models import HounsfieldCalibration, HounsfieldQAPhantom
+        from .dicom_utils import DicomProcessor
+    except ImportError:
+        # If models don't exist, return empty context
+        context = {
+            'recent_calibrations': [],
+            'total_calibrations': 0,
+            'valid_calibrations': 0,
+            'invalid_calibrations': 0,
+            'success_rate': 0,
+            'scanner_stats': {},
+            'available_phantoms': [],
+        }
+        return render(request, 'dicom_viewer/hu_calibration_dashboard.html', context)
+    
+    # Get recent calibrations
+    recent_calibrations = HounsfieldCalibration.objects.all()[:20] if HounsfieldCalibration else []
+    
+    # Get calibration statistics
+    total_calibrations = HounsfieldCalibration.objects.count() if HounsfieldCalibration else 0
+    valid_calibrations = HounsfieldCalibration.objects.filter(is_valid=True).count() if HounsfieldCalibration else 0
+    invalid_calibrations = HounsfieldCalibration.objects.filter(is_valid=False).count() if HounsfieldCalibration else 0
+    
+    # Get scanner statistics
+    scanner_stats = {}
+    if HounsfieldCalibration:
+        for calibration in HounsfieldCalibration.objects.all():
+            scanner_key = f"{calibration.manufacturer} {calibration.model}"
+            if scanner_key not in scanner_stats:
+                scanner_stats[scanner_key] = {
+                    'total': 0,
+                    'valid': 0,
+                    'invalid': 0,
+                    'latest_date': None
+                }
+            
+            scanner_stats[scanner_key]['total'] += 1
+            if calibration.is_valid:
+                scanner_stats[scanner_key]['valid'] += 1
+            else:
+                scanner_stats[scanner_key]['invalid'] += 1
+            
+            if not scanner_stats[scanner_key]['latest_date'] or calibration.created_at.date() > scanner_stats[scanner_key]['latest_date']:
+                scanner_stats[scanner_key]['latest_date'] = calibration.created_at.date()
+    
+    # Get available phantoms
+    available_phantoms = HounsfieldQAPhantom.objects.filter(is_active=True) if HounsfieldQAPhantom else []
+    
+    context = {
+        'recent_calibrations': recent_calibrations,
+        'total_calibrations': total_calibrations,
+        'valid_calibrations': valid_calibrations,
+        'invalid_calibrations': invalid_calibrations,
+        'success_rate': (valid_calibrations / total_calibrations * 100) if total_calibrations > 0 else 0,
+        'scanner_stats': scanner_stats,
+        'available_phantoms': available_phantoms,
+    }
+    
+    return render(request, 'dicom_viewer/hu_calibration_dashboard.html', context)
+
+@login_required
+@user_passes_test(lambda u: hasattr(u, 'is_admin') and u.is_admin())
+def manage_qa_phantoms(request):
+    """Manage QA phantoms for HU calibration"""
+    try:
+        from .models import HounsfieldQAPhantom
+    except ImportError:
+        # If model doesn't exist, return empty context
+        phantoms = []
+        context = {'phantoms': phantoms}
+        return render(request, 'dicom_viewer/manage_qa_phantoms.html', context)
+    
+    phantoms = HounsfieldQAPhantom.objects.all().order_by('-created_at')
+    
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        
+        if action == 'create':
+            try:
+                phantom = HounsfieldQAPhantom.objects.create(
+                    name=request.POST.get('name'),
+                    manufacturer=request.POST.get('manufacturer'),
+                    model=request.POST.get('model'),
+                    description=request.POST.get('description', ''),
+                    water_roi_coordinates=json.loads(request.POST.get('water_roi', '{}')),
+                    air_roi_coordinates=json.loads(request.POST.get('air_roi', '{}')),
+                    expected_water_hu=float(request.POST.get('expected_water_hu', 0.0)),
+                    expected_air_hu=float(request.POST.get('expected_air_hu', -1000.0)),
+                    water_tolerance=float(request.POST.get('water_tolerance', 5.0)),
+                    air_tolerance=float(request.POST.get('air_tolerance', 50.0))
+                )
+                messages.success(request, f'QA phantom "{phantom.name}" created successfully')
+            except Exception as e:
+                messages.error(request, f'Error creating phantom: {str(e)}')
+        
+        elif action == 'toggle_active':
+            phantom_id = request.POST.get('phantom_id')
+            try:
+                phantom = HounsfieldQAPhantom.objects.get(id=phantom_id)
+                phantom.is_active = not phantom.is_active
+                phantom.save()
+                status = 'activated' if phantom.is_active else 'deactivated'
+                messages.success(request, f'Phantom "{phantom.name}" {status}')
+            except HounsfieldQAPhantom.DoesNotExist:
+                messages.error(request, 'Phantom not found')
+        
+        return redirect('dicom_viewer:manage_qa_phantoms')
+    
+    context = {
+        'phantoms': phantoms,
+    }
+    
+    return render(request, 'dicom_viewer/manage_qa_phantoms.html', context)

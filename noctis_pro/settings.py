@@ -287,25 +287,15 @@ else:
         }
     }
 
-# Cache configuration
-if os.environ.get('USE_DUMMY_CACHE', 'False').lower() == 'true':
-    # Use dummy cache for container deployments without Redis
-    CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
-        }
+# Cache configuration - Always use dummy cache and database sessions for stability
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
     }
-    # Use database sessions when Redis is not available
-    SESSION_ENGINE = 'django.contrib.sessions.backends.db'
-else:
-    # Use dummy cache and database sessions for development
-    CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
-        }
-    }
-    # Use database sessions when Redis is not available
-    SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+}
+
+# Always use database sessions to avoid Redis dependency issues
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 
 # Logging
 LOGGING = {

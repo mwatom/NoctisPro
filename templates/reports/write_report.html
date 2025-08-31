@@ -308,8 +308,8 @@
                         <i class="fas fa-image fa-3x mb-3"></i>
                         <h5>DICOM Image Viewer</h5>
                         <p>Click to open full DICOM viewer</p>
-                        <a href="{% url 'dicom_viewer:launch_study_in_desktop_viewer' study.id %}" class="btn btn-medical" target="_blank">
-                            <i class="fas fa-external-link-alt me-2"></i>Launch Desktop Viewer
+                        <a href="{% url 'dicom_viewer:viewer' %}?study={{ study.id }}" class="btn-dicom-viewer">
+                            <i class="fas fa-external-link-alt"></i>Launch DICOM Viewer
                         </a>
                     </div>
                 </div>

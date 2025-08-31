@@ -525,34 +525,30 @@ def api_studies(request):
 @login_required
 def api_study_detail(request, study_id):
 	"""API endpoint to get study detail for permission checking"""
-	try:
-		user = request.user
-		study = get_object_or_404(Study, id=study_id)
-		
-		# Check permissions
-		if user.is_facility_user() and getattr(user, 'facility', None) and study.facility != user.facility:
-			return JsonResponse({'error': 'Permission denied'}, status=403)
-		
-		study_data = {
-			'id': study.id,
-			'accession_number': study.accession_number,
-			'patient_name': study.patient.full_name,
-			'patient_id': study.patient.patient_id,
-			'modality': study.modality.code,
-			'status': study.status,
-			'priority': str(study.priority or 'normal'),
-			'study_date': study.study_date.isoformat(),
-			'facility': study.facility.name,
-			'image_count': study.get_image_count(),
-			'series_count': study.get_series_count(),
-			'study_description': study.study_description,
-			'clinical_info': str(study.clinical_info or ''),
-		}
-		
-		return JsonResponse({'success': True, 'study': study_data})
-	except Exception as e:
-		logger.error(f"Error in api_study_detail: {e}")
-		return JsonResponse({'error': str(e)}, status=500)
+	user = request.user
+	study = get_object_or_404(Study, id=study_id)
+	
+	# Check permissions
+	if user.is_facility_user() and getattr(user, 'facility', None) and study.facility != user.facility:
+		return JsonResponse({'error': 'Permission denied'}, status=403)
+	
+	study_data = {
+		'id': study.id,
+		'accession_number': study.accession_number,
+		'patient_name': study.patient.full_name,
+		'patient_id': study.patient.patient_id,
+		'modality': study.modality.code,
+		'status': study.status,
+		'priority': str(study.priority or 'normal'),
+		'study_date': study.study_date.isoformat(),
+		'facility': study.facility.name,
+		'image_count': study.get_image_count(),
+		'series_count': study.get_series_count(),
+		'study_description': study.study_description,
+		'clinical_info': str(study.clinical_info or ''),
+	}
+	
+	return JsonResponse({'success': True, 'study': study_data})
 
 @login_required
 @csrf_exempt
@@ -669,199 +665,182 @@ def upload_attachment(request, study_id):
 @login_required
 def view_attachment(request, attachment_id):
     """View or download attachment"""
-    try:
-        attachment = get_object_or_404(StudyAttachment, id=attachment_id)
-        user = request.user
+    attachment = get_object_or_404(StudyAttachment, id=attachment_id)
+    user = request.user
+    
+    # All authenticated users can view attachments
+    
+    # Increment access count
+    attachment.increment_access_count()
+    
+    # Handle DICOM files
+    if attachment.is_dicom_file():
+        if attachment.attached_study:
+            # Launch desktop viewer for attached study
+            return redirect('dicom_viewer:launch_study_in_desktop_viewer', study_id=attachment.attached_study.id)
+        else:
+            # Launch desktop viewer without study context
+            return redirect('dicom_viewer:launch_standalone_viewer')
+    
+    # Handle viewable files (PDF, images)
+    if attachment.is_viewable_in_browser():
+        action = request.GET.get('action', 'view')
         
-        # All authenticated users can view attachments
-        
-        # Increment access count
-        attachment.increment_access_count()
-        
-        # Handle DICOM files
-        if attachment.is_dicom_file():
-            if attachment.attached_study:
-                # Launch desktop viewer for attached study
-                return redirect('dicom_viewer:viewer', study_id=attachment.attached_study.id)
-            else:
-                # Launch desktop viewer without study context
-                return redirect('dicom_viewer:viewer')
-        
-        # Handle viewable files (PDF, images)
-        if attachment.is_viewable_in_browser():
-            action = request.GET.get('action', 'view')
-            
-            if action == 'download':
-                # Force download
-                response = FileResponse(
-                    attachment.file.open('rb'),
-                    as_attachment=True,
-                    filename=attachment.name
-                )
-                return response
-            else:
-                # View in browser
-                response = FileResponse(
-                    attachment.file.open('rb'),
-                    content_type=attachment.mime_type
-                )
-                return response
-        
-        # For non-viewable files, force download
-        response = FileResponse(
-            attachment.file.open('rb'),
-            as_attachment=True,
-            filename=attachment.name
-        )
-        return response
-    except Exception as e:
-        logger.error(f"Error in view_attachment: {e}")
-        messages.error(request, f'Error viewing attachment: {str(e)}')
-        return redirect('worklist:study_list')
+        if action == 'download':
+            # Force download
+            response = FileResponse(
+                attachment.file.open('rb'),
+                as_attachment=True,
+                filename=attachment.name
+            )
+            return response
+        else:
+            # View in browser
+            response = FileResponse(
+                attachment.file.open('rb'),
+                content_type=attachment.mime_type
+            )
+            return response
+    
+    # For non-viewable files, force download
+    response = FileResponse(
+        attachment.file.open('rb'),
+        as_attachment=True,
+        filename=attachment.name
+    )
+    return response
 
 @login_required
 @csrf_exempt
 def attachment_comments(request, attachment_id):
     """Handle attachment comments"""
-    try:
-        attachment = get_object_or_404(StudyAttachment, id=attachment_id)
-        user = request.user
-        
-        # Check permissions
-        if user.is_facility_user() and attachment.study.facility != user.facility:
-            return JsonResponse({'error': 'Permission denied'}, status=403)
-        
-        if request.method == 'POST':
-            try:
-                data = json.loads(request.body)
-                comment_text = data.get('comment', '').strip()
-                
-                if not comment_text:
-                    return JsonResponse({'error': 'Comment cannot be empty'}, status=400)
-                
-                comment = AttachmentComment.objects.create(
-                    attachment=attachment,
-                    user=user,
-                    comment=comment_text
-                )
-                
-                return JsonResponse({
-                    'success': True,
-                    'comment': {
-                        'id': comment.id,
-                        'comment': comment.comment,
-                        'user': comment.user.get_full_name() or comment.user.username,
-                        'created_at': comment.created_at.isoformat()
-                    }
-                })
-                
-            except Exception as e:
-                return JsonResponse({'error': str(e)}, status=500)
-        
-        # GET request - return comments
-        comments = attachment.comments.select_related('user').order_by('-created_at')
-        comments_data = []
-        
-        for comment in comments:
-            comments_data.append({
-                'id': comment.id,
-                'comment': comment.comment,
-                'user': comment.user.get_full_name() or comment.user.username,
-                'created_at': comment.created_at.isoformat()
+    attachment = get_object_or_404(StudyAttachment, id=attachment_id)
+    user = request.user
+    
+    # Check permissions
+    if user.is_facility_user() and attachment.study.facility != user.facility:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            comment_text = data.get('comment', '').strip()
+            
+            if not comment_text:
+                return JsonResponse({'error': 'Comment cannot be empty'}, status=400)
+            
+            comment = AttachmentComment.objects.create(
+                attachment=attachment,
+                user=user,
+                comment=comment_text
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'comment': {
+                    'id': comment.id,
+                    'comment': comment.comment,
+                    'user': comment.user.get_full_name() or comment.user.username,
+                    'created_at': comment.created_at.isoformat()
+                }
             })
-        
-        return JsonResponse({'comments': comments_data})
-    except Exception as e:
-        logger.error(f"Error in attachment_comments: {e}")
-        return JsonResponse({'error': str(e)}, status=500)
+            
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    # GET request - return comments
+    comments = attachment.comments.select_related('user').order_by('-created_at')
+    comments_data = []
+    
+    for comment in comments:
+        comments_data.append({
+            'id': comment.id,
+            'comment': comment.comment,
+            'user': comment.user.get_full_name() or comment.user.username,
+            'created_at': comment.created_at.isoformat()
+        })
+    
+    return JsonResponse({'comments': comments_data})
 
 @login_required
 @csrf_exempt
 def delete_attachment(request, attachment_id):
     """Delete attachment"""
-    try:
-        attachment = get_object_or_404(StudyAttachment, id=attachment_id)
-        user = request.user
-        
-        # All authenticated users can delete attachments
-        
-        if request.method == 'POST':
-            try:
-                study_id = attachment.study.id
-                attachment_name = attachment.name
-                
-                # Delete file from storage
-                if attachment.file:
-                    attachment.file.delete()
-                
-                # Delete thumbnail if exists
-                if attachment.thumbnail:
-                    attachment.thumbnail.delete()
-                
-                # Delete attachment record
-                attachment.delete()
-                
-                messages.success(request, f'Attachment "{attachment_name}" deleted successfully')
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': f'Attachment "{attachment_name}" deleted successfully'
-                })
-                
-            except Exception as e:
-                return JsonResponse({'error': str(e)}, status=500)
-        
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-    except Exception as e:
-        logger.error(f"Error in delete_attachment: {e}")
-        return JsonResponse({'error': str(e)}, status=500)
+    attachment = get_object_or_404(StudyAttachment, id=attachment_id)
+    user = request.user
+    
+    # All authenticated users can delete attachments
+    
+    if request.method == 'POST':
+        try:
+            study_id = attachment.study.id
+            attachment_name = attachment.name
+            
+            # Delete file from storage
+            if attachment.file:
+                attachment.file.delete()
+            
+            # Delete thumbnail if exists
+            if attachment.thumbnail:
+                attachment.thumbnail.delete()
+            
+            # Delete attachment record
+            attachment.delete()
+            
+            messages.success(request, f'Attachment "{attachment_name}" deleted successfully')
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Attachment "{attachment_name}" deleted successfully'
+            })
+            
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 @login_required
 @csrf_exempt
 def api_search_studies(request):
     """API endpoint to search for studies to attach"""
-    try:
-        user = request.user
-        query = request.GET.get('q', '').strip()
-        patient_id = request.GET.get('patient_id')
-        
-        if len(query) < 2:
-            return JsonResponse({'studies': []})
-        
-        # Base queryset based on user role
-        if user.is_facility_user() and getattr(user, 'facility', None):
-            studies = Study.objects.filter(facility=user.facility)
-        else:
-            studies = Study.objects.all()
-        
-        # Filter by patient if specified
-        if patient_id:
-            studies = studies.filter(patient__patient_id=patient_id)
-        
-        # Search query
-        studies = studies.filter(
-            Q(accession_number__icontains=query) |
-            Q(patient__first_name__icontains=query) |
-            Q(patient__last_name__icontains=query) |
-            Q(study_description__icontains=query)
-        ).select_related('patient', 'modality').order_by('-study_date')[:20]
-        
-        studies_data = []
-        for study in studies:
-            studies_data.append({
-                'id': study.id,
-                'accession_number': study.accession_number,
-                'patient_name': study.patient.full_name,
-                'patient_id': study.patient.patient_id,
-                'study_date': study.study_date.strftime('%Y-%m-%d'),
-                'modality': study.modality.code,
-                'description': study.study_description
-            })
-        
-        return JsonResponse({'studies': studies_data})
-    except Exception as e:
-        logger.error(f"Error in api_search_studies: {e}")
-        return JsonResponse({'error': str(e)}, status=500)
+    user = request.user
+    query = request.GET.get('q', '').strip()
+    patient_id = request.GET.get('patient_id')
+    
+    if len(query) < 2:
+        return JsonResponse({'studies': []})
+    
+    # Base queryset based on user role
+    if user.is_facility_user() and getattr(user, 'facility', None):
+        studies = Study.objects.filter(facility=user.facility)
+    else:
+        studies = Study.objects.all()
+    
+    # Filter by patient if specified
+    if patient_id:
+        studies = studies.filter(patient__patient_id=patient_id)
+    
+    # Search query
+    studies = studies.filter(
+        Q(accession_number__icontains=query) |
+        Q(patient__first_name__icontains=query) |
+        Q(patient__last_name__icontains=query) |
+        Q(study_description__icontains=query)
+    ).select_related('patient', 'modality').order_by('-study_date')[:20]
+    
+    studies_data = []
+    for study in studies:
+        studies_data.append({
+            'id': study.id,
+            'accession_number': study.accession_number,
+            'patient_name': study.patient.full_name,
+            'patient_id': study.patient.patient_id,
+            'study_date': study.study_date.strftime('%Y-%m-%d'),
+            'modality': study.modality.code,
+            'description': study.study_description
+        })
+    
+    return JsonResponse({'studies': studies_data})
 
 @login_required
 @csrf_exempt
@@ -870,41 +849,45 @@ def api_update_study_status(request, study_id):
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
+    study = get_object_or_404(Study, id=study_id)
+    user = request.user
+    
+    # Check permissions
+    if user.is_facility_user() and getattr(user, 'facility', None) and study.facility != user.facility:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    
     try:
-        study = get_object_or_404(Study, id=study_id)
-        user = request.user
+        data = json.loads(request.body)
+        new_status = data.get('status', '').strip()
         
-        # Check permissions
-        if user.is_facility_user() and getattr(user, 'facility', None) and study.facility != user.facility:
-            return JsonResponse({'error': 'Permission denied'}, status=403)
+        # Validate status
+        valid_statuses = ['scheduled', 'in_progress', 'completed', 'cancelled']
+        if new_status not in valid_statuses:
+            return JsonResponse({'error': 'Invalid status'}, status=400)
         
-        try:
-            data = json.loads(request.body)
-            new_status = data.get('status', '').strip()
-            
-            # Validate status
-            valid_statuses = ['scheduled', 'in_progress', 'completed', 'cancelled']
-            if new_status not in valid_statuses:
-                return JsonResponse({'error': 'Invalid status'}, status=400)
-            
-            # Update study status
-            old_status = study.status
-            study.status = new_status
-            study.save()
-            
-            return JsonResponse({
-                'success': True,
-                'message': f'Study status updated from {old_status} to {new_status}',
-                'old_status': old_status,
-                'new_status': new_status
-            })
-            
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
+        # Update study status
+        old_status = study.status
+        study.status = new_status
+        study.save()
+        
+        # Log the status change (if you have logging)
+        # StudyStatusLog.objects.create(
+        #     study=study,
+        #     old_status=old_status,
+        #     new_status=new_status,
+        #     changed_by=user
+        # )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Study status updated from {old_status} to {new_status}',
+            'old_status': old_status,
+            'new_status': new_status
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON data'}, status=400)
     except Exception as e:
-        logger.error(f"Error in api_update_study_status: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
 @login_required
@@ -915,119 +898,107 @@ def api_delete_study(request, study_id):
     if request.method not in ['DELETE', 'POST']:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
+    # Check if user is admin
+    if not request.user.is_admin():
+        return JsonResponse({'error': 'Permission denied. Only administrators can delete studies.'}, status=403)
+    
+    study = get_object_or_404(Study, id=study_id)
+    
     try:
-        # Check if user is admin
-        if not hasattr(request.user, 'is_admin') or not request.user.is_admin():
-            return JsonResponse({'error': 'Permission denied. Only administrators can delete studies.'}, status=403)
+        # Store study info for logging
+        study_info = {
+            'id': study.id,
+            'accession_number': study.accession_number,
+            'patient_name': study.patient.full_name,
+            'deleted_by': request.user.username
+        }
         
-        study = get_object_or_404(Study, id=study_id)
+        # Delete the study (this will cascade to related objects)
+        study.delete()
         
-        try:
-            # Store study info for logging
-            study_info = {
-                'id': study.id,
-                'accession_number': study.accession_number,
-                'patient_name': study.patient.full_name,
-                'deleted_by': request.user.username
-            }
-            
-            # Delete the study (this will cascade to related objects)
-            study.delete()
-            
-            return JsonResponse({
-                'success': True,
-                'message': f'Study {study_info["accession_number"]} deleted successfully',
-                'deleted_study': study_info
-            })
-            
-        except Exception as e:
-            return JsonResponse({'error': f'Failed to delete study: {str(e)}'}, status=500)
+        return JsonResponse({
+            'success': True,
+            'message': f'Study {study_info["accession_number"]} deleted successfully',
+            'deleted_study': study_info
+        })
+        
     except Exception as e:
-        logger.error(f"Error in api_delete_study: {e}")
-        return JsonResponse({'error': str(e)}, status=500)
+        return JsonResponse({'error': f'Failed to delete study: {str(e)}'}, status=500)
 
 @login_required
 def api_refresh_worklist(request):
     """API endpoint to refresh worklist and get latest studies"""
-    try:
-        user = request.user
-        
-        # Get recent studies (last 24 hours)
-        from datetime import timedelta
-        recent_cutoff = timezone.now() - timedelta(hours=24)
-        
-        if user.is_facility_user() and getattr(user, 'facility', None):
-            studies = Study.objects.filter(facility=user.facility, upload_date__gte=recent_cutoff)
-        else:
-            studies = Study.objects.filter(upload_date__gte=recent_cutoff)
-        
-        studies_data = []
-        for study in studies.order_by('-upload_date')[:20]:  # Last 20 uploaded studies
-            studies_data.append({
-                'id': study.id,
-                'accession_number': study.accession_number,
-                'patient_name': study.patient.full_name,
-                'patient_id': study.patient.patient_id,
-                'modality': study.modality.code,
-                'status': study.status,
-                'priority': study.priority,
-                'study_date': study.study_date.isoformat(),
-                'upload_date': study.upload_date.isoformat(),
-                'facility': study.facility.name,
-                'series_count': study.get_series_count(),
-                'image_count': study.get_image_count(),
-                'uploaded_by': study.uploaded_by.get_full_name() if study.uploaded_by else 'Unknown',
-                'study_description': study.study_description,
-            })
-        
-        return JsonResponse({
-            'success': True, 
-            'studies': studies_data,
-            'total_recent': len(studies_data),
-            'refresh_time': timezone.now().isoformat()
+    user = request.user
+    
+    # Get recent studies (last 24 hours)
+    from datetime import timedelta
+    recent_cutoff = timezone.now() - timedelta(hours=24)
+    
+    if user.is_facility_user() and getattr(user, 'facility', None):
+        studies = Study.objects.filter(facility=user.facility, upload_date__gte=recent_cutoff)
+    else:
+        studies = Study.objects.filter(upload_date__gte=recent_cutoff)
+    
+    studies_data = []
+    for study in studies.order_by('-upload_date')[:20]:  # Last 20 uploaded studies
+        studies_data.append({
+            'id': study.id,
+            'accession_number': study.accession_number,
+            'patient_name': study.patient.full_name,
+            'patient_id': study.patient.patient_id,
+            'modality': study.modality.code,
+            'status': study.status,
+            'priority': study.priority,
+            'study_date': study.study_date.isoformat(),
+            'upload_date': study.upload_date.isoformat(),
+            'facility': study.facility.name,
+            'series_count': study.get_series_count(),
+            'image_count': study.get_image_count(),
+            'uploaded_by': study.uploaded_by.get_full_name() if study.uploaded_by else 'Unknown',
+            'study_description': study.study_description,
         })
-    except Exception as e:
-        logger.error(f"Error in api_refresh_worklist: {e}")
-        return JsonResponse({'error': str(e)}, status=500)
+    
+    return JsonResponse({
+        'success': True, 
+        'studies': studies_data,
+        'total_recent': len(studies_data),
+        'refresh_time': timezone.now().isoformat()
+    })
 
 @login_required
 def api_get_upload_stats(request):
     """API endpoint to get upload statistics"""
-    try:
-        user = request.user
-        
-        # Get upload statistics for the last 7 days
-        from datetime import timedelta
-        week_ago = timezone.now() - timedelta(days=7)
-        
-        if user.is_facility_user() and getattr(user, 'facility', None):
-            recent_studies = Study.objects.filter(facility=user.facility, upload_date__gte=week_ago)
-        else:
-            recent_studies = Study.objects.filter(upload_date__gte=week_ago)
-        
-        total_studies = recent_studies.count()
-        total_series = sum(study.get_series_count() for study in recent_studies)
-        total_images = sum(study.get_image_count() for study in recent_studies)
-        
-        # Group by modality
-        modality_stats = {}
-        for study in recent_studies:
-            modality = study.modality.code
-            modality_stats[modality] = modality_stats.get(modality, 0) + 1
-        
-        return JsonResponse({
-            'success': True,
-            'stats': {
-                'total_studies': total_studies,
-                'total_series': total_series,
-                'total_images': total_images,
-                'modality_breakdown': modality_stats,
-                'period': '7 days'
-            }
-        })
-    except Exception as e:
-        logger.error(f"Error in api_get_upload_stats: {e}")
-        return JsonResponse({'error': str(e)}, status=500)
+    user = request.user
+    
+    # Get upload statistics for the last 7 days
+    from datetime import timedelta
+    week_ago = timezone.now() - timedelta(days=7)
+    
+    if user.is_facility_user() and getattr(user, 'facility', None):
+        recent_studies = Study.objects.filter(facility=user.facility, upload_date__gte=week_ago)
+    else:
+        recent_studies = Study.objects.filter(upload_date__gte=week_ago)
+    
+    total_studies = recent_studies.count()
+    total_series = sum(study.get_series_count() for study in recent_studies)
+    total_images = sum(study.get_image_count() for study in recent_studies)
+    
+    # Group by modality
+    modality_stats = {}
+    for study in recent_studies:
+        modality = study.modality.code
+        modality_stats[modality] = modality_stats.get(modality, 0) + 1
+    
+    return JsonResponse({
+        'success': True,
+        'stats': {
+            'total_studies': total_studies,
+            'total_series': total_series,
+            'total_images': total_images,
+            'modality_breakdown': modality_stats,
+            'period': '7 days'
+        }
+    })
 
 @login_required
 @csrf_exempt
@@ -1035,32 +1006,25 @@ def api_reassign_study_facility(request, study_id):
 	"""Reassign a study to a facility (admin/radiologist only). Useful for recovering a lost study."""
 	if request.method != 'POST':
 		return JsonResponse({'error': 'Method not allowed'}, status=405)
-	
+	user = request.user
+	if not (user.is_admin() or user.is_radiologist()):
+		return JsonResponse({'error': 'Permission denied'}, status=403)
+	study = get_object_or_404(Study, id=study_id)
 	try:
-		user = request.user
-		if not (hasattr(user, 'is_admin') and user.is_admin() or hasattr(user, 'is_radiologist') and user.is_radiologist()):
-			return JsonResponse({'error': 'Permission denied'}, status=403)
-		
-		study = get_object_or_404(Study, id=study_id)
-		
-		try:
-			payload = json.loads(request.body)
-			facility_id = str(payload.get('facility_id', '')).strip()
-			if not facility_id:
-				return JsonResponse({'error': 'facility_id is required'}, status=400)
-			target = Facility.objects.filter(id=facility_id, is_active=True).first()
-			if not target:
-				return JsonResponse({'error': 'Target facility not found or inactive'}, status=404)
-			old_fac = study.facility
-			study.facility = target
-			study.save(update_fields=['facility'])
-			return JsonResponse({'success': True, 'message': 'Study reassigned', 'old_facility': old_fac.name, 'new_facility': target.name})
-		except json.JSONDecodeError:
-			return JsonResponse({'error': 'Invalid JSON data'}, status=400)
-		except Exception as e:
-			return JsonResponse({'error': str(e)}, status=500)
+		payload = json.loads(request.body)
+		facility_id = str(payload.get('facility_id', '')).strip()
+		if not facility_id:
+			return JsonResponse({'error': 'facility_id is required'}, status=400)
+		target = Facility.objects.filter(id=facility_id, is_active=True).first()
+		if not target:
+			return JsonResponse({'error': 'Target facility not found or inactive'}, status=404)
+		old_fac = study.facility
+		study.facility = target
+		study.save(update_fields=['facility'])
+		return JsonResponse({'success': True, 'message': 'Study reassigned', 'old_facility': old_fac.name, 'new_facility': target.name})
+	except json.JSONDecodeError:
+		return JsonResponse({'error': 'Invalid JSON data'}, status=400)
 	except Exception as e:
-		logger.error(f"Error in api_reassign_study_facility: {e}")
 		return JsonResponse({'error': str(e)}, status=500)
 
 @login_required
@@ -1070,39 +1034,35 @@ def api_update_clinical_info(request, study_id):
 	if request.method != 'POST':
 		return JsonResponse({'error': 'Method not allowed'}, status=405)
 	
+	study = get_object_or_404(Study, id=study_id)
+	user = request.user
+	
+	# Check permissions
+	if user.is_facility_user() and getattr(user, 'facility', None) and study.facility != user.facility:
+		return JsonResponse({'error': 'Permission denied'}, status=403)
+	
 	try:
-		study = get_object_or_404(Study, id=study_id)
-		user = request.user
+		new_info = ''
+		if request.content_type and request.content_type.startswith('application/json'):
+			payload = json.loads(request.body)
+			new_info = (payload.get('clinical_info') or '').strip()
+		else:
+			new_info = (request.POST.get('clinical_info') or '').strip()
 		
-		# Check permissions
-		if user.is_facility_user() and getattr(user, 'facility', None) and study.facility != user.facility:
-			return JsonResponse({'error': 'Permission denied'}, status=403)
+		old_info = study.clinical_info or ''
+		study.clinical_info = new_info
+		# Ensure auto_now updates last_updated when using update_fields
+		study.save(update_fields=['clinical_info', 'last_updated'])
 		
-		try:
-			new_info = ''
-			if request.content_type and request.content_type.startswith('application/json'):
-				payload = json.loads(request.body)
-				new_info = (payload.get('clinical_info') or '').strip()
-			else:
-				new_info = (request.POST.get('clinical_info') or '').strip()
-			
-			old_info = study.clinical_info or ''
-			study.clinical_info = new_info
-			# Ensure auto_now updates last_updated when using update_fields
-			study.save(update_fields=['clinical_info', 'last_updated'])
-			
-			return JsonResponse({
-				'success': True,
-				'message': 'Clinical information updated',
-				'old_clinical_info': old_info,
-				'clinical_info': study.clinical_info,
-			})
-		except json.JSONDecodeError:
-			return JsonResponse({'error': 'Invalid JSON data'}, status=400)
-		except Exception as e:
-			return JsonResponse({'error': str(e)}, status=500)
+		return JsonResponse({
+			'success': True,
+			'message': 'Clinical information updated',
+			'old_clinical_info': old_info,
+			'clinical_info': study.clinical_info,
+		})
+	except json.JSONDecodeError:
+		return JsonResponse({'error': 'Invalid JSON data'}, status=400)
 	except Exception as e:
-		logger.error(f"Error in api_update_clinical_info: {e}")
 		return JsonResponse({'error': str(e)}, status=500)
 
 def process_attachment_metadata(attachment):
@@ -1154,11 +1114,8 @@ def generate_attachment_thumbnail(attachment):
                     pixel_array = ds.pixel_array
                     
                     # Normalize pixel values
-                    if pixel_array.max() > pixel_array.min():
-                        pixel_array = ((pixel_array - pixel_array.min()) * 255 / 
-                                     (pixel_array.max() - pixel_array.min())).astype('uint8')
-                    else:
-                        pixel_array = pixel_array.astype('uint8')
+                    pixel_array = ((pixel_array - pixel_array.min()) * 255 / 
+                                 (pixel_array.max() - pixel_array.min())).astype('uint8')
                     
                     # Create PIL image and thumbnail
                     image = Image.fromarray(pixel_array, mode='L')
@@ -1177,3 +1134,130 @@ def generate_attachment_thumbnail(attachment):
     except Exception:
         # If thumbnail generation fails, continue silently
         pass
+
+@login_required
+def api_refresh_worklist(request):
+	"""API endpoint for worklist refresh"""
+	try:
+		user = request.user
+		
+		if user.is_facility_user() and getattr(user, 'facility', None):
+			recent_studies = Study.objects.filter(facility=user.facility, upload_date__gte=timezone.now() - timezone.timedelta(hours=1))
+		else:
+			recent_studies = Study.objects.filter(upload_date__gte=timezone.now() - timezone.timedelta(hours=1))
+		
+		return JsonResponse({
+			'success': True,
+			'total_recent': recent_studies.count(),
+			'refresh_time': timezone.now().isoformat()
+		})
+	except Exception as e:
+		return JsonResponse({'success': False, 'error': str(e)})
+
+@login_required
+def api_get_upload_stats(request):
+	"""API endpoint for upload statistics"""
+	try:
+		user = request.user
+		
+		if user.is_facility_user() and getattr(user, 'facility', None):
+			studies = Study.objects.filter(facility=user.facility)
+		else:
+			studies = Study.objects.all()
+		
+		total_studies = studies.count()
+		total_series = sum(study.get_series_count() for study in studies[:100])  # Limit for performance
+		total_images = sum(study.get_image_count() for study in studies[:100])  # Limit for performance
+		
+		return JsonResponse({
+			'success': True,
+			'stats': {
+				'total_studies': total_studies,
+				'total_series': total_series,
+				'total_images': total_images
+			}
+		})
+	except Exception as e:
+		return JsonResponse({'success': False, 'error': str(e)})
+
+@login_required
+@csrf_exempt
+def api_delete_study(request, study_id):
+	"""API endpoint to delete a study (ADMIN ONLY)"""
+	if request.method != 'DELETE':
+		return JsonResponse({'error': 'Method not allowed'}, status=405)
+	
+	user = request.user
+	
+	# STRICT admin-only check
+	if not (user.is_authenticated and 
+			hasattr(user, 'role') and 
+			user.role == 'admin' and 
+			user.is_verified and 
+			user.is_active):
+		return JsonResponse({
+			'error': 'UNAUTHORIZED: Only verified administrators can delete studies',
+			'code': 'ADMIN_ONLY_DELETE',
+			'user_role': getattr(user, 'role', 'unknown')
+		}, status=403)
+	
+	try:
+		study = get_object_or_404(Study, id=study_id)
+		accession = study.accession_number
+		
+		# Delete study and all related data
+		study.delete()
+		
+		return JsonResponse({
+			'success': True,
+			'message': f'Study {accession} deleted successfully'
+		})
+	except Exception as e:
+		logger.error(f"Error deleting study {study_id}: {e}")
+		return JsonResponse({'error': str(e)}, status=500)
+
+def generate_attachment_thumbnail(attachment):
+	"""Generate thumbnail for supported file types"""
+	try:
+		if attachment.file_type == 'image':
+			# Generate thumbnail for images
+			image = Image.open(attachment.file.path)
+			image.thumbnail((200, 200), Image.Resampling.LANCZOS)
+			
+			# Save thumbnail
+			thumb_io = BytesIO()
+			image.save(thumb_io, format='PNG')
+			thumb_file = ContentFile(thumb_io.getvalue())
+			
+			thumb_name = f"thumb_{attachment.id}.png"
+			attachment.thumbnail.save(thumb_name, thumb_file, save=True)
+			
+		elif attachment.file_type == 'dicom_study':
+			# Generate thumbnail for DICOM images
+			try:
+				ds = pydicom.dcmread(attachment.file.path)
+				if hasattr(ds, 'pixel_array'):
+					pixel_array = ds.pixel_array
+					
+					# Normalize pixel values
+					pixel_array = ((pixel_array - pixel_array.min()) * 255 / 
+								 (pixel_array.max() - pixel_array.min())).astype('uint8')
+					
+					# Create PIL image
+					pil_image = Image.fromarray(pixel_array)
+					pil_image.thumbnail((200, 200), Image.Resampling.LANCZOS)
+					
+					# Save thumbnail
+					thumb_io = BytesIO()
+					pil_image.save(thumb_io, format='PNG')
+					thumb_file = ContentFile(thumb_io.getvalue())
+					
+					thumb_name = f"dicom_thumb_{attachment.id}.png"
+					attachment.thumbnail.save(thumb_name, thumb_file, save=True)
+					
+			except Exception:
+				pass
+				
+	except Exception:
+		# If thumbnail generation fails, continue silently
+		pass

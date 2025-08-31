@@ -390,7 +390,7 @@
                 <h4 class="text-light mb-2">Upload Successful!</h4>
                 <p class="text-secondary mb-3">Your DICOM studies have been uploaded successfully.</p>
                 <div id="uploadSummary" class="text-light mb-3"></div>
-                <button type="button" class="btn-control" onclick="redirectToDashboard()" type="button"   class="btn-control primary">
+                <button type="button" class="btn-control primary" onclick="redirectToDashboard()">
                     <i class="fas fa-arrow-left me-2"></i>Return to Worklist
                 </button>
             </div>
@@ -399,7 +399,7 @@
                 <a href="{% url 'worklist:dashboard' %}" class="btn-control">
                     <i class="fas fa-arrow-left me-2"></i>Cancel
                 </a>
-                <button type="submit" class="btn-control" id="uploadBtn" disabled class="btn-control primary">
+                <button type="submit" class="btn-control primary" id="uploadBtn" disabled>
                     <i class="fas fa-upload me-2"></i>Upload Studies
                 </button>
             </div>
