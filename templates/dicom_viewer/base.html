@@ -535,55 +535,8 @@ const reconStatus = document.getElementById('reconStatus');
     let reconstructionCache = new Map();
     let activeReconstruction = null;
     
-    async function generateReconstruction(type) {
-      try {
-        if (!currentSeries) {
-          showToast('No series loaded', 'error');
-          return;
-        }
-        
-        // Check cache first
-        const cacheKey = `${currentSeries}_${type}_${ww}_${wl}_${inverted}`;
-        if (reconstructionCache.has(cacheKey)) {
-          displayReconstructionResult(reconstructionCache.get(cacheKey), type);
-          return;
-        }
-        
-        // Show progress with specific message
-        showReconstructionProgress(type);
-        
-        // Prepare parameters
-        const params = new URLSearchParams({
-          ww: Math.round(ww),
-          wl: Math.round(wl),
-          invert: inverted
-        });
-        
-        if (type === 'bone') {
-          params.append('threshold', document.getElementById('boneThreshold')?.value || 300);
-        }
-        
-        // Make request
-        const response = await fetch(`/dicom-viewer/api/series/${currentSeries}/${type}/?${params}`);
-        
-        if (!response.ok) {
-          throw new Error(`Reconstruction failed: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        
-        // Cache the result
-        reconstructionCache.set(cacheKey, data);
-        
-        // Display result
-        displayReconstructionResult(data, type);
-        
-      } catch (error) {
-        hideProgressIndicator();
-        console.error('Reconstruction error:', error);
-        showToast(`${type.toUpperCase()} failed: ${error.message}`, 'error');
-      }
-    }
+    // First generateReconstruction function removed to avoid duplicate
+    // The main function is defined later in the code
     
     function showReconstructionProgress(type) {
       const overlay = document.getElementById('progressOverlay') || createProgressOverlay();
