@@ -2501,6 +2501,46 @@ const reconStatus = document.getElementById('reconStatus');
           imageCache.clear();
           mprImageCache.clear();
           requestDraw();
+        } else if (activeTool === 'cine') {
+          // Toggle cine mode
+          if (!cineInterval) {
+            startCine();
+          } else {
+            stopCine();
+          }
+        } else if (activeTool === 'spyglass') {
+          // Toggle spyglass mode
+          spyglass.active = !spyglass.active;
+          if (!spyglass.active) {
+            spyglass.isPress = false;
+          }
+          requestDraw();
+        } else if (activeTool === 'align-center') {
+          // Center image
+          panOffset = { x: 0, y: 0 };
+          zoom = 1.0;
+          zoomSlider.value = 100;
+          document.getElementById('zoomVal').textContent = '100%';
+          requestDraw();
+        } else if (activeTool === 'reload') {
+          // Reload current series/images
+          imageCache.clear();
+          mprImageCache.clear();
+          if (currentSeries && currentSeries.id) {
+            loadSeries(currentSeries.id);
+          }
+        } else if (activeTool === 'ai') {
+          // Trigger AI analysis
+          triggerAIAnalysis();
+        } else if (activeTool === 'crosshair') {
+          // Toggle crosshair for MPR
+          showCrosshair = !showCrosshair;
+          requestDraw();
+        } else if (activeTool === 'hu') {
+          // Toggle HU probe mode
+          showHuProbe = !showHuProbe;
+          huEllipse = null;
+          requestDraw();
         }
       });
     });
