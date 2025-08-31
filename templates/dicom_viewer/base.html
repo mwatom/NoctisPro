@@ -428,7 +428,17 @@
     const boneSlider = document.getElementById('boneThreshold');
     const boneVal = document.getElementById('boneVal');
     const btnGenerateRecon = document.getElementById('btnGenerateRecon');
-    const reconStatus = document.getElementById('reconStatus');
+    
+    // Ensure all elements are properly defined
+    const btnPrint = document.getElementById('btnPrint');
+    const btnToggleTags = document.getElementById('btnToggleTags');
+    const sortSelect = document.getElementById('sortSelect');
+    const btnSavePreset = document.getElementById('btnSavePreset');
+    const btnLoadPreset = document.getElementById('btnLoadPreset');
+    const btnClearMeasurements = document.getElementById('btnClearMeasurements');
+    let currentModality = 'CT';
+    let showTagsOverlay = false;
+const reconStatus = document.getElementById('reconStatus');
     const reconViews = document.getElementById('reconViews');
     const viewAxial = document.getElementById('viewAxial');
     const viewSagittal = document.getElementById('viewSagittal');
@@ -475,6 +485,176 @@
           btn3D.classList.remove('active');
         }
       });
+    }
+
+    // Professional 3D reconstruction handling
+    let reconstructionCache = new Map();
+    let activeReconstruction = null;
+    
+    async function generateReconstruction(type) {
+      try {
+        if (!currentSeries) {
+          showToast('No series loaded', 'error');
+          return;
+        }
+        
+        // Check cache first
+        const cacheKey = `${currentSeries}_${type}_${ww}_${wl}_${inverted}`;
+        if (reconstructionCache.has(cacheKey)) {
+          displayReconstructionResult(reconstructionCache.get(cacheKey), type);
+          return;
+        }
+        
+        // Show progress with specific message
+        showReconstructionProgress(type);
+        
+        // Prepare parameters
+        const params = new URLSearchParams({
+          ww: Math.round(ww),
+          wl: Math.round(wl),
+          invert: inverted
+        });
+        
+        if (type === 'bone') {
+          params.append('threshold', document.getElementById('boneThreshold')?.value || 300);
+        }
+        
+        // Make request
+        const response = await fetch(`/dicom-viewer/api/series/${currentSeries}/${type}/?${params}`);
+        
+        if (!response.ok) {
+          throw new Error(`Reconstruction failed: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        // Cache the result
+        reconstructionCache.set(cacheKey, data);
+        
+        // Display result
+        displayReconstructionResult(data, type);
+        
+      } catch (error) {
+        hideProgressIndicator();
+        console.error('Reconstruction error:', error);
+        showToast(`${type.toUpperCase()} failed: ${error.message}`, 'error');
+      }
+    }
+    
+    function showReconstructionProgress(type) {
+      const overlay = document.getElementById('progressOverlay') || createProgressOverlay();
+      const text = overlay.querySelector('.progress-text');
+      if (text) {
+        text.textContent = `Generating ${type.toUpperCase()} reconstruction...`;
+      }
+      overlay.style.display = 'flex';
+    }
+    
+    function createProgressOverlay() {
+      const overlay = document.createElement('div');
+      overlay.id = 'progressOverlay';
+      overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      `;
+      overlay.innerHTML = `
+        <div style="background: var(--card-surface); padding: 30px; border-radius: 8px; text-align: center;">
+          <div class="spinner" style="width: 50px; height: 50px; border: 3px solid var(--border-color); border-top-color: var(--accent-color); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+          <div class="progress-text" style="font-size: 14px; color: var(--text-primary);">Processing...</div>
+          <div style="font-size: 12px; color: var(--text-secondary); margin-top: 10px;">Please wait while the reconstruction is being generated</div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      
+      // Add spinner animation
+      const style = document.createElement('style');
+      style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+      document.head.appendChild(style);
+      
+      return overlay;
+    }
+    
+    function displayReconstructionResult(data, type) {
+      hideProgressIndicator();
+      
+      if (type === 'mpr' || type === 'mip') {
+        // Display MPR/MIP views
+        if (data.views) {
+          // Update the preview images
+          if (data.views.axial && viewAxial) viewAxial.src = data.views.axial;
+          if (data.views.sagittal && viewSagittal) viewSagittal.src = data.views.sagittal;
+          if (data.views.coronal && viewCoronal) viewCoronal.src = data.views.coronal;
+          
+          // Show the reconstruction panel
+          const reconPanel = document.querySelector('.panel:has(#reconViews)');
+          if (reconPanel) reconPanel.style.display = 'block';
+          
+          // Update status
+          if (reconStatus) {
+            reconStatus.textContent = `${type.toUpperCase()} reconstruction complete`;
+            reconStatus.style.color = 'var(--success-color)';
+          }
+          
+          activeReconstruction = type;
+        }
+      } else if (type === 'bone') {
+        // Handle bone reconstruction
+        if (data.previews) {
+          displayBoneReconstruction(data);
+        }
+      }
+      
+      showToast(`${type.toUpperCase()} reconstruction complete`, 'success', 1500);
+    }
+    
+    function displayBoneReconstruction(data) {
+      // Create or update bone visualization
+      const boneContainer = document.getElementById('boneContainer') || createBoneContainer();
+      
+      if (data.previews) {
+        // Update preview images
+        const previews = boneContainer.querySelectorAll('.bone-preview');
+        if (previews[0] && data.previews.axial) previews[0].src = data.previews.axial;
+        if (previews[1] && data.previews.sagittal) previews[1].src = data.previews.sagittal;
+        if (previews[2] && data.previews.coronal) previews[2].src = data.previews.coronal;
+      }
+      
+      boneContainer.style.display = 'block';
+    }
+    
+    function createBoneContainer() {
+      const container = document.createElement('div');
+      container.id = 'boneContainer';
+      container.className = 'panel';
+      container.innerHTML = `
+        <h3>Bone Reconstruction</h3>
+        <div class="bone-views" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+          <img class="bone-preview" style="width: 100%; background: #000; border-radius: 4px;" />
+          <img class="bone-preview" style="width: 100%; background: #000; border-radius: 4px;" />
+          <img class="bone-preview" style="width: 100%; background: #000; border-radius: 4px;" />
+        </div>
+      `;
+      document.querySelector('.right').appendChild(container);
+      return container;
+    }
+    
+    // Optimize canvas rendering for smooth interaction
+    let renderFrameRequest = null;
+    function requestDraw() {
+      if (!renderFrameRequest) {
+        renderFrameRequest = requestAnimationFrame(() => {
+          draw();
+          renderFrameRequest = null;
+        });
+      }
     }
     
     // Reduce initial image decode overhead for large previews
