@@ -907,3 +907,11 @@ Watching for file changes with StatReloader
 Watching for file changes with StatReloader
 Watching for file changes with StatReloader
 HTTP GET /login/ 200 [0.01, 127.0.0.1:33868]
+/workspace/admin_panel/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/admin_panel/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/admin_panel/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/admin_panel/views.py changed, reloading.
+Watching for file changes with StatReloader

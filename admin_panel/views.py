@@ -15,8 +15,8 @@ from django.utils.crypto import get_random_string
 
 
 def is_admin(user):
-    """Check if user is admin"""
-    return user.is_authenticated and user.is_admin()
+    """Strict admin check - only admin role users can access admin functions"""
+    return user.is_authenticated and hasattr(user, 'role') and user.role == 'admin' and user.is_verified
 
 def _standardize_aetitle(source: str) -> str:
     """Generate a DICOM-compliant AE Title (<=16 chars, A-Z 0-9 _), ensure uniqueness."""
@@ -144,8 +144,13 @@ def user_management(request):
 @login_required
 @user_passes_test(is_admin)
 def user_create(request):
-    """Create new user with enhanced form validation"""
+    """ADMIN ONLY: Create new user with enhanced form validation and privilege assignment"""
     from .forms import CustomUserCreationForm
+    
+    # Double-check admin privileges
+    if not request.user.is_admin():
+        messages.error(request, 'Access denied. Only administrators can create users.')
+        return redirect('worklist:dashboard')
     
     if request.method == 'POST':
         form = CustomUserCreationForm(request.POST)
@@ -219,8 +224,13 @@ def user_create(request):
 @login_required
 @user_passes_test(is_admin)
 def user_edit(request, user_id):
-    """Edit existing user with enhanced form validation"""
+    """ADMIN ONLY: Edit existing user with enhanced form validation and privilege assignment"""
     from .forms import CustomUserUpdateForm
+    
+    # Double-check admin privileges
+    if not request.user.is_admin():
+        messages.error(request, 'Access denied. Only administrators can edit users.')
+        return redirect('worklist:dashboard')
     
     user = get_object_or_404(User, id=user_id)
     
@@ -290,9 +300,19 @@ def user_edit(request, user_id):
 @login_required
 @user_passes_test(is_admin)
 def user_delete(request, user_id):
-    """Delete user immediately without confirmation"""
+    """ADMIN ONLY: Delete user immediately without confirmation"""
+    # Double-check admin privileges
+    if not request.user.is_admin():
+        messages.error(request, 'Access denied. Only administrators can delete users.')
+        return redirect('worklist:dashboard')
+    
     user = get_object_or_404(User, id=user_id)
     username = user.username
+    
+    # Prevent admin from deleting themselves
+    if user.id == request.user.id:
+        messages.error(request, 'You cannot delete your own admin account.')
+        return redirect('admin_panel:user_management')
 
     # Log the action before deleting
     AuditLog.objects.create(
