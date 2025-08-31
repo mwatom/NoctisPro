@@ -717,13 +717,42 @@
         // Data loading and management
         let adminData = [];
         let filteredData = [];
+        
+        // CSRF token utility
+        function getCSRFToken() {
+            return document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                   document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
+                   getCookie('csrftoken');
+        }
+        
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
 
         // Load admin data
         async function loadAdminData() {
             try {
-                // In a real implementation, this would fetch from your backend API
-                const response = await fetch('/api/admin/dashboard/');
+                const response = await fetch('/admin-panel/api/dashboard/');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: Failed to load data`);
+                }
+                
                 const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to load admin data');
+                }
                 
                 adminData = data.items || [];
                 filteredData = [...adminData];
@@ -733,6 +762,7 @@
             } catch (error) {
                 console.error('Error loading admin data:', error);
                 showNoDataMessage();
+                showNotification(`Failed to load data: ${error.message}`, 'error');
             }
         }
 
@@ -839,10 +869,78 @@
             showNotification('Edit functionality would be implemented here', 'info');
         }
 
-        function deleteItem(itemId) {
-            console.log('Deleting item:', itemId);
-            showNotification('Item deleted successfully', 'success');
-            loadAdminData(); // Refresh data
+        async function deleteItem(itemId) {
+            if (!confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                // Get CSRF token
+                const csrfToken = getCSRFToken();
+                if (!csrfToken) {
+                    showNotification('Security token missing. Please refresh the page.', 'error');
+                    return;
+                }
+                
+                // Find the item to determine its type
+                const item = adminData.find(i => String(i.id) === String(itemId));
+                if (!item) {
+                    showNotification('Item not found', 'error');
+                    return;
+                }
+                
+                // Show loading state
+                const deleteButton = document.querySelector(`button[onclick*="deleteItem('${itemId}'"]`);
+                if (deleteButton) {
+                    deleteButton.disabled = true;
+                    deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> DEL';
+                }
+                
+                let deleteUrl = '';
+                if (item.type === 'study') {
+                    deleteUrl = `/worklist/api/study/${itemId}/delete/`;
+                } else if (item.role && item.name) {
+                    // This is likely a user
+                    deleteUrl = `/admin-panel/users/delete/${itemId}/`;
+                } else {
+                    // Fallback to generic delete
+                    deleteUrl = `/admin-panel/api/delete/${itemId}/`;
+                }
+                
+                const response = await fetch(deleteUrl, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'same-origin'
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || `HTTP ${response.status}: Delete failed`);
+                }
+                
+                // Success - remove from data and refresh table
+                adminData = adminData.filter(i => String(i.id) !== String(itemId));
+                filteredData = filteredData.filter(i => String(i.id) !== String(itemId));
+                renderAdminTable();
+                updateStats();
+                showNotification('Item deleted successfully', 'success');
+                
+            } catch (error) {
+                console.error('Delete error:', error);
+                showNotification(`Delete failed: ${error.message}`, 'error');
+                
+                // Reset button state
+                const deleteButton = document.querySelector(`button[onclick*="deleteItem('${itemId}'"]`);
+                if (deleteButton) {
+                    deleteButton.disabled = false;
+                    deleteButton.innerHTML = '<i class="fas fa-trash"></i> DEL';
+                }
+            }
         }
 
         function exportData() {

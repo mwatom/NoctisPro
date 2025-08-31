@@ -47,6 +47,7 @@ urlpatterns = [
     # Alias endpoints expected by the dashboard UI
     path('api/studies/', worklist_views.api_studies, name='api_studies_root'),
     path('api/admin/dashboard/', admin_views.api_admin_dashboard, name='api_admin_dashboard'),
+    path('admin-panel/api/dashboard/', admin_views.api_admin_dashboard, name='api_admin_dashboard_alt'),
     path('dicom-viewer/', include(('dicom_viewer.urls','dicom_viewer'), namespace='dicom_viewer')),
     path('viewer/', RedirectView.as_view(url='/dicom-viewer/', permanent=False, query_string=True)),
     path('viewer/<path:subpath>/', RedirectView.as_view(url='/dicom-viewer/%(subpath)s/', permanent=False, query_string=True)),
