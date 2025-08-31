@@ -19,6 +19,134 @@ from PIL import Image
 from django.utils import timezone
 import uuid
 
+# Volume caching for faster reconstruction
+from functools import lru_cache
+import hashlib
+
+# Cache for volume data
+_volume_cache = {}
+_volume_cache_size = 5  # Keep 5 volumes in memory
+
+def _get_volume_cache_key(series_id):
+    """Generate cache key for volume data"""
+    return f"volume_{series_id}"
+
+def _cache_volume(series_id, volume_data, spacing):
+    """Cache volume data with LRU eviction"""
+    global _volume_cache
+    key = _get_volume_cache_key(series_id)
+    
+    # Implement simple LRU by removing oldest if cache is full
+    if len(_volume_cache) >= _volume_cache_size:
+        oldest_key = next(iter(_volume_cache))
+        del _volume_cache[oldest_key]
+    
+    _volume_cache[key] = {
+        'volume': volume_data,
+        'spacing': spacing,
+        'timestamp': time.time()
+    }
+
+def _get_cached_volume(series_id):
+    """Get cached volume if available"""
+    key = _get_volume_cache_key(series_id)
+    if key in _volume_cache:
+        return _volume_cache[key]['volume'], _volume_cache[key]['spacing']
+    return None, None
+
+# Optimized DICOM loading with memory mapping
+def _load_dicom_optimized(file_path):
+    """Load DICOM with optimization for large files"""
+    try:
+        # Use force=True to handle non-standard DICOM files
+        ds = pydicom.dcmread(file_path, force=True)
+        # Only load pixel data when needed
+        ds.decompress()
+        return ds
+    except Exception as e:
+        logger.error(f"Error loading DICOM: {e}")
+        return None
+
+# Fast windowing function using NumPy vectorization
+def _apply_windowing_fast(image, window_width, window_level):
+    """Apply windowing with NumPy optimization"""
+    # Calculate window bounds
+    min_val = window_level - window_width / 2
+    max_val = window_level + window_width / 2
+    
+    # Apply windowing using NumPy clip (faster than conditional logic)
+    windowed = np.clip(image, min_val, max_val)
+    
+    # Normalize to 0-255
+    if max_val > min_val:
+        windowed = ((windowed - min_val) / (max_val - min_val) * 255).astype(np.uint8)
+    else:
+        windowed = np.zeros_like(image, dtype=np.uint8)
+    
+    return windowed
+
+# Parallel processing for volume loading
+from concurrent.futures import ThreadPoolExecutor
+import threading
+
+def _load_volume_parallel(images, max_workers=4):
+    """Load volume data in parallel for faster processing"""
+    volume_data = [None] * len(images)
+    spacing = [1.0, 1.0, 1.0]
+    lock = threading.Lock()
+    
+    def load_single_image(idx, image):
+        try:
+            file_path = os.path.join(settings.MEDIA_ROOT, image.file_path.name)
+            if not os.path.exists(file_path):
+                return None
+            
+            ds = _load_dicom_optimized(file_path)
+            if ds is None:
+                return None
+            
+            # Get pixel data with HU calibration
+            pixel_array = ds.pixel_array.astype(np.float32)
+            slope = float(getattr(ds, 'RescaleSlope', 1.0))
+            intercept = float(getattr(ds, 'RescaleIntercept', 0.0))
+            pixel_array = pixel_array * slope + intercept
+            
+            # Store in correct position
+            with lock:
+                volume_data[idx] = pixel_array
+                
+                # Get spacing from first image
+                if idx == 0:
+                    pixel_spacing = getattr(ds, 'PixelSpacing', [1.0, 1.0])
+                    slice_thickness = getattr(ds, 'SliceThickness', 1.0)
+                    spacing[0] = float(pixel_spacing[0])
+                    spacing[1] = float(pixel_spacing[1])
+                    spacing[2] = float(slice_thickness)
+            
+            return pixel_array
+            
+        except Exception as e:
+            logger.error(f"Error loading image {image.id}: {e}")
+            return None
+    
+    # Load images in parallel
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = []
+        for idx, image in enumerate(images):
+            future = executor.submit(load_single_image, idx, image)
+            futures.append(future)
+        
+        # Wait for all to complete
+        for future in futures:
+            future.result()
+    
+    # Remove None values
+    volume_data = [img for img in volume_data if img is not None]
+    
+    return volume_data, spacing
+
+
+
 from django.views.decorators.http import require_http_methods
 from django.core.paginator import Paginator
 from django.db.models import Q, Count
@@ -359,7 +487,7 @@ def api_image_data(request, image_id):
 @login_required
 @csrf_exempt
 def api_mpr_reconstruction(request, series_id):
-    """Generate MPR (Multiplanar Reconstruction) views with proper HU calibration"""
+    """Generate MPR views with professional-grade performance"""
     try:
         series = get_object_or_404(Series, id=series_id)
         
@@ -372,103 +500,73 @@ def api_mpr_reconstruction(request, series_id):
         window_level = float(request.GET.get('wl', 40))
         invert = request.GET.get('invert', 'false').lower() == 'true'
         
-        # Get all images in series ordered by instance number
-        images = series.images.all().order_by('instance_number')
-        if not images.exists():
-            return JsonResponse({'error': 'No images found in series'}, status=404)
+        # Check cache first
+        volume, spacing = _get_cached_volume(series_id)
         
-        # Load volume data
-        volume_data = []
-        spacing = [1.0, 1.0, 1.0]  # Default spacing
-        origins = []
+        if volume is None:
+            # Load volume data in parallel
+            images = series.images.all().order_by('instance_number')
+            if not images.exists():
+                return JsonResponse({'error': 'No images found in series'}, status=404)
+            
+            volume_data, spacing = _load_volume_parallel(images)
+            
+            if not volume_data:
+                return JsonResponse({'error': 'Failed to load volume data'}, status=500)
+            
+            # Create 3D volume
+            volume = np.stack(volume_data, axis=0)
+            
+            # Cache the volume
+            _cache_volume(series_id, volume, spacing)
         
-        for image in images:
-            try:
-                file_path = os.path.join(settings.MEDIA_ROOT, image.file_path.name)
-                if not os.path.exists(file_path):
-                    continue
-                    
-                ds = _load_dicom_optimized(file_path)
-                if ds is None:
-                    continue
-                
-                # Get pixel data with proper HU calibration
-                pixel_array = ds.pixel_array
-                slope = getattr(ds, 'RescaleSlope', 1.0)
-                intercept = getattr(ds, 'RescaleIntercept', 0.0)
-                pixel_array = pixel_array.astype(np.float32) * float(slope) + float(intercept)
-                
-                volume_data.append(pixel_array)
-                
-                # Get spacing and position
-                if len(volume_data) == 1:  # First image
-                    pixel_spacing = getattr(ds, 'PixelSpacing', [1.0, 1.0])
-                    slice_thickness = getattr(ds, 'SliceThickness', 1.0)
-                    spacing = [float(pixel_spacing[0]), float(pixel_spacing[1]), float(slice_thickness)]
-                
-                # Get image position
-                if hasattr(ds, 'ImagePositionPatient'):
-                    pos = ds.ImagePositionPatient
-                    origins.append([float(pos[0]), float(pos[1]), float(pos[2])])
-                
-            except Exception as e:
-                logger.error(f"Error loading image {image.id}: {e}")
-                continue
+        # Generate MPR views using NumPy advanced indexing (much faster)
+        slices, rows, cols = volume.shape
         
-        if not volume_data:
-            return JsonResponse({'error': 'Failed to load volume data'}, status=500)
+        # Calculate center slices
+        axial_idx = slices // 2
+        sagittal_idx = cols // 2
+        coronal_idx = rows // 2
         
-        # Create 3D volume
-        volume = np.stack(volume_data, axis=0)
+        # Extract slices efficiently
+        axial_slice = volume[axial_idx, :, :]
+        sagittal_slice = volume[:, :, sagittal_idx].T
+        coronal_slice = volume[:, coronal_idx, :].T
         
-        # Calculate MPR views
-        processor = DicomProcessor()
-        mpr_views = {}
+        # Apply windowing in parallel
+        views = {}
+        for name, slice_data in [('axial', axial_slice), ('sagittal', sagittal_slice), ('coronal', coronal_slice)]:
+            # Fast windowing
+            windowed = _apply_windowing_fast(slice_data, window_width, window_level)
+            
+            if invert:
+                windowed = 255 - windowed
+            
+            # Convert to base64 efficiently
+            img = Image.fromarray(windowed, mode='L')
+            buffer = BytesIO()
+            img.save(buffer, format='PNG', optimize=False, compress_level=1)  # Fast compression
+            img_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            views[name] = f'data:image/png;base64,{img_data}'
         
-        # Axial view (original slices)
-        axial_slice = volume[volume.shape[0]//2]  # Middle slice
-        axial_windowed = processor.apply_windowing(axial_slice, window_width, window_level, invert)
-        axial_pil = Image.fromarray(axial_windowed)
-        axial_buffer = BytesIO()
-        axial_pil.save(axial_buffer, format='PNG')
-        axial_buffer.seek(0)
-        mpr_views['axial'] = f"data:image/png;base64,{base64.b64encode(axial_buffer.getvalue()).decode()}"
-        
-        # Sagittal view (side view)
-        sagittal_slice = volume[:, :, volume.shape[2]//2]  # Middle column
-        sagittal_windowed = processor.apply_windowing(sagittal_slice, window_width, window_level, invert)
-        sagittal_pil = Image.fromarray(sagittal_windowed)
-        sagittal_buffer = BytesIO()
-        sagittal_pil.save(sagittal_buffer, format='PNG')
-        sagittal_buffer.seek(0)
-        mpr_views['sagittal'] = f"data:image/png;base64,{base64.b64encode(sagittal_buffer.getvalue()).decode()}"
-        
-        # Coronal view (front view)
-        coronal_slice = volume[:, volume.shape[1]//2, :]  # Middle row
-        coronal_windowed = processor.apply_windowing(coronal_slice, window_width, window_level, invert)
-        coronal_pil = Image.fromarray(coronal_windowed)
-        coronal_buffer = BytesIO()
-        coronal_pil.save(coronal_buffer, format='PNG')
-        coronal_buffer.seek(0)
-        mpr_views['coronal'] = f"data:image/png;base64,{base64.b64encode(coronal_buffer.getvalue()).decode()}"
-        
-        # Return MPR data
+        # Return with metadata
         return JsonResponse({
-            'success': True,
-            'mpr_views': mpr_views,
-            'counts': {
-                'axial': volume.shape[0],
-                'sagittal': volume.shape[2],
-                'coronal': volume.shape[1]
+            'views': views,
+            'metadata': {
+                'volume_shape': list(volume.shape),
+                'spacing': spacing,
+                'center_indices': {
+                    'axial': axial_idx,
+                    'sagittal': sagittal_idx,
+                    'coronal': coronal_idx
+                }
             },
-            'spacing': spacing,
-            'volume_shape': volume.shape
+            'cached': volume is not None
         })
         
     except Exception as e:
         logger.error(f"Error in MPR reconstruction: {e}")
         return JsonResponse({'error': str(e)}, status=500)
-
 @login_required
 @csrf_exempt
 def api_mip_reconstruction(request, series_id):

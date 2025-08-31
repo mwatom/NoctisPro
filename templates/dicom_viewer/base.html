@@ -42,6 +42,9 @@
     .btn:disabled { opacity: 0.6; cursor: not-allowed; pointer-events: none; }
     .btn-primary { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); }
     .btn-primary:hover:not(:disabled) { background: #00b8d4; border-color: #00b8d4; }
+    .btn-danger { background: var(--danger-color); color: var(--text-primary); border-color: var(--danger-color); }
+    .btn-danger:hover:not(:disabled) { background: #ff6666; border-color: #ff6666; transform: translateY(-1px); box-shadow: 0 2px 4px rgba(255, 68, 68, 0.3); }
+    
     .btn-control { padding: 3px 8px; border: 1px solid var(--border-color); border-radius: 2px; cursor: pointer; font-size: 10px; background: var(--card-bg); color: var(--text-primary); transition: all 0.2s ease; font-weight: 500; display: inline-flex; align-items: center; gap: 3px; text-decoration: none; min-width: 80px; justify-content: center; }
     .btn-control:hover:not(:disabled) { background: var(--accent-color); color: var(--primary-bg); border-color: var(--accent-color); transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); }
     .btn-control:disabled { opacity: 0.6; cursor: not-allowed; pointer-events: none; }
@@ -187,6 +190,10 @@
       <button type="button" id="btnShowDicom" class="btn"><i class="fas fa-info-circle"></i> Show DICOM</button>
       <button type="button" id="btnCapture" class="btn"><i class="fas fa-camera"></i> Capture</button>
       <button type="button" id="btnPrint" class="btn"><i class="fas fa-print"></i> Print</button>
+      
+      {% if user.is_superuser %}
+      <button type="button" id="btnDeleteStudy" class="btn btn-danger" style="margin-left: auto;"><i class="fas fa-trash"></i> Delete Study</button>
+      {% endif %}
       <div id="patientInfo" style="margin-left:auto;color:#ccc;font-size:13px;">Patient: - | Study Date: - | Modality: -</div>
     </div>
     <div class="viewport" id="viewport">
@@ -384,6 +391,24 @@
 
   <script>
   (function(){
+
+    // Store the referrer for back navigation
+    (function() {
+      const referrer = document.referrer;
+      if (referrer && referrer.includes('/worklist/')) {
+        sessionStorage.setItem('worklistReferrer', referrer);
+      }
+      
+      // Update back button href dynamically
+      const backBtn = document.getElementById('btnBackWorklist');
+      if (backBtn) {
+        const storedReferrer = sessionStorage.getItem('worklistReferrer');
+        if (storedReferrer) {
+          backBtn.href = storedReferrer;
+        }
+      }
+    })();
+    
     const canvas = document.getElementById('dicomCanvas');
     const ctx = canvas.getContext('2d');
     const seriesSelect = document.getElementById('seriesSelect');
@@ -403,7 +428,17 @@
     const boneSlider = document.getElementById('boneThreshold');
     const boneVal = document.getElementById('boneVal');
     const btnGenerateRecon = document.getElementById('btnGenerateRecon');
-    const reconStatus = document.getElementById('reconStatus');
+    
+    // Ensure all elements are properly defined
+    const btnPrint = document.getElementById('btnPrint');
+    const btnToggleTags = document.getElementById('btnToggleTags');
+    const sortSelect = document.getElementById('sortSelect');
+    const btnSavePreset = document.getElementById('btnSavePreset');
+    const btnLoadPreset = document.getElementById('btnLoadPreset');
+    const btnClearMeasurements = document.getElementById('btnClearMeasurements');
+    let currentModality = 'CT';
+    let showTagsOverlay = false;
+const reconStatus = document.getElementById('reconStatus');
     const reconViews = document.getElementById('reconViews');
     const viewAxial = document.getElementById('viewAxial');
     const viewSagittal = document.getElementById('viewSagittal');
@@ -431,7 +466,7 @@
           const reconType = button.dataset.recon;
           try {
             generateReconstruction(reconType);
-            showToast(`Starting ${reconType.toUpperCase()} reconstruction`, 'info');
+            
           } catch (error) {
             console.error('3D reconstruction error:', error);
             showToast(`Failed to start ${reconType.toUpperCase()} reconstruction`, 'error');
@@ -451,6 +486,176 @@
         }
       });
     }
+
+    // Professional 3D reconstruction handling
+    let reconstructionCache = new Map();
+    let activeReconstruction = null;
+    
+    async function generateReconstruction(type) {
+      try {
+        if (!currentSeries) {
+          showToast('No series loaded', 'error');
+          return;
+        }
+        
+        // Check cache first
+        const cacheKey = `${currentSeries}_${type}_${ww}_${wl}_${inverted}`;
+        if (reconstructionCache.has(cacheKey)) {
+          displayReconstructionResult(reconstructionCache.get(cacheKey), type);
+          return;
+        }
+        
+        // Show progress with specific message
+        showReconstructionProgress(type);
+        
+        // Prepare parameters
+        const params = new URLSearchParams({
+          ww: Math.round(ww),
+          wl: Math.round(wl),
+          invert: inverted
+        });
+        
+        if (type === 'bone') {
+          params.append('threshold', document.getElementById('boneThreshold')?.value || 300);
+        }
+        
+        // Make request
+        const response = await fetch(`/dicom-viewer/api/series/${currentSeries}/${type}/?${params}`);
+        
+        if (!response.ok) {
+          throw new Error(`Reconstruction failed: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        // Cache the result
+        reconstructionCache.set(cacheKey, data);
+        
+        // Display result
+        displayReconstructionResult(data, type);
+        
+      } catch (error) {
+        hideProgressIndicator();
+        console.error('Reconstruction error:', error);
+        showToast(`${type.toUpperCase()} failed: ${error.message}`, 'error');
+      }
+    }
+    
+    function showReconstructionProgress(type) {
+      const overlay = document.getElementById('progressOverlay') || createProgressOverlay();
+      const text = overlay.querySelector('.progress-text');
+      if (text) {
+        text.textContent = `Generating ${type.toUpperCase()} reconstruction...`;
+      }
+      overlay.style.display = 'flex';
+    }
+    
+    function createProgressOverlay() {
+      const overlay = document.createElement('div');
+      overlay.id = 'progressOverlay';
+      overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      `;
+      overlay.innerHTML = `
+        <div style="background: var(--card-surface); padding: 30px; border-radius: 8px; text-align: center;">
+          <div class="spinner" style="width: 50px; height: 50px; border: 3px solid var(--border-color); border-top-color: var(--accent-color); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+          <div class="progress-text" style="font-size: 14px; color: var(--text-primary);">Processing...</div>
+          <div style="font-size: 12px; color: var(--text-secondary); margin-top: 10px;">Please wait while the reconstruction is being generated</div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      
+      // Add spinner animation
+      const style = document.createElement('style');
+      style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+      document.head.appendChild(style);
+      
+      return overlay;
+    }
+    
+    function displayReconstructionResult(data, type) {
+      hideProgressIndicator();
+      
+      if (type === 'mpr' || type === 'mip') {
+        // Display MPR/MIP views
+        if (data.views) {
+          // Update the preview images
+          if (data.views.axial && viewAxial) viewAxial.src = data.views.axial;
+          if (data.views.sagittal && viewSagittal) viewSagittal.src = data.views.sagittal;
+          if (data.views.coronal && viewCoronal) viewCoronal.src = data.views.coronal;
+          
+          // Show the reconstruction panel
+          const reconPanel = document.querySelector('.panel:has(#reconViews)');
+          if (reconPanel) reconPanel.style.display = 'block';
+          
+          // Update status
+          if (reconStatus) {
+            reconStatus.textContent = `${type.toUpperCase()} reconstruction complete`;
+            reconStatus.style.color = 'var(--success-color)';
+          }
+          
+          activeReconstruction = type;
+        }
+      } else if (type === 'bone') {
+        // Handle bone reconstruction
+        if (data.previews) {
+          displayBoneReconstruction(data);
+        }
+      }
+      
+      showToast(`${type.toUpperCase()} reconstruction complete`, 'success', 1500);
+    }
+    
+    function displayBoneReconstruction(data) {
+      // Create or update bone visualization
+      const boneContainer = document.getElementById('boneContainer') || createBoneContainer();
+      
+      if (data.previews) {
+        // Update preview images
+        const previews = boneContainer.querySelectorAll('.bone-preview');
+        if (previews[0] && data.previews.axial) previews[0].src = data.previews.axial;
+        if (previews[1] && data.previews.sagittal) previews[1].src = data.previews.sagittal;
+        if (previews[2] && data.previews.coronal) previews[2].src = data.previews.coronal;
+      }
+      
+      boneContainer.style.display = 'block';
+    }
+    
+    function createBoneContainer() {
+      const container = document.createElement('div');
+      container.id = 'boneContainer';
+      container.className = 'panel';
+      container.innerHTML = `
+        <h3>Bone Reconstruction</h3>
+        <div class="bone-views" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+          <img class="bone-preview" style="width: 100%; background: #000; border-radius: 4px;" />
+          <img class="bone-preview" style="width: 100%; background: #000; border-radius: 4px;" />
+          <img class="bone-preview" style="width: 100%; background: #000; border-radius: 4px;" />
+        </div>
+      `;
+      document.querySelector('.right').appendChild(container);
+      return container;
+    }
+    
+    // Optimize canvas rendering for smooth interaction
+    let renderFrameRequest = null;
+    function requestDraw() {
+      if (!renderFrameRequest) {
+        renderFrameRequest = requestAnimationFrame(() => {
+          draw();
+          renderFrameRequest = null;
+        });
+      }
+    }
     
     // Reduce initial image decode overhead for large previews
     [viewAxial, viewSagittal, viewCoronal].forEach(img=>{ if(img){ img.loading='eager'; img.decoding='async'; }});
@@ -465,1344 +670,13 @@
     const closeDicomModal = document.getElementById('closeDicomModal');
     const btnSavePreset = document.getElementById('btnSavePreset');
     const btnLoadPreset = document.getElementById('btnLoadPreset');
-    
-    
-    
+
     // Capture button handler - Fixed with proper error handling
     if (btnCapture) {
       btnCapture.addEventListener('click', () => {
         try {
           if (!canvas || !canvas.getContext) {
-            showToast('Canvas not available for capture', 'error');
-            return;
-          }
-          
-          // Create a download link for the current canvas
-          const link = document.createElement('a');
-          link.download = `dicom_capture_${Date.now()}.png`;
-          link.href = canvas.toDataURL('image/png', 1.0);
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          showToast('Image captured successfully', 'success');
-        } catch (error) {
-          console.error('Capture error:', error);
-          showToast('Failed to capture image', 'error');
-        }
-      });
-    }
-    
-    // Show DICOM tags button handler - Fixed with better error handling
-    if (btnShowDicom) {
-      btnShowDicom.addEventListener('click', async () => {
-        try {
-          const imageId = getCurrentImageId();
-          if (!imageId) {
-            showToast('No image loaded', 'error');
-            return;
-          }
-          
-          showProgressIndicator();
-          const response = await fetch(`/dicom-viewer/api/image/${imageId}/data/`);
-          
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
-          
-          const data = await response.json();
-          hideProgressIndicator();
-          
-          if (data && Object.keys(data).length > 0) {
-            dicomTagsPre.textContent = JSON.stringify(data, null, 2);
-            dicomModal.style.display = 'flex';
-            showToast('DICOM tags loaded successfully', 'success');
-          } else {
-            showToast('No DICOM tags available', 'warning');
-          }
-        } catch (error) {
-          hideProgressIndicator();
-          console.error('DICOM tags error:', error);
-          showToast(`Failed to load DICOM tags: ${error.message}`, 'error');
-        }
-      });
-    }
-
-    let currentStudy = null;
-    let currentSeries = null;
-    let images = [];
-    let index = 0;
-    let ww = 400, wl = 40, inverted = false, zoom = 1.0;
-    let defaultWw = 400, defaultWl = 40;
-    let mprMode = false;
-    let mprImgs = { axial: null, sagittal: null, coronal: null };
-    let reconMode = null; // 'mpr' | 'mip' | 'bone' | null
-    let reconImgs = []; // ordered list of image data URLs for canvas display
-    let reconIndex = 0;
-    // MPR plane browsing state
-    let mprScroll = { axial: 0, sagittal: 0, coronal: 0, counts: { axial: 0, sagittal: 0, coronal: 0 } };
-    // Crosshair linkage across planes (x: sagittal index, y: coronal index, z: axial index)
-    let mprCross = { x: null, y: null, z: null };
-    let showHuProbe = false;
-    let huEllipse = null;
-    let activeTool = 'window';
-    let isDragging = false;
-    let dragStart = null;
-    let panOffset = { x: 0, y: 0 };
-    let measureDraft = null; // {start:{x,y}, end:{x,y}}
-    let measurements = []; // persisted per image id
-    let annotations = [];
-    let crosshair = false;
-    let measureUnit = 'mm';
-    let mprMeasurements = { axial: [], sagittal: [], coronal: [] };
-    let mprMeasurePlaneMode = 'auto'; // 'auto' | 'axial' | 'sagittal' | 'coronal'
-    let mprMeasureType = 'distance';
-    const mprImageCache = new Map(); // key: series|plane|slice|ww|wl|inv -> Promise<string>|string
-
-    // New states
-    let showTagsOverlay = false;
-    let currentImageTags = null;
-    let cineActive = false; let cineTimer = null; let cineFps = 12;
-    let spyglass = { active:false, radius:80, factor:2.0, invert:false, isPress:false, cx:0, cy:0 };
-    let mprFullPlane = null; // enlarged plane key when in MPR
-
-    // Track last viewport mapping for precise coordinate transforms
-    let lastVp = null; // {x,y,scale,imgW,imgH}
-    const mprRegionVps = {}; // key-> {x,y,scale,imgW,imgH,rect}
-
-    // Map imageId -> arrays to persist while session active
-    const imageIdToMeasurements = new Map();
-    const imageIdToAnnotations = new Map();
-
-    // Image cache and render scheduler to improve responsiveness
-    const imageCache = new Map(); // key -> Promise<HTMLImageElement> | HTMLImageElement
-    let drawScheduled = false;
-    const userCanEdit = {% if user.can_edit_reports %}true{% else %}false{% endif %};
-    
-    // Progress indicator functions
-    function showProgressIndicator() {
-      const overlay = document.createElement('div');
-      overlay.id = 'progressOverlay';
-      overlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.8);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 9999;
-      `;
-      overlay.innerHTML = `
-        <div style="background: var(--card-surface); padding: 20px; border-radius: 8px; text-align: center;">
-          <div style="margin-bottom: 10px;">🔄 Processing...</div>
-          <div style="font-size: 12px; color: var(--text-secondary);">Please wait while the reconstruction is being generated</div>
-        </div>
-      `;
-      document.body.appendChild(overlay);
-    }
-    
-    function hideProgressIndicator() {
-      const overlay = document.getElementById('progressOverlay');
-      if (overlay) {
-        overlay.remove();
-      }
-    }
-    
-    // Toast notification system
-    function showToast(message, type = 'info', duration = 3000) {
-      const toast = document.createElement('div');
-      toast.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: var(--card-surface);
-        border: 1px solid var(--border-color);
-        border-left: 4px solid var(--accent-color);
-        color: var(--text-primary);
-        padding: 8px 12px;
-        border-radius: 3px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        z-index: 2000;
-        font-size: 11px;
-        max-width: 280px;
-        transform: translateX(100%);
-        transition: transform 0.3s ease;
-        opacity: 0.95;
-      `;
-      
-      if (type === 'error') {
-        toast.style.borderLeftColor = 'var(--danger-color)';
-      } else if (type === 'success') {
-        toast.style.borderLeftColor = 'var(--success-color)';
-      } else if (type === 'warning') {
-        toast.style.borderLeftColor = 'var(--warning-color)';
-      }
-      
-      toast.innerHTML = `${message}`;
-      document.body.appendChild(toast);
-      
-      // Slide in
-      setTimeout(() => {
-        toast.style.transform = 'translateX(0)';
-      }, 10);
-      
-      // Auto-remove
-      setTimeout(() => {
-        toast.style.transform = 'translateX(100%)';
-        setTimeout(() => {
-          if (toast.parentNode) {
-            toast.remove();
-          }
-        }, 300);
-      }, duration);
-    }
-    function requestDraw(){
-      if (drawScheduled) return;
-      drawScheduled = true;
-      requestAnimationFrame(async ()=>{ drawScheduled = false; await draw(); });
-    }
-    function debounce(fn, delay){
-      let t; return (...args)=>{ clearTimeout(t); t = setTimeout(()=> fn(...args), delay); };
-    }
-    // Cancelable overlay requests
-    let overlayRequestId = 0;
-    function getImageKey(imageId, ww, wl, inverted){
-      return `${imageId}|${Math.round(ww)}|${Math.round(wl)}|${inverted?1:0}`;
-    }
-    async function loadHtmlImage(src){
-      return new Promise((resolve, reject)=>{ const im = new Image(); im.crossOrigin = 'anonymous'; im.decoding = 'async'; im.onload = ()=> resolve(im); im.onerror = reject; im.src = src; });
-    }
-    async function getImageForIndex(i){
-      const imgMeta = images[i];
-      if (!imgMeta) return null;
-      const key = getImageKey(imgMeta.id, ww, wl, inverted);
-      if (imageCache.has(key)){
-        const val = imageCache.get(key);
-        return typeof val.then === 'function' ? await val : val;
-      }
-      const url = `/dicom-viewer/image/${imgMeta.id}/?ww=${ww}&wl=${wl}&invert=${inverted}`;
-      console.log(`Loading image: ${url}`); // Debug log
-      const promise = loadHtmlImage(url).then(im=>{ imageCache.set(key, im); return im; }).catch(err=>{ console.error('Image load error:', err); imageCache.delete(key); throw err; });
-      imageCache.set(key, promise);
-      return await promise;
-    }
-    function prefetchIndex(i){
-      if (i < 0 || i >= images.length) return;
-      const imgMeta = images[i];
-      const key = getImageKey(imgMeta.id, ww, wl, inverted);
-      if (imageCache.has(key)) return;
-      const url = `/dicom-viewer/image/${imgMeta.id}/?ww=${ww}&wl=${wl}&invert=${inverted}`;
-      const promise = loadHtmlImage(url).then(im=>{ imageCache.set(key, im); return im; }).catch(()=>{ imageCache.delete(key); });
-      imageCache.set(key, promise);
-    }
-    function prefetchAround(center, radius=3){
-      for (let o = -radius; o <= radius; o++){
-        if (o === 0) continue;
-        prefetchIndex(center + o);
-      }
-    }
-    const debouncedLoadOverlaysForCurrentImage = debounce(()=>{ loadOverlaysForCurrentImage(); }, 80);
-    
-    async function loadOverlaysForCurrentImage() {
-      const imageId = getCurrentImageId();
-      if (!imageId) return;
-      
-      // Load measurements for current image
-      const savedMeasurements = imageIdToMeasurements.get(imageId);
-      if (savedMeasurements) {
-        measurements = savedMeasurements;
-        renderMeasurementsList();
-      } else {
-        measurements = [];
-        renderMeasurementsList();
-      }
-      
-      // Load annotations for current image
-      const savedAnnotations = imageIdToAnnotations.get(imageId);
-      if (savedAnnotations) {
-        annotations = savedAnnotations;
-      } else {
-        annotations = [];
-      }
-    }
-
-    // Helper: parse pixel spacing robustly (string "0.5\\0.5", "0.5,0.5" or array)
-    function parsePixelSpacing(ps){
-      if (!ps) return null;
-      if (Array.isArray(ps)) return ps.map(Number);
-      if (typeof ps === 'string'){
-        const parts = ps.split(/[\\,\s]+/).filter(Boolean);
-        if (parts.length >= 2) return [parseFloat(parts[0]), parseFloat(parts[1])];
-      }
-      return null;
-    }
-
-    async function fallbackToDesktop(){
-      try {
-        const params = new URLSearchParams(window.location.search);
-        const studyId = params.get('study_id') || (currentStudy && currentStudy.id);
-        if (studyId){
-          const resp = await fetch(`/dicom-viewer/launch-desktop/${studyId}/`);
-          const j = await resp.json();
-          if (j && j.fallback_url){ window.location.href = j.fallback_url; return; }
-          // Desktop launched; leave page as-is
-        } else {
-          const resp = await fetch('/dicom-viewer/launch-desktop/', { method:'POST', headers:{'Content-Type':'application/json'}, body: '{}' });
-          const j = await resp.json();
-          if (j && j.fallback_url){ window.location.href = j.fallback_url; return; }
-        }
-      } catch (e) {
-        // swallow
-      }
-    }
-
-    // Canvas sizing - Fixed with proper error handling and validation
-    function setCanvasSize(){
-      try {
-        const vp = document.getElementById('viewport');
-        if (!vp) {
-          console.error('Viewport element not found');
-          return;
-        }
-        
-        const rect = vp.getBoundingClientRect();
-        const newWidth = Math.max(100, Math.floor(rect.width - 20));
-        const newHeight = Math.max(100, Math.floor(rect.height - 20));
-        
-        // Only update if dimensions actually changed to avoid unnecessary redraws
-        if (canvas.width !== newWidth || canvas.height !== newHeight) {
-          canvas.width = newWidth;
-          canvas.height = newHeight;
-          canvas.style.maxWidth = '100%';
-          canvas.style.maxHeight = '100%';
-          
-          // Ensure canvas context is preserved
-          if (!canvas.getContext) {
-            console.error('Canvas context not available');
-            return;
-          }
-          
-          // Clear canvas after resize
-          const ctx = canvas.getContext('2d');
-          ctx.fillStyle = '#000000';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          
-          console.log(`Canvas resized to ${newWidth}x${newHeight}`);
-        }
-      } catch (error) {
-        console.error('Canvas resize error:', error);
-      }
-    }
-    
-    // Debounced resize handler to prevent excessive redraws
-    let resizeTimeout;
-    window.addEventListener('resize', () => {
-      clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(() => {
-        setCanvasSize();
-        requestDraw();
-      }, 100);
-    });
-
-    function q(name){ return new URLSearchParams(window.location.search).get(name); }
-    
-    function getCookie(name){
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) {
-        const token = parts.pop().split(';').shift();
-        return token && token.trim() ? token : null;
-      }
-      return null;
-    }
-
-    async function loadAvailableStudies(){
-      try {
-        console.log('Loading available studies...');
-        const r = await fetch('/dicom-viewer/web/');
-        if (r.ok) {
-          // This would redirect to the index page, but for now just populate series selector
-          seriesSelect.innerHTML = '<option value="">Load a study first or use "Load Local DICOM"</option>';
-        }
-      } catch (e) {
-        console.warn('Could not load available studies:', e);
-        seriesSelect.innerHTML = '<option value="">Use "Load Local DICOM" to get started</option>';
-      }
-    }
-
-    async function loadStudy(studyId){
-      try {
-        console.log(`Loading study ID: ${studyId}`);
-        const r = await fetch(`/dicom-viewer/study/${studyId}/`);
-        if (!r.ok) {
-          console.error(`Study fetch failed: ${r.status} ${r.statusText}`);
-          throw new Error(`study fetch failed: ${r.status} ${r.statusText}`);
-        }
-        const data = await r.json();
-        console.log('Study data loaded:', data);
-        currentStudy = data.study;
-        // Enable write report button when study is known
-        const wr = document.getElementById('btnWriteReport');
-        if (wr && currentStudy && currentStudy.id){
-          wr.style.display = '';
-          wr.onclick = function(){ window.location.href = `/reports/write/${currentStudy.id}/`; };
-        }
-        // Mark study as in_progress when opened by editor roles
-        try {
-          if (userCanEdit && currentStudy && currentStudy.id){
-            const headers = { 'Content-Type': 'application/json' };
-            const csrfToken = getCookie('csrftoken');
-            if (csrfToken) {
-              headers['X-CSRFToken'] = csrfToken;
-            }
-            await fetch(`/worklist/api/study/${currentStudy.id}/update-status/`, {
-              method: 'POST',
-              headers: headers,
-              body: JSON.stringify({ status: 'in_progress' }),
-              credentials: 'same-origin'
-            });
-          }
-        } catch (_) { /* non-blocking */ }
-        // Update patient info in topbar
-        const patientInfoEl = document.getElementById('patientInfo');
-        if (patientInfoEl) {
-          const patientName = currentStudy.patient_name || 'Unknown Patient';
-          const studyDate = currentStudy.study_date || 'Unknown Date';
-          const modality = currentStudy.modality || 'Unknown Modality';
-          patientInfoEl.textContent = `Patient: ${patientName} | Study Date: ${studyDate} | Modality: ${modality}`;
-        }
-        
-        // Show clinical info and priority in sidebar
-        const clinicalInfoEl = document.getElementById('clinicalInfo');
-        const priorityInfoEl = document.getElementById('priorityInfo');
-        
-        if (clinicalInfoEl) {
-          const clin = (currentStudy.clinical_info && currentStudy.clinical_info.trim()) ? currentStudy.clinical_info : '-';
-          clinicalInfoEl.textContent = `Clinical Info: ${clin}`;
-        }
-        
-        if (priorityInfoEl) {
-          priorityInfoEl.textContent = `Priority: ${currentStudy.priority ? currentStudy.priority.toUpperCase() : '-'}`;
-        }
-        
-        console.log('Patient details updated:', { patientName: currentStudy.patient_name, studyDate: currentStudy.study_date, modality: currentStudy.modality });
-        seriesSelect.innerHTML = '<option value="">Select Series</option>';
-        (data.series_list || []).forEach(s=>{
-          const opt = document.createElement('option');
-          opt.value = s.id; opt.textContent = `Series ${s.series_number} - ${s.modality} (${s.image_count} images)`;
-          seriesSelect.appendChild(opt);
-        });
-        if ((data.series_list||[]).length){
-          seriesSelect.value = data.series_list[0].id;
-          await loadSeries(data.series_list[0].id);
-        }
-        // Apply suggested hanging protocol
-        try {
-          const hpq = new URLSearchParams(); hpq.set('modality', currentStudy.modality||'');
-          const rhp = await fetch(`/dicom-viewer/api/hanging/?${hpq.toString()}`); const hp = await rhp.json();
-          if (hp && hp.suggested && hp.suggested.layout === 'mpr-3plane') { generateReconstruction('mpr'); }
-        } catch(e){}
-      } catch (e) {
-        console.error('Study loading error:', e);
-        showToast(`Failed to load study: ${e.message}`, 'error');
-        // Reset to initial state
-        currentStudy = null;
-        currentSeries = null;
-        images = [];
-        seriesSelect.innerHTML = '<option value="">Study load failed - try "Load Local DICOM"</option>';
-      }
-    }
-
-    async function loadSeries(seriesId){
-      try {
-        console.log(`Loading series ID: ${seriesId}`);
-        const r = await fetch(`/dicom-viewer/series/${seriesId}/images/`);
-        if (!r.ok) {
-          console.error(`Series fetch failed: ${r.status} ${r.statusText}`);
-          throw new Error(`series fetch failed: ${r.status} ${r.statusText}`);
-        }
-        const data = await r.json();
-        console.log('Series data loaded:', data);
-        currentSeries = data.series; images = data.images || []; index = 0;
-        imageCache.clear();
-        sliceSlider.max = Math.max(0, images.length - 1); sliceSlider.value = 0; document.getElementById('sliceVal').textContent = '1';
-        if (images.length){
-          const probe = await fetch(`/dicom-viewer/api/image/${images[0].id}/display/`);
-          if (probe.ok){
-            const j = await probe.json();
-            if (j && j.image_info){
-              ww = j.image_info.default_window_width || ww;
-              wl = j.image_info.default_window_level || wl;
-              defaultWw = ww; defaultWl = wl;
-              if (j.windowing && typeof j.windowing.inverted === 'boolean') { inverted = j.windowing.inverted; }
-            }
-          }
-          wwSlider.value = Math.round(ww); wlSlider.value = Math.round(wl); wwNum.value = Math.round(ww); wlNum.value = Math.round(wl); document.getElementById('wwVal').textContent = Math.round(ww); document.getElementById('wlVal').textContent = Math.round(wl);
-        }
-        // Reset view state
-        zoom = 1.0; panOffset = {x:0,y:0}; activeTool = 'window'; crosshair = false; mprMode = false; mprImgs = {axial:null,sagittal:null,coronal:null}; reconMode = null; reconImgs = []; reconIndex = 0;
-        mprCross = { x: null, y: null, z: null }; // reset crosshair linkage
-        mprMeasurements = { axial: [], sagittal: [], coronal: [] };
-        mprImageCache.clear();
-        const enterMpr = document.getElementById('btnEnterMpr');
-        const exitMpr = document.getElementById('btnExitMpr');
-        if (enterMpr) enterMpr.style.display = images.length ? '' : 'none';
-        if (exitMpr) exitMpr.style.display = 'none';
-        document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active'));
-        document.querySelector('.tool[data-tool="window"]').classList.add('active');
-        setCanvasSize();
-        await draw();
-        await loadOverlaysForCurrentImage();
-        // Prefetch neighbors
-        prefetchAround(0, 3);
-        // Warm up MPR mid-slices so first MPR is instant
-        try { warmupMpr(); } catch(e) {}
-      } catch (e) {
-        console.error('Series loading error:', e);
-        showToast(`Failed to load series: ${e.message}`, 'error');
-        // Reset series state
-        currentSeries = null;
-        images = [];
-        seriesSelect.innerHTML = '<option value="">Series load failed</option>';
-      }
-    }
-
-    function getCurrentImageId(){
-      if (!images.length) return null;
-      return images[index].id;
-    }
-
-    function getViewportPlacement(imgW, imgH){
-      const scale = Math.min(canvas.width / imgW, canvas.height / imgH) * zoom;
-      const w = imgW * scale, h = imgH * scale;
-      const x = (canvas.width - w)/2 + panOffset.x;
-      const y = (canvas.height - h)/2 + panOffset.y;
-      return { scale, w, h, x, y };
-    }
-
-    async function draw(){
-      if (!images.length && reconImgs.length===0) { ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height); return; }
-      if (mprMode){
-        try{
-          // Enlarge one plane if set
-          if (mprFullPlane){
-            // Ensure image for that plane is current
-            if (!mprImgs[mprFullPlane]){
-              try {
-                const img = await getMprImage(currentSeries.id, mprFullPlane, mprScroll[mprFullPlane] || 0);
-                mprImgs[mprFullPlane] = img;
-              } catch(e){}
-            }
-            ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
-            const imgSrc = mprImgs[mprFullPlane];
-            if (imgSrc){
-              try {
-                const im = await loadImage(imgSrc);
-                const scale = Math.min(canvas.width / im.width, canvas.height / im.height);
-                const dw = im.width * scale, dh = im.height * scale;
-                const dx = (canvas.width - dw)/2, dy = (canvas.height - dh)/2;
-                if (ctx.imageSmoothingEnabled !== false) ctx.imageSmoothingEnabled = false; 
-                ctx.drawImage(im, dx, dy, dw, dh);
-                mprRegionVps[mprFullPlane] = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height, rect: {x:0,y:0,w:canvas.width,h:canvas.height} };
-                if (huEllipse && huEllipse.mode==='mpr' && huEllipse.plane===mprFullPlane){ drawEllipseOverlay(mprFullPlane); }
-                // Draw linked crosshair on enlarged plane (only if enabled)
-                if (crosshair) { drawMprCrosshairOverlay(mprFullPlane, dx, dy, scale, im.width, im.height); }
-              } catch (e) {
-                console.error(`Failed to load full plane ${mprFullPlane} image:`, e);
-                // Draw placeholder
-                ctx.save();
-                ctx.fillStyle = '#333';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#666';
-                ctx.font = '24px monospace';
-                ctx.textAlign = 'center';
-                ctx.fillText('Loading 3D View...', canvas.width/2, canvas.height/2);
-                ctx.restore();
-              }
-            }
-            document.getElementById('overlay').innerHTML = `MPR (${mprFullPlane.toUpperCase()}) | WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}`;
-            document.getElementById('zoominfo').textContent = `MPR`;
-            return;
-          }
-          // Ensure counts and initial mid-slice indices are loaded
-          if (!mprImgs.axial || !mprImgs.sagittal || !mprImgs.coronal){
-            const params = new URLSearchParams(); params.set('window_width', ww); params.set('window_level', wl); params.set('inverted', inverted);
-            const r = await fetch(`/dicom-viewer/api/series/${currentSeries.id}/mpr/?${params.toString()}`);
-            const j = await r.json();
-            if (j && j.mpr_views){ mprImgs = j.mpr_views; }
-            if (j && j.counts){
-              mprScroll.counts = j.counts;
-              mprScroll.axial = Math.floor((j.counts.axial||0)/2);
-              mprScroll.sagittal = Math.floor((j.counts.sagittal||0)/2);
-              mprScroll.coronal = Math.floor((j.counts.coronal||0)/2);
-              if (mprCross.x === null || mprCross.y === null || mprCross.z === null){
-                mprCross = {
-                  x: mprScroll.sagittal,
-                  y: mprScroll.coronal,
-                  z: mprScroll.axial
-                };
-              }
-              // Immediately request exact mid slices for all planes
-              await Promise.all([
-                getMprImage(currentSeries.id, 'axial', mprScroll.axial).then(img=>{ mprImgs.axial = img; }).catch(err=>{ console.error('Failed to load axial MPR image:', err); }),
-                getMprImage(currentSeries.id, 'sagittal', mprScroll.sagittal).then(img=>{ mprImgs.sagittal = img; }).catch(err=>{ console.error('Failed to load sagittal MPR image:', err); }),
-                getMprImage(currentSeries.id, 'coronal', mprScroll.coronal).then(img=>{ mprImgs.coronal = img; }).catch(err=>{ console.error('Failed to load coronal MPR image:', err); })
-              ]);
-              prefetchMprSlices('axial', mprScroll.axial);
-              prefetchMprSlices('sagittal', mprScroll.sagittal);
-              prefetchMprSlices('coronal', mprScroll.coronal);
-            }
-          }
-          ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
-          const halfW = Math.floor(canvas.width/2), halfH = Math.floor(canvas.height/2);
-          const regions = [
-            { x: 0, y: 0, w: halfW, h: halfH, key: 'sagittal' },
-            { x: halfW, y: 0, w: canvas.width - halfW, h: halfH, key: 'coronal' },
-            { x: 0, y: halfH, w: halfW, h: canvas.height - halfH, key: 'axial' },
-            { x: halfW, y: halfH, w: canvas.width - halfW, h: canvas.height - halfH, key: 'empty' },
-          ];
-          // Crosshair dividing lines
-          ctx.save();
-          ctx.strokeStyle = 'rgba(0,255,255,0.8)';
-          ctx.beginPath();
-          ctx.moveTo(halfW, 0); ctx.lineTo(halfW, canvas.height);
-          ctx.moveTo(0, halfH); ctx.lineTo(canvas.width, halfH);
-          ctx.stroke();
-          ctx.restore();
-          // Draw regions using available images immediately, then refresh asynchronously
-          for (const reg of regions){
-            if (reg.key === 'empty') continue;
-            const imgSrc = mprImgs[reg.key];
-            if (imgSrc){
-              try {
-                const im = await loadImage(imgSrc);
-                if (im && im.width > 0 && im.height > 0) {
-                  const scale = Math.min(reg.w / im.width, reg.h / im.height);
-                  const dw = im.width * scale, dh = im.height * scale;
-                  const dx = reg.x + (reg.w - dw)/2, dy = reg.y + (reg.h - dh)/2;
-                  
-                  // Apply windowing for better contrast and enhanced clarity
-                  ctx.save();
-                  ctx.imageSmoothingEnabled = true; // Enable smoothing for better image quality
-                  ctx.imageSmoothingQuality = 'high';
-                  
-                  // Apply image enhancement for clarity
-                  ctx.filter = 'contrast(1.1) brightness(1.05)';
-                  
-                  ctx.drawImage(im, dx, dy, dw, dh);
-                  
-                  // Save mapping for tools
-                  mprRegionVps[reg.key] = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height, rect: reg };
-                  ctx.restore();
-                } else {
-                  throw new Error('Invalid image dimensions');
-                }
-              } catch (e) {
-                console.error(`Failed to load ${reg.key} image:`, e);
-                // Draw placeholder for failed image but keep trying
-                ctx.save();
-                ctx.fillStyle = '#333';
-                ctx.fillRect(reg.x, reg.y, reg.w, reg.h);
-                ctx.fillStyle = '#666';
-                ctx.font = '14px Arial, sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(`${reg.key.toUpperCase()}`, reg.x + reg.w/2, reg.y + reg.h/2 - 10);
-                ctx.fillText('Loading...', reg.x + reg.w/2, reg.y + reg.h/2 + 10);
-                ctx.restore();
-                
-                // Retry loading after a short delay
-                setTimeout(() => {
-                  console.log(`Retrying load for ${reg.key}...`);
-                  requestDraw();
-                }, 1000);
-              }
-              // Draw plane label and slice index (use region coordinates if image failed)
-              const labelX = (mprRegionVps[reg.key] ? mprRegionVps[reg.key].x : reg.x) + 8;
-              const labelY = (mprRegionVps[reg.key] ? mprRegionVps[reg.key].y : reg.y) + 8;
-              ctx.save();
-              ctx.fillStyle = 'rgba(0,0,0,0.5)';
-              ctx.fillRect(labelX, labelY, 180, 22);
-              ctx.fillStyle = '#0ff';
-              ctx.font = '12px monospace';
-              // Enhanced plane label with crosshair coordinates
-              const crossInfo = `${reg.key.toUpperCase()} ${ (mprScroll[reg.key]||0) + 1 }/${ mprScroll.counts[reg.key]||0 }`;
-              let coordInfo = '';
-              if (mprCross.x !== null && mprCross.y !== null && mprCross.z !== null) {
-                if (reg.key === 'axial') coordInfo = ` [${mprCross.x},${mprCross.y}]`;
-                else if (reg.key === 'sagittal') coordInfo = ` [${mprCross.y},${mprCross.z}]`;
-                else if (reg.key === 'coronal') coordInfo = ` [${mprCross.x},${mprCross.z}]`;
-              }
-              ctx.fillText(crossInfo + coordInfo, labelX + 4, labelY + 16);
-              ctx.restore();
-              // Draw measurement overlays for this plane
-              ctx.save();
-              ctx.strokeStyle = 'yellow'; ctx.fillStyle = 'yellow'; ctx.lineWidth = 2;
-              const planeMeasures = mprMeasurements[reg.key] || [];
-              if (mprRegionVps[reg.key]) {
-                const vp = mprRegionVps[reg.key];
-                for (const m of planeMeasures){
-                  const x1 = vp.x + m.start.x * vp.scale, y1 = vp.y + m.start.y * vp.scale;
-                  const x2 = vp.x + m.end.x * vp.scale, y2 = vp.y + m.end.y * vp.scale;
-                  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-                  if (m.label){ ctx.font='12px monospace'; ctx.fillText(m.label, x2 + 6, y2 - 6); }
-                }
-                // Draft line if belongs to this plane
-                if (measureDraft && measureDraft.plane === reg.key && measureDraft.start && measureDraft.end){
-                  const x1 = vp.x + measureDraft.start.x * vp.scale, y1 = vp.y + measureDraft.start.y * vp.scale;
-                  const x2 = vp.x + measureDraft.end.x * vp.scale, y2 = vp.y + measureDraft.end.y * vp.scale;
-                  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-                }
-              }
-              ctx.restore();
-              // Draw HU ellipse overlay if belongs to this plane
-              if (huEllipse && huEllipse.mode==='mpr' && huEllipse.plane===reg.key){
-                drawEllipseOverlay(reg.key);
-              }
-              // Draw linked crosshair overlay for this plane (only if enabled)
-              if (crosshair && mprRegionVps[reg.key]) { 
-                const vp = mprRegionVps[reg.key];
-                drawMprCrosshairOverlay(reg.key, vp.x, vp.y, vp.scale, vp.imgW, vp.imgH); 
-              }
-            }
-            // Fetch updated slice without blocking draw
-            (async ()=>{
-              try {
-                const img = await getMprImage(currentSeries.id, reg.key, mprScroll[reg.key] || 0);
-                mprImgs[reg.key] = img; requestAnimationFrame(()=>draw());
-              } catch(e){ console.error('Failed to load MPR image for plane', reg.key, ':', e); }
-            })();
-          }
-          document.getElementById('overlay').innerHTML = `MPR | WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}`;
-          document.getElementById('zoominfo').textContent = `MPR`;
-          return;
-        } catch(e){ /* fallback to normal draw below */ }
-      }
-      if (reconMode && reconImgs.length){
-        try {
-          console.log(`Drawing reconstruction mode: ${reconMode}, images: ${reconImgs.length}`);
-          ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
-          if (reconMode === 'mip' || reconMode === 'bone'){
-            console.log(`Drawing 3-plane ${reconMode} reconstruction`);
-            // Draw 3-plane grid similar to MPR using the three recon previews
-            const imgs = [];
-            for (let i=0;i<3;i++){ 
-              if (reconImgs[i]) { 
-                try { 
-                  imgs[i] = await loadImage(reconImgs[i]); 
-                  console.log(`Loaded image ${i}: ${imgs[i].width}x${imgs[i].height}`);
-                } catch(e){ 
-                  console.error(`Failed to load image ${i}:`, e);
-                  imgs[i] = null; 
-                } 
-              } else {
-                console.warn(`No image data for index ${i}`);
-              }
-            }
-            const halfW = Math.floor(canvas.width/2), halfH = Math.floor(canvas.height/2);
-            const regions = [
-              { x: 0, y: 0, w: halfW, h: halfH, key: 'sagittal', im: imgs[1] },
-              { x: halfW, y: 0, w: canvas.width - halfW, h: halfH, key: 'coronal', im: imgs[2] },
-              { x: 0, y: halfH, w: halfW, h: canvas.height - halfH, key: 'axial', im: imgs[0] },
-              { x: halfW, y: halfH, w: canvas.width - halfW, h: canvas.height - halfH, key: 'empty', im: null },
-            ];
-            // Crosshair dividing lines
-            ctx.save(); ctx.strokeStyle = 'rgba(0,255,255,0.8)'; ctx.beginPath(); ctx.moveTo(halfW, 0); ctx.lineTo(halfW, canvas.height); ctx.moveTo(0, halfH); ctx.lineTo(canvas.width, halfH); ctx.stroke(); ctx.restore();
-            for (const reg of regions){
-              if (!reg.im) continue;
-              const im = reg.im;
-              const scale = Math.min(reg.w / im.width, reg.h / im.height);
-              const dw = im.width * scale, dh = im.height * scale;
-              const dx = reg.x + (reg.w - dw)/2 + panOffset.x; const dy = reg.y + (reg.h - dh)/2 + panOffset.y;
-              ctx.imageSmoothingEnabled = false;
-              ctx.drawImage(im, dx, dy, dw, dh);
-              // Label
-              ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(dx + 8, dy + 8, 150, 22); ctx.fillStyle = '#0ff'; ctx.font = '12px monospace'; ctx.fillText(`${reg.key.toUpperCase()}`, dx + 12, dy + 24); ctx.restore();
-            }
-            document.getElementById('overlay').innerHTML = `${reconMode.toUpperCase()} | 3-Plane`;
-            document.getElementById('zoominfo').textContent = `${reconMode.toUpperCase()}`;
-            return;
-          } else {
-            const im = await loadImage(reconImgs[reconIndex]);
-            const scale = Math.min(canvas.width / im.width, canvas.height / im.height) * zoom;
-            const dw = im.width * scale, dh = im.height * scale;
-            const dx = (canvas.width - dw)/2 + panOffset.x; const dy = (canvas.height - dh)/2 + panOffset.y;
-            ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(im, dx, dy, dw, dh);
-            lastVp = { x: dx, y: dy, scale: scale, imgW: im.width, imgH: im.height };
-            document.getElementById('overlay').innerHTML = `${reconMode.toUpperCase()} | View ${reconIndex+1}/${reconImgs.length}`;
-            document.getElementById('zoominfo').textContent = `Zoom: ${Math.round(zoom*100)}%`;
-            return;
-          }
-        } catch(e){}
-      }
-      try {
-        const htmlImg = await getImageForIndex(index);
-        const vp = getViewportPlacement(htmlImg.width, htmlImg.height);
-        ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
-        
-        // Enhanced image rendering for clarity
-        ctx.save();
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.filter = 'contrast(1.05) brightness(1.02)';
-        
-        ctx.drawImage(htmlImg, vp.x, vp.y, vp.w, vp.h);
-        ctx.restore();
-        lastVp = { x: vp.x, y: vp.y, scale: vp.scale, imgW: htmlImg.width, imgH: htmlImg.height };
-        drawOverlays(vp);
-        if (huEllipse && huEllipse.mode==='series') drawEllipseOverlay();
-        // Spyglass lens on top
-        if (spyglass.active && spyglass.isPress && lastVp){
-          ctx.save();
-          const r = Math.max(20, spyglass.radius);
-          // Clip circle
-          ctx.beginPath(); ctx.arc(spyglass.cx, spyglass.cy, r, 0, Math.PI*2); ctx.clip();
-          // Compute anchor image coords under cursor
-          const imgPt = canvasToImageCoords(lastVp, spyglass.cx, spyglass.cy);
-          const factor = Math.max(1.2, spyglass.factor);
-          const scale2 = lastVp.scale * factor;
-          const dw2 = lastVp.imgW * scale2, dh2 = lastVp.imgH * scale2;
-          const dx2 = spyglass.cx - (imgPt.x * scale2);
-          const dy2 = spyglass.cy - (imgPt.y * scale2);
-          ctx.imageSmoothingEnabled = false;
-          ctx.drawImage(htmlImg, dx2, dy2, dw2, dh2);
-          if (spyglass.invert){
-            // Invert only inside lens
-            const imgData = ctx.getImageData(spyglass.cx - r, spyglass.cy - r, r*2, r*2);
-            const d = imgData.data; for (let i=0;i<d.length;i+=4){ d[i]=255-d[i]; d[i+1]=255-d[i+1]; d[i+2]=255-d[i+2]; }
-            ctx.putImageData(imgData, spyglass.cx - r, spyglass.cy - r);
-          }
-          ctx.restore();
-          // Lens ring and info
-          ctx.save(); ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(spyglass.cx, spyglass.cy, r, 0, Math.PI*2); ctx.stroke(); ctx.restore();
-          document.getElementById('overlay').innerHTML = `WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}<br>Slice: ${index+1}/${images.length}<br>Spyglass x:${Math.round(imgPt.x)} y:${Math.round(imgPt.y)} mag:${factor.toFixed(1)}x`;
-        }
-        if (showTagsOverlay && currentImageTags){
-          const lines = [];
-          const t = currentImageTags;
-          if (t.patient_name) lines.push(`Patient: ${t.patient_name}`);
-          if (t.study_date) lines.push(`Study: ${t.study_date}`);
-          if (t.series_number !== undefined) lines.push(`Series#: ${t.series_number}`);
-          if (images[index] && images[index].instance_number !== undefined) lines.push(`Instance#: ${images[index].instance_number}`);
-          if (t.slice_thickness) lines.push(`Slice Thk: ${t.slice_thickness}`);
-          if (t.pixel_spacing) lines.push(`Pix Spacing: ${t.pixel_spacing}`);
-          ctx.save();
-          ctx.fillStyle = 'rgba(0,0,0,0.6)';
-          ctx.fillRect(canvas.width - 260, 12, 248, lines.length*16 + 10);
-          ctx.fillStyle = '#ddd'; ctx.font = '12px monospace';
-          lines.forEach((ln, i)=> ctx.fillText(ln, canvas.width - 250, 28 + i*16));
-          ctx.restore();
-        }
-        document.getElementById('overlay').innerHTML = `WW: ${Math.round(ww)}<br>WL: ${Math.round(wl)}<br>Slice: ${index+1}/${images.length}`;
-        document.getElementById('zoominfo').textContent = `Zoom: ${Math.round(zoom*100)}%`;
-        // Opportunistically prefetch neighbors
-        prefetchAround(index, 3);
-      } catch (e) {
-        await fallbackToDesktop();
-      }
-    }
-
-    function drawMprCrosshairOverlay(planeKey, dx, dy, scale, imgW, imgH){
-      if (mprCross.x === null || mprCross.y === null || mprCross.z === null) return;
-      
-      ctx.save();
-      ctx.strokeStyle = 'rgba(255,255,0,0.9)';
-      ctx.lineWidth = 1;
-      
-      // Optimized crosshair drawing - ensure coordinates are valid
-      if (planeKey === 'axial'){
-        const cx = dx + Math.max(0, Math.min(imgW - 1, mprCross.x)) * scale;
-        const cy = dy + Math.max(0, Math.min(imgH - 1, mprCross.y)) * scale;
-        ctx.beginPath();
-        ctx.moveTo(cx, dy); 
-        ctx.lineTo(cx, dy + imgH * scale);
-        ctx.moveTo(dx, cy); 
-        ctx.lineTo(dx + imgW * scale, cy);
-        ctx.stroke();
-      } else if (planeKey === 'sagittal'){
-        // sagittal image axes: x=height(y), y=depth(z)
-        const cx = dx + Math.max(0, Math.min(imgW - 1, mprCross.y)) * scale;
-        const cy = dy + Math.max(0, Math.min(imgH - 1, mprCross.z)) * scale;
-        ctx.beginPath();
-        ctx.moveTo(cx, dy); 
-        ctx.lineTo(cx, dy + imgH * scale);
-        ctx.moveTo(dx, cy); 
-        ctx.lineTo(dx + imgW * scale, cy);
-        ctx.stroke();
-      } else if (planeKey === 'coronal'){
-        // coronal image axes: x=width(x), y=depth(z)
-        const cx = dx + Math.max(0, Math.min(imgW - 1, mprCross.x)) * scale;
-        const cy = dy + Math.max(0, Math.min(imgH - 1, mprCross.z)) * scale;
-        ctx.beginPath();
-        ctx.moveTo(cx, dy); 
-        ctx.lineTo(cx, dy + imgH * scale);
-        ctx.moveTo(dx, cy); 
-        ctx.lineTo(dx + imgW * scale, cy);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-
-    function drawOverlays(vp){
-      // Measurements (draft first)
-      ctx.save();
-      ctx.strokeStyle = 'yellow';
-      ctx.fillStyle = 'yellow';
-      ctx.lineWidth = 2;
-      const toCanvas = (p)=>({
-        x: vp.x + p.x * vp.scale,
-        y: vp.y + p.y * vp.scale,
-      });
-      const drawLine = (a,b)=>{
-        const A = toCanvas(a), B = toCanvas(b);
-        ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
-      };
-      const drawText = (p, text)=>{
-        const P = toCanvas(p);
-        ctx.font = '12px monospace';
-        ctx.fillStyle = 'yellow';
-        ctx.fillText(text, P.x + 6, P.y - 6);
-      };
-      if (measureDraft && measureDraft.start && measureDraft.end){
-        drawLine(measureDraft.start, measureDraft.end);
-      }
-      measurements.forEach(m=>{ drawLine(m.start, m.end); if (m.label) drawText(m.end, m.label); });
-      // Annotations
-      annotations.forEach(a=>{ drawText(a.pos, a.text); });
-      // Crosshair
-      if (crosshair){
-        ctx.strokeStyle = 'rgba(0,255,255,0.8)';
-        ctx.beginPath();
-        ctx.moveTo(canvas.width/2, 0); ctx.lineTo(canvas.width/2, canvas.height);
-        ctx.moveTo(0, canvas.height/2); ctx.lineTo(canvas.width, canvas.height/2);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-
-    function drawEllipseOverlay(planeKey){
-      if (!huEllipse) return;
-      ctx.save();
-      
-      let mapping;
-      if (huEllipse && huEllipse.mode==='mpr'){
-        mapping = mprRegionVps[planeKey||huEllipse.plane];
-      } else {
-        mapping = lastVp;
-      }
-      if (!mapping) { ctx.restore(); return; }
-      
-      const { x, y, scale } = mapping;
-      const cx = x + huEllipse.cx * scale;
-      const cy = y + huEllipse.cy * scale;
-      const rx = Math.max(2, Math.abs(huEllipse.rx * scale)); // Minimum 2px radius
-      const ry = Math.max(2, Math.abs(huEllipse.ry * scale)); // Minimum 2px radius
-      
-      // Draw ellipse with enhanced visibility
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = '#00ff88';
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-      ctx.shadowBlur = 3;
-      
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2);
-      ctx.stroke();
-      
-      // Draw center crosshair
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = '#ffff00';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(cx - 5, cy);
-      ctx.lineTo(cx + 5, cy);
-      ctx.moveTo(cx, cy - 5);
-      ctx.lineTo(cx, cy + 5);
-      ctx.stroke();
-      
-      // Draw resize handles if ellipse is large enough
-      if (rx > 10 || ry > 10) {
-        ctx.fillStyle = '#00ff88';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1;
-        
-        // Right handle
-        ctx.beginPath();
-        ctx.arc(cx + rx, cy, 3, 0, Math.PI*2);
-        ctx.fill();
-        ctx.stroke();
-        
-        // Bottom handle
-        ctx.beginPath();
-        ctx.arc(cx, cy + ry, 3, 0, Math.PI*2);
-        ctx.fill();
-        ctx.stroke();
-      }
-      
-      ctx.restore();
-    }
-
-    function canvasToImageCoords(vp, cx, cy){
-      const x = (cx - vp.x) / vp.scale;
-      const y = (cy - vp.y) / vp.scale;
-      return { x, y };
-    }
-
-    function imageDistance(a, b){
-      const dx = b.x - a.x, dy = b.y - a.y;
-      const px = Math.sqrt(dx*dx + dy*dy);
-      const spacing = parsePixelSpacing(currentSeries && currentSeries.pixel_spacing);
-      if (spacing && spacing.length >= 2 && isFinite(spacing[0]) && isFinite(spacing[1])){
-        const mm = Math.sqrt((dx*spacing[0])**2 + (dy*spacing[1])**2);
-        const value = (measureUnit === 'cm') ? (mm/10.0) : mm;
-        const unit = (measureUnit === 'cm') ? 'cm' : 'mm';
-        return { px, mm, value, unit };
-      }
-      return { px, mm: null, value: px, unit: 'px' };
-    }
-
-    function mprImageDistance(planeKey, a, b){
-      const dx = b.x - a.x, dy = b.y - a.y;
-      const px = Math.sqrt(dx*dx + dy*dy);
-      const ps = parsePixelSpacing(currentSeries && currentSeries.pixel_spacing) || [1,1];
-      const st = (currentSeries && +currentSeries.slice_thickness) || 1.0;
-      let sx = 1.0, sy = 1.0;
-      if (planeKey === 'axial') { sx = ps[0]; sy = ps[1]; }
-      else if (planeKey === 'sagittal') { sx = ps[0]; sy = st; }
-      else if (planeKey === 'coronal') { sx = ps[1]; sy = st; }
-      const mm = Math.sqrt((dx*sx)**2 + (dy*sy)**2);
-      const value = (measureUnit === 'cm') ? (mm/10.0) : mm;
-      const unit = (measureUnit === 'cm') ? 'cm' : 'mm';
-      return { px, mm, value, unit };
-    }
-
-    async function saveMeasurementToServer(m){
-      const imageId = getCurrentImageId();
-      if (!imageId) return;
-      const dist = imageDistance(m.start, m.end);
-      const payload = {
-        image_id: imageId,
-        type: 'distance',
-        points: [m.start, m.end],
-        value: (dist.mm ? (measureUnit==='cm' ? (dist.mm/10.0) : dist.mm) : dist.px),
-        unit: (dist.mm ? measureUnit : 'px'),
-        notes: ''
-      };
-      try {
-        const r = await fetch('/dicom-viewer/measurements/save/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-        const j = await r.json();
-        if (j && j.success){
-          if (dist.mm){
-            const mm = dist.mm; const cm = mm/10.0;
-            m.label = (measureUnit==='cm') ? `${cm.toFixed(2)} cm` : `${mm.toFixed(2)} mm`;
-          } else { m.label = `${dist.px.toFixed(1)} px`; }
-        }
-      } catch(e){}
-    }
-
-    async function saveAnnotationToServer(p, text){
-      const imageId = getCurrentImageId();
-      if (!imageId) return;
-      try {
-        await fetch('/dicom-viewer/annotations/save/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ image_id: imageId, position_x: p.x, position_y: p.y, text }) });
-      } catch(e){}
-    }
-
-    async function loadOverlaysForCurrentImage(){
-      const reqId = ++overlayRequestId;
-      const imageId = getCurrentImageId();
-      if (!imageId) return;
-      const tasks = [];
-      if (imageIdToMeasurements.has(imageId)) {
-        measurements = imageIdToMeasurements.get(imageId);
-      } else {
-        tasks.push(
-          (async ()=>{
-            try {
-              const r = await fetch(`/dicom-viewer/measurements/${imageId}/`); const j = await r.json();
-              measurements = (j.measurements||[]).map(m=>({ start: m.points[0], end: m.points[1], label: m.unit==='mm' ? `${(+m.value).toFixed(2)} mm` : `${(+m.value).toFixed(1)} px` }));
-              imageIdToMeasurements.set(imageId, measurements);
-            } catch(e){ measurements = []; }
-          })()
-        );
-      }
-      if (imageIdToAnnotations.has(imageId)) {
-        annotations = imageIdToAnnotations.get(imageId);
-      } else {
-        tasks.push(
-          (async ()=>{
-            try {
-              const r = await fetch(`/dicom-viewer/annotations/${imageId}/`); const j = await r.json();
-              annotations = (j.annotations||[]).map(a=>({ pos: {x:a.position_x, y:a.position_y}, text: a.text }));
-              imageIdToAnnotations.set(imageId, annotations);
-            } catch(e){ annotations = []; }
-          })()
-        );
-      }
-      if (showTagsOverlay){
-        tasks.push(
-          (async ()=>{
-            try {
-              const r = await fetch(`/dicom-viewer/api/image/${imageId}/data/`); const j = await r.json();
-              currentImageTags = {
-                patient_name: j.patient_name || j.image_info?.patient_name,
-                study_date: j.study_date || j.image_info?.study_date,
-                series_number: j.series?.series_number ?? j.series_number,
-                slice_thickness: j.series?.slice_thickness ?? j.slice_thickness,
-                pixel_spacing: j.series?.pixel_spacing ?? j.pixel_spacing
-              };
-            } catch(e){ currentImageTags = null; }
-          })()
-        );
-      } else {
-        currentImageTags = null;
-      }
-      if (tasks.length) { try { await Promise.all(tasks); } catch(e){} }
-      // If a newer overlay request superseded this one or image changed, skip applying
-      if (reqId !== overlayRequestId || imageId !== getCurrentImageId()) return;
-      renderMeasurementsList();
-      requestDraw();
-    }
-
-    function renderMeasurementsList(){
-      measurementsList.innerHTML = '';
-      measurements.forEach((m, i)=>{
-        const li = document.createElement('li');
-        li.style.cssText = 'margin-bottom: 8px; padding: 4px; background: var(--secondary-bg); border-radius: 4px; display: flex; justify-content: space-between; align-items: center;';
-        li.innerHTML = `
-          <span style="font-size: 10px; color: var(--text-secondary);">${m.label || `Measurement ${i + 1}`}</span>
-          <button type="button" class="remove-measurement-btn" data-index="${i}" style="background: var(--danger-color); color: white; border: none; padding: 2px 6px; border-radius: 2px; font-size: 9px; cursor: pointer;">Remove</button>
-        `;
-        measurementsList.appendChild(li);
-      });
-      
-      // Add event listeners for remove buttons
-      document.querySelectorAll('.remove-measurement-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const index = parseInt(e.target.dataset.index);
-          measurements.splice(index, 1);
-          imageIdToMeasurements.set(getCurrentImageId(), measurements);
-          renderMeasurementsList();
-          requestDraw();
-        });
-      });
-    }
-
-    // UI wiring
-    seriesSelect.addEventListener('change', e=>{ if(e.target.value) loadSeries(e.target.value); });
-    wwSlider.addEventListener('input', e=>{ ww = +e.target.value; wwNum.value = Math.round(ww); document.getElementById('wwVal').textContent = ww; imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw(); });
-    wlSlider.addEventListener('input', e=>{ wl = +e.target.value; wlNum.value = Math.round(wl); document.getElementById('wlVal').textContent = wl; imageCache.clear(); mprImageCache.clear(); mprImgs = { axial:null, sagittal:null, coronal:null }; requestDraw(); });
-    sliceSlider.addEventListener('input', e=>{ index = +e.target.value; document.getElementById('sliceVal').textContent = index+1; requestDraw(); debouncedLoadOverlaysForCurrentImage(); prefetchAround(index, 3); });
-    zoomSlider.addEventListener('input', e=>{ zoom = (+e.target.value)/100; document.getElementById('zoomVal').textContent = `${e.target.value}%`; requestDraw(); });
-    // Window/Level preset buttons - Fixed with enhanced functionality and feedback
-    document.querySelectorAll('[data-preset]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        try {
-          const preset = btn.getAttribute('data-preset');
-          const presetMap = {
-            lung: { ww: 1500, wl: -600, name: 'Lung' },
-            bone: { ww: 2000, wl: 300, name: 'Bone' },
-            soft: { ww: 400, wl: 40, name: 'Soft Tissue' },
-            brain: { ww: 100, wl: 50, name: 'Brain' }
-          };
-          
-          const presetData = presetMap[preset];
-          if (!presetData) {
-            showToast('Invalid window/level preset', 'error');
-            return;
-          }
-          
-          // Apply preset values
-          ww = presetData.ww;
-          wl = presetData.wl;
-          
-          // Update UI controls
-          wwSlider.value = ww;
-          wlSlider.value = wl;
-          wwNum.value = Math.round(ww);
-          wlNum.value = Math.round(wl);
-          document.getElementById('wwVal').textContent = ww;
-          document.getElementById('wlVal').textContent = wl;
-          
-          // Clear caches and redraw
-          imageCache.clear();
-          mprImageCache.clear();
-          mprImgs = { axial: null, sagittal: null, coronal: null };
-          requestDraw();
-          
-          // Provide user feedback
-          showToast(`${presetData.name} preset applied (WW: ${ww}, WL: ${wl})`, 'success', 2000);
-          
-          // Highlight the selected preset button temporarily
-          btn.style.background = 'var(--success-color)';
-          btn.style.color = 'var(--primary-bg)';
-          setTimeout(() => {
-            btn.style.background = '';
-            btn.style.color = '';
-          }, 1000);
-          
-        } catch (error) {
-          console.error('Preset button error:', error);
-          showToast(`Failed to apply preset: ${error.message}`, 'error');
-        }
-      });
-    });
-    // Tool button handlers - Fixed with comprehensive error handling and validation
-    document.querySelectorAll('.tool').forEach(t => {
-      t.addEventListener('click', () => {
-        try {
-          const tool = t.getAttribute('data-tool');
-          
-          if (!tool) {
-            console.warn('Tool button missing data-tool attribute');
-            return;
-          }
-          
-          // Update active state
-          document.querySelectorAll('.tool').forEach(x => x.classList.remove('active'));
-          t.classList.add('active');
-          
-          // Handle specific tools with improved functionality
-          switch (tool) {
-            case 'invert':
-              inverted = !inverted;
-              imageCache.clear();
-              mprImageCache.clear();
-              mprImgs = { axial: null, sagittal: null, coronal: null };
-              requestDraw();
-              showToast('Image inverted', 'info', 1000);
-              return;
-              
-            case 'reset':
-              zoom = 1.0;
-              panOffset = { x: 0, y: 0 };
-              ww = defaultWw;
-              wl = defaultWl;
-              inverted = false;
-              zoomSlider.value = 100;
-              wwSlider.value = Math.round(ww);
-              wlSlider.value = Math.round(wl);
-              document.getElementById('zoomVal').textContent = '100%';
-              document.getElementById('wwVal').textContent = Math.round(ww);
-              document.getElementById('wlVal').textContent = Math.round(wl);
-              imageCache.clear();
-              mprImageCache.clear();
-              mprImgs = { axial: null, sagittal: null, coronal: null };
-              requestDraw();
-              showToast('View reset to defaults', 'success', 1000);
-              return;
-              
-            case 'fit':
-              panOffset = { x: 0, y: 0 };
-              zoom = 1.0;
-              zoomSlider.value = 100;
-              document.getElementById('zoomVal').textContent = '100%';
-              requestDraw();
-              showToast('Image fitted to viewport', 'info', 1000);
-              return;
-              
-            case 'one':
-              if (lastVp) {
-                const baseFit = Math.min(canvas.width / lastVp.imgW, canvas.height / lastVp.imgH);
-                zoom = 1 / baseFit;
-                zoomSlider.value = Math.min(500, Math.max(25, Math.round(zoom * 100)));
-                document.getElementById('zoomVal').textContent = `${Math.round(zoom * 100)}%`;
-                panOffset = { x: 0, y: 0 };
-                requestDraw();
-                showToast('Zoom set to 1:1', 'info', 1000);
-              }
-              return;
-              
-            case 'cine':
-              cineActive = !cineActive;
-              if (cineActive) {
-                if (!images.length) {
-                  showToast('No images available for cine mode', 'warning');
-                  cineActive = false;
-                  return;
-                }
-                if (cineTimer) clearInterval(cineTimer);
-                cineTimer = setInterval(() => {
-                  if (!images.length) return;
-                  index = (index + 1) % images.length;
-                  sliceSlider.value = index;
-                  document.getElementById('sliceVal').textContent = index + 1;
-                  requestDraw();
-                  debouncedLoadOverlaysForCurrentImage();
-                }, Math.max(30, Math.round(1000 / cineFps)));
-                showToast('Cine mode started', 'success', 1000);
-              } else {
-                if (cineTimer) {
-                  clearInterval(cineTimer);
-                  cineTimer = null;
-                }
-                showToast('Cine mode stopped', 'info', 1000);
-              }
-              return;
-              
-            case 'spyglass':
-              spyglass.active = !spyglass.active;
-              requestDraw();
-              showToast(`Spyglass ${spyglass.active ? 'enabled' : 'disabled'}`, 'info', 1000);
-              return;
-              
-            case 'align-center':
-              panOffset = { x: 0, y: 0 };
-              requestDraw();
-              showToast('Image centered', 'info', 1000);
-              return;
-              
-            case 'reload':
-              // Reset all parameters
-              ww = defaultWw;
-              wl = defaultWl;
-              inverted = false;
-              panOffset = { x: 0, y: 0 };
-              zoom = 1.0;
-              wwSlider.value = Math.round(ww);
-              wlSlider.value = Math.round(wl);
-              document.getElementById('wwVal').textContent = Math.round(ww);
-              document.getElementById('wlVal').textContent = Math.round(wl);
-              zoomSlider.value = 100;
-              document.getElementById('zoomVal').textContent = '100%';
-              imageCache.clear();
-              mprImageCache.clear();
-              mprImgs = { axial: null, sagittal: null, coronal: null };
-              requestDraw();
-              showToast('All settings reloaded', 'success', 1000);
-              return;
-              
-            case 'ai':
-              showToast('AI analysis feature coming soon', 'info');
-              return;
-              
-            case 'crosshair':
-              if (activeTool === 'crosshair') {
-                crosshair = false;
-                activeTool = 'window';
-                showToast('Crosshair disabled', 'info', 1000);
-              } else {
-                activeTool = 'crosshair';
-                crosshair = true;
-                showToast('Crosshair enabled', 'info', 1000);
-              }
-              requestDraw();
-              return;
-              
-            case 'hu':
-              showHuProbe = true;
-              huEllipse = null;
-              requestDraw();
-              showToast('HU probe enabled', 'info', 1000);
-              return;
-              
-            case 'measure':
-              showHuProbe = false;
-              if (mprMode) {
-                document.getElementById('mprMeasurePanel').style.display = '';
-              }
-              showToast('Measurement tool selected', 'info', 1000);
+            
               break;
               
             case 'mpr':
@@ -2522,22 +1396,11 @@
              });
            }
 
-      // Worklist navigation that prefers returning to the original/mother worklist window
+            // Simple back navigation
       function returnToWorklist(e){
-        try {
-          const targetUrl = '{% url 'worklist:dashboard' %}';
-          if (e && typeof e.preventDefault === 'function') e.preventDefault();
-          if (window.opener && !window.opener.closed) {
-            try { window.opener.location.href = targetUrl; } catch(err) {}
-            window.close();
-            return false;
-          }
-          if (window.top && window.top !== window){
-            try { window.top.location.href = targetUrl; return false; } catch(err) {}
-          }
-          window.location.href = targetUrl;
-          return false;
-        } catch(_) { window.location.href = '{% url 'worklist:dashboard' %}'; return false; }
+        if (e) e.preventDefault();
+        window.history.back();
+        return false;
       }
       // expose for inline onclick
       window.returnToWorklist = returnToWorklist;
@@ -3687,7 +2550,50 @@
          }
        });
      }
-   })();
+
+    // Admin delete study functionality
+    if (document.getElementById('btnDeleteStudy')) {
+      document.getElementById('btnDeleteStudy').addEventListener('click', async function() {
+        if (!currentStudy) {
+          showToast('No study loaded', 'warning');
+          return;
+        }
+        
+        const confirmDelete = confirm('Delete this study? This cannot be undone.');
+        
+        if (!confirmDelete) return;
+        
+        try {
+          showProgressIndicator();
+          
+          const response = await fetch(`/worklist/api/studies/${currentStudy}/delete/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': getCookie('csrftoken')
+            }
+          });
+          
+          hideProgressIndicator();
+          
+          if (response.ok) {
+            showToast('Study deleted successfully', 'success');
+            // Redirect to worklist after 2 seconds
+            setTimeout(() => {
+              window.location.href = '/worklist/dashboard/';
+            }, 2000);
+          } else {
+            const error = await response.json();
+            showToast(`Failed to delete study: ${error.error || 'Unknown error'}`, 'error');
+          }
+        } catch (error) {
+          hideProgressIndicator();
+          console.error('Delete error:', error);
+          showToast(`Delete failed: ${error.message}`, 'error');
+        }
+      });
+    }
+  })();
   </script>
 </body>
 </html>

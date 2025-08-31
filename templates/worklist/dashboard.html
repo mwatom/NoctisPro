@@ -1128,7 +1128,7 @@
                 }
                 
                 const url = `/dicom-viewer/web/viewer/?study_id=${studyId}`;
-                window.open(url, '_blank');
+                window.location.href = url;
             } catch (error) {
                 console.error('Error opening DICOM viewer:', error);
                 showToast('Failed to open DICOM viewer', 'error');
