@@ -86,24 +86,39 @@ WSGI_APPLICATION = 'noctis_pro.wsgi.application'
 ASGI_APPLICATION = 'noctis_pro.asgi.application'
 
 # Database - PostgreSQL for production
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('POSTGRES_DB', 'noctisprodb'),
-        'USER': os.environ.get('POSTGRES_USER', 'noctispro'),
-        'PASSWORD': os.environ.get('POSTGRES_PASSWORD'),
-        'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
-        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
-        'OPTIONS': {
-            'charset': 'utf8',
-            'sslmode': os.environ.get('DB_OPTIONS_SSLMODE', 'prefer'),
-            'connect_timeout': 10,
-            'options': '-c default_transaction_isolation=read committed'
-        },
-        'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', 300)),
-        'CONN_HEALTH_CHECKS': True,
+# Use SQLite as fallback if PostgreSQL is not available
+USE_SQLITE = os.environ.get('USE_SQLITE', 'False').lower() == 'true'
+
+if USE_SQLITE:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.environ.get('DATABASE_PATH', BASE_DIR / 'db.sqlite3'),
+            'OPTIONS': {
+                'timeout': 30,
+                'check_same_thread': False,
+            }
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('POSTGRES_DB', 'noctis_pro'),
+            'USER': os.environ.get('POSTGRES_USER', 'noctis_user'),
+            'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'noctis_secure_password_2024'),
+            'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
+            'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+            'OPTIONS': {
+                'charset': 'utf8',
+                'sslmode': os.environ.get('DB_OPTIONS_SSLMODE', 'prefer'),
+                'connect_timeout': 10,
+                'options': '-c default_transaction_isolation=read committed'
+            },
+            'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', 300)),
+            'CONN_HEALTH_CHECKS': True,
+        }
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -160,16 +175,26 @@ CHANNEL_LAYERS = {
 }
 
 # Cache configuration
-CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': f'redis://{REDIS_HOST}:{REDIS_PORT}/1',
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-            'PASSWORD': REDIS_PASSWORD if REDIS_PASSWORD else None,
+DISABLE_REDIS = os.environ.get('DISABLE_REDIS', 'False').lower() == 'true'
+USE_DUMMY_CACHE = os.environ.get('USE_DUMMY_CACHE', 'False').lower() == 'true'
+
+if DISABLE_REDIS or USE_DUMMY_CACHE:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
         }
     }
-}
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': f'redis://{REDIS_HOST}:{REDIS_PORT}/1',
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                'PASSWORD': REDIS_PASSWORD if REDIS_PASSWORD else None,
+            }
+        }
+    }
 
 # Session configuration
 SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
