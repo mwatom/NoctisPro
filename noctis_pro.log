@@ -1116,3 +1116,43 @@ Watching for file changes with StatReloader
 [mHTTP HEAD /static/js/worklist-button-handlers.js 200 [0.00, 127.0.0.1:33186][0m
 [mHTTP HEAD /static/css/dicom-viewer-buttons.css 200 [0.00, 127.0.0.1:58476][0m
 Watching for file changes with StatReloader
+[32mHTTP GET /dicom-viewer/api/studies/ 302 [0.02, 127.0.0.1:54794][0m
+Watching for file changes with StatReloader
+[32mHTTP GET /dicom-viewer/api/studies/ 302 [0.01, 127.0.0.1:58666][0m
+[32mHTTP GET /dicom-viewer/api/studies/ 302 [0.00, 127.0.0.1:38682][0m
+[32mHTTP GET /dicom-viewer/ 302 [0.00, 127.0.0.1:38690][0m
+/workspace/dicom_viewer/views.py changed, reloading.
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+[mHTTP GET /dicom-viewer/api/studies/ 200 [0.01, 127.0.0.1:53380][0m
+Internal Server Error: /dicom-viewer/api/study/2/
+[35;1mHTTP GET /dicom-viewer/api/study/2/ 500 [0.01, 127.0.0.1:53384][0m
+/workspace/dicom_viewer/views.py changed, reloading.
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+[mHTTP GET /dicom-viewer/api/study/2/ 200 [0.01, 127.0.0.1:42514][0m
+[mHTTP GET /dicom-viewer/api/image/1/display/ 200 [0.02, 127.0.0.1:42516][0m
+[mHTTP GET /dicom-viewer/ 200 [0.01, 127.0.0.1:43002][0m
+[mHTTP GET /dicom-viewer/api/study/2/ 200 [0.01, 127.0.0.1:41242][0m
