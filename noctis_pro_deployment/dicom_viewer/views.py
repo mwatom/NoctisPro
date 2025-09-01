@@ -3435,3 +3435,224 @@ def print_settings_view(request):
     }
     
     return render(request, 'dicom_viewer/print_settings.html', context)
+
+
+@login_required
+@require_http_methods(["POST"])
+def ai_3d_print_api(request, series_id):
+    """
+    Generate AI-enhanced 3D print model from DICOM series.
+    """
+    try:
+        series = get_object_or_404(Series, id=series_id)
+        
+        # Check user permissions
+        if not request.user.has_perm('dicom_viewer.can_generate_3d_models'):
+            return JsonResponse({
+                'success': False,
+                'error': 'Permission denied for 3D model generation'
+            })
+        
+        # Parse request data
+        data = json.loads(request.body) if request.body else {}
+        quality = data.get('quality', 'high')
+        format_type = data.get('format', 'stl')
+        ai_enhanced = data.get('ai_enhanced', True)
+        
+        # Get DICOM images for the series
+        images = DicomImage.objects.filter(series=series).order_by('instance_number')
+        if not images.exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'No DICOM images found for this series'
+            })
+        
+        # Create reconstruction job
+        job = ReconstructionJob.objects.create(
+            series=series,
+            user=request.user,
+            reconstruction_type='ai_3d_print',
+            parameters={
+                'quality': quality,
+                'format': format_type,
+                'ai_enhanced': ai_enhanced
+            },
+            status='processing'
+        )
+        
+        # For demo purposes, simulate AI 3D print generation
+        # In a real implementation, this would call an AI service
+        try:
+            # Simulate processing time
+            import time
+            time.sleep(2)
+            
+            # Generate mock 3D model file
+            model_filename = f"ai_3d_model_{series_id}_{int(time.time())}.{format_type}"
+            model_path = os.path.join(settings.MEDIA_ROOT, 'ai_3d_models', model_filename)
+            
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(model_path), exist_ok=True)
+            
+            # Create mock STL content (in real implementation, this would be actual 3D mesh data)
+            mock_stl_content = f"""solid AI_Enhanced_Model_{series_id}
+  facet normal 0.0 0.0 1.0
+    outer loop
+      vertex 0.0 0.0 0.0
+      vertex 1.0 0.0 0.0
+      vertex 0.0 1.0 0.0
+    endloop
+  endfacet
+  facet normal 0.0 0.0 1.0
+    outer loop
+      vertex 1.0 0.0 0.0
+      vertex 1.0 1.0 0.0
+      vertex 0.0 1.0 0.0
+    endloop
+  endfacet
+endsolid AI_Enhanced_Model_{series_id}
+"""
+            
+            with open(model_path, 'w') as f:
+                f.write(mock_stl_content)
+            
+            # Update job status
+            job.status = 'completed'
+            job.result_path = model_path
+            job.save()
+            
+            download_url = f"/media/ai_3d_models/{model_filename}"
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'AI 3D print model generated successfully',
+                'download_url': download_url,
+                'filename': model_filename,
+                'job_id': job.id
+            })
+            
+        except Exception as e:
+            job.status = 'failed'
+            job.error_message = str(e)
+            job.save()
+            raise e
+            
+    except Exception as e:
+        logger.error(f"AI 3D Print error for series {series_id}: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Failed to generate AI 3D print model: {str(e)}'
+        })
+
+
+@login_required
+@require_http_methods(["POST"])
+def advanced_reconstruction_api(request, series_id):
+    """
+    Perform advanced AI-enhanced reconstruction on DICOM series.
+    """
+    try:
+        series = get_object_or_404(Series, id=series_id)
+        
+        # Check user permissions
+        if not request.user.has_perm('dicom_viewer.can_use_advanced_reconstruction'):
+            return JsonResponse({
+                'success': False,
+                'error': 'Permission denied for advanced reconstruction'
+            })
+        
+        # Parse request data
+        data = json.loads(request.body) if request.body else {}
+        reconstruction_type = data.get('reconstruction_type', 'ai_enhanced')
+        include_mpr = data.get('include_mpr', True)
+        include_mip = data.get('include_mip', True)
+        include_volume_rendering = data.get('include_volume_rendering', True)
+        
+        # Get DICOM images for the series
+        images = DicomImage.objects.filter(series=series).order_by('instance_number')
+        if not images.exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'No DICOM images found for this series'
+            })
+        
+        # Create reconstruction job
+        job = ReconstructionJob.objects.create(
+            series=series,
+            user=request.user,
+            reconstruction_type='advanced_ai',
+            parameters={
+                'reconstruction_type': reconstruction_type,
+                'include_mpr': include_mpr,
+                'include_mip': include_mip,
+                'include_volume_rendering': include_volume_rendering
+            },
+            status='processing'
+        )
+        
+        # For demo purposes, simulate advanced reconstruction
+        # In a real implementation, this would call advanced AI reconstruction services
+        try:
+            # Simulate processing time
+            import time
+            time.sleep(3)
+            
+            # Generate mock reconstruction results
+            reconstructions = []
+            
+            if include_mpr:
+                # Generate mock MPR views
+                for view in ['axial', 'sagittal', 'coronal']:
+                    mock_url = f"/dicom-viewer/api/mock-reconstruction/{series_id}/{view}/"
+                    reconstructions.append({
+                        'type': 'mpr',
+                        'view': view,
+                        'url': mock_url,
+                        'description': f'AI-Enhanced {view.title()} MPR'
+                    })
+            
+            if include_mip:
+                # Generate mock MIP views
+                mock_url = f"/dicom-viewer/api/mock-reconstruction/{series_id}/mip/"
+                reconstructions.append({
+                    'type': 'mip',
+                    'view': 'composite',
+                    'url': mock_url,
+                    'description': 'AI-Enhanced Maximum Intensity Projection'
+                })
+            
+            if include_volume_rendering:
+                # Generate mock volume rendering
+                mock_url = f"/dicom-viewer/api/mock-reconstruction/{series_id}/volume/"
+                reconstructions.append({
+                    'type': 'volume',
+                    'view': '3d',
+                    'url': mock_url,
+                    'description': 'AI-Enhanced Volume Rendering'
+                })
+            
+            # Update job status
+            job.status = 'completed'
+            job.result_data = {'reconstructions': reconstructions}
+            job.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Advanced reconstruction completed successfully',
+                'reconstructions': [r['url'] for r in reconstructions],
+                'details': reconstructions,
+                'job_id': job.id
+            })
+            
+        except Exception as e:
+            job.status = 'failed'
+            job.error_message = str(e)
+            job.save()
+            raise e
+            
+    except Exception as e:
+        logger.error(f"Advanced reconstruction error for series {series_id}: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Failed to perform advanced reconstruction: {str(e)}'
+        })

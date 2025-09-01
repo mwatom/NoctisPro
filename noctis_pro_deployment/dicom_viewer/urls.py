@@ -91,4 +91,8 @@ urlpatterns += [
     path('print/printers/', views.get_available_printers, name='get_available_printers'),
     path('print/layouts/', views.get_print_layouts, name='get_print_layouts'),
     path('print/settings/', views.print_settings_view, name='print_settings'),
+    
+    # AI and Advanced Features
+    path('api/ai-3d-print/<int:series_id>/', views.ai_3d_print_api, name='ai_3d_print_api'),
+    path('api/advanced-reconstruction/<int:series_id>/', views.advanced_reconstruction_api, name='advanced_reconstruction_api'),
 ]
