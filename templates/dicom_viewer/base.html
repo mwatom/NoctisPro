@@ -1878,7 +1878,7 @@
             try {
                 showLoading('Generating MPR views...');
                 
-                const response = await fetch(`/dicom-viewer/api/mpr/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
+                const response = await fetch(`/dicom_viewer/api/mpr/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
                 const data = await response.json();
                 
                 if (data.views) {
@@ -1912,7 +1912,7 @@
             try {
                 showLoading('Generating MIP views...');
                 
-                const response = await fetch(`/dicom-viewer/api/mip/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
+                const response = await fetch(`/dicom_viewer/api/mip/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
                 const data = await response.json();
                 
                 if (data.success && data.mip_views) {
@@ -1949,7 +1949,7 @@
             try {
                 showLoading('Generating bone 3D reconstruction...');
                 
-                const response = await fetch(`/dicom-viewer/api/bone/${currentSeries.id}/?threshold=200&mesh=true&quality=normal`);
+                const response = await fetch(`/dicom_viewer/api/bone/${currentSeries.id}/?threshold=200&mesh=true&quality=normal`);
                 const data = await response.json();
                 
                 if (data.bone_views) {
@@ -2591,13 +2591,68 @@
         }
 
         // AI Analysis
-        function runAIAnalysis() {
+        async function runAIAnalysis() {
             if (!currentSeries) {
                 showToast('Please load a series first', 'warning');
                 return;
             }
             
-            showToast('AI analysis feature coming soon', 'info');
+            try {
+                showLoading('Running AI analysis...');
+                
+                // Call AI analysis API
+                const response = await fetch(`/ai_analysis/api/analyze/${currentSeries.id}/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        analysis_type: 'comprehensive',
+                        include_measurements: true,
+                        include_annotations: true
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                hideLoading();
+                
+                if (result.success) {
+                    showToast('AI analysis completed successfully', 'success');
+                    
+                    // Display AI results
+                    if (result.findings && result.findings.length > 0) {
+                        let findingsHtml = '<h4>AI Analysis Results:</h4><ul>';
+                        result.findings.forEach(finding => {
+                            findingsHtml += `<li><strong>${finding.type}:</strong> ${finding.description} (Confidence: ${(finding.confidence * 100).toFixed(1)}%)</li>`;
+                        });
+                        findingsHtml += '</ul>';
+                        
+                        // Add to measurements panel
+                        const measurementsDiv = document.getElementById('measurements');
+                        if (measurementsDiv) {
+                            measurementsDiv.innerHTML += findingsHtml;
+                        }
+                    }
+                    
+                    // Highlight detected regions if available
+                    if (result.annotations) {
+                        displayAIAnnotations(result.annotations);
+                    }
+                    
+                } else {
+                    showToast(result.error || 'AI analysis failed', 'error');
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error('Error running AI analysis:', error);
+                showToast('AI analysis service unavailable', 'warning');
+            }
         }
 
         // Export Functions
