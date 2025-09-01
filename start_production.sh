@@ -1,48 +1,24 @@
 #!/bin/bash
+echo "🚀 Starting NoctisPro Production..."
+sudo systemctl start noctispro-production.service
+echo "⏳ Waiting for services to start..."
+sleep 20
 
-# NoctisPro Production Startup Script
+echo "📊 Service Status:"
+sudo systemctl status noctispro-production.service --no-pager -l
 
-echo "🚀 Starting NoctisPro with PostgreSQL..."
-
-# Set PostgreSQL environment variables
-export POSTGRES_DB=noctis_pro
-export POSTGRES_USER=noctis_user
-export POSTGRES_PASSWORD=noctis123
-export POSTGRES_HOST=localhost
-export POSTGRES_PORT=5432
-export DEBUG=false
-export SECRET_KEY=django-insecure-production-key-$(date +%s)
-
-# Activate virtual environment
-source venv/bin/activate
-
-# Start PostgreSQL if not running
-sudo service postgresql start
-
-# Run migrations
-echo "🔄 Running migrations..."
-python manage.py migrate
-
-# Collect static files
-echo "📦 Collecting static files..."
-python manage.py collectstatic --noinput
-
-# Create/update admin user
-echo "👤 Setting up admin user..."
-echo "
-from django.contrib.auth import get_user_model
-User = get_user_model()
-admin, created = User.objects.get_or_create(username='admin')
-admin.set_password('admin123')
-admin.is_staff = True
-admin.is_superuser = True
-admin.save()
-print('✅ Admin user ready: admin/admin123')
-" | python manage.py shell
-
-# Start the server
-echo "🌐 Starting Django server on http://localhost:8000"
-echo "👤 Admin login: http://localhost:8000/admin/ (admin/admin123)"
-echo "🏥 Main app: http://localhost:8000/worklist/"
-
-python manage.py runserver 0.0.0.0:8000
+echo ""
+echo "🌐 Application URLs:"
+echo "✅ Main App: https://colt-charmed-lark.ngrok-free.app"
+echo "🔧 Admin Panel: https://colt-charmed-lark.ngrok-free.app/admin/"
+echo "📱 DICOM Viewer: https://colt-charmed-lark.ngrok-free.app/dicom-viewer/"
+echo "📋 Worklist: https://colt-charmed-lark.ngrok-free.app/worklist/"
+echo ""
+echo "🔑 Admin Credentials:"
+echo "   Username: admin"
+echo "   Password: admin123"
+echo ""
+echo "📝 Management Commands:"
+echo "   Stop:    ./stop_production.sh"
+echo "   Status:  sudo systemctl status noctispro-production.service"
+echo "   Logs:    sudo journalctl -u noctispro-production.service -f"
