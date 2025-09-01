@@ -8,6 +8,7 @@ urlpatterns = [
     path('', views.viewer, name='viewer'),
     
     # API endpoints for professional DICOM viewer
+    path('api/studies/', views.api_studies_list, name='api_studies_list'),
     path('api/study/<int:study_id>/', views.api_study_data, name='api_study_data'),
     path('api/image/<int:image_id>/display/', views.api_image_display, name='api_image_display'),
     

@@ -171,6 +171,50 @@ def viewer(request):
 
 @login_required
 @csrf_exempt
+def api_studies_list(request):
+    """API endpoint to list all studies available to the user"""
+    try:
+        user = request.user
+        
+        # Get studies based on user permissions
+        if user.is_superuser:
+            studies = Study.objects.all()
+        elif user.is_facility_user() and getattr(user, 'facility', None):
+            studies = Study.objects.filter(facility=user.facility)
+        else:
+            studies = Study.objects.none()
+        
+        studies_data = []
+        for study in studies.order_by('-study_date')[:50]:  # Limit to 50 most recent
+            studies_data.append({
+                'id': study.id,
+                'accession_number': study.accession_number,
+                'patient_name': study.patient.full_name if study.patient else 'Unknown',
+                'patient_id': study.patient.patient_id if study.patient else '',
+                'study_date': study.study_date.isoformat() if study.study_date else '',
+                'modality': study.modality.code if study.modality else 'Unknown',
+                'description': study.study_description or '',
+                'body_part': study.body_part or '',
+                'priority': str(study.priority or 'normal'),
+                'facility': study.facility.name if study.facility else ''
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'studies': studies_data,
+            'total_count': studies.count()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in api_studies_list: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': 'Failed to load studies list',
+            'message': str(e)
+        }, status=500)
+
+@login_required
+@csrf_exempt
 def api_study_data(request, study_id):
     """Enhanced API endpoint for study data with professional error handling"""
     try:
