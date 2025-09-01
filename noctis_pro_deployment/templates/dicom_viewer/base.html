@@ -2282,7 +2282,14 @@
          showToast(`Preset "${p.name}" loaded`, 'success', 2000);
        } catch(_){}
      });
-   })();
-  </script>
+     })();
+ </script>
+
+<!-- Button Handler Scripts -->
+{% load static %}
+<script src="{% static 'js/button-utils.js' %}"></script>
+<script src="{% static 'js/dicom-viewer-utils.js' %}"></script>
+<script src="{% static 'js/worklist-button-handlers.js' %}"></script>
+
 </body>
 </html>
