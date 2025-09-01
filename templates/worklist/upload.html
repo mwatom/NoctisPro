@@ -386,14 +386,41 @@
 
 {% block content %}
 <div class="upload-container">
-    <div class="upload-card">
-        <div class="upload-header">
-            <div class="upload-icon">
-                <i class="fas fa-cloud-upload-alt"></i>
+    <!-- Top Navigation - matching admin panel -->
+    <nav class="top-navbar">
+        <div class="nav-left">
+            <div class="logo">
+                <i class="fas fa-upload"></i> Noctis Pro PACS - Upload
             </div>
-            <h2 class="text-light">Upload DICOM Studies</h2>
-            <p class="text-secondary">Upload individual DICOM files or entire folders containing CT/MRI studies with multiple series</p>
+            <div class="nav-tabs">
+                <a href="{% url 'worklist:dashboard' %}" class="nav-tab">DASHBOARD</a>
+                <div class="nav-tab active">UPLOAD</div>
+                {% if user.role == 'admin' %}
+                <a href="{% url 'admin_panel:dashboard' %}" class="nav-tab">ADMIN</a>
+                {% endif %}
+            </div>
         </div>
+        <div class="nav-right">
+            <div class="user-info">
+                <div class="user-avatar">{{ user.get_full_name|default:user.username|slice:":2"|upper }}</div>
+                <div>
+                    <div style="font-weight: bold;">{{ user.get_full_name|default:user.username }}</div>
+                    <div>{{ user.get_role_display }}{% if user.facility %} - {{ user.facility.name }}{% endif %}</div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="upload-card">
+            <div class="upload-header">
+                <div class="upload-icon">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                </div>
+                <h2 class="text-light">Upload DICOM Studies</h2>
+                <p class="text-secondary">Upload individual DICOM files or entire folders containing CT/MRI studies with multiple series</p>
+            </div>
 
         <form id="uploadForm" enctype="multipart/form-data">
             {% csrf_token %}
@@ -517,6 +544,7 @@
                 </a>
             </div>
         </form>
+        </div>
     </div>
 </div>
 {% endblock %}
