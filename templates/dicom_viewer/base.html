@@ -521,9 +521,21 @@
             background: var(--secondary-bg);
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
             z-index: 1000;
             overflow: hidden;
+            animation: slideInRight 0.3s ease-out;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
         }
 
         .panel-header {
@@ -556,10 +568,18 @@
             cursor: pointer;
             font-size: 12px;
             transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 4px;
         }
 
         .close-btn:hover {
             background: #c82333;
+            transform: scale(1.05);
+        }
+
+        .close-btn:active {
+            transform: scale(0.95);
         }
 
         .ai-controls, .reconstruction-controls {
@@ -1030,22 +1050,12 @@
             
             <div class="tool-separator"></div>
             
-            <!-- AI & 3D Group -->
+            <!-- AI & Export Group -->
             <div class="tool-group">
-                <button class="tool" data-tool="3d" onclick="toggle3DPanel()" title="3D Reconstruction">
-                    <i class="fas fa-cubes"></i>
-                    <span>3D</span>
-                </button>
                 <button class="tool" data-tool="ai" onclick="toggleAIPanel()" title="AI Analysis">
                     <i class="fas fa-brain"></i>
                     <span>AI</span>
                 </button>
-            </div>
-            
-            <div class="tool-separator"></div>
-            
-            <!-- Export Group -->
-            <div class="tool-group">
                 <button class="tool" data-tool="print" onclick="showPrintDialog()" title="Print/Export">
                     <i class="fas fa-print"></i>
                     <span>Print</span>
@@ -1283,33 +1293,7 @@
         </div>
     </div>
 
-    <!-- 3D Reconstruction Panel -->
-    <div class="floating-panel" id="threeDPanel" style="display: none;">
-        <div class="panel-header">
-            <div class="panel-title">
-                <i class="fas fa-cubes"></i> 3D Reconstruction
-            </div>
-            <button class="close-btn" onclick="close3DPanel()">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        <div class="panel-content">
-            <div class="reconstruction-controls">
-                <button class="btn-dicom-viewer btn-primary" onclick="generateMPR()" style="width: 100%; margin-bottom: 6px;">
-                    <i class="fas fa-cube"></i> MPR Views
-                </button>
-                <button class="btn-dicom-viewer btn-primary" onclick="generateMIP()" style="width: 100%; margin-bottom: 6px;">
-                    <i class="fas fa-layer-group"></i> MIP Views
-                </button>
-                <button class="btn-dicom-viewer btn-primary" onclick="launch3DViewer()" style="width: 100%; margin-bottom: 6px;">
-                    <i class="fas fa-cubes"></i> 3D Viewer
-                </button>
-            </div>
-            <div id="reconstructionResults" class="reconstruction-results">
-                <div class="no-results">No reconstruction results yet. Click a reconstruction type to start.</div>
-            </div>
-        </div>
-    </div>
+
 
     <!-- 3D Modal (for full 3D viewer) -->
     <div class="modal-overlay" id="threeDModal" style="display: none;">
@@ -3037,5 +3021,189 @@
     <script src="{% static 'js/movable-annotations.js' %}"></script>
     <script src="{% static 'js/3d-reconstruction.js' %}"></script>
     <script src="{% static 'js/ai-auto-learning.js' %}"></script>
+    
+    <script>
+        // Panel Management Functions
+        function toggleAIPanel() {
+            const panel = document.getElementById('aiPanel');
+            
+            if (panel.style.display === 'none' || !panel.style.display) {
+                panel.style.display = 'block';
+                panel.style.right = '20px';
+                showToast('AI Analysis panel opened', 'info');
+            } else {
+                panel.style.display = 'none';
+                showToast('AI Analysis panel closed', 'info');
+            }
+        }
+        
+        function closeAIPanel() {
+            document.getElementById('aiPanel').style.display = 'none';
+            showToast('AI Analysis panel closed', 'info');
+        }
+        
+        function showPrintDialog() {
+            document.getElementById('printModal').style.display = 'flex';
+        }
+        
+        function closePrintDialog() {
+            document.getElementById('printModal').style.display = 'none';
+        }
+
+        // Enhanced AI Analysis Function
+        async function runAIAnalysis() {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading('Running AI analysis...');
+                
+                // Update AI results panel
+                const resultsDiv = document.getElementById('aiResults');
+                resultsDiv.innerHTML = '<div style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i><br>Analyzing...</div>';
+                
+                // Call AI analysis API
+                const response = await fetch(`/ai_analysis/api/analyze/${currentSeries.id}/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        analysis_type: 'comprehensive',
+                        include_measurements: document.querySelector('#aiPanel input[type="checkbox"]:nth-child(2)').checked,
+                        include_annotations: document.querySelector('#aiPanel input[type="checkbox"]:nth-child(3)').checked
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    hideLoading();
+                    showToast('AI analysis completed', 'success');
+                    
+                    // Display AI results in panel
+                    if (result.findings && result.findings.length > 0) {
+                        let findingsHtml = '<div class="findings-header" style="font-weight: bold; margin-bottom: 10px; color: var(--accent-color);">Analysis Results:</div>';
+                        result.findings.forEach((finding, index) => {
+                            const confidenceColor = finding.confidence > 0.8 ? '#28a745' : finding.confidence > 0.6 ? '#ffc107' : '#dc3545';
+                            findingsHtml += `
+                                <div class="finding-item" style="background: var(--secondary-bg); border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; margin-bottom: 8px;">
+                                    <div style="font-weight: bold; color: var(--text-primary); margin-bottom: 4px;">${finding.type}</div>
+                                    <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">${finding.description}</div>
+                                    <div style="font-size: 10px; color: ${confidenceColor};">Confidence: ${(finding.confidence * 100).toFixed(1)}%</div>
+                                </div>
+                            `;
+                        });
+                        resultsDiv.innerHTML = findingsHtml;
+                        showToast(`Found ${result.findings.length} findings`, 'info');
+                    } else {
+                        resultsDiv.innerHTML = '<div class="no-results">No significant findings detected</div>';
+                        showToast('No significant findings detected', 'info');
+                    }
+                } else {
+                    hideLoading();
+                    resultsDiv.innerHTML = '<div style="color: var(--danger-color); text-align: center; padding: 20px;">Analysis failed: ' + (result.error || 'Unknown error') + '</div>';
+                    showToast(result.error || 'AI analysis failed', 'error');
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error('AI analysis error:', error);
+                const resultsDiv = document.getElementById('aiResults');
+                resultsDiv.innerHTML = '<div style="color: var(--danger-color); text-align: center; padding: 20px;">Analysis failed: ' + error.message + '</div>';
+                showToast('AI analysis failed: ' + error.message, 'error');
+            }
+        }
+        
+        // Print/Export Functions
+        function exportImage() {
+            const format = document.getElementById('exportFormat').value;
+            const includePatientInfo = document.getElementById('includePatientInfo').checked;
+            const includeMeasurements = document.getElementById('includeMeasurements').checked;
+            const includeAnnotations = document.getElementById('includeAnnotations').checked;
+            const quality = document.getElementById('exportQuality').value;
+            
+            // Call the enhanced export function from dicom-print-export-fix.js
+            if (typeof exportImageWithDetails === 'function') {
+                exportImageWithDetails(format, {
+                    includePatientInfo,
+                    includeMeasurements, 
+                    includeAnnotations,
+                    quality
+                });
+                showToast('Export started...', 'info');
+            } else {
+                // Fallback export
+                const canvas = document.querySelector('#dicom-canvas') || document.querySelector('canvas');
+                if (canvas) {
+                    const link = document.createElement('a');
+                    link.download = `dicom-export-${Date.now()}.${format === 'png' ? 'png' : 'jpg'}`;
+                    link.href = canvas.toDataURL(`image/${format === 'png' ? 'png' : 'jpeg'}`);
+                    link.click();
+                    showToast('Image exported', 'success');
+                } else {
+                    showToast('No image to export', 'error');
+                }
+            }
+            
+            closePrintDialog();
+        }
+        
+        function printImage() {
+            // Call the print function from dicom-print-export-fix.js
+            if (typeof printDicomImage === 'function') {
+                printDicomImage();
+            } else {
+                // Fallback print
+                window.print();
+            }
+            
+            closePrintDialog();
+            showToast('Print dialog opened', 'info');
+        }
+
+        // Close panels when clicking outside
+        document.addEventListener('click', function(event) {
+            const aiPanel = document.getElementById('aiPanel');
+            const printModal = document.getElementById('printModal');
+            
+            // Close AI panel if clicking outside
+            if (aiPanel.style.display !== 'none' && 
+                !aiPanel.contains(event.target) && 
+                !event.target.closest('[data-tool="ai"]')) {
+                // Don't auto-close AI panel, user should use close button
+            }
+            
+            // Close print modal if clicking outside
+            if (printModal.style.display !== 'none' && 
+                event.target === printModal) {
+                closePrintDialog();
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(event) {
+            // ESC key closes panels
+            if (event.key === 'Escape') {
+                const aiPanel = document.getElementById('aiPanel');
+                const printModal = document.getElementById('printModal');
+                
+                if (printModal.style.display !== 'none') {
+                    closePrintDialog();
+                } else if (aiPanel.style.display !== 'none') {
+                    closeAIPanel();
+                }
+            }
+            
+            // Ctrl+P opens print dialog
+            if (event.ctrlKey && event.key === 'p') {
+                event.preventDefault();
+                showPrintDialog();
+            }
+        });
+    </script>
 </body>
 </html>
