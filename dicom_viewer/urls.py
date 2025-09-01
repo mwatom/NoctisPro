@@ -39,6 +39,12 @@ urlpatterns = [
     # Upload endpoint
     path('upload/', views.upload_dicom, name='upload_dicom'),
     
+    # Print endpoints
+    path('print/', views.print_dicom_image, name='print_dicom_image'),
+    path('print/printers/', views.get_available_printers, name='get_available_printers'),
+    path('print/settings/', views.print_settings_view, name='print_settings_view'),
+    path('print/layouts/', views.get_print_layouts, name='get_print_layouts'),
+    
     # Web viewer endpoints
     path('web/series/<int:series_id>/images/', views.web_series_images, name='web_series_images'),
     # path('web/series/<int:series_id>/images/bulletproof/', views.web_series_images_bulletproof, name='web_series_images_bulletproof'),

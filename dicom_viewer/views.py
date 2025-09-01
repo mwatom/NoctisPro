@@ -23,6 +23,26 @@ import logging
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 import threading
+import tempfile
+import subprocess
+
+# Print functionality imports
+try:
+    import cups
+except ImportError:
+    cups = None
+
+try:
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.lib.units import inch
+    from reportlab.lib.colors import black, white
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+except ImportError:
+    # ReportLab not available - print functionality will be limited
+    pass
 
 # Import models and utilities
 from worklist.models import Study, Series, DicomImage, Patient, Modality
