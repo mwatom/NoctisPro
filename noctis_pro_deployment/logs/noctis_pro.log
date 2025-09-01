@@ -14,3 +14,8 @@ WARNING 2025-09-01 13:40:00,146 misc 3578 140322594664704 The 'pydicom.pixel_dat
 WARNING 2025-09-01 13:40:02,194 misc 3613 140556365029632 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
 WARNING 2025-09-01 13:40:20,460 misc 3674 140007614320896 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
 WARNING 2025-09-01 13:40:22,524 misc 3706 140334939889920 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+WARNING 2025-09-01 13:51:50,085 misc 9543 139793560649984 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+WARNING 2025-09-01 13:51:55,381 misc 9583 140031957520640 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+INFO 2025-09-01 13:51:55,709 server 9583 140031957520640 HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+INFO 2025-09-01 13:51:55,709 server 9583 140031957520640 Configuring endpoint tcp:port=8000:interface=127.0.0.1
+INFO 2025-09-01 13:51:55,709 server 9583 140031957520640 Listening on TCP address 127.0.0.1:8000
