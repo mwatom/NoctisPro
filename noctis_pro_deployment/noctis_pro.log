@@ -22,3 +22,5 @@ Watching for file changes with StatReloader
 "GET /login/ HTTP/1.1" 200 7929
 "GET /login/ HTTP/1.1" 200 7929
 "HEAD /admin/ HTTP/1.1" 302 0
+/workspace/noctis_pro_deployment/noctis_pro/settings.py changed, reloading.
+Watching for file changes with StatReloader
