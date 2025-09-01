@@ -186,7 +186,7 @@ def viewer(request):
             logger.warning(f"Could not update study status: {e}")
     
     # Use improved viewer template with all enhanced features
-    return render(request, 'dicom_viewer/viewer_improved.html', context)
+    return render(request, 'dicom_viewer/viewer_bulletproof.html', context)
 
 @csrf_exempt
 def api_studies_list(request):
