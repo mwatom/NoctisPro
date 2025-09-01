@@ -1,0 +1,21 @@
+[Unit]
+Description=NoctisPro Django Application
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/workspace/noctis_pro_deployment
+Environment=PATH=/home/ubuntu/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONPATH=/home/ubuntu/.local/lib/python3.13/site-packages
+Environment=DEBUG=False
+Environment=ALLOWED_HOSTS=*,colt-charmed-lark.ngrok-free.app,localhost,127.0.0.1
+ExecStart=/usr/bin/python3 manage.py runserver 0.0.0.0:8000
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

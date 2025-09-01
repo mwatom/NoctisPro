@@ -1,21 +1,18 @@
 [Unit]
 Description=NoctisPro Ngrok Tunnel
-After=network-online.target noctispro-production.service
-Wants=network-online.target
-Requires=noctispro-production.service
+After=network.target noctispro-django.service
+Requires=noctispro-django.service
 
 [Service]
 Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/workspace
+ExecStart=/workspace/ngrok http 8000 --hostname=colt-charmed-lark.ngrok-free.app --log=stdout
 Restart=always
 RestartSec=10
-User=root
-WorkingDirectory=/opt/noctispro
-Environment=HOME=/root
-ExecStartPre=/bin/sleep 30
-ExecStart=/usr/local/bin/ngrok http --url=colt-charmed-lark.ngrok-free.app 80 --log=stdout
-ExecStop=/usr/bin/pkill -f ngrok
-StandardOutput=append:/opt/noctispro/logs/ngrok.log
-StandardError=append:/opt/noctispro/logs/ngrok-error.log
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target

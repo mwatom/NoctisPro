@@ -16,3 +16,58 @@ Not Found: /static/js/button-utils.js
 Not Found: /admin/login/
 [33mHTTP GET /admin/login/ 404 [0.00, 127.0.0.1:34758][0m
 [32mHTTP GET /worklist/ 302 [0.00, 127.0.0.1:33578][0m
+Watching for file changes with StatReloader
+"HEAD / HTTP/1.1" 302 0
+"GET / HTTP/1.1" 302 0
+"GET /login/ HTTP/1.1" 200 7929
+"GET /login/ HTTP/1.1" 200 7929
+"HEAD /admin/ HTTP/1.1" 302 0
+/workspace/noctis_pro_deployment/noctis_pro/settings.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/noctis_pro_deployment/noctis_pro/settings.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/noctis_pro_deployment/noctis_pro/urls.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/noctis_pro_deployment/noctis_pro/urls.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/noctis_pro_deployment/noctis_pro/urls.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+"GET / HTTP/1.1" 302 0
+"GET /login/ HTTP/1.1" 200 7929
+"GET /worklist/ HTTP/1.1" 302 0
+"GET /dicom-viewer/ HTTP/1.1" 302 0
+"GET /worklist/api/studies/ HTTP/1.1" 302 0
+"GET /worklist/api/refresh-worklist/ HTTP/1.1" 302 0
+"GET /worklist/api/upload-stats/ HTTP/1.1" 302 0
+Not Found: /dicom-viewer/api/studies/
+"GET /dicom-viewer/api/studies/ HTTP/1.1" 404 179
+"GET / HTTP/1.1" 302 0
+"GET /login/ HTTP/1.1" 200 7929
+"GET /admin/ HTTP/1.1" 302 0
+"GET /worklist/ HTTP/1.1" 302 0
+"GET /worklist/api/studies/ HTTP/1.1" 302 0
+"GET /worklist/api/refresh-worklist/ HTTP/1.1" 302 0
+"GET /worklist/api/upload-stats/ HTTP/1.1" 302 0
+"GET /dicom-viewer/ HTTP/1.1" 302 0
+Not Found: /dicom-viewer/api/studies/
+"GET /dicom-viewer/api/studies/ HTTP/1.1" 404 179
+"GET /viewer/ HTTP/1.1" 302 0
+"GET /reports/ HTTP/1.1" 302 0
+"GET /admin-panel/ HTTP/1.1" 302 0
+"GET /chat/ HTTP/1.1" 302 0
+"GET /notifications/ HTTP/1.1" 302 0
+"GET /ai/ HTTP/1.1" 302 0
+Not Found: /static/css/style.css
+"GET /static/css/style.css HTTP/1.1" 404 179
+Not Found: /static/js/main.js
+"GET /static/js/main.js HTTP/1.1" 404 179
+"GET / HTTP/1.1" 302 0
+"GET /login/ HTTP/1.1" 200 7929
+"GET /worklist/ HTTP/1.1" 302 0
+"GET /dicom-viewer/ HTTP/1.1" 302 0

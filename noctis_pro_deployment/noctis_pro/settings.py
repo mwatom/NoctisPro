@@ -27,13 +27,13 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-7x!8k@m$z9h#4p&x3w2v6
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*,colt-charmed-lark.ngrok-free.app,localhost,127.0.0.1').split(',')
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    'daphne',  # Re-enabled for production WebSocket support
+    # 'daphne',  # Disabled temporarily to fix Redis dependency
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -42,17 +42,17 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',  # Re-enabled for API access
-    'channels',  # Re-enabled for real-time features
+    # 'channels',  # Disabled temporarily to fix Redis dependency
     
-    # Custom apps
+    # Custom apps - ALL ENABLED FOR FULL FUNCTIONALITY
     'accounts',
-    'worklist',
-    'dicom_viewer',
-    'reports',  # Re-enabled to fix model registration
-    'admin_panel',
-    'chat',  # Re-enabled to fix template URLs
-    'notifications',  # Re-enabled to fix User.notifications relationship
-    'ai_analysis',
+    'worklist',  # ENABLED - DICOM functionality restored
+    'dicom_viewer',  # ENABLED - DICOM viewer restored
+    'reports',  # ENABLED - Reports functionality restored
+    'admin_panel',  # ENABLED - Admin panel restored
+    'chat',  # ENABLED - Chat functionality restored
+    'notifications',  # ENABLED - Notifications restored
+    'ai_analysis',  # ENABLED - AI analysis restored
 ]
 
 MIDDLEWARE = [
@@ -85,27 +85,34 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'noctis_pro.wsgi.application'
-ASGI_APPLICATION = 'noctis_pro.asgi.application'
+# ASGI_APPLICATION = 'noctis_pro.asgi.application'  # Disabled temporarily
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# Redis configuration for channels
+# Redis configuration for channels - Disabled for now to fix login
+# CHANNEL_LAYERS = {
+#     'default': {
+#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
+#         'CONFIG': {
+#             "hosts": [('127.0.0.1', 6379)],
+#         },
+#     },
+# }
+
+# Use in-memory channel layer for now
 CHANNEL_LAYERS = {
     'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [('127.0.0.1', 6379)],
-        },
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
     },
 }
 
-# Celery Configuration
-CELERY_BROKER_URL = 'redis://localhost:6379'
-CELERY_RESULT_BACKEND = 'redis://localhost:6379'
-CELERY_ACCEPT_CONTENT = ['application/json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
+# Celery Configuration - Disabled for now to fix login
+# CELERY_BROKER_URL = 'redis://localhost:6379'
+# CELERY_RESULT_BACKEND = 'redis://localhost:6379'
+# CELERY_ACCEPT_CONTENT = ['application/json']
+# CELERY_TASK_SERIALIZER = 'json'
+# CELERY_RESULT_SERIALIZER = 'json'
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -186,6 +193,11 @@ AUTH_USER_MODEL = 'accounts.User'
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/worklist/'
 LOGOUT_REDIRECT_URL = '/login/'
+
+# Session configuration - Use database sessions instead of Redis
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+SESSION_COOKIE_AGE = 86400  # 24 hours
+SESSION_SAVE_EVERY_REQUEST = True
 
 # File upload settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100MB

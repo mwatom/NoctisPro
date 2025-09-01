@@ -1054,3 +1054,6 @@ Watching for file changes with StatReloader
 Watching for file changes with StatReloader
 [32mHTTP GET / 302 [0.01, 127.0.0.1:50212][0m
 [32mHTTP GET / 302 [0.00, 127.0.0.1:59748][0m
+Watching for file changes with StatReloader
+/home/ubuntu/.local/lib/python3.13/site-packages/numpy/lib/_datasource.py changed, reloading.
+Watching for file changes with StatReloader
