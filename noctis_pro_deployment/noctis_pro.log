@@ -16,3 +16,9 @@ Not Found: /static/js/button-utils.js
 Not Found: /admin/login/
 [33mHTTP GET /admin/login/ 404 [0.00, 127.0.0.1:34758][0m
 [32mHTTP GET /worklist/ 302 [0.00, 127.0.0.1:33578][0m
+Watching for file changes with StatReloader
+"HEAD / HTTP/1.1" 302 0
+"GET / HTTP/1.1" 302 0
+"GET /login/ HTTP/1.1" 200 7929
+"GET /login/ HTTP/1.1" 200 7929
+"HEAD /admin/ HTTP/1.1" 302 0
