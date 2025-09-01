@@ -6,7 +6,7 @@ from django.http import HttpResponse
 def login_view(request):
     """Simple, bulletproof login view"""
     if request.user.is_authenticated:
-        return redirect('/worklist/')
+        return HttpResponse('<html><body><h1>✅ Already Logged In!</h1><p><a href="/worklist/">Go to Dashboard</a></p></body></html>')
     
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
@@ -16,7 +16,7 @@ def login_view(request):
             user = authenticate(request, username=username, password=password)
             if user is not None:
                 login(request, user)
-                return redirect('/worklist/')
+                return HttpResponse(f'<html><body><h1>✅ Login Successful!</h1><p>Welcome {user.username}!</p><p><a href="/worklist/">Continue to Dashboard</a></p></body></html>')
             else:
                 messages.error(request, 'Invalid username or password.')
         else:
@@ -27,4 +27,4 @@ def login_view(request):
 def logout_view(request):
     """Simple logout view"""
     logout(request)
-    return redirect('/login/')
+    return HttpResponse('<html><body><h1>✅ Logged Out!</h1><p><a href="/login/">Login Again</a></p></body></html>')
