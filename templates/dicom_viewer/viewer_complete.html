@@ -1075,21 +1075,66 @@
                 </div>
             </div>
 
-            <!-- Advanced Tools -->
+            <!-- Advanced Reconstruction -->
             <div class="panel">
-                <h3>Advanced Tools</h3>
-                <div style="display: flex; flex-direction: column; gap: 8px;">
-                    <button class="btn btn-primary" onclick="generateMPR()" style="width: 100%;">
+                <h3>Reconstruction</h3>
+                <div id="reconstructionButtons">
+                    <!-- Basic reconstruction -->
+                    <button class="btn btn-primary" onclick="generateMPR()" style="width: 100%; margin-bottom: 6px;">
                         <i class="fas fa-cube"></i> MPR Views
                     </button>
-                    <button class="btn" onclick="generateMIP()" style="width: 100%;">
+                    <button class="btn" onclick="generateMIP()" style="width: 100%; margin-bottom: 6px;">
                         <i class="fas fa-layer-group"></i> MIP Views
                     </button>
-                    <button class="btn" onclick="show3DReconstruction()" style="width: 100%;">
-                        <i class="fas fa-cubes"></i> 3D Reconstruction
+                    <button class="btn" onclick="generateBone3D()" style="width: 100%; margin-bottom: 6px;">
+                        <i class="fas fa-bone"></i> Bone 3D
                     </button>
-                    <button class="btn" onclick="toggleAIPanel()" style="width: 100%;">
+                    <button class="btn" onclick="generateVolumeRender()" style="width: 100%; margin-bottom: 6px;">
+                        <i class="fas fa-cubes"></i> Volume Render
+                    </button>
+                    
+                    <!-- Modality-specific reconstruction (populated dynamically) -->
+                    <div id="modalitySpecificButtons" style="margin-top: 8px;">
+                        <!-- Buttons will be added based on detected modality -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Crosshair Controls -->
+            <div class="panel">
+                <h3>Crosshair Control</h3>
+                <div class="control">
+                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <input type="checkbox" id="orthogonalSync" checked onchange="toggleOrthogonalSync()">
+                        <span>Orthogonal Sync</span>
+                    </label>
+                </div>
+                <div class="control">
+                    <div class="control-label">
+                        <span>Active Plane</span>
+                        <span id="activePlaneLabel">Axial</span>
+                    </div>
+                </div>
+                <div class="control">
+                    <div class="control-label">
+                        <span>Crosshair Position</span>
+                        <span id="crosshairPosition">X:50 Y:50 Z:50</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- AI Analysis -->
+            <div class="panel">
+                <h3>AI Analysis</h3>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <button class="btn btn-primary" onclick="toggleAIPanel()" style="width: 100%;">
                         <i class="fas fa-brain"></i> AI Analysis
+                    </button>
+                    <button class="btn" onclick="runPathologyDetection()" style="width: 100%;">
+                        <i class="fas fa-search"></i> Pathology Detection
+                    </button>
+                    <button class="btn" onclick="runAutoMeasurements()" style="width: 100%;">
+                        <i class="fas fa-ruler"></i> Auto Measurements
                     </button>
                 </div>
             </div>
@@ -1135,6 +1180,7 @@
     <!-- Load essential JavaScript files -->
     <script src="{% static 'js/dicom-viewer-utils.js' %}"></script>
     <script src="{% static 'js/delete-button-fix.js' %}"></script>
+    <script src="{% static 'js/mpr-reconstruction-complete.js' %}"></script>
 
     <script>
         // Global variables - Based on PyQt implementation
@@ -1646,6 +1692,9 @@
                         <div>Modality: ${currentSeries.modality}</div>
                         <div>Thickness: ${currentSeries.slice_thickness || 'N/A'}</div>
                     `;
+                    
+                    // Load modality-specific reconstruction options
+                    await loadModalityReconstructionOptions(seriesId);
                     
                     // Load first image
                     await updateImageDisplay();
@@ -2300,6 +2349,124 @@
                 loadStudy(this.value);
             }
         });
+        
+        // Crosshair control functions
+        function toggleOrthogonalSync() {
+            orthogonalSync = document.getElementById('orthogonalSync').checked;
+            
+            if (orthogonalSync) {
+                ReconstructionSuite.updateAllCrosshairs();
+                showToast('Orthogonal sync enabled', 'success');
+            } else {
+                hideAllCrosshairs();
+                showToast('Orthogonal sync disabled', 'info');
+            }
+        }
+        
+        function hideAllCrosshairs() {
+            const planes = ['axial', 'sagittal', 'coronal'];
+            planes.forEach(plane => {
+                const crosshair = document.getElementById(`crosshair${plane.charAt(0).toUpperCase() + plane.slice(1)}`);
+                if (crosshair) {
+                    crosshair.classList.remove('active');
+                }
+            });
+        }
+        
+        // Load modality-specific reconstruction options
+        async function loadModalityReconstructionOptions(seriesId) {
+            try {
+                const response = await fetch(`/dicom-viewer/api/modality-options/${seriesId}/`);
+                const data = await response.json();
+                
+                if (data.modality) {
+                    const modalityButtons = document.getElementById('modalitySpecificButtons');
+                    modalityButtons.innerHTML = '';
+                    
+                    // Add modality-specific reconstruction buttons
+                    const modality = data.modality;
+                    
+                    if (modality === 'CT') {
+                        modalityButtons.innerHTML = `
+                            <button class="btn" onclick="generateBone3D()" style="width: 100%; margin-bottom: 6px;">
+                                <i class="fas fa-bone"></i> Bone 3D
+                            </button>
+                            <button class="btn" onclick="generateVolumeRender()" style="width: 100%; margin-bottom: 6px;">
+                                <i class="fas fa-cubes"></i> Volume Render
+                            </button>
+                        `;
+                    } else if (modality === 'MR' || modality === 'MRI') {
+                        modalityButtons.innerHTML = `
+                            <button class="btn" onclick="generateMRI('brain')" style="width: 100%; margin-bottom: 6px;">
+                                <i class="fas fa-brain"></i> MRI Brain
+                            </button>
+                            <button class="btn" onclick="generateMRI('spine')" style="width: 100%; margin-bottom: 6px;">
+                                <i class="fas fa-spine"></i> MRI Spine
+                            </button>
+                            <button class="btn" onclick="generateMRI('cardiac')" style="width: 100%; margin-bottom: 6px;">
+                                <i class="fas fa-heart"></i> MRI Cardiac
+                            </button>
+                        `;
+                    } else if (modality === 'PT' || modality === 'PET') {
+                        modalityButtons.innerHTML = `
+                            <button class="btn" onclick="generatePET()" style="width: 100%; margin-bottom: 6px;">
+                                <i class="fas fa-radiation"></i> PET SUV
+                            </button>
+                            <button class="btn" onclick="generatePETHotspots()" style="width: 100%; margin-bottom: 6px;">
+                                <i class="fas fa-fire"></i> PET Hotspots
+                            </button>
+                        `;
+                    } else if (modality === 'NM' || modality === 'SPECT') {
+                        modalityButtons.innerHTML = `
+                            <button class="btn" onclick="generateSPECT('tc99m')" style="width: 100%; margin-bottom: 6px;">
+                                <i class="fas fa-heart-pulse"></i> SPECT Cardiac
+                            </button>
+                            <button class="btn" onclick="generateSPECT('tl201')" style="width: 100%; margin-bottom: 6px;">
+                                <i class="fas fa-lungs"></i> SPECT Perfusion
+                            </button>
+                            <button class="btn" onclick="generateNuclear('tc99m')" style="width: 100%; margin-bottom: 6px;">
+                                <i class="fas fa-atom"></i> Nuclear Med
+                            </button>
+                        `;
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading modality options:', error);
+            }
+        }
+        
+        // AI Analysis Functions
+        function runPathologyDetection() {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            showToast('Running AI pathology detection...', 'info');
+            // TODO: Implement actual AI pathology detection
+        }
+        
+        function runAutoMeasurements() {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            showToast('Running AI auto measurements...', 'info');
+            // TODO: Implement actual AI auto measurements
+        }
+        
+        function runImageEnhancement() {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            showToast('Running AI image enhancement...', 'info');
+            // TODO: Implement actual AI image enhancement
+        }
+        
+        // PET Hotspots function
+        function generatePETHotspots() {
+            generatePET(); // Same as PET SUV for now
+        }
     </script>
 </body>
 </html>

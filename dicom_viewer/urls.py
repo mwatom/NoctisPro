@@ -17,6 +17,7 @@ urlpatterns = [
     
     # Advanced reconstruction endpoints
     path('api/mpr/<int:series_id>/', views.api_mpr_reconstruction, name='api_mpr_reconstruction'),
+    path('api/mpr/<int:series_id>/update/', views.api_mpr_update, name='api_mpr_update'),
     path('api/mip/<int:series_id>/', views.api_mip_reconstruction, name='api_mip_reconstruction'),
     path('api/bone/<int:series_id>/', views.api_bone_reconstruction, name='api_bone_reconstruction'),
     path('api/series/<int:series_id>/mpr/', views.api_mpr_reconstruction, name='api_series_mpr_reconstruction'),

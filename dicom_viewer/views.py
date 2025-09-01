@@ -625,6 +625,106 @@ def api_mpr_reconstruction(request, series_id):
 
 @login_required
 @csrf_exempt
+def api_mpr_update(request, series_id):
+    """Update MPR views based on crosshair position for real-time image transformation"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        series = get_object_or_404(Series, id=series_id)
+        
+        # Check permissions
+        if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and series.study.facility != request.user.facility:
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        data = json.loads(request.body)
+        
+        # Get crosshair position
+        crosshair_x = float(data.get('crosshair_x', 50))
+        crosshair_y = float(data.get('crosshair_y', 50))
+        crosshair_z = float(data.get('crosshair_z', 50))
+        
+        # Get windowing parameters
+        window_width = float(data.get('ww', 400))
+        window_level = float(data.get('wl', 40))
+        invert = data.get('invert', False)
+        
+        # Load volume data (use cached if available)
+        cache_key = f"volume_{series_id}"
+        volume = None
+        
+        with _VOLUME_CACHE_LOCK:
+            cached_volume = _VOLUME_CACHE.get(cache_key)
+            if cached_volume:
+                volume = cached_volume
+        
+        if volume is None:
+            # Load volume data
+            images = series.images.all().order_by('instance_number')
+            volume_data = []
+            
+            for image in images:
+                try:
+                    file_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
+                    if os.path.exists(file_path):
+                        ds = _load_dicom_optimized(file_path)
+                        if ds is not None:
+                            pixel_array = ds.pixel_array.astype(np.float32)
+                            slope = float(getattr(ds, 'RescaleSlope', 1.0))
+                            intercept = float(getattr(ds, 'RescaleIntercept', 0.0))
+                            pixel_array = pixel_array * slope + intercept
+                            volume_data.append(pixel_array)
+                except Exception as e:
+                    logger.warning(f"Failed to load image {image.id}: {e}")
+                    continue
+            
+            if not volume_data:
+                return JsonResponse({'error': 'No valid images found'}, status=404)
+            
+            volume = np.stack(volume_data, axis=0)
+            
+            # Cache volume
+            with _VOLUME_CACHE_LOCK:
+                _VOLUME_CACHE[cache_key] = volume
+        
+        # Calculate slice indices from crosshair percentages
+        slices, rows, cols = volume.shape
+        axial_idx = int((crosshair_z / 100.0) * (slices - 1))
+        sagittal_idx = int((crosshair_x / 100.0) * (cols - 1))
+        coronal_idx = int((crosshair_y / 100.0) * (rows - 1))
+        
+        # Clamp indices
+        axial_idx = max(0, min(slices - 1, axial_idx))
+        sagittal_idx = max(0, min(cols - 1, sagittal_idx))
+        coronal_idx = max(0, min(rows - 1, coronal_idx))
+        
+        # Extract orthogonal slices
+        axial_slice = volume[axial_idx, :, :]
+        sagittal_slice = volume[:, :, sagittal_idx]
+        coronal_slice = volume[:, coronal_idx, :]
+        
+        # Apply windowing and convert to base64
+        updated_views = {}
+        updated_views['axial'] = _array_to_base64_image(axial_slice, window_width, window_level, invert)
+        updated_views['sagittal'] = _array_to_base64_image(sagittal_slice, window_width, window_level, invert)
+        updated_views['coronal'] = _array_to_base64_image(coronal_slice, window_width, window_level, invert)
+        
+        return JsonResponse({
+            'success': True,
+            'updated_views': updated_views,
+            'slice_indices': {
+                'axial': axial_idx,
+                'sagittal': sagittal_idx,
+                'coronal': coronal_idx
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error updating MPR views: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+@csrf_exempt
 def api_mip_reconstruction(request, series_id):
     """Professional MIP reconstruction"""
     try:
