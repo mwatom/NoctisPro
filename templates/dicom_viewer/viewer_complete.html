@@ -296,6 +296,134 @@
             box-shadow: 0 0 2px rgba(0, 255, 255, 0.5);
         }
 
+        /* MPR Grid Layout */
+        .mpr-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 2px;
+            width: 100%;
+            height: 100%;
+            background: var(--border-color);
+        }
+
+        .mpr-viewport {
+            background: #000000;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--border-color);
+            cursor: crosshair;
+            transition: all 0.1s ease;
+        }
+
+        .mpr-viewport:hover {
+            border-color: var(--accent-color);
+            box-shadow: inset 0 0 0 1px var(--accent-color);
+        }
+
+        .mpr-viewport.active {
+            border-color: var(--accent-color);
+            box-shadow: inset 0 0 0 3px var(--accent-color);
+        }
+
+        .mpr-viewport img {
+            max-width: 100%;
+            max-height: 100%;
+            image-rendering: pixelated;
+            cursor: crosshair;
+        }
+
+        .mpr-label {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: rgba(0, 0, 0, 0.8);
+            color: var(--accent-color);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        /* Professional MPR Crosshair System */
+        .crosshair-overlay-mpr {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 15;
+            display: none;
+        }
+
+        .crosshair-overlay-mpr.active {
+            display: block;
+        }
+
+        .crosshair-line-h-mpr {
+            position: absolute;
+            height: 2px;
+            background: #00ffff;
+            width: 100%;
+            top: 50%;
+            left: 0;
+            opacity: 0.9;
+            box-shadow: 0 0 4px rgba(0, 255, 255, 0.6);
+            transform: translateY(-1px);
+        }
+
+        .crosshair-line-v-mpr {
+            position: absolute;
+            width: 2px;
+            background: #00ffff;
+            height: 100%;
+            left: 50%;
+            top: 0;
+            opacity: 0.9;
+            box-shadow: 0 0 4px rgba(0, 255, 255, 0.6);
+            transform: translateX(-1px);
+        }
+
+        /* Enhanced 3D Visualization */
+        .three-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        .three-controls {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 12px;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 10;
+        }
+
+        .three-control-btn {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .three-control-btn:hover {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+        }
+
         /* Right Panel */
         .right-panel {
             grid-column: 3;
@@ -811,8 +939,8 @@
                 </div>
             </div>
 
-            <!-- Image View -->
-            <div class="viewport-content" id="imageView" style="display: none;">
+            <!-- Single Image View -->
+            <div class="viewport-content" id="singleView">
                 <div class="image-container" id="imageContainer">
                     <img class="dicom-image" id="dicomImage" alt="DICOM Image">
                     <div class="crosshair-overlay" id="crosshairOverlay" style="display: none;">
@@ -829,6 +957,38 @@
                 </div>
                 <div class="zoom-info" id="zoomInfo">
                     Zoom: 100%
+                </div>
+            </div>
+
+            <!-- Professional 2x2 Orthogonal View Grid -->
+            <div class="mpr-grid" id="mprView" style="display: none;">
+                <div class="mpr-viewport" data-plane="axial" onclick="setActivePlane('axial')">
+                    <div class="mpr-label">Axial (Z)</div>
+                    <img id="mprAxial" alt="Axial View" onload="updateCrosshairOverlay('axial')">
+                    <div class="crosshair-overlay-mpr" id="crosshairAxial">
+                        <div class="crosshair-line-h-mpr"></div>
+                        <div class="crosshair-line-v-mpr"></div>
+                    </div>
+                </div>
+                <div class="mpr-viewport" data-plane="sagittal" onclick="setActivePlane('sagittal')">
+                    <div class="mpr-label">Sagittal (X)</div>
+                    <img id="mprSagittal" alt="Sagittal View" onload="updateCrosshairOverlay('sagittal')">
+                    <div class="crosshair-overlay-mpr" id="crosshairSagittal">
+                        <div class="crosshair-line-h-mpr"></div>
+                        <div class="crosshair-line-v-mpr"></div>
+                    </div>
+                </div>
+                <div class="mpr-viewport" data-plane="coronal" onclick="setActivePlane('coronal')">
+                    <div class="mpr-label">Coronal (Y)</div>
+                    <img id="mprCoronal" alt="Coronal View" onload="updateCrosshairOverlay('coronal')">
+                    <div class="crosshair-overlay-mpr" id="crosshairCoronal">
+                        <div class="crosshair-line-h-mpr"></div>
+                        <div class="crosshair-line-v-mpr"></div>
+                    </div>
+                </div>
+                <div class="mpr-viewport" data-plane="3d" onclick="setActivePlane('3d')">
+                    <div class="mpr-label">3D Volume</div>
+                    <div id="threeDContainer" class="three-container"></div>
                 </div>
             </div>
         </div>
