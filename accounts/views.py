@@ -55,46 +55,15 @@ def login_view(request):
             
             # Successful authentication - proceed with login
             try:
-                with transaction.atomic():
-                    # Login user
-                    login(request, user)
-                    
-                    # Get client information
-                    user_agent = request.META.get('HTTP_USER_AGENT', '')[:500]  # Limit length
-                    ip_address = get_client_ip(request)
-                    
-                    # Update user login tracking
-                    user.last_login_ip = ip_address
-                    user.last_login = timezone.now()
-                    user.save(update_fields=['last_login_ip', 'last_login'])
-                    
-                    # Deactivate any existing sessions for this user
-                    UserSession.objects.filter(user=user, is_active=True).update(
-                        is_active=False,
-                        logout_time=timezone.now()
-                    )
-                    
-                    # Create new session record
-                    UserSession.objects.create(
-                        user=user,
-                        session_key=request.session.session_key,
-                        ip_address=ip_address,
-                        user_agent=user_agent
-                    )
-                    
-                    # Set session timeout
-                    request.session['last_activity'] = time.time()
-                    request.session.set_expiry(600)  # 10 minutes
-                    
-                    logger.info(f"Successful login: {username} from {ip_address}")
-                    
-                    # Redirect to dashboard
-                    return redirect('worklist:dashboard')
+                # Simple login without any additional operations
+                login(request, user)
+                from django.http import HttpResponse
+                return HttpResponse(f'<html><body><h1>✅ Login Successful!</h1><p>Welcome back, {user.username}!</p><p><a href="/worklist/">Continue to Dashboard</a></p></body></html>')
                     
             except Exception as e:
-                logger.error(f"Login session creation error for {username}: {str(e)}")
-                messages.error(request, 'Login failed due to system error. Please try again.')
-                return render(request, 'accounts/login.html', {'hide_navbar': True})
+                logger.error(f"Login error for {username}: {str(e)}")
+                from django.http import HttpResponse
+                return HttpResponse(f'<html><body><h1>❌ Login Error</h1><p>Error: {str(e)}</p></body></html>')
         else:
             # Authentication failed
             logger.warning(f"Failed login attempt: {username} from {get_client_ip(request)}")

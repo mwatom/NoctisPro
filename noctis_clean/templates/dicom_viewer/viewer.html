@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DICOM Viewer - Noctis Pro PACS</title>
+    <style>
+        :root {
+            --primary-bg: #0a0a0a;
+            --secondary-bg: #1a1a1a;
+            --card-bg: #252525;
+            --border-color: #404040;
+            --accent-color: #00d4ff;
+            --text-primary: #ffffff;
+            --text-secondary: #b3b3b3;
+            --success-color: #00ff88;
+            --warning-color: #ffaa00;
+            --danger-color: #ff4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--primary-bg);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .navbar {
+            background: var(--secondary-bg);
+            padding: 0.5rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+        }
+
+        .navbar h1 {
+            color: var(--accent-color);
+            font-size: 20px;
+        }
+
+        .navbar .nav-links {
+            display: flex;
+            gap: 15px;
+        }
+
+        .navbar .nav-links a {
+            color: var(--text-primary);
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+
+        .navbar .nav-links a:hover {
+            background: var(--card-bg);
+        }
+
+        .viewer-container {
+            display: flex;
+            height: calc(100vh - 60px);
+        }
+
+        /* Left Toolbar */
+        .toolbar {
+            width: 80px;
+            background: var(--secondary-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 10px 5px;
+            gap: 5px;
+        }
+
+        .tool-btn {
+            width: 70px;
+            height: 50px;
+            background: var(--card-bg);
+            border: none;
+            border-radius: 5px;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+
+        .tool-btn:hover {
+            background: #555;
+        }
+
+        .tool-btn.active {
+            background: var(--accent-color);
+            color: #000;
+        }
+
+        .tool-btn .icon {
+            font-size: 16px;
+            margin-bottom: 2px;
+        }
+
+        /* Main Viewer Area */
+        .viewer-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .viewer-header {
+            height: 50px;
+            background: var(--secondary-bg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 20px;
+        }
+
+        .viewer-header select {
+            background: var(--card-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 14px;
+        }
+
+        .patient-info {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .viewport {
+            flex: 1;
+            background: #000;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .dicom-canvas {
+            max-width: 100%;
+            max-height: 100%;
+            border: 1px solid var(--border-color);
+        }
+
+        .overlay-info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .zoom-info {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        /* Right Panel */
+        .right-panel {
+            width: 250px;
+            background: var(--secondary-bg);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .panel-section {
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .panel-section h3 {
+            color: var(--accent-color);
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .slider-group {
+            margin-bottom: 15px;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+
+        .slider {
+            width: 100%;
+            height: 4px;
+            background: var(--card-bg);
+            outline: none;
+            border-radius: 2px;
+        }
+
+        .slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--accent-color);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .preset-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+            margin-top: 10px;
+        }
+
+        .preset-btn {
+            background: var(--card-bg);
+            color: var(--text-primary);
+            border: none;
+            border-radius: 3px;
+            padding: 8px 4px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .preset-btn:hover {
+            background: #555;
+        }
+
+        .btn {
+            background: var(--accent-color);
+            color: #000;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 15px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            background: #00b8e6;
+        }
+
+        .btn-secondary {
+            background: var(--card-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: #555;
+        }
+
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 5px;
+            padding: 20px;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .upload-area.dragover {
+            border-color: var(--accent-color);
+            background: rgba(0, 212, 255, 0.1);
+        }
+
+        .no-studies {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        .image-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .image-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .image-item:hover {
+            background: var(--card-bg);
+        }
+
+        .image-item.active {
+            background: var(--accent-color);
+            color: #000;
+        }
+
+        .error-message {
+            background: var(--danger-color);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+
+        .success-message {
+            background: var(--success-color);
+            color: #000;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>🔍 DICOM Viewer - Noctis Pro PACS</h1>
+        <div class="nav-links">
+            <a href="/worklist/">Dashboard</a>
+            <a href="/worklist/studies/">Studies</a>
+            <a href="/dicom-viewer/">DICOM Viewer</a>
+            <a href="/admin/">Admin</a>
+            <a href="/accounts/logout/">Logout</a>
+        </div>
+    </div>
+
+    <div class="viewer-container">
+        <!-- Left Toolbar -->
+        <div class="toolbar">
+            <button class="tool-btn active" data-tool="windowing">
+                <div class="icon">🔄</div>
+                <div>Window</div>
+            </button>
+            <button class="tool-btn" data-tool="zoom">
+                <div class="icon">🔍</div>
+                <div>Zoom</div>
+            </button>
+            <button class="tool-btn" data-tool="pan">
+                <div class="icon">✋</div>
+                <div>Pan</div>
+            </button>
+            <button class="tool-btn" data-tool="measure">
+                <div class="icon">📏</div>
+                <div>Measure</div>
+            </button>
+            <button class="tool-btn" data-tool="annotate">
+                <div class="icon">📝</div>
+                <div>Annotate</div>
+            </button>
+            <button class="tool-btn" data-tool="crosshair">
+                <div class="icon">✚</div>
+                <div>Crosshair</div>
+            </button>
+            <button class="tool-btn" data-tool="invert">
+                <div class="icon">⚫</div>
+                <div>Invert</div>
+            </button>
+            <button class="tool-btn" data-tool="reset">
+                <div class="icon">🔄</div>
+                <div>Reset</div>
+            </button>
+        </div>
+
+        <!-- Main Viewer -->
+        <div class="viewer-main">
+            <div class="viewer-header">
+                <select id="studySelect">
+                    <option value="">Select Study</option>
+                </select>
+                <div class="patient-info" id="patientInfo">
+                    Patient: - | Study Date: - | Modality: -
+                </div>
+                <button class="btn btn-secondary" onclick="loadLocalDicom()">Load Local Files</button>
+                <input type="file" id="localFileInput" multiple accept=".dcm,.dicom" style="display: none;">
+            </div>
+
+            <div class="viewport" id="viewport">
+                <div class="no-studies" id="noStudies">
+                    <h3>No DICOM Study Selected</h3>
+                    <p>Select a study from the dropdown or load local DICOM files</p>
+                </div>
+                
+                <canvas id="dicomCanvas" class="dicom-canvas" style="display: none;"></canvas>
+                
+                <div class="overlay-info" id="overlayInfo" style="display: none;">
+                    <div>WW: <span id="windowWidth">400</span></div>
+                    <div>WL: <span id="windowLevel">40</span></div>
+                    <div>Slice: <span id="currentSlice">1</span>/<span id="totalSlices">1</span></div>
+                </div>
+                
+                <div class="zoom-info" id="zoomInfo" style="display: none;">
+                    Zoom: <span id="zoomLevel">100</span>%
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel -->
+        <div class="right-panel">
+            <!-- Window/Level Controls -->
+            <div class="panel-section">
+                <h3>Window/Level</h3>
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span>Window Width</span>
+                        <span id="wwValue">400</span>
+                    </div>
+                    <input type="range" class="slider" id="wwSlider" min="1" max="4000" value="400">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span>Window Level</span>
+                        <span id="wlValue">40</span>
+                    </div>
+                    <input type="range" class="slider" id="wlSlider" min="-1000" max="1000" value="40">
+                </div>
+                <div class="preset-buttons">
+                    <button class="preset-btn" data-preset="lung">Lung</button>
+                    <button class="preset-btn" data-preset="bone">Bone</button>
+                    <button class="preset-btn" data-preset="soft">Soft</button>
+                    <button class="preset-btn" data-preset="brain">Brain</button>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <div class="panel-section">
+                <h3>Navigation</h3>
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span>Slice</span>
+                        <span id="sliceValue">1</span>
+                    </div>
+                    <input type="range" class="slider" id="sliceSlider" min="0" max="0" value="0">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span>Zoom</span>
+                        <span id="zoomValue">100%</span>
+                    </div>
+                    <input type="range" class="slider" id="zoomSlider" min="25" max="500" value="100">
+                </div>
+            </div>
+
+            <!-- Image List -->
+            <div class="panel-section">
+                <h3>Images</h3>
+                <div class="image-list" id="imageList">
+                    <div style="text-align: center; color: var(--text-secondary); padding: 20px;">
+                        No images loaded
+                    </div>
+                </div>
+            </div>
+
+            <!-- Study Info -->
+            <div class="panel-section">
+                <h3>Study Info</h3>
+                <div id="studyInfo">
+                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">
+                        <div>Dimensions: -</div>
+                        <div>Pixel Spacing: -</div>
+                        <div>Series: -</div>
+                        <div>Institution: -</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload Area -->
+            <div class="panel-section">
+                <h3>Upload DICOM</h3>
+                <div id="uploadMessage"></div>
+                <div class="upload-area" id="uploadArea">
+                    <div>📁 Drop DICOM files here</div>
+                    <div style="margin: 10px 0;">or</div>
+                    <button class="btn" onclick="document.getElementById('fileInput').click()">Browse Files</button>
+                    <input type="file" id="fileInput" multiple accept=".dcm,.dicom" style="display: none;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DICOM Viewer JavaScript
+        class DicomViewer {
+            constructor() {
+                this.currentStudy = null;
+                this.currentImages = [];
+                this.currentImageIndex = 0;
+                this.activeTool = 'windowing';
+                this.windowWidth = 400;
+                this.windowLevel = 40;
+                this.zoomFactor = 1.0;
+                this.panX = 0;
+                this.panY = 0;
+                this.inverted = false;
+                this.crosshair = false;
+                
+                this.canvas = document.getElementById('dicomCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                
+                this.initializeEventListeners();
+                this.loadStudies();
+            }
+            
+            initializeEventListeners() {
+                // Tool buttons
+                document.querySelectorAll('.tool-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const tool = e.currentTarget.dataset.tool;
+                        this.setActiveTool(tool);
+                    });
+                });
+                
+                // Study selection
+                document.getElementById('studySelect').addEventListener('change', (e) => {
+                    if (e.target.value) {
+                        this.loadStudyImages(e.target.value);
+                    }
+                });
+                
+                // Sliders
+                document.getElementById('wwSlider').addEventListener('input', (e) => {
+                    this.windowWidth = parseInt(e.target.value);
+                    document.getElementById('wwValue').textContent = this.windowWidth;
+                    this.updateDisplay();
+                });
+                
+                document.getElementById('wlSlider').addEventListener('input', (e) => {
+                    this.windowLevel = parseInt(e.target.value);
+                    document.getElementById('wlValue').textContent = this.windowLevel;
+                    this.updateDisplay();
+                });
+                
+                document.getElementById('sliceSlider').addEventListener('input', (e) => {
+                    this.currentImageIndex = parseInt(e.target.value);
+                    document.getElementById('sliceValue').textContent = this.currentImageIndex + 1;
+                    this.updateDisplay();
+                });
+                
+                document.getElementById('zoomSlider').addEventListener('input', (e) => {
+                    this.zoomFactor = parseInt(e.target.value) / 100;
+                    document.getElementById('zoomValue').textContent = e.target.value + '%';
+                    this.updateDisplay();
+                });
+                
+                // Preset buttons
+                document.querySelectorAll('.preset-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        this.applyPreset(e.target.dataset.preset);
+                    });
+                });
+                
+                // File upload
+                document.getElementById('fileInput').addEventListener('change', (e) => {
+                    this.handleFileUpload(e.target.files);
+                });
+                
+                // Local file loading
+                document.getElementById('localFileInput').addEventListener('change', (e) => {
+                    this.handleLocalFiles(e.target.files);
+                });
+                
+                // Canvas mouse events
+                this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+                this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+                this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+                this.canvas.addEventListener('wheel', (e) => this.handleWheel(e));
+                
+                // Drag and drop
+                const uploadArea = document.getElementById('uploadArea');
+                uploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.add('dragover');
+                });
+                
+                uploadArea.addEventListener('dragleave', () => {
+                    uploadArea.classList.remove('dragover');
+                });
+                
+                uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.remove('dragover');
+                    this.handleFileUpload(e.dataTransfer.files);
+                });
+            }
+            
+            async loadStudies() {
+                try {
+                    const response = await fetch('/dicom-viewer/api/studies/');
+                    const data = await response.json();
+                    
+                    const select = document.getElementById('studySelect');
+                    select.innerHTML = '<option value="">Select Study</option>';
+                    
+                    data.studies.forEach(study => {
+                        const option = document.createElement('option');
+                        option.value = study.id;
+                        option.textContent = `${study.patient_name} - ${study.modality} (${study.image_count} images)`;
+                        select.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error('Error loading studies:', error);
+                }
+            }
+            
+            async loadStudyImages(studyId) {
+                try {
+                    const response = await fetch(`/dicom-viewer/api/study/${studyId}/images/`);
+                    const data = await response.json();
+                    
+                    this.currentImages = data.images;
+                    this.currentImageIndex = 0;
+                    
+                    if (this.currentImages.length > 0) {
+                        // Update UI
+                        document.getElementById('noStudies').style.display = 'none';
+                        document.getElementById('dicomCanvas').style.display = 'block';
+                        document.getElementById('overlayInfo').style.display = 'block';
+                        document.getElementById('zoomInfo').style.display = 'block';
+                        
+                        // Update sliders
+                        document.getElementById('sliceSlider').max = this.currentImages.length - 1;
+                        document.getElementById('sliceSlider').value = 0;
+                        document.getElementById('sliceValue').textContent = '1';
+                        
+                        // Update patient info
+                        const firstImage = this.currentImages[0];
+                        document.getElementById('patientInfo').textContent = 
+                            `Patient: ${this.currentStudy?.patient_name || '-'} | Images: ${this.currentImages.length}`;
+                        
+                        this.updateImageList();
+                        this.updateDisplay();
+                    }
+                } catch (error) {
+                    console.error('Error loading study images:', error);
+                }
+            }
+            
+            updateImageList() {
+                const imageList = document.getElementById('imageList');
+                imageList.innerHTML = '';
+                
+                this.currentImages.forEach((image, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'image-item' + (index === this.currentImageIndex ? ' active' : '');
+                    item.textContent = `Slice ${image.instance_number}`;
+                    item.onclick = () => {
+                        this.currentImageIndex = index;
+                        document.getElementById('sliceSlider').value = index;
+                        document.getElementById('sliceValue').textContent = index + 1;
+                        this.updateImageList();
+                        this.updateDisplay();
+                    };
+                    imageList.appendChild(item);
+                });
+            }
+            
+            updateDisplay() {
+                if (this.currentImages.length === 0) return;
+                
+                const currentImage = this.currentImages[this.currentImageIndex];
+                
+                // Update overlay info
+                document.getElementById('windowWidth').textContent = this.windowWidth;
+                document.getElementById('windowLevel').textContent = this.windowLevel;
+                document.getElementById('currentSlice').textContent = this.currentImageIndex + 1;
+                document.getElementById('totalSlices').textContent = this.currentImages.length;
+                document.getElementById('zoomLevel').textContent = Math.round(this.zoomFactor * 100);
+                
+                // If we have base64 image data, display it
+                if (currentImage.image_base64) {
+                    const img = new Image();
+                    img.onload = () => {
+                        this.canvas.width = img.width;
+                        this.canvas.height = img.height;
+                        
+                        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                        this.ctx.save();
+                        
+                        // Apply zoom and pan
+                        this.ctx.scale(this.zoomFactor, this.zoomFactor);
+                        this.ctx.translate(this.panX, this.panY);
+                        
+                        // Draw image
+                        this.ctx.drawImage(img, 0, 0);
+                        
+                        this.ctx.restore();
+                        
+                        // Draw overlays
+                        this.drawOverlays();
+                    };
+                    img.src = currentImage.image_base64;
+                } else {
+                    // Create placeholder image
+                    this.canvas.width = 512;
+                    this.canvas.height = 512;
+                    this.ctx.fillStyle = '#333';
+                    this.ctx.fillRect(0, 0, 512, 512);
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = '16px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('DICOM Image Placeholder', 256, 256);
+                    this.ctx.fillText(`Slice ${currentImage.instance_number}`, 256, 280);
+                }
+                
+                this.updateImageList();
+            }
+            
+            drawOverlays() {
+                if (this.crosshair) {
+                    const centerX = this.canvas.width / 2;
+                    const centerY = this.canvas.height / 2;
+                    
+                    this.ctx.strokeStyle = 'cyan';
+                    this.ctx.lineWidth = 1;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, centerY);
+                    this.ctx.lineTo(this.canvas.width, centerY);
+                    this.ctx.moveTo(centerX, 0);
+                    this.ctx.lineTo(centerX, this.canvas.height);
+                    this.ctx.stroke();
+                }
+            }
+            
+            setActiveTool(tool) {
+                // Handle special tools
+                if (tool === 'reset') {
+                    this.resetView();
+                    return;
+                } else if (tool === 'invert') {
+                    this.inverted = !this.inverted;
+                    this.updateDisplay();
+                    return;
+                } else if (tool === 'crosshair') {
+                    this.crosshair = !this.crosshair;
+                    this.updateDisplay();
+                    return;
+                }
+                
+                this.activeTool = tool;
+                
+                // Update button states
+                document.querySelectorAll('.tool-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                document.querySelector(`[data-tool="${tool}"]`).classList.add('active');
+            }
+            
+            applyPreset(preset) {
+                const presets = {
+                    lung: { ww: 1500, wl: -600 },
+                    bone: { ww: 2000, wl: 300 },
+                    soft: { ww: 400, wl: 40 },
+                    brain: { ww: 100, wl: 50 }
+                };
+                
+                if (presets[preset]) {
+                    this.windowWidth = presets[preset].ww;
+                    this.windowLevel = presets[preset].wl;
+                    
+                    document.getElementById('wwSlider').value = this.windowWidth;
+                    document.getElementById('wlSlider').value = this.windowLevel;
+                    document.getElementById('wwValue').textContent = this.windowWidth;
+                    document.getElementById('wlValue').textContent = this.windowLevel;
+                    
+                    this.updateDisplay();
+                }
+            }
+            
+            resetView() {
+                this.zoomFactor = 1.0;
+                this.panX = 0;
+                this.panY = 0;
+                document.getElementById('zoomSlider').value = 100;
+                document.getElementById('zoomValue').textContent = '100%';
+                this.updateDisplay();
+            }
+            
+            handleMouseDown(e) {
+                this.mouseDown = true;
+                this.lastMouseX = e.offsetX;
+                this.lastMouseY = e.offsetY;
+            }
+            
+            handleMouseMove(e) {
+                if (!this.mouseDown) return;
+                
+                const deltaX = e.offsetX - this.lastMouseX;
+                const deltaY = e.offsetY - this.lastMouseY;
+                
+                if (this.activeTool === 'pan') {
+                    this.panX += deltaX / this.zoomFactor;
+                    this.panY += deltaY / this.zoomFactor;
+                    this.updateDisplay();
+                } else if (this.activeTool === 'windowing') {
+                    this.windowWidth = Math.max(1, this.windowWidth + deltaX * 2);
+                    this.windowLevel = Math.max(-1000, Math.min(1000, this.windowLevel + deltaY * 2));
+                    
+                    document.getElementById('wwSlider').value = this.windowWidth;
+                    document.getElementById('wlSlider').value = this.windowLevel;
+                    document.getElementById('wwValue').textContent = Math.round(this.windowWidth);
+                    document.getElementById('wlValue').textContent = Math.round(this.windowLevel);
+                    
+                    this.updateDisplay();
+                }
+                
+                this.lastMouseX = e.offsetX;
+                this.lastMouseY = e.offsetY;
+            }
+            
+            handleMouseUp(e) {
+                this.mouseDown = false;
+            }
+            
+            handleWheel(e) {
+                e.preventDefault();
+                
+                if (e.ctrlKey) {
+                    // Zoom
+                    const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
+                    this.zoomFactor = Math.max(0.1, Math.min(5.0, this.zoomFactor * zoomDelta));
+                    document.getElementById('zoomSlider').value = Math.round(this.zoomFactor * 100);
+                    document.getElementById('zoomValue').textContent = Math.round(this.zoomFactor * 100) + '%';
+                    this.updateDisplay();
+                } else {
+                    // Slice navigation
+                    const direction = e.deltaY > 0 ? 1 : -1;
+                    const newIndex = Math.max(0, Math.min(this.currentImages.length - 1, this.currentImageIndex + direction));
+                    
+                    if (newIndex !== this.currentImageIndex) {
+                        this.currentImageIndex = newIndex;
+                        document.getElementById('sliceSlider').value = newIndex;
+                        document.getElementById('sliceValue').textContent = newIndex + 1;
+                        this.updateDisplay();
+                    }
+                }
+            }
+            
+            handleFileUpload(files) {
+                // This would upload files to the server
+                const messageDiv = document.getElementById('uploadMessage');
+                messageDiv.innerHTML = '<div class="success-message">File upload functionality ready (demo mode)</div>';
+                
+                setTimeout(() => {
+                    messageDiv.innerHTML = '';
+                }, 3000);
+            }
+            
+            handleLocalFiles(files) {
+                // This would load local DICOM files using FileReader API
+                console.log('Loading local files:', files);
+                alert('Local file loading feature would be implemented here.\nThis requires additional DICOM parsing libraries.');
+            }
+        }
+        
+        // Global functions
+        function loadLocalDicom() {
+            document.getElementById('localFileInput').click();
+        }
+        
+        // Initialize viewer when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            window.dicomViewer = new DicomViewer();
+        });
+    </script>
+</body>
+</html>
