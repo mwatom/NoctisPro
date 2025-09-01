@@ -44,15 +44,15 @@ INSTALLED_APPS = [
     'corsheaders',  # Re-enabled for API access
     # 'channels',  # Disabled temporarily to fix Redis dependency
     
-    # Custom apps - Temporarily disabled problematic apps
+    # Custom apps - ALL ENABLED FOR FULL FUNCTIONALITY
     'accounts',
-    # 'worklist',  # Disabled temporarily - requires heavy dependencies
-    # 'dicom_viewer',  # Disabled temporarily - requires scipy, etc.
-    # 'reports',  # Disabled temporarily
-    # 'admin_panel',  # Disabled temporarily
-    # 'chat',  # Disabled temporarily
-    # 'notifications',  # Disabled temporarily
-    # 'ai_analysis',  # Disabled temporarily
+    'worklist',  # ENABLED - DICOM functionality restored
+    'dicom_viewer',  # ENABLED - DICOM viewer restored
+    'reports',  # ENABLED - Reports functionality restored
+    'admin_panel',  # ENABLED - Admin panel restored
+    'chat',  # ENABLED - Chat functionality restored
+    'notifications',  # ENABLED - Notifications restored
+    'ai_analysis',  # ENABLED - AI analysis restored
 ]
 
 MIDDLEWARE = [

@@ -20,14 +20,14 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.http import HttpResponse
-# from worklist import views as worklist_views  # Temporarily disabled
+from worklist import views as worklist_views  # RESTORED FOR FULL FUNCTIONALITY
 from django.views.generic.base import RedirectView
 
 def home_redirect(request):
     """Redirect home page to login or dashboard based on authentication"""
     if request.user.is_authenticated:
-        # Temporarily redirect all authenticated users to a success page
-        return HttpResponse("<h1>Login Successful!</h1><p>Error 500 is fixed! The system is now working.</p>")
+        # Redirect authenticated users to worklist dashboard - FULL FUNCTIONALITY RESTORED
+        return redirect('worklist:dashboard')
     return redirect('accounts:login')
 
 def favicon_view(request):
@@ -40,18 +40,18 @@ urlpatterns = [
     path('favicon.ico', favicon_view, name='favicon'),
     path('', home_redirect, name='home'),
     path('', include('accounts.urls')),
-    # path('worklist/', include('worklist.urls')),  # Temporarily disabled
+    path('worklist/', include('worklist.urls')),  # RESTORED
     # Alias endpoints expected by the dashboard UI
-    # path('api/studies/', worklist_views.api_studies, name='api_studies_root'),  # Temporarily disabled
-    # path('dicom-viewer/', include(('dicom_viewer.urls','dicom_viewer'), namespace='dicom_viewer')),  # Temporarily disabled
+    path('api/studies/', worklist_views.api_studies, name='api_studies_root'),  # RESTORED
+    path('dicom-viewer/', include(('dicom_viewer.urls','dicom_viewer'), namespace='dicom_viewer')),  # RESTORED
     # Removed duplicate 'viewer/' include to avoid namespace clash; keep alias via redirect if needed
-    # path('viewer/', RedirectView.as_view(url='/dicom-viewer/', permanent=False, query_string=True)),  # Temporarily disabled
-    # path('viewer/<path:subpath>/', RedirectView.as_view(url='/dicom-viewer/%(subpath)s/', permanent=False, query_string=True)),  # Temporarily disabled
-    # path('reports/', include('reports.urls')),  # Temporarily disabled
-    # path('admin-panel/', include('admin_panel.urls')),  # Temporarily disabled
-    # path('chat/', include('chat.urls')),  # Temporarily disabled
-    # path('notifications/', include('notifications.urls')),  # Temporarily disabled
-    # path('ai/', include('ai_analysis.urls')),  # Temporarily disabled
+    path('viewer/', RedirectView.as_view(url='/dicom-viewer/', permanent=False, query_string=True)),  # RESTORED
+    path('viewer/<path:subpath>/', RedirectView.as_view(url='/dicom-viewer/%(subpath)s/', permanent=False, query_string=True)),  # RESTORED
+    path('reports/', include('reports.urls')),  # RESTORED
+    path('admin-panel/', include('admin_panel.urls')),  # RESTORED
+    path('chat/', include('chat.urls')),  # RESTORED
+    path('notifications/', include('notifications.urls')),  # RESTORED
+    path('ai/', include('ai_analysis.urls')),  # RESTORED
 ]
 
 # Serve media files during development

@@ -24,3 +24,12 @@ Watching for file changes with StatReloader
 "HEAD /admin/ HTTP/1.1" 302 0
 /workspace/noctis_pro_deployment/noctis_pro/settings.py changed, reloading.
 Watching for file changes with StatReloader
+/workspace/noctis_pro_deployment/noctis_pro/settings.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/noctis_pro_deployment/noctis_pro/urls.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/noctis_pro_deployment/noctis_pro/urls.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/noctis_pro_deployment/noctis_pro/urls.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
