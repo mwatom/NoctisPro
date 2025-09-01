@@ -1115,3 +1115,4 @@ Watching for file changes with StatReloader
 [32mHTTP HEAD / 302 [0.01, 127.0.0.1:35058][0m
 [mHTTP HEAD /static/js/worklist-button-handlers.js 200 [0.00, 127.0.0.1:33186][0m
 [mHTTP HEAD /static/css/dicom-viewer-buttons.css 200 [0.00, 127.0.0.1:58476][0m
+Watching for file changes with StatReloader
