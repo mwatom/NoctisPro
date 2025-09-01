@@ -2030,3 +2030,391 @@ def manage_qa_phantoms(request):
     }
     
     return render(request, 'dicom_viewer/manage_qa_phantoms.html', context)
+
+# Print functionality
+@login_required
+@csrf_exempt
+def print_dicom_image(request):
+    """
+    Print DICOM image with high quality settings optimized for glossy paper.
+    Supports various paper sizes and printer configurations.
+    """
+    try:
+        # Get image data from request
+        image_data = request.POST.get('image_data')
+        if not image_data:
+            return JsonResponse({'success': False, 'error': 'No image data provided'})
+        
+        # Parse image data (base64 encoded)
+        if image_data.startswith('data:image'):
+            image_data = image_data.split(',')[1]
+        
+        image_bytes = base64.b64decode(image_data)
+        
+        # Get printing options
+        paper_size = request.POST.get('paper_size', 'A4')
+        paper_type = request.POST.get('paper_type', 'glossy')
+        print_quality = request.POST.get('print_quality', 'high')
+        copies = int(request.POST.get('copies', 1))
+        printer_name = request.POST.get('printer_name', '')
+        layout_type = request.POST.get('layout_type', 'single')
+        print_medium = request.POST.get('print_medium', 'paper')  # paper or film
+        
+        # Get patient and study information
+        patient_name = request.POST.get('patient_name', 'Unknown Patient')
+        study_date = request.POST.get('study_date', '')
+        modality = request.POST.get('modality', '')
+        series_description = request.POST.get('series_description', '')
+        institution_name = request.POST.get('institution_name', request.user.facility.name if hasattr(request.user, 'facility') and request.user.facility else 'Medical Facility')
+        
+        # Create temporary files
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as img_temp:
+            img_temp.write(image_bytes)
+            img_temp_path = img_temp.name
+        
+        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as pdf_temp:
+            pdf_temp_path = pdf_temp.name
+        
+        try:
+            # Create PDF with medical image and metadata using selected layout
+            create_medical_print_pdf_enhanced(
+                img_temp_path, pdf_temp_path, paper_size, layout_type, 
+                print_medium, modality, patient_name, study_date, 
+                series_description, institution_name
+            )
+            
+            # Print the PDF
+            print_result = send_to_printer(
+                pdf_temp_path, printer_name, paper_type, 
+                print_quality, copies
+            )
+            
+            if print_result['success']:
+                # Log successful print
+                logger.info(f"Successfully printed DICOM image for patient {patient_name}")
+                return JsonResponse({
+                    'success': True, 
+                    'message': f'Image sent to printer successfully. Job ID: {print_result.get("job_id", "N/A")}'
+                })
+            else:
+                return JsonResponse({
+                    'success': False, 
+                    'error': f'Printing failed: {print_result.get("error", "Unknown error")}'
+                })
+                
+        finally:
+            # Clean up temporary files
+            try:
+                os.unlink(img_temp_path)
+                os.unlink(pdf_temp_path)
+            except:
+                pass
+                
+    except Exception as e:
+        logger.error(f"Error in print_dicom_image: {str(e)}")
+        return JsonResponse({'success': False, 'error': str(e)})
+
+def create_medical_print_pdf_enhanced(image_path, output_path, paper_size, layout_type, print_medium, modality, patient_name, study_date, series_description, institution_name):
+    """
+    Create a PDF optimized for medical image printing with multiple layout options for different modalities.
+    Supports both paper and film printing with modality-specific layouts.
+    """
+    try:
+        # Set paper size
+        if paper_size.upper() == 'A4':
+            page_size = A4
+        elif paper_size.upper() == 'LETTER':
+            page_size = letter
+        elif paper_size.upper() == 'FILM_14X17':
+            page_size = (14*inch, 17*inch)  # Standard film size
+        elif paper_size.upper() == 'FILM_11X14':
+            page_size = (11*inch, 14*inch)
+        else:
+            page_size = A4
+        
+        # Create PDF
+        c = canvas.Canvas(output_path, pagesize=page_size)
+        width, height = page_size
+        
+        # Apply layout based on type and modality
+        if layout_type == 'single':
+            create_single_image_layout(c, image_path, width, height, print_medium, modality, patient_name, study_date, series_description, institution_name)
+        elif layout_type == 'quad':
+            create_quad_layout(c, image_path, width, height, print_medium, modality, patient_name, study_date, series_description, institution_name)
+        elif layout_type == 'comparison':
+            create_comparison_layout(c, image_path, width, height, print_medium, modality, patient_name, study_date, series_description, institution_name)
+        else:
+            create_single_image_layout(c, image_path, width, height, print_medium, modality, patient_name, study_date, series_description, institution_name)
+        
+        c.save()
+    except Exception as e:
+        logger.error(f"Error creating medical print PDF: {str(e)}")
+        raise
+
+def create_single_image_layout(c, image_path, width, height, print_medium, modality, patient_name, study_date, series_description, institution_name):
+    """Create single image layout for medical printing"""
+    try:
+        # Calculate image dimensions (maintain aspect ratio)
+        margin = 0.5 * inch if print_medium == 'paper' else 0.2 * inch
+        img_width = width - 2 * margin
+        img_height = height - 2 * margin - inch  # Leave space for metadata
+        
+        # Draw the DICOM image
+        c.drawImage(image_path, margin, margin + inch, img_width, img_height, preserveAspectRatio=True)
+        
+        # Add medical metadata
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(margin, height - margin - 20, f"Patient: {patient_name}")
+        c.drawString(margin, height - margin - 40, f"Study Date: {study_date}")
+        c.drawString(margin, height - margin - 60, f"Modality: {modality}")
+        c.drawString(margin, height - margin - 80, f"Series: {series_description}")
+        
+        # Add institution info
+        c.setFont("Helvetica", 10)
+        c.drawString(width - 200, height - margin - 20, institution_name)
+        c.drawString(width - 200, height - margin - 40, f"Printed: {timezone.now().strftime('%Y-%m-%d %H:%M')}")
+    except Exception as e:
+        logger.error(f"Error in single image layout: {str(e)}")
+        raise
+
+def create_quad_layout(c, image_path, width, height, print_medium, modality, patient_name, study_date, series_description, institution_name):
+    """Create quad layout for medical printing"""
+    try:
+        margin = 0.3 * inch
+        img_width = (width - 3 * margin) / 2
+        img_height = (height - 3 * margin - inch) / 2
+        
+        # Draw 4 copies of the image
+        positions = [
+            (margin, height - margin - img_height),
+            (margin + img_width + margin, height - margin - img_height),
+            (margin, height - margin - 2 * img_height - margin),
+            (margin + img_width + margin, height - margin - 2 * img_height - margin)
+        ]
+        
+        for x, y in positions:
+            c.drawImage(image_path, x, y, img_width, img_height, preserveAspectRatio=True)
+        
+        # Add metadata at bottom
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(margin, margin + 40, f"Patient: {patient_name} | Study: {study_date} | {modality} | {series_description}")
+        c.drawString(margin, margin + 20, f"{institution_name} | Printed: {timezone.now().strftime('%Y-%m-%d %H:%M')}")
+    except Exception as e:
+        logger.error(f"Error in quad layout: {str(e)}")
+        raise
+
+def create_comparison_layout(c, image_path, width, height, print_medium, modality, patient_name, study_date, series_description, institution_name):
+    """Create comparison layout for medical printing"""
+    try:
+        margin = 0.4 * inch
+        img_width = (width - 3 * margin) / 2
+        img_height = height - 2 * margin - inch
+        
+        # Draw 2 copies side by side
+        c.drawImage(image_path, margin, margin + inch, img_width, img_height, preserveAspectRatio=True)
+        c.drawImage(image_path, margin + img_width + margin, margin + inch, img_width, img_height, preserveAspectRatio=True)
+        
+        # Add labels
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(margin + img_width/2 - 30, height - margin - 20, "Current")
+        c.drawString(margin + img_width + margin + img_width/2 - 30, height - margin - 20, "Comparison")
+        
+        # Add metadata
+        c.setFont("Helvetica", 10)
+        c.drawString(margin, margin + 40, f"Patient: {patient_name} | Study: {study_date} | {modality} | {series_description}")
+        c.drawString(margin, margin + 20, f"{institution_name} | Printed: {timezone.now().strftime('%Y-%m-%d %H:%M')}")
+    except Exception as e:
+        logger.error(f"Error in comparison layout: {str(e)}")
+        raise
+
+def send_to_printer(pdf_path, printer_name, paper_type, print_quality, copies):
+    """Send PDF to printer with optimized settings for glossy paper."""
+    try:
+        if cups:
+            return send_to_printer_cups(pdf_path, printer_name, paper_type, print_quality, copies)
+        else:
+            return send_to_printer_fallback(pdf_path, printer_name, paper_type, print_quality, copies)
+    except Exception as e:
+        logger.error(f"Error in send_to_printer: {str(e)}")
+        return send_to_printer_fallback(pdf_path, printer_name, paper_type, print_quality, copies)
+
+def send_to_printer_cups(pdf_path, printer_name, paper_type, print_quality, copies):
+    """Send to printer using CUPS"""
+    try:
+        conn = cups.Connection()
+        
+        # Get available printers
+        printers = conn.getPrinters()
+        
+        if not printers:
+            return {'success': False, 'error': 'No printers available'}
+        
+        # Use specified printer or default
+        if printer_name and printer_name in printers:
+            target_printer = printer_name
+        else:
+            target_printer = list(printers.keys())[0]  # Use first available printer
+        
+        # Set print options optimized for medical imaging
+        print_options = {
+            'copies': str(copies),
+            'print-quality': '5' if print_quality == 'high' else '4',
+            'media-type': 'photographic-glossy' if paper_type == 'glossy' else 'stationery',
+            'ColorModel': 'Gray' if paper_type == 'film' else 'RGB',
+            'Resolution': '1200dpi',
+            'page-ranges': '1-1'
+        }
+        
+        # Add film-specific options
+        if paper_type == 'film':
+            print_options.update({
+                'media-type': 'film',
+                'print-quality': '5',
+                'Resolution': '600dpi',
+                'Density': 'High'
+            })
+        
+        job_id = conn.printFile(target_printer, pdf_path, "DICOM Medical Image", print_options)
+        
+        logger.info(f"Print job {job_id} submitted to printer {target_printer}")
+        
+        return {
+            'success': True,
+            'job_id': job_id,
+            'printer': target_printer,
+            'message': f'Print job submitted successfully to {target_printer}'
+        }
+        
+    except Exception as e:
+        logger.error(f"Error with CUPS printing: {str(e)}")
+        return send_to_printer_fallback(pdf_path, printer_name, paper_type, print_quality, copies)
+
+def send_to_printer_fallback(pdf_path, printer_name, paper_type, print_quality, copies):
+    """Fallback printing using lp command"""
+    try:
+        cmd = ['lp']
+        
+        if printer_name:
+            cmd.extend(['-d', printer_name])
+        
+        # Add print options
+        if print_quality == 'high':
+            cmd.extend(['-o', 'print-quality=5'])
+        
+        if paper_type == 'glossy':
+            cmd.extend(['-o', 'media-type=photographic-glossy'])
+        elif paper_type == 'film':
+            cmd.extend(['-o', 'media-type=film'])
+        
+        cmd.extend(['-n', str(copies)])
+        cmd.extend(['-t', 'DICOM Medical Image'])
+        cmd.append(pdf_path)
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        
+        if result.returncode == 0:
+            return {
+                'success': True,
+                'job_id': result.stdout.strip(),
+                'message': 'Print job submitted successfully using lp command'
+            }
+        else:
+            return {
+                'success': False,
+                'error': f'Print command failed: {result.stderr}'
+            }
+            
+    except Exception as e:
+        logger.error(f"Error with fallback printing: {str(e)}")
+        return {
+            'success': False,
+            'error': f'Printing failed: {str(e)}'
+        }
+
+@login_required
+def get_available_printers(request):
+    """Get list of available printers and their capabilities."""
+    try:
+        if cups:
+            conn = cups.Connection()
+            printers = conn.getPrinters()
+            
+            printer_list = []
+            for name, printer_info in printers.items():
+                printer_list.append({
+                    'name': name,
+                    'description': printer_info.get('printer-info', name),
+                    'location': printer_info.get('printer-location', ''),
+                    'state': printer_info.get('printer-state-message', 'Ready'),
+                    'accepts_jobs': printer_info.get('printer-is-accepting-jobs', True)
+                })
+        else:
+            # Fallback to lpstat command
+            result = subprocess.run(['lpstat', '-p'], capture_output=True, text=True)
+            printer_list = []
+            if result.returncode == 0:
+                for line in result.stdout.strip().split('\n'):
+                    if line.startswith('printer'):
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            printer_list.append({
+                                'name': parts[1],
+                                'description': parts[1],
+                                'location': '',
+                                'state': 'Ready',
+                                'accepts_jobs': True
+                            })
+        
+        return JsonResponse({'success': True, 'printers': printer_list})
+        
+    except Exception as e:
+        logger.error(f"Error getting printers: {str(e)}")
+        return JsonResponse({'success': False, 'error': str(e), 'printers': []})
+
+@login_required
+def print_settings_view(request):
+    """Render print settings page."""
+    if request.method == 'POST':
+        try:
+            # Save print settings
+            default_printer = request.POST.get('default_printer')
+            default_paper_size = request.POST.get('default_paper_size', 'A4')
+            default_paper_type = request.POST.get('default_paper_type', 'glossy')
+            default_quality = request.POST.get('default_quality', 'high')
+            
+            # Store in user session
+            request.session['print_settings'] = {
+                'default_printer': default_printer,
+                'default_paper_size': default_paper_size,
+                'default_paper_type': default_paper_type,
+                'default_quality': default_quality,
+            }
+            
+            messages.success(request, 'Print settings saved successfully')
+            
+        except Exception as e:
+            messages.error(request, f'Error saving print settings: {str(e)}')
+    
+    # Get current settings
+    current_settings = request.session.get('print_settings', {
+        'default_printer': '',
+        'default_paper_size': 'A4',
+        'default_paper_type': 'glossy',
+        'default_quality': 'high',
+    })
+    
+    context = {
+        'current_settings': current_settings,
+    }
+    
+    return render(request, 'dicom_viewer/print_settings.html', context)
+
+@login_required
+def get_print_layouts(request):
+    """Get available print layouts"""
+    layouts = [
+        {'id': 'single', 'name': 'Single Image', 'description': 'One large image with patient info'},
+        {'id': 'quad', 'name': 'Quad Layout', 'description': 'Four identical images on one page'},
+        {'id': 'comparison', 'name': 'Comparison', 'description': 'Two images side by side'}
+    ]
+    return JsonResponse({'success': True, 'layouts': layouts})
