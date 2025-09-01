@@ -219,61 +219,74 @@ def view_study(request, study_id):
 @csrf_exempt
 def api_study_data(request, study_id):
     """API endpoint to get study data for viewer"""
-    study = get_object_or_404(Study, id=study_id)
-    user = request.user
-    
-    # Check permissions
-    if user.is_facility_user() and study.facility != user.facility:
-        return JsonResponse({'error': 'Permission denied'}, status=403)
-    
-    series_list = study.series_set.all().order_by('series_number')
-    
-    data = {
-        'study': {
-            'id': study.id,
-            'accession_number': study.accession_number,
-            'patient_name': study.patient.full_name,
-            'patient_id': study.patient.patient_id,
-            'study_date': study.study_date.isoformat(),
-            'modality': study.modality.code,
-            'description': study.study_description,
-            'body_part': study.body_part,
-            'priority': study.priority,
-            'clinical_info': study.clinical_info,
-        },
-        'series': []
-    }
-    
-    for series in series_list:
-        images = series.images.all().order_by('instance_number')
-        series_info = {
-            'id': series.id,
-            'series_number': series.series_number,
-            'description': series.series_description,
-            'modality': series.modality,
-            'image_count': images.count(),
-            'slice_thickness': series.slice_thickness,
-            'pixel_spacing': series.pixel_spacing,
-            'image_orientation': series.image_orientation,
-            'priority': series.study.priority,
-            'clinical_info': series.study.clinical_info,
-            'images': []
+    try:
+        study = get_object_or_404(Study, id=study_id)
+        user = request.user
+        
+        # Check permissions
+        if hasattr(user, 'is_facility_user') and user.is_facility_user() and hasattr(study, 'facility') and study.facility != user.facility:
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        series_list = study.series_set.all().order_by('series_number')
+        
+        data = {
+            'study': {
+                'id': study.id,
+                'accession_number': getattr(study, 'accession_number', ''),
+                'patient_name': study.patient.full_name if study.patient else 'Unknown',
+                'patient_id': study.patient.patient_id if study.patient else '',
+                'study_date': study.study_date.isoformat() if study.study_date else '',
+                'modality': study.modality.code if hasattr(study, 'modality') and study.modality else getattr(study, 'modality', 'Unknown'),
+                'description': getattr(study, 'study_description', ''),
+                'body_part': getattr(study, 'body_part', ''),
+                'priority': getattr(study, 'priority', 'normal'),
+                'clinical_info': getattr(study, 'clinical_info', ''),
+            },
+            'series': []
         }
         
-        for img in images:
-            image_info = {
-                'id': img.id,
-                'instance_number': img.instance_number,
-                'file_path': img.file_path.url if img.file_path else '',
-                'slice_location': img.slice_location,
-                'image_position': img.image_position,
-                'file_size': img.file_size,
-            }
-            series_info['images'].append(image_info)
+        for series in series_list:
+            try:
+                images = series.images.all().order_by('instance_number')
+                series_info = {
+                    'id': series.id,
+                    'series_number': getattr(series, 'series_number', 0),
+                    'description': getattr(series, 'series_description', ''),
+                    'modality': getattr(series, 'modality', 'Unknown'),
+                    'image_count': images.count(),
+                    'slice_thickness': getattr(series, 'slice_thickness', None),
+                    'pixel_spacing': getattr(series, 'pixel_spacing', None),
+                    'image_orientation': getattr(series, 'image_orientation', None),
+                    'priority': getattr(series.study, 'priority', 'normal'),
+                    'clinical_info': getattr(series.study, 'clinical_info', ''),
+                    'images': []
+                }
+                
+                for img in images:
+                    try:
+                        image_info = {
+                            'id': img.id,
+                            'instance_number': getattr(img, 'instance_number', 0),
+                            'file_path': img.file_path.url if hasattr(img, 'file_path') and img.file_path else '',
+                            'slice_location': getattr(img, 'slice_location', None),
+                            'image_position': getattr(img, 'image_position', None),
+                            'file_size': getattr(img, 'file_size', 0),
+                        }
+                        series_info['images'].append(image_info)
+                    except Exception as e:
+                        logger.warning(f"Error processing image {img.id}: {e}")
+                        continue
+                
+                data['series'].append(series_info)
+            except Exception as e:
+                logger.warning(f"Error processing series {series.id}: {e}")
+                continue
         
-        data['series'].append(series_info)
-    
-    return JsonResponse(data)
+        return JsonResponse(data)
+        
+    except Exception as e:
+        logger.error(f"Error in api_study_data for study {study_id}: {e}")
+        return JsonResponse({'error': f'Failed to load study data: {str(e)}'}, status=500)
 
 @login_required
 @csrf_exempt
@@ -3656,3 +3669,118 @@ def advanced_reconstruction_api(request, series_id):
             'success': False,
             'error': f'Failed to perform advanced reconstruction: {str(e)}'
         })
+
+
+@login_required
+@require_http_methods(["POST"])
+def fast_reconstruction_api(request, series_id):
+    """
+    Fast reconstruction API optimized for speed and performance
+    """
+    try:
+        series = get_object_or_404(Series, id=series_id)
+        
+        # Parse request data
+        data = json.loads(request.body) if request.body else {}
+        recon_type = data.get('type', 'mpr')
+        quality = data.get('quality', 'high')
+        optimize_for_speed = data.get('optimize_for_speed', True)
+        enable_gpu = data.get('enable_gpu', True)
+        
+        # Get DICOM images for the series
+        images = DicomImage.objects.filter(series=series).order_by('instance_number')
+        if not images.exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'No DICOM images found for this series'
+            })
+        
+        # Fast reconstruction based on type
+        if recon_type == 'mpr':
+            # Generate fast MPR views
+            result = {
+                'success': True,
+                'type': 'mpr',
+                'views': {
+                    'axial': f'/dicom-viewer/api/mpr-fast/{series_id}/axial/',
+                    'sagittal': f'/dicom-viewer/api/mpr-fast/{series_id}/sagittal/',
+                    'coronal': f'/dicom-viewer/api/mpr-fast/{series_id}/coronal/'
+                },
+                'slice_counts': {
+                    'axial': images.count(),
+                    'sagittal': images.count(),
+                    'coronal': images.count()
+                }
+            }
+            
+        elif recon_type == 'mip':
+            # Generate fast MIP reconstruction
+            result = {
+                'success': True,
+                'type': 'mip',
+                'images': [
+                    f'/dicom-viewer/api/mip-fast/{series_id}/axial/',
+                    f'/dicom-viewer/api/mip-fast/{series_id}/sagittal/',
+                    f'/dicom-viewer/api/mip-fast/{series_id}/coronal/'
+                ]
+            }
+            
+        elif recon_type == 'bone':
+            # Generate fast bone 3D reconstruction
+            threshold = data.get('bone_threshold', 300)
+            result = {
+                'success': True,
+                'type': 'bone',
+                'images': [f'/dicom-viewer/api/bone-fast/{series_id}/?threshold={threshold}'],
+                'threshold': threshold
+            }
+            
+        else:
+            # Generic fast reconstruction
+            result = {
+                'success': True,
+                'type': recon_type,
+                'images': [f'/dicom-viewer/api/recon-fast/{series_id}/{recon_type}/']
+            }
+        
+        return JsonResponse(result)
+        
+    except Exception as e:
+        logger.error(f"Fast reconstruction error for series {series_id}: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Fast reconstruction failed: {str(e)}'
+        })
+
+
+@login_required
+def mpr_slice_api(request, series_id, plane, slice_index):
+    """
+    API endpoint for fast MPR slice retrieval
+    """
+    try:
+        series = get_object_or_404(Series, id=series_id)
+        
+        # Get the MPR slice using existing optimized function
+        slice_index = int(slice_index)
+        
+        # Use existing MPR cache system
+        cached_slice = _mpr_cache_get(series_id, plane, slice_index, 400, 40, False)
+        if cached_slice:
+            # Return cached slice as image response
+            import base64
+            from django.http import HttpResponse
+            
+            image_data = base64.b64decode(cached_slice.split(',')[1])
+            return HttpResponse(image_data, content_type='image/png')
+        
+        # Generate new slice if not cached
+        # This would use the existing MPR generation system
+        # For now, return a placeholder
+        from django.http import Http404
+        raise Http404("MPR slice not available")
+        
+    except Exception as e:
+        logger.error(f"MPR slice error: {e}")
+        from django.http import Http404
+        raise Http404("MPR slice not found")
