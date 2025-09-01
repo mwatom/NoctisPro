@@ -40,17 +40,49 @@ logger = logging.getLogger(__name__)
 
 class ModalityType(Enum):
     """DICOM modality types with specific processing requirements"""
-    CT = "CT"
-    MR = "MR" 
-    XR = "XR"
-    US = "US"
-    NM = "NM"
-    PT = "PT"
-    RF = "RF"
-    MG = "MG"
-    DX = "DX"
-    CR = "CR"
-    OTHER = "OT"
+    # Core modalities
+    CT = "CT"           # Computed Tomography
+    MR = "MR"           # Magnetic Resonance
+    XR = "XR"           # X-Ray
+    US = "US"           # Ultrasound
+    NM = "NM"           # Nuclear Medicine
+    PT = "PT"           # Positron Emission Tomography
+    RF = "RF"           # Radio Fluoroscopy
+    MG = "MG"           # Mammography
+    
+    # Digital radiography
+    CR = "CR"           # Computed Radiography
+    DX = "DX"           # Digital Radiography
+    IO = "IO"           # Intraoral Radiography
+    PX = "PX"           # Panoramic X-Ray
+    
+    # Specialized imaging
+    GM = "GM"           # General Microscopy
+    SM = "SM"           # Slide Microscopy
+    XC = "XC"           # External Camera Photography
+    ECG = "ECG"         # Electrocardiography
+    EPS = "EPS"         # Cardiac Electrophysiology
+    HD = "HD"           # Hemodynamic Waveform
+    
+    # Radiotherapy
+    RTIMAGE = "RTIMAGE" # Radiotherapy Image
+    RTDOSE = "RTDOSE"   # Radiotherapy Dose
+    RTSTRUCT = "RTSTRUCT" # Radiotherapy Structure Set
+    RTPLAN = "RTPLAN"   # Radiotherapy Plan
+    
+    # Advanced imaging
+    SPECT = "SPECT"     # Single Photon Emission Computed Tomography
+    PET_CT = "PET/CT"   # Combined PET/CT
+    MRA = "MRA"         # MR Angiography
+    CTA = "CTA"         # CT Angiography
+    
+    # Functional imaging
+    FMRI = "fMRI"       # Functional MRI
+    DTI = "DTI"         # Diffusion Tensor Imaging
+    PERFUSION = "PERF"  # Perfusion Imaging
+    
+    # Other
+    OT = "OT"           # Other
 
 
 class WindowPreset(Enum):
@@ -270,6 +302,141 @@ class DicomProcessor:
             area -= mm_points[j][0] * mm_points[i][1]
         return abs(area) / 2.0
 
+    def process_dicom_image_comprehensive(self, dicom_data, enhance_for_modality=True):
+        """
+        Comprehensive DICOM image processing that handles all modality types
+        with optimized display parameters and enhancements.
+        """
+        try:
+            # Get modality
+            modality = getattr(dicom_data, 'Modality', 'OT')
+            
+            # Get pixel array
+            pixel_array = dicom_data.pixel_array.copy()
+            
+            # Handle different photometric interpretations
+            photometric = getattr(dicom_data, 'PhotometricInterpretation', 'MONOCHROME2')
+            
+            # Apply modality-specific processing
+            if enhance_for_modality:
+                pixel_array = self._apply_modality_specific_processing(pixel_array, dicom_data, modality)
+            
+            # Apply appropriate windowing based on modality
+            windowed_array = self._apply_modality_windowing(pixel_array, dicom_data, modality)
+            
+            # Handle color images
+            if photometric in ['RGB', 'YBR_FULL', 'YBR_FULL_422', 'YBR_PARTIAL_422']:
+                return self._process_color_image(windowed_array, photometric)
+            
+            # Handle monochrome images
+            return self._process_monochrome_image(windowed_array, photometric)
+            
+        except Exception as e:
+            logger.error(f"Error in comprehensive DICOM processing: {str(e)}")
+            # Fallback to basic processing
+            return self._basic_image_processing(dicom_data)
+    
+    def _apply_modality_specific_processing(self, pixel_array, dicom_data, modality):
+        """Apply modality-specific image processing enhancements"""
+        try:
+            if modality in ['CT']:
+                # CT-specific processing
+                return self._process_ct_image(pixel_array, dicom_data)
+            elif modality in ['MR', 'MRA', 'FMRI', 'DTI']:
+                # MR-specific processing
+                return self._process_mr_image(pixel_array, dicom_data)
+            elif modality in ['XR', 'CR', 'DX', 'RF']:
+                # X-Ray specific processing
+                return self._process_xray_image(pixel_array, dicom_data)
+            elif modality in ['US']:
+                # Ultrasound specific processing
+                return self._process_ultrasound_image(pixel_array, dicom_data)
+            elif modality in ['MG']:
+                # Mammography specific processing
+                return self._process_mammography_image(pixel_array, dicom_data)
+            elif modality in ['NM', 'PT', 'SPECT']:
+                # Nuclear medicine specific processing
+                return self._process_nuclear_image(pixel_array, dicom_data)
+            else:
+                # Generic processing for other modalities
+                return self._process_generic_image(pixel_array, dicom_data)
+                
+        except Exception as e:
+            logger.warning(f"Modality-specific processing failed for {modality}: {str(e)}")
+            return pixel_array
+    
+    def _process_ct_image(self, pixel_array, dicom_data):
+        """CT-specific image processing"""
+        # Apply Hounsfield unit conversion
+        if hasattr(dicom_data, 'RescaleSlope') and hasattr(dicom_data, 'RescaleIntercept'):
+            slope = float(dicom_data.RescaleSlope)
+            intercept = float(dicom_data.RescaleIntercept)
+            pixel_array = pixel_array * slope + intercept
+        
+        # Noise reduction for CT
+        pixel_array = self._apply_noise_reduction(pixel_array, method='gaussian')
+        return pixel_array
+    
+    def _process_mr_image(self, pixel_array, dicom_data):
+        """MR-specific image processing"""
+        # Normalize MR intensity
+        pixel_array = self._normalize_intensity(pixel_array)
+        
+        # Apply bias field correction if needed
+        pixel_array = self._apply_bias_correction(pixel_array)
+        
+        # Enhance contrast for MR
+        pixel_array = self._enhance_contrast(pixel_array, method='adaptive')
+        return pixel_array
+    
+    def _process_xray_image(self, pixel_array, dicom_data):
+        """X-Ray specific image processing"""
+        # Apply logarithmic transformation for X-Ray
+        pixel_array = self._apply_log_transform(pixel_array)
+        
+        # Enhance edges for X-Ray
+        pixel_array = self._enhance_edges(pixel_array)
+        
+        # Apply histogram equalization
+        pixel_array = self._apply_histogram_equalization(pixel_array)
+        return pixel_array
+    
+    def _process_ultrasound_image(self, pixel_array, dicom_data):
+        """Ultrasound specific image processing"""
+        # Speckle reduction
+        pixel_array = self._apply_speckle_reduction(pixel_array)
+        
+        # Enhance contrast for ultrasound
+        pixel_array = self._enhance_contrast(pixel_array, method='ultrasound')
+        return pixel_array
+    
+    def _process_mammography_image(self, pixel_array, dicom_data):
+        """Mammography specific image processing"""
+        # Apply specialized mammography enhancement
+        pixel_array = self._apply_mammography_enhancement(pixel_array)
+        
+        # Enhance microcalcifications
+        pixel_array = self._enhance_microcalcifications(pixel_array)
+        return pixel_array
+    
+    def _process_nuclear_image(self, pixel_array, dicom_data):
+        """Nuclear medicine specific image processing"""
+        # Apply nuclear medicine specific normalization
+        pixel_array = self._normalize_nuclear_image(pixel_array)
+        
+        # Apply smoothing for nuclear images
+        pixel_array = self._apply_nuclear_smoothing(pixel_array)
+        return pixel_array
+    
+    def _process_generic_image(self, pixel_array, dicom_data):
+        """Generic image processing for other modalities"""
+        # Basic normalization
+        pixel_array = self._normalize_intensity(pixel_array)
+        
+        # Basic contrast enhancement
+        pixel_array = self._enhance_contrast(pixel_array, method='basic')
+        return pixel_array
+
     def calculate_angle(self, point1, point2, point3):
         v1 = np.array([point1[0] - point2[0], point1[1] - point2[1]])
         v2 = np.array([point3[0] - point2[0], point3[1] - point2[1]])
@@ -474,6 +641,254 @@ class DicomProcessor:
             )
         
         return report
+
+    # Helper methods for modality-specific processing
+    def _apply_modality_windowing(self, pixel_array, dicom_data, modality):
+        """Apply modality-specific windowing"""
+        try:
+            if modality == 'CT':
+                # Use appropriate CT window
+                return self.apply_windowing(pixel_array, 400, 40)  # Soft tissue
+            elif modality in ['MR', 'MRA', 'FMRI', 'DTI']:
+                # MR auto-windowing
+                ww, wl = self.get_optimal_window_level(pixel_array, 'MR')
+                return self.apply_windowing(pixel_array, ww, wl)
+            elif modality in ['XR', 'CR', 'DX']:
+                # X-Ray windowing
+                ww, wl = self.get_optimal_window_level(pixel_array, 'XR')
+                return self.apply_windowing(pixel_array, ww, wl)
+            else:
+                # Auto-windowing for other modalities
+                ww, wl = self.get_optimal_window_level(pixel_array, modality)
+                return self.apply_windowing(pixel_array, ww, wl)
+        except Exception:
+            return pixel_array
+
+    def _process_color_image(self, image_array, photometric):
+        """Process color DICOM images"""
+        if photometric == 'RGB':
+            return image_array
+        elif photometric in ['YBR_FULL', 'YBR_FULL_422', 'YBR_PARTIAL_422']:
+            # Convert YBR to RGB
+            return self._convert_ybr_to_rgb(image_array)
+        return image_array
+
+    def _process_monochrome_image(self, image_array, photometric):
+        """Process monochrome DICOM images"""
+        if photometric == 'MONOCHROME1':
+            # Invert for MONOCHROME1
+            return np.max(image_array) - image_array
+        return image_array
+
+    def _basic_image_processing(self, dicom_data):
+        """Fallback basic image processing"""
+        try:
+            pixel_array = dicom_data.pixel_array
+            return self.apply_windowing(pixel_array, 400, 40)
+        except Exception:
+            return np.zeros((512, 512), dtype=np.uint8)
+
+    def _normalize_intensity(self, pixel_array):
+        """Normalize image intensity"""
+        try:
+            min_val = np.min(pixel_array)
+            max_val = np.max(pixel_array)
+            if max_val > min_val:
+                return (pixel_array - min_val) / (max_val - min_val) * 255.0
+            return pixel_array
+        except Exception:
+            return pixel_array
+
+    def _apply_noise_reduction(self, pixel_array, method='gaussian'):
+        """Apply noise reduction"""
+        try:
+            from scipy import ndimage
+            if method == 'gaussian':
+                return ndimage.gaussian_filter(pixel_array, sigma=0.8)
+            elif method == 'median':
+                return ndimage.median_filter(pixel_array, size=3)
+            return pixel_array
+        except ImportError:
+            return pixel_array
+        except Exception:
+            return pixel_array
+
+    def _apply_bias_correction(self, pixel_array):
+        """Apply bias field correction (simplified)"""
+        try:
+            # Simple bias correction using low-pass filtering
+            from scipy import ndimage
+            bias_field = ndimage.gaussian_filter(pixel_array, sigma=50)
+            bias_field[bias_field == 0] = 1  # Avoid division by zero
+            return pixel_array / bias_field * np.mean(bias_field)
+        except (ImportError, Exception):
+            return pixel_array
+
+    def _enhance_contrast(self, pixel_array, method='adaptive'):
+        """Enhance image contrast"""
+        try:
+            if method == 'adaptive':
+                # Adaptive histogram equalization
+                return self._apply_adaptive_histogram_equalization(pixel_array)
+            elif method == 'basic':
+                # Simple contrast stretching
+                return self._apply_contrast_stretching(pixel_array)
+            elif method == 'ultrasound':
+                # Ultrasound-specific contrast enhancement
+                return self._apply_ultrasound_contrast(pixel_array)
+            return pixel_array
+        except Exception:
+            return pixel_array
+
+    def _apply_log_transform(self, pixel_array):
+        """Apply logarithmic transformation"""
+        try:
+            # Ensure positive values
+            pixel_array = pixel_array - np.min(pixel_array) + 1
+            return np.log(pixel_array + 1)
+        except Exception:
+            return pixel_array
+
+    def _enhance_edges(self, pixel_array):
+        """Enhance edges in the image"""
+        try:
+            from scipy import ndimage
+            # Sobel edge detection
+            edge_x = ndimage.sobel(pixel_array, axis=0)
+            edge_y = ndimage.sobel(pixel_array, axis=1)
+            edges = np.sqrt(edge_x**2 + edge_y**2)
+            # Combine with original
+            return pixel_array + 0.3 * edges
+        except (ImportError, Exception):
+            return pixel_array
+
+    def _apply_histogram_equalization(self, pixel_array):
+        """Apply histogram equalization"""
+        try:
+            # Flatten and get histogram
+            flat = pixel_array.flatten()
+            hist, bins = np.histogram(flat, bins=256, range=(flat.min(), flat.max()))
+            
+            # Calculate CDF
+            cdf = hist.cumsum()
+            cdf = cdf / cdf.max()
+            
+            # Interpolate
+            equalized = np.interp(flat, bins[:-1], cdf * 255)
+            return equalized.reshape(pixel_array.shape)
+        except Exception:
+            return pixel_array
+
+    def _apply_speckle_reduction(self, pixel_array):
+        """Apply speckle reduction for ultrasound"""
+        try:
+            from scipy import ndimage
+            # Anisotropic diffusion-like filtering
+            return ndimage.gaussian_filter(pixel_array, sigma=1.2)
+        except (ImportError, Exception):
+            return pixel_array
+
+    def _apply_mammography_enhancement(self, pixel_array):
+        """Apply mammography-specific enhancement"""
+        try:
+            # Enhance contrast for mammography
+            enhanced = self._apply_contrast_stretching(pixel_array)
+            # Apply unsharp masking
+            return self._apply_unsharp_masking(enhanced)
+        except Exception:
+            return pixel_array
+
+    def _enhance_microcalcifications(self, pixel_array):
+        """Enhance microcalcifications in mammography"""
+        try:
+            from scipy import ndimage
+            # High-pass filtering to enhance small features
+            low_pass = ndimage.gaussian_filter(pixel_array, sigma=3)
+            high_pass = pixel_array - low_pass
+            return pixel_array + 0.5 * high_pass
+        except (ImportError, Exception):
+            return pixel_array
+
+    def _normalize_nuclear_image(self, pixel_array):
+        """Normalize nuclear medicine images"""
+        try:
+            # Apply square root normalization for nuclear images
+            return np.sqrt(pixel_array - np.min(pixel_array) + 1)
+        except Exception:
+            return pixel_array
+
+    def _apply_nuclear_smoothing(self, pixel_array):
+        """Apply smoothing for nuclear images"""
+        try:
+            from scipy import ndimage
+            return ndimage.gaussian_filter(pixel_array, sigma=1.5)
+        except (ImportError, Exception):
+            return pixel_array
+
+    def _convert_ybr_to_rgb(self, image_array):
+        """Convert YBR color space to RGB"""
+        try:
+            if len(image_array.shape) == 3 and image_array.shape[2] == 3:
+                # YBR to RGB conversion matrix
+                y, cb, cr = image_array[:,:,0], image_array[:,:,1], image_array[:,:,2]
+                r = y + 1.402 * (cr - 128)
+                g = y - 0.344 * (cb - 128) - 0.714 * (cr - 128)
+                b = y + 1.772 * (cb - 128)
+                
+                # Clip values
+                r = np.clip(r, 0, 255)
+                g = np.clip(g, 0, 255)
+                b = np.clip(b, 0, 255)
+                
+                return np.stack([r, g, b], axis=2)
+            return image_array
+        except Exception:
+            return image_array
+
+    def _apply_adaptive_histogram_equalization(self, pixel_array):
+        """Apply adaptive histogram equalization"""
+        try:
+            # Simple adaptive histogram equalization
+            h, w = pixel_array.shape
+            result = np.zeros_like(pixel_array)
+            
+            # Process in 64x64 blocks
+            block_size = 64
+            for i in range(0, h, block_size):
+                for j in range(0, w, block_size):
+                    block = pixel_array[i:i+block_size, j:j+block_size]
+                    result[i:i+block_size, j:j+block_size] = self._apply_histogram_equalization(block)
+            
+            return result
+        except Exception:
+            return pixel_array
+
+    def _apply_contrast_stretching(self, pixel_array):
+        """Apply contrast stretching"""
+        try:
+            # Percentile-based contrast stretching
+            p2, p98 = np.percentile(pixel_array, (2, 98))
+            return np.clip((pixel_array - p2) * 255 / (p98 - p2), 0, 255)
+        except Exception:
+            return pixel_array
+
+    def _apply_ultrasound_contrast(self, pixel_array):
+        """Apply ultrasound-specific contrast enhancement"""
+        try:
+            # Log compression for ultrasound
+            return 20 * np.log10(pixel_array + 1)
+        except Exception:
+            return pixel_array
+
+    def _apply_unsharp_masking(self, pixel_array):
+        """Apply unsharp masking"""
+        try:
+            from scipy import ndimage
+            blurred = ndimage.gaussian_filter(pixel_array, sigma=2)
+            mask = pixel_array - blurred
+            return pixel_array + 0.5 * mask
+        except (ImportError, Exception):
+            return pixel_array
 
 
 class DicomFileHandler:

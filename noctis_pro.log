@@ -1100,3 +1100,13 @@ Watching for file changes with StatReloader
 [32mHTTP HEAD /dicom-viewer/api/hounsfield/ 302 [0.00, 127.0.0.1:41578][0m
 [32mHTTP HEAD /worklist/api/study/1/delete/ 302 [0.00, 127.0.0.1:41590][0m
 [32mHTTP HEAD /admin/ 302 [0.01, 127.0.0.1:41592][0m
+Watching for file changes with StatReloader
+/workspace/venv/lib/python3.13/site-packages/numpy/lib/_arraypad_impl.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+[mHTTP HEAD /static/css/dicom-viewer-buttons.css 200 [0.00, 127.0.0.1:50082][0m
+[mHTTP HEAD /static/js/dicom-viewer-mouse-fix.js 200 [0.00, 127.0.0.1:50090][0m
+[32mHTTP POST /dicom-viewer/api/hounsfield/ 302 [0.01, 127.0.0.1:53510][0m
+[32mHTTP HEAD /dicom-viewer/print/printers/ 302 [0.00, 127.0.0.1:53514][0m
+/workspace/dicom_viewer/dicom_utils.py changed, reloading.
+Watching for file changes with StatReloader
