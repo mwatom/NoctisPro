@@ -118,33 +118,49 @@
 <body>
   <div class="layout">
     <div class="toolbar">
-      <button class="tool active" data-tool="window"><i class="fas fa-adjust"></i><span>Window</span></button>
-      <button class="tool" data-tool="zoom"><i class="fas fa-search-plus"></i><span>Zoom</span></button>
-      <button class="tool" data-tool="pan"><i class="fas fa-arrows-alt"></i><span>Pan</span></button>
-      <button class="tool" data-tool="measure"><i class="fas fa-ruler"></i><span>Measure</span></button>
-      <button class="tool" data-tool="annotate"><i class="fas fa-comment-dots"></i><span>Annotate</span></button>
-      <button class="tool" data-tool="crosshair"><i class="fas fa-crosshairs"></i><span>Crosshair</span></button>
-      <button class="tool" data-tool="hu"><i class="fas fa-thermometer-half"></i><span>HU</span></button>
-      <button class="tool" data-tool="invert"><i class="fas fa-adjust"></i><span>Invert</span></button>
-      <button class="tool" data-tool="reset"><i class="fas fa-undo"></i><span>Reset</span></button>
-      <button class="tool" data-tool="fit"><i class="fas fa-compress-arrows-alt"></i><span>Fit</span></button>
-      <button class="tool" data-tool="one"><i class="fas fa-expand"></i><span>1:1</span></button>
-      <button class="tool" data-tool="cine"><i class="fas fa-film"></i><span>Cine</span></button>
-      <button class="tool" data-tool="spyglass"><i class="fas fa-search"></i><span>Spyglass</span></button>
-      <button class="tool" data-tool="align-center"><i class="fas fa-align-center"></i><span>Center</span></button>
-      <button class="tool" data-tool="reload"><i class="fas fa-sync"></i><span>Reload</span></button>
-      <button class="tool" data-tool="ai"><i class="fas fa-robot"></i><span>AI</span></button>
-      <!-- 3D dropdown moved into toolbar -->
+      <!-- Basic Navigation Tools -->
+      <button class="tool active" data-tool="window" title="Window/Level Adjustment"><i class="fas fa-adjust"></i><span>Window</span></button>
+      <button class="tool" data-tool="zoom" title="Zoom Tool"><i class="fas fa-search-plus"></i><span>Zoom</span></button>
+      <button class="tool" data-tool="pan" title="Pan Image"><i class="fas fa-arrows-alt"></i><span>Pan</span></button>
+      
+      <!-- Measurement Tools -->
+      <button class="tool" data-tool="measure" title="Distance Measurement"><i class="fas fa-ruler"></i><span>Measure</span></button>
+      <button class="tool" data-tool="annotate" title="Add Annotations"><i class="fas fa-comment-dots"></i><span>Annotate</span></button>
+      <button class="tool" data-tool="crosshair" title="Crosshair Overlay"><i class="fas fa-crosshairs"></i><span>Crosshair</span></button>
+      
+      <!-- Diagnostic Tools -->
+      <button class="tool" data-tool="hu" title="Hounsfield Unit Probe"><i class="fas fa-thermometer-half"></i><span>HU</span></button>
+      <button class="tool" data-tool="roi" title="Region of Interest"><i class="fas fa-circle"></i><span>ROI</span></button>
+      <button class="tool" data-tool="angle" title="Angle Measurement"><i class="fas fa-drafting-compass"></i><span>Angle</span></button>
+      
+      <!-- Display Controls -->
+      <button class="tool" data-tool="invert" title="Invert Colors"><i class="fas fa-adjust"></i><span>Invert</span></button>
+      <button class="tool" data-tool="reset" title="Reset View"><i class="fas fa-undo"></i><span>Reset</span></button>
+      <button class="tool" data-tool="fit" title="Fit to Window"><i class="fas fa-compress-arrows-alt"></i><span>Fit</span></button>
+      <button class="tool" data-tool="one" title="1:1 Zoom"><i class="fas fa-expand"></i><span>1:1</span></button>
+      
+      <!-- Advanced Tools -->
+      <button class="tool" data-tool="cine" title="Cine Mode"><i class="fas fa-film"></i><span>Cine</span></button>
+      <button class="tool" data-tool="spyglass" title="Magnifying Glass"><i class="fas fa-search"></i><span>Spyglass</span></button>
+      <button class="tool" data-tool="sync" title="Synchronize Views"><i class="fas fa-link"></i><span>Sync</span></button>
+      
+      <!-- 3D Reconstruction Dropdown -->
       <div class="tool-dropdown">
-        <button id="btn3D" class="tool"><i class="fas fa-cube"></i><span>3D</span></button>
+        <button id="btn3D" class="tool" title="3D Reconstruction Tools"><i class="fas fa-cube"></i><span>3D</span></button>
         <div id="menu3D" class="tool-dropdown-menu">
-          <button data-recon="mpr"><i class="fas fa-layer-group"></i> MPR</button>
+          <button data-recon="mpr"><i class="fas fa-layer-group"></i> MPR Views</button>
           <button data-recon="mip"><i class="fas fa-bullseye"></i> MIP</button>
-          <button data-recon="bone"><i class="fas fa-bone"></i> Bone</button>
+          <button data-recon="minip"><i class="fas fa-dot-circle"></i> MinIP</button>
+          <button data-recon="vr"><i class="fas fa-cube"></i> Volume Render</button>
+          <button data-recon="bone"><i class="fas fa-bone"></i> Bone 3D</button>
+          <button data-recon="vessel"><i class="fas fa-heartbeat"></i> Vessel Analysis</button>
+          <button data-recon="cardiac"><i class="fas fa-heart"></i> Cardiac 4D</button>
           <button data-recon="ai-3d-print"><i class="fas fa-print"></i> AI 3D Print</button>
-          <button data-recon="advanced-recon"><i class="fas fa-brain"></i> Advanced Recon</button>
         </div>
       </div>
+      
+      <!-- AI Analysis -->
+      <button class="tool" data-tool="ai" title="AI-Assisted Analysis"><i class="fas fa-brain"></i><span>AI</span></button>
     </div>
     <div class="topbar">
       <button id="btnLoadLocal" class="btn-control"><i class="fas fa-folder-open"></i> Load Local DICOM</button>
