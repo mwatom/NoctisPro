@@ -1110,3 +1110,4 @@ Watching for file changes with StatReloader
 [32mHTTP HEAD /dicom-viewer/print/printers/ 302 [0.00, 127.0.0.1:53514][0m
 /workspace/dicom_viewer/dicom_utils.py changed, reloading.
 Watching for file changes with StatReloader
+Watching for file changes with StatReloader
