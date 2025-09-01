@@ -19,3 +19,18 @@ Watching for file changes with StatReloader
 Watching for file changes with StatReloader
 [mHTTP HEAD /login/ 200 [0.01, 127.0.0.1:44808][0m
 [mHTTP GET /login/ 200 [0.01, 127.0.0.1:36596][0m
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+/workspace/accounts/views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+/workspace/accounts/views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+/workspace/accounts/views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+/workspace/accounts/views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
