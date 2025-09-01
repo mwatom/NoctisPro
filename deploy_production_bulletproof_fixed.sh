@@ -46,13 +46,21 @@ cleanup_on_error() {
     log_error "Deployment failed with exit code: $exit_code"
     log_info "Initiating rollback procedures..."
     
-    # Stop any running processes
-    pkill -f "daphne.*noctis_pro" 2>/dev/null || true
-    pkill -f "ngrok" 2>/dev/null || true
+    # Stop any running processes using our comprehensive stop function
+    if declare -f stop_existing_services > /dev/null 2>&1; then
+        stop_existing_services
+    else
+        # Fallback if function not defined yet
+        pkill -f "daphne.*noctis_pro" 2>/dev/null || true
+        pkill -f "ngrok" 2>/dev/null || true
+        kill_port_processes 8000 2>/dev/null || true
+    fi
     
     # Stop systemd service if it was created
-    sudo systemctl stop "$SERVICE_NAME" 2>/dev/null || true
-    sudo systemctl disable "$SERVICE_NAME" 2>/dev/null || true
+    if sudo -n true 2>/dev/null; then
+        sudo systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+        sudo systemctl disable "$SERVICE_NAME" 2>/dev/null || true
+    fi
     
     # Restore backup if exists
     if [ -d "$BACKUP_DIR" ]; then
@@ -66,6 +74,95 @@ cleanup_on_error() {
 
 trap cleanup_on_error ERR
 
+# Check if port is in use
+is_port_in_use() {
+    local port=${1:-8000}
+    
+    # Try multiple methods to check port usage
+    if command -v fuser >/dev/null 2>&1; then
+        fuser -n tcp "$port" >/dev/null 2>&1
+    elif command -v netstat >/dev/null 2>&1; then
+        netstat -tulpn 2>/dev/null | grep ":$port " >/dev/null
+    elif command -v ss >/dev/null 2>&1; then
+        ss -tulpn 2>/dev/null | grep ":$port " >/dev/null
+    else
+        # Fallback: try to connect to the port
+        timeout 2 bash -c "echo >/dev/tcp/localhost/$port" 2>/dev/null
+    fi
+}
+
+# Get PIDs using a port
+get_port_pids() {
+    local port=${1:-8000}
+    local pids=""
+    
+    if command -v fuser >/dev/null 2>&1; then
+        pids=$(fuser -n tcp "$port" 2>/dev/null | awk '{print $1}' || true)
+    elif command -v netstat >/dev/null 2>&1; then
+        pids=$(netstat -tulpn 2>/dev/null | grep ":$port " | awk '{print $7}' | cut -d'/' -f1 || true)
+    elif command -v ss >/dev/null 2>&1; then
+        pids=$(ss -tulpn 2>/dev/null | grep ":$port " | awk '{print $6}' | grep -o '[0-9]*' || true)
+    fi
+    
+    echo "$pids"
+}
+
+# Kill processes using a port
+kill_port_processes() {
+    local port=${1:-8000}
+    
+    if command -v fuser >/dev/null 2>&1; then
+        fuser -k -n tcp "$port" 2>/dev/null || true
+    else
+        local pids=$(get_port_pids "$port")
+        if [ ! -z "$pids" ]; then
+            echo "$pids" | xargs -r kill -KILL 2>/dev/null || true
+        fi
+    fi
+}
+
+# Check port availability
+check_port_availability() {
+    local port=${1:-8000}
+    local max_attempts=5
+    local attempt=1
+    
+    log_info "Checking port $port availability..."
+    
+    while [ $attempt -le $max_attempts ]; do
+        if ! is_port_in_use "$port"; then
+            log_success "Port $port is available"
+            return 0
+        fi
+        
+        log_warning "Port $port is in use (attempt $attempt/$max_attempts)"
+        
+        # Try to free the port
+        local port_pids=$(get_port_pids "$port")
+        if [ ! -z "$port_pids" ]; then
+            log_info "Attempting to free port $port (PIDs: $port_pids)"
+            echo "$port_pids" | xargs -r kill -TERM 2>/dev/null || true
+            sleep 3
+            
+            # Force kill if still running
+            if is_port_in_use "$port"; then
+                log_warning "Force killing processes on port $port"
+                kill_port_processes "$port"
+                sleep 2
+            fi
+        else
+            # No PIDs found but port still in use, try generic kill
+            kill_port_processes "$port"
+            sleep 2
+        fi
+        
+        ((attempt++))
+    done
+    
+    log_error "Could not free port $port after $max_attempts attempts"
+    return 1
+}
+
 # Pre-deployment validation
 validate_environment() {
     log_header "🔍 Pre-deployment Validation"
@@ -78,10 +175,24 @@ validate_environment() {
     log_success "Python 3 found: $(python3 --version)"
     
     # Check virtual environment
-    if [ ! -d "venv" ]; then
-        log_info "Virtual environment not found. Creating one..."
-        python3 -m venv venv
-        log_success "Virtual environment created"
+    if [ ! -d "venv" ] || [ ! -f "venv/bin/activate" ]; then
+        log_info "Virtual environment not found or broken. Creating/recreating one..."
+        rm -rf venv 2>/dev/null || true
+        
+        # Try different methods to create virtual environment
+        if python3 -m venv venv 2>/dev/null; then
+            log_success "Virtual environment created with venv module"
+        elif command -v virtualenv >/dev/null 2>&1; then
+            virtualenv venv
+            log_success "Virtual environment created with virtualenv"
+        else
+            log_warning "Cannot create virtual environment, trying to install packages globally"
+            # Create a fake activate script that does nothing
+            mkdir -p venv/bin
+            echo '#!/bin/bash' > venv/bin/activate
+            echo 'echo "Using system Python (no venv available)"' >> venv/bin/activate
+            chmod +x venv/bin/activate
+        fi
     fi
     
     # Check essential files
@@ -108,6 +219,9 @@ validate_environment() {
     else
         log_success "Sudo access available"
     fi
+    
+    # Check port availability
+    check_port_availability 8000
 }
 
 # Install system dependencies
@@ -144,7 +258,10 @@ install_system_dependencies() {
             libwebp-dev \
             libtiff5-dev \
             libopenjp2-7-dev \
-            zlib1g-dev || {
+            zlib1g-dev \
+            psmisc \
+            procps \
+            net-tools || {
             log_warning "Some system packages failed to install, but continuing..."
         }
         
@@ -175,6 +292,19 @@ install_system_dependencies() {
         fi
     else
         log_warning "Skipping system package installation (no sudo access)"
+        
+        # Check if essential tools are available and warn if missing
+        local missing_tools=()
+        for tool in fuser netstat ss curl; do
+            if ! command -v "$tool" >/dev/null 2>&1; then
+                missing_tools+=("$tool")
+            fi
+        done
+        
+        if [ ${#missing_tools[@]} -gt 0 ]; then
+            log_warning "Missing system tools: ${missing_tools[*]}"
+            log_warning "Port management may be limited without these tools"
+        fi
     fi
 }
 
@@ -224,32 +354,40 @@ install_dependencies() {
     log_header "📚 Installing Dependencies"
     
     # Create virtual environment if it doesn't exist
-    if [ ! -d "venv" ]; then
+    if [ ! -d "venv" ] || [ ! -f "venv/bin/activate" ]; then
         log_info "Creating virtual environment..."
-        python3 -m venv venv || {
-            log_error "Failed to create virtual environment"
-            exit 1
-        }
-        log_success "Virtual environment created"
+        rm -rf venv 2>/dev/null || true
+        
+        if python3 -m venv venv 2>/dev/null; then
+            log_success "Virtual environment created"
+        elif command -v virtualenv >/dev/null 2>&1; then
+            virtualenv venv
+            log_success "Virtual environment created with virtualenv"
+        else
+            log_warning "Cannot create virtual environment, using system Python"
+            mkdir -p venv/bin
+            echo '#!/bin/bash' > venv/bin/activate
+            echo 'echo "Using system Python (no venv available)"' >> venv/bin/activate
+            chmod +x venv/bin/activate
+        fi
     fi
     
     # Activate virtual environment
     source venv/bin/activate || {
-        log_error "Failed to activate virtual environment"
-        exit 1
+        log_warning "Failed to activate virtual environment, using system Python"
     }
     
     # Upgrade pip safely
-    python -m pip install --upgrade pip --quiet || {
+    python3 -m pip install --upgrade pip --quiet || {
         log_warning "Pip upgrade failed, continuing with current version"
     }
     
     # Install requirements with error handling
     if [ -f "requirements.txt" ]; then
         log_info "Installing Python packages..."
-        pip install -r requirements.txt || {
+        pip install -r requirements.txt --break-system-packages || {
             log_warning "Some packages failed to install, trying essential ones only..."
-            pip install django djangorestframework daphne redis python-dotenv pillow pydicom numpy scipy matplotlib django-cors-headers channels || {
+            pip install django djangorestframework daphne redis python-dotenv pillow pydicom numpy scipy matplotlib django-cors-headers channels --break-system-packages || {
                 log_error "Failed to install essential packages"
                 exit 1
             }
@@ -258,12 +396,12 @@ install_dependencies() {
     fi
     
     # Install additional packages for image processing
-    pip install dj-database-url scikit-image opencv-python || {
+    pip install dj-database-url scikit-image opencv-python --break-system-packages || {
         log_warning "Some optional packages failed to install"
     }
     
     # Verify critical packages
-    python -c "import django, daphne" || {
+    python3 -c "import django, daphne" || {
         log_error "Critical packages not available"
         exit 1
     }
@@ -383,11 +521,82 @@ WantedBy=multi-user.target
 EOF
     
     # Install service
-    sudo cp /tmp/$SERVICE_NAME.service /etc/systemd/system/
-    sudo systemctl daemon-reload
-    sudo systemctl enable $SERVICE_NAME
+    if sudo cp /tmp/$SERVICE_NAME.service /etc/systemd/system/ 2>/dev/null && \
+       sudo systemctl daemon-reload 2>/dev/null && \
+       sudo systemctl enable $SERVICE_NAME 2>/dev/null; then
+        log_success "Systemd service created and enabled"
+    else
+        log_warning "Systemd service creation failed (systemd may not be available)"
+        return 1
+    fi
+}
+
+# Stop all existing services
+stop_existing_services() {
+    log_info "🛑 Stopping all existing services..."
     
-    log_success "Systemd service created and enabled"
+    # Stop systemd service if it exists
+    if sudo -n true 2>/dev/null; then
+        local services=("noctispro-production-bulletproof" "noctispro-production" "noctispro" "noctispro-complete" "noctispro-django")
+        for service in "${services[@]}"; do
+            if sudo systemctl is-active "$service" >/dev/null 2>&1; then
+                log_info "Stopping systemd service: $service"
+                sudo systemctl stop "$service" 2>/dev/null || true
+            fi
+        done
+    fi
+    
+    # Kill processes by name with increasing force
+    local process_patterns=("daphne.*noctis_pro" "ngrok" "python.*manage.py.*runserver" "gunicorn.*noctis_pro")
+    
+    for pattern in "${process_patterns[@]}"; do
+        local pids=$(pgrep -f "$pattern" 2>/dev/null || true)
+        if [ ! -z "$pids" ]; then
+            log_info "Stopping processes matching: $pattern"
+            echo "$pids" | xargs -r kill -TERM 2>/dev/null || true
+            sleep 2
+            
+            # Check if still running and force kill
+            pids=$(pgrep -f "$pattern" 2>/dev/null || true)
+            if [ ! -z "$pids" ]; then
+                log_warning "Force killing stubborn processes: $pattern"
+                echo "$pids" | xargs -r kill -KILL 2>/dev/null || true
+                sleep 1
+            fi
+        fi
+    done
+    
+    # Kill any process using port 8000 specifically
+    local port_pids=$(get_port_pids 8000)
+    if [ ! -z "$port_pids" ]; then
+        log_info "Killing processes using port 8000: $port_pids"
+        echo "$port_pids" | xargs -r kill -KILL 2>/dev/null || true
+        sleep 1
+    fi
+    
+    # Clean up PID files
+    rm -f daphne.pid ngrok.pid *.pid
+    
+    # Final verification that port 8000 is free
+    local max_attempts=10
+    local attempt=1
+    while [ $attempt -le $max_attempts ]; do
+        if ! is_port_in_use 8000; then
+            log_success "Port 8000 is now available"
+            break
+        fi
+        log_info "Waiting for port 8000 to be released... (attempt $attempt/$max_attempts)"
+        kill_port_processes 8000
+        sleep 2
+        ((attempt++))
+    done
+    
+    if [ $attempt -gt $max_attempts ]; then
+        log_error "Port 8000 is still in use after $max_attempts attempts"
+        log_info "Attempting final force kill of port 8000 processes..."
+        kill_port_processes 8000
+        sleep 3
+    fi
 }
 
 # Start application services
@@ -397,11 +606,8 @@ start_services() {
     source venv/bin/activate
     export $(grep -v '^#' "$ENV_FILE" | grep -v '^$' | xargs) 2>/dev/null || true
     
-    # Stop any existing processes
-    log_info "Stopping existing processes..."
-    pkill -f "daphne.*noctis_pro" 2>/dev/null || true
-    pkill -f "ngrok" 2>/dev/null || true
-    sleep 3
+    # Stop any existing processes first
+    stop_existing_services
     
     # Try to start via systemd first
     if sudo -n true 2>/dev/null && sudo systemctl is-enabled $SERVICE_NAME >/dev/null 2>&1; then
@@ -427,24 +633,69 @@ start_services() {
 }
 
 start_daphne_directly() {
+    local port=${DAPHNE_PORT:-8000}
+    local bind=${DAPHNE_BIND:-0.0.0.0}
+    
+    # Final port check before starting
+    if is_port_in_use "$port"; then
+        log_error "Port $port is still in use, cannot start Daphne"
+        local port_pids=$(get_port_pids "$port")
+        log_info "Processes using port $port: $port_pids"
+        kill_port_processes "$port"
+        sleep 3
+        
+        if is_port_in_use "$port"; then
+            log_error "Unable to free port $port, deployment cannot continue"
+            exit 1
+        fi
+    fi
+    
     # Start Daphne directly
-    nohup daphne -b ${DAPHNE_BIND:-0.0.0.0} -p ${DAPHNE_PORT:-8000} \
+    log_info "Starting Daphne on $bind:$port..."
+    nohup daphne -b "$bind" -p "$port" \
         --access-log logs/daphne-access.log \
         noctis_pro.asgi:application > logs/daphne.log 2>&1 &
     
     DAPHNE_PID=$!
     echo $DAPHNE_PID > daphne.pid
     
-    # Wait for Daphne to start
+    # Wait for Daphne to start with progressive checking
     log_info "Waiting for Daphne to initialize..."
-    sleep 10
+    local max_wait=30
+    local wait_count=0
+    local daphne_started=false
+    
+    while [ $wait_count -lt $max_wait ]; do
+        sleep 1
+        ((wait_count++))
+        
+        # Check if process is still alive
+        if ! kill -0 $DAPHNE_PID 2>/dev/null; then
+            log_error "Daphne process died during startup"
+            break
+        fi
+        
+        # Check if port is being listened on
+        if is_port_in_use "$port"; then
+            # Try a simple HTTP request
+            if curl -s -f "http://localhost:$port" >/dev/null 2>&1 || curl -s "http://localhost:$port" >/dev/null 2>&1; then
+                daphne_started=true
+                break
+            fi
+        fi
+        
+        if [ $((wait_count % 5)) -eq 0 ]; then
+            log_info "Still waiting for Daphne... ($wait_count/${max_wait}s)"
+        fi
+    done
     
     # Verify Daphne is running
-    if kill -0 $DAPHNE_PID 2>/dev/null; then
-        log_success "Daphne started successfully (PID: $DAPHNE_PID)"
+    if $daphne_started && kill -0 $DAPHNE_PID 2>/dev/null; then
+        log_success "Daphne started successfully (PID: $DAPHNE_PID) on $bind:$port"
     else
         log_error "Daphne failed to start properly"
-        cat logs/daphne.log 2>/dev/null || true
+        log_info "Daphne log output:"
+        cat logs/daphne.log 2>/dev/null || echo "No log file found"
         exit 1
     fi
 }
@@ -642,7 +893,7 @@ main() {
     install_dependencies
     configure_environment
     run_django_commands
-    create_systemd_service
+    create_systemd_service || log_warning "Systemd service creation failed, continuing with direct startup"
     start_services
     create_management_scripts
     

@@ -26,17 +26,51 @@
             console.log('Backup System initialized');
         },
         
+        showPanel: function() {
+            const panel = document.getElementById('backup-panel');
+            if (panel) {
+                panel.classList.add('show');
+                panel.style.display = 'block';
+                console.log('Backup panel shown');
+            }
+        },
+        
+        hidePanel: function() {
+            const panel = document.getElementById('backup-panel');
+            if (panel) {
+                panel.classList.remove('show');
+                panel.style.display = 'none';
+                console.log('Backup panel hidden');
+            }
+        },
+        
+        togglePanel: function() {
+            const panel = document.getElementById('backup-panel');
+            if (panel) {
+                if (panel.style.display === 'none' || !panel.classList.contains('show')) {
+                    this.showPanel();
+                } else {
+                    this.hidePanel();
+                }
+            }
+        },
+        
         createBackupPanel: function() {
             const panel = document.createElement('div');
             panel.id = 'backup-panel';
             panel.className = 'backup-panel';
             panel.innerHTML = `
                 <div class="backup-header">
-                    <h3><i class="fas fa-database"></i> Backup System</h3>
-                    <div class="backup-status">
-                        <span class="status-indicator" id="backup-status-indicator"></span>
-                        <span id="backup-status-text">Idle</span>
+                    <div class="backup-title">
+                        <h3><i class="fas fa-database"></i> Backup System</h3>
+                        <div class="backup-status">
+                            <span class="status-indicator" id="backup-status-indicator"></span>
+                            <span id="backup-status-text">Idle</span>
+                        </div>
                     </div>
+                    <button class="backup-close-btn" onclick="BackupSystem.hidePanel()" title="Hide Backup Panel">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>
                 
                 <div class="backup-content">
@@ -141,7 +175,7 @@
                 .backup-panel {
                     position: fixed;
                     top: 80px;
-                    right: 380px;
+                    right: 20px;
                     width: 400px;
                     max-height: 85vh;
                     background: var(--card-bg, #252525);
@@ -151,8 +185,26 @@
                     color: var(--text-primary, #ffffff);
                     font-size: 12px;
                     overflow-y: auto;
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+                    display: none;
+                    animation: slideInRight 0.3s ease-out;
                 }
+                
+                .backup-panel.show {
+                    display: block;
+                }
+                
+                @keyframes slideInRight {
+                    from {
+                        transform: translateX(100%);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                }
+                
                 .backup-header {
                     display: flex;
                     justify-content: space-between;
@@ -160,6 +212,31 @@
                     padding: 12px 15px;
                     background: linear-gradient(135deg, #2c3e50, #34495e);
                     border-radius: 8px 8px 0 0;
+                }
+                
+                .backup-title {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                }
+                
+                .backup-close-btn {
+                    background: #e74c3c;
+                    border: none;
+                    color: white;
+                    padding: 6px 8px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 12px;
+                    transition: all 0.2s ease;
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                }
+                
+                .backup-close-btn:hover {
+                    background: #c0392b;
+                    transform: scale(1.05);
                 }
                 .backup-header h3 {
                     margin: 0;
