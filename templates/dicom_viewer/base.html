@@ -123,29 +123,47 @@
             grid-row: 2;
             background: var(--secondary-bg);
             border-right: 1px solid var(--border-color);
-            padding: 10px 6px;
+            padding: 8px 4px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 6px;
             overflow-y: auto;
+            overflow-x: hidden;
+            min-width: 76px;
+            max-width: 76px;
         }
 
         .tool {
             width: 68px;
-            height: 50px;
+            height: 46px;
             background: var(--card-bg);
             border: 1px solid var(--border-color);
-            border-radius: 6px;
+            border-radius: 4px;
             color: var(--text-primary);
             cursor: pointer;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            font-size: 10px;
+            font-size: 9px;
             transition: all 0.2s ease;
             font-weight: 500;
             position: relative;
+            flex-shrink: 0;
+        }
+
+        .tool-separator {
+            width: 100%;
+            height: 1px;
+            background: var(--border-color);
+            margin: 4px 0;
+            flex-shrink: 0;
+        }
+
+        .tool-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
         }
 
         .tool.active {
@@ -493,6 +511,154 @@
             cursor: pointer;
         }
 
+        /* Floating Panels */
+        .floating-panel {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            width: 320px;
+            max-height: calc(100vh - 100px);
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            overflow: hidden;
+            animation: slideInRight 0.3s ease-out;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .panel-header {
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-title {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .panel-content {
+            padding: 16px;
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
+        }
+
+        .close-btn {
+            background: var(--danger-color);
+            border: none;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .close-btn:hover {
+            background: #c82333;
+            transform: scale(1.05);
+        }
+
+        .close-btn:active {
+            transform: scale(0.95);
+        }
+
+        .ai-controls, .reconstruction-controls {
+            margin-bottom: 16px;
+        }
+
+        .analysis-types {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .analysis-types label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .ai-results, .reconstruction-results {
+            background: var(--primary-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 12px;
+            min-height: 100px;
+            font-size: 12px;
+        }
+
+        .no-results {
+            color: var(--text-muted);
+            text-align: center;
+            font-style: italic;
+        }
+
+        /* Print Modal Styles */
+        .modal-body {
+            padding: 20px;
+        }
+
+        .print-options {
+            margin-bottom: 20px;
+        }
+
+        .option-group {
+            margin-bottom: 15px;
+        }
+
+        .option-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .option-group label input[type="checkbox"] {
+            margin-right: 8px;
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 8px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 12px;
+        }
+
+        .print-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .print-actions button {
+            flex: 1;
+        }
+
         /* 3D Modal */
         .modal-overlay {
             position: fixed;
@@ -830,50 +996,71 @@
 
         <!-- Left Toolbar -->
         <div class="toolbar">
-            <button class="tool active" data-tool="window" onclick="setTool('window')" title="Window/Level">
-                <i class="fas fa-adjust"></i>
-                <span>Window</span>
-            </button>
-            <button class="tool" data-tool="zoom" onclick="setTool('zoom')" title="Zoom">
-                <i class="fas fa-search-plus"></i>
-                <span>Zoom</span>
-            </button>
-            <button class="tool" data-tool="pan" onclick="setTool('pan')" title="Pan">
-                <i class="fas fa-hand-paper"></i>
-                <span>Pan</span>
-            </button>
-            <button class="tool" data-tool="measure" onclick="setTool('measure')" title="Measure">
-                <i class="fas fa-ruler"></i>
-                <span>Measure</span>
-            </button>
-            <button class="tool" data-tool="annotate" onclick="setTool('annotate')" title="Annotate">
-                <i class="fas fa-comment"></i>
-                <span>Annotate</span>
-            </button>
-            <button class="tool" data-tool="crosshair" onclick="toggleCrosshair()" title="Crosshair">
-                <i class="fas fa-crosshairs"></i>
-                <span>Crosshair</span>
-            </button>
-            <button class="tool" data-tool="invert" onclick="toggleInvert()" title="Invert">
-                <i class="fas fa-adjust"></i>
-                <span>Invert</span>
-            </button>
-            <button class="tool" data-tool="reset" onclick="resetView()" title="Reset View">
-                <i class="fas fa-undo"></i>
-                <span>Reset</span>
-            </button>
-            <button class="tool" data-tool="mpr" onclick="toggleMPR()" title="MPR Views">
-                <i class="fas fa-cube"></i>
-                <span>MPR</span>
-            </button>
-            <button class="tool" data-tool="3d" onclick="launch3DViewer()" title="3D Reconstruction">
-                <i class="fas fa-cubes"></i>
-                <span>3D</span>
-            </button>
-            <button class="tool" data-tool="ai" onclick="runAIAnalysis()" title="AI Analysis">
-                <i class="fas fa-brain"></i>
-                <span>AI</span>
-            </button>
+            <!-- Basic Tools Group -->
+            <div class="tool-group">
+                <button class="tool active" data-tool="window" onclick="setTool('window')" title="Window/Level">
+                    <i class="fas fa-adjust"></i>
+                    <span>Window</span>
+                </button>
+                <button class="tool" data-tool="zoom" onclick="setTool('zoom')" title="Zoom">
+                    <i class="fas fa-search-plus"></i>
+                    <span>Zoom</span>
+                </button>
+                <button class="tool" data-tool="pan" onclick="setTool('pan')" title="Pan">
+                    <i class="fas fa-hand-paper"></i>
+                    <span>Pan</span>
+                </button>
+                <button class="tool" data-tool="reset" onclick="resetView()" title="Reset View">
+                    <i class="fas fa-undo"></i>
+                    <span>Reset</span>
+                </button>
+            </div>
+            
+            <div class="tool-separator"></div>
+            
+            <!-- Measurement & Annotation Group -->
+            <div class="tool-group">
+                <button class="tool" data-tool="measure" onclick="setTool('measure')" title="Measure">
+                    <i class="fas fa-ruler"></i>
+                    <span>Measure</span>
+                </button>
+                <button class="tool" data-tool="annotate" onclick="setTool('annotate')" title="Annotate">
+                    <i class="fas fa-comment"></i>
+                    <span>Annotate</span>
+                </button>
+                <button class="tool" data-tool="crosshair" onclick="toggleCrosshair()" title="Crosshair">
+                    <i class="fas fa-crosshairs"></i>
+                    <span>Crosshair</span>
+                </button>
+            </div>
+            
+            <div class="tool-separator"></div>
+            
+            <!-- Advanced Tools Group -->
+            <div class="tool-group">
+                <button class="tool" data-tool="invert" onclick="toggleInvert()" title="Invert">
+                    <i class="fas fa-adjust"></i>
+                    <span>Invert</span>
+                </button>
+                <button class="tool" data-tool="mpr" onclick="toggleMPR()" title="MPR Views">
+                    <i class="fas fa-cube"></i>
+                    <span>MPR</span>
+                </button>
+            </div>
+            
+            <div class="tool-separator"></div>
+            
+            <!-- AI & Export Group -->
+            <div class="tool-group">
+                <button class="tool" data-tool="ai" onclick="toggleAIPanel()" title="AI Analysis">
+                    <i class="fas fa-brain"></i>
+                    <span>AI</span>
+                </button>
+                <button class="tool" data-tool="print" onclick="showPrintDialog()" title="Print/Export">
+                    <i class="fas fa-print"></i>
+                    <span>Print</span>
+                </button>
+            </div>
         </div>
 
         <!-- Main Viewport -->
@@ -1079,17 +1266,92 @@
         </div>
     </div>
 
-    <!-- 3D Modal -->
-    <div class="modal-overlay" id="threeDModal">
+    <!-- AI Analysis Panel -->
+    <div class="floating-panel" id="aiPanel" style="display: none;">
+        <div class="panel-header">
+            <div class="panel-title">
+                <i class="fas fa-brain"></i> AI Analysis
+            </div>
+            <button class="close-btn" onclick="closeAIPanel()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="panel-content">
+            <div class="ai-controls">
+                <button class="btn-dicom-viewer btn-primary" onclick="runAIAnalysis()" style="width: 100%; margin-bottom: 10px;">
+                    <i class="fas fa-play"></i> Run AI Analysis
+                </button>
+                <div class="analysis-types">
+                    <label><input type="checkbox" checked> Pathology Detection</label>
+                    <label><input type="checkbox" checked> Measurements</label>
+                    <label><input type="checkbox" checked> Annotations</label>
+                </div>
+            </div>
+            <div id="aiResults" class="ai-results">
+                <div class="no-results">No analysis results yet. Click "Run AI Analysis" to start.</div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- 3D Modal (for full 3D viewer) -->
+    <div class="modal-overlay" id="threeDModal" style="display: none;">
         <div class="modal-content">
             <div class="modal-header">
-                <div class="modal-title">3D Reconstruction</div>
+                <div class="modal-title">3D Reconstruction Viewer</div>
                 <button class="close-btn" onclick="close3DModal()">
                     <i class="fas fa-times"></i> Close
                 </button>
             </div>
             <div id="threeDContent" style="width: 100%; height: calc(100% - 60px);">
                 <!-- 3D content will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Print Dialog Modal -->
+    <div class="modal-overlay" id="printModal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <div class="modal-title">Print/Export Options</div>
+                <button class="close-btn" onclick="closePrintDialog()">
+                    <i class="fas fa-times"></i> Close
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="print-options">
+                    <div class="option-group">
+                        <label>Export Format:</label>
+                        <select id="exportFormat" class="form-select">
+                            <option value="jpeg">JPEG Image</option>
+                            <option value="png">PNG Image</option>
+                            <option value="pdf">PDF Document</option>
+                        </select>
+                    </div>
+                    <div class="option-group">
+                        <label>Include:</label>
+                        <label><input type="checkbox" id="includePatientInfo" checked> Patient Information</label>
+                        <label><input type="checkbox" id="includeMeasurements" checked> Measurements</label>
+                        <label><input type="checkbox" id="includeAnnotations" checked> Annotations</label>
+                    </div>
+                    <div class="option-group">
+                        <label>Quality:</label>
+                        <select id="exportQuality" class="form-select">
+                            <option value="high">High Quality</option>
+                            <option value="medium">Medium Quality</option>
+                            <option value="low">Low Quality</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="print-actions">
+                    <button class="btn-dicom-viewer btn-primary" onclick="exportImage()">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                    <button class="btn-dicom-viewer btn-secondary" onclick="printImage()">
+                        <i class="fas fa-print"></i> Print
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -2759,5 +3021,189 @@
     <script src="{% static 'js/movable-annotations.js' %}"></script>
     <script src="{% static 'js/3d-reconstruction.js' %}"></script>
     <script src="{% static 'js/ai-auto-learning.js' %}"></script>
+    
+    <script>
+        // Panel Management Functions
+        function toggleAIPanel() {
+            const panel = document.getElementById('aiPanel');
+            
+            if (panel.style.display === 'none' || !panel.style.display) {
+                panel.style.display = 'block';
+                panel.style.right = '20px';
+                showToast('AI Analysis panel opened', 'info');
+            } else {
+                panel.style.display = 'none';
+                showToast('AI Analysis panel closed', 'info');
+            }
+        }
+        
+        function closeAIPanel() {
+            document.getElementById('aiPanel').style.display = 'none';
+            showToast('AI Analysis panel closed', 'info');
+        }
+        
+        function showPrintDialog() {
+            document.getElementById('printModal').style.display = 'flex';
+        }
+        
+        function closePrintDialog() {
+            document.getElementById('printModal').style.display = 'none';
+        }
+
+        // Enhanced AI Analysis Function
+        async function runAIAnalysis() {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading('Running AI analysis...');
+                
+                // Update AI results panel
+                const resultsDiv = document.getElementById('aiResults');
+                resultsDiv.innerHTML = '<div style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i><br>Analyzing...</div>';
+                
+                // Call AI analysis API
+                const response = await fetch(`/ai_analysis/api/analyze/${currentSeries.id}/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        analysis_type: 'comprehensive',
+                        include_measurements: document.querySelector('#aiPanel input[type="checkbox"]:nth-child(2)').checked,
+                        include_annotations: document.querySelector('#aiPanel input[type="checkbox"]:nth-child(3)').checked
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    hideLoading();
+                    showToast('AI analysis completed', 'success');
+                    
+                    // Display AI results in panel
+                    if (result.findings && result.findings.length > 0) {
+                        let findingsHtml = '<div class="findings-header" style="font-weight: bold; margin-bottom: 10px; color: var(--accent-color);">Analysis Results:</div>';
+                        result.findings.forEach((finding, index) => {
+                            const confidenceColor = finding.confidence > 0.8 ? '#28a745' : finding.confidence > 0.6 ? '#ffc107' : '#dc3545';
+                            findingsHtml += `
+                                <div class="finding-item" style="background: var(--secondary-bg); border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; margin-bottom: 8px;">
+                                    <div style="font-weight: bold; color: var(--text-primary); margin-bottom: 4px;">${finding.type}</div>
+                                    <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">${finding.description}</div>
+                                    <div style="font-size: 10px; color: ${confidenceColor};">Confidence: ${(finding.confidence * 100).toFixed(1)}%</div>
+                                </div>
+                            `;
+                        });
+                        resultsDiv.innerHTML = findingsHtml;
+                        showToast(`Found ${result.findings.length} findings`, 'info');
+                    } else {
+                        resultsDiv.innerHTML = '<div class="no-results">No significant findings detected</div>';
+                        showToast('No significant findings detected', 'info');
+                    }
+                } else {
+                    hideLoading();
+                    resultsDiv.innerHTML = '<div style="color: var(--danger-color); text-align: center; padding: 20px;">Analysis failed: ' + (result.error || 'Unknown error') + '</div>';
+                    showToast(result.error || 'AI analysis failed', 'error');
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error('AI analysis error:', error);
+                const resultsDiv = document.getElementById('aiResults');
+                resultsDiv.innerHTML = '<div style="color: var(--danger-color); text-align: center; padding: 20px;">Analysis failed: ' + error.message + '</div>';
+                showToast('AI analysis failed: ' + error.message, 'error');
+            }
+        }
+        
+        // Print/Export Functions
+        function exportImage() {
+            const format = document.getElementById('exportFormat').value;
+            const includePatientInfo = document.getElementById('includePatientInfo').checked;
+            const includeMeasurements = document.getElementById('includeMeasurements').checked;
+            const includeAnnotations = document.getElementById('includeAnnotations').checked;
+            const quality = document.getElementById('exportQuality').value;
+            
+            // Call the enhanced export function from dicom-print-export-fix.js
+            if (typeof exportImageWithDetails === 'function') {
+                exportImageWithDetails(format, {
+                    includePatientInfo,
+                    includeMeasurements, 
+                    includeAnnotations,
+                    quality
+                });
+                showToast('Export started...', 'info');
+            } else {
+                // Fallback export
+                const canvas = document.querySelector('#dicom-canvas') || document.querySelector('canvas');
+                if (canvas) {
+                    const link = document.createElement('a');
+                    link.download = `dicom-export-${Date.now()}.${format === 'png' ? 'png' : 'jpg'}`;
+                    link.href = canvas.toDataURL(`image/${format === 'png' ? 'png' : 'jpeg'}`);
+                    link.click();
+                    showToast('Image exported', 'success');
+                } else {
+                    showToast('No image to export', 'error');
+                }
+            }
+            
+            closePrintDialog();
+        }
+        
+        function printImage() {
+            // Call the print function from dicom-print-export-fix.js
+            if (typeof printDicomImage === 'function') {
+                printDicomImage();
+            } else {
+                // Fallback print
+                window.print();
+            }
+            
+            closePrintDialog();
+            showToast('Print dialog opened', 'info');
+        }
+
+        // Close panels when clicking outside
+        document.addEventListener('click', function(event) {
+            const aiPanel = document.getElementById('aiPanel');
+            const printModal = document.getElementById('printModal');
+            
+            // Close AI panel if clicking outside
+            if (aiPanel.style.display !== 'none' && 
+                !aiPanel.contains(event.target) && 
+                !event.target.closest('[data-tool="ai"]')) {
+                // Don't auto-close AI panel, user should use close button
+            }
+            
+            // Close print modal if clicking outside
+            if (printModal.style.display !== 'none' && 
+                event.target === printModal) {
+                closePrintDialog();
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(event) {
+            // ESC key closes panels
+            if (event.key === 'Escape') {
+                const aiPanel = document.getElementById('aiPanel');
+                const printModal = document.getElementById('printModal');
+                
+                if (printModal.style.display !== 'none') {
+                    closePrintDialog();
+                } else if (aiPanel.style.display !== 'none') {
+                    closeAIPanel();
+                }
+            }
+            
+            // Ctrl+P opens print dialog
+            if (event.ctrlKey && event.key === 'p') {
+                event.preventDefault();
+                showPrintDialog();
+            }
+        });
+    </script>
 </body>
 </html>

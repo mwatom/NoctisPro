@@ -648,38 +648,74 @@
       
       if (!currentFormStep) {
         console.error('Current form step not found:', currentStep);
-        return false;
+        // Try to find any visible form step as fallback
+        const visibleStep = document.querySelector('.form-step.active, .form-step:not([style*="display: none"])');
+        if (visibleStep) {
+          console.log('Using visible step as fallback');
+          currentFormStep = visibleStep;
+        } else {
+          return false;
+        }
       }
       
       const requiredFields = currentFormStep.querySelectorAll('[required]');
       console.log('Required fields in step:', requiredFields.length);
       
+      let isValid = true;
+      let firstInvalidField = null;
+      
+      // Clear existing error messages
+      currentFormStep.querySelectorAll('.validation-error').forEach(error => error.remove());
+      
       for (let field of requiredFields) {
-        if (!field.value.trim()) {
+        // Skip hidden fields
+        if (field.type === 'hidden' || field.offsetParent === null) {
+          continue;
+        }
+        
+        let fieldValue = field.value ? field.value.trim() : '';
+        if (!fieldValue) {
           console.log('Required field missing value:', field.name || field.id);
           
           // Show visual feedback
           field.style.borderColor = '#ff4444';
-          field.focus();
+          field.style.boxShadow = '0 0 5px rgba(255, 68, 68, 0.3)';
+          
+          if (!firstInvalidField) {
+            firstInvalidField = field;
+          }
           
           // Add temporary error message
-          let errorMsg = field.parentNode.querySelector('.validation-error');
-          if (!errorMsg) {
-            errorMsg = document.createElement('div');
-            errorMsg.className = 'validation-error';
-            errorMsg.style.cssText = 'color: #ff4444; font-size: 11px; margin-top: 4px;';
-            field.parentNode.appendChild(errorMsg);
-          }
+          let errorMsg = document.createElement('div');
+          errorMsg.className = 'validation-error';
+          errorMsg.style.cssText = 'color: #ff4444; font-size: 11px; margin-top: 4px; animation: fadeIn 0.3s ease;';
           errorMsg.textContent = 'This field is required';
+          
+          // Insert after the field
+          field.parentNode.insertBefore(errorMsg, field.nextSibling);
           
           // Remove error styling on input
           field.addEventListener('input', function() {
             field.style.borderColor = '';
+            field.style.boxShadow = '';
+            const errorMsg = field.parentNode.querySelector('.validation-error');
             if (errorMsg) errorMsg.remove();
           }, { once: true });
           
-          return false;
+          isValid = false;
         }
+      }
+      
+      // Focus on first invalid field
+      if (firstInvalidField) {
+        setTimeout(() => {
+          firstInvalidField.focus();
+          firstInvalidField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 200);
+      }
+      
+      if (!isValid) {
+        return false;
       }
       
       // Additional validation for step 2 (passwords)
@@ -761,17 +797,47 @@
       e.preventDefault();
       console.log('Next button clicked, current step:', currentStep);
       
-      try {
-        if (validateCurrentStep()) {
-          console.log('Validation passed, moving to next step');
-          currentStep++;
-          showStep(currentStep);
-        } else {
-          console.log('Validation failed for step:', currentStep);
+      // Add visual feedback
+      nextBtn.disabled = true;
+      nextBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Validating...';
+      
+      // Use setTimeout to allow UI to update
+      setTimeout(() => {
+        try {
+          if (validateCurrentStep()) {
+            console.log('Validation passed, moving to next step');
+            currentStep++;
+            showStep(currentStep);
+            
+            // Show success feedback
+            const currentStepElement = document.querySelector(`.form-step[data-step="${currentStep-1}"]`);
+            if (currentStepElement) {
+              currentStepElement.style.borderLeft = '4px solid #00ff88';
+              setTimeout(() => {
+                currentStepElement.style.borderLeft = '';
+              }, 2000);
+            }
+          } else {
+            console.log('Validation failed for step:', currentStep);
+            
+            // Show error feedback
+            const currentStepElement = document.querySelector(`.form-step[data-step="${currentStep}"]`);
+            if (currentStepElement) {
+              currentStepElement.style.borderLeft = '4px solid #ff4444';
+              setTimeout(() => {
+                currentStepElement.style.borderLeft = '';
+              }, 3000);
+            }
+          }
+        } catch (error) {
+          console.error('Error in next button handler:', error);
+          alert('An error occurred while validating the form. Please check the console for details.');
+        } finally {
+          // Reset button state
+          nextBtn.disabled = false;
+          nextBtn.innerHTML = 'Next <i class="fas fa-arrow-right ms-2"></i>';
         }
-      } catch (error) {
-        console.error('Error in next button handler:', error);
-      }
+      }, 100);
     });
 
     prevBtn.addEventListener('click', function() {

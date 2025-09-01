@@ -554,6 +554,9 @@
                     <div class="nav-tab" onclick="window.location.href='{% url 'admin_panel:facility_management' %}'">FACILITIES</div>
                     <div class="nav-tab" onclick="window.location.href='{% url 'admin_panel:system_logs' %}'">LOGS</div>
                     <div class="nav-tab" onclick="window.location.href='{% url 'admin_panel:settings' %}'">SETTINGS</div>
+                    <div class="nav-tab" onclick="toggleBackupPanel()" title="Toggle Backup System">
+                        <i class="fas fa-database"></i> BACKUP
+                    </div>
                 </div>
             </div>
             <div class="nav-right">
@@ -1089,5 +1092,23 @@
     
     <!-- Backup System -->
     <script src="{% static 'js/backup-system.js' %}"></script>
+    
+    <script>
+        // Initialize backup system when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof BackupSystem !== 'undefined') {
+                BackupSystem.init();
+            }
+        });
+        
+        // Toggle backup panel function
+        function toggleBackupPanel() {
+            if (typeof BackupSystem !== 'undefined') {
+                BackupSystem.togglePanel();
+            } else {
+                console.error('Backup system not loaded');
+            }
+        }
+    </script>
 </body>
 </html>
