@@ -85,18 +85,11 @@ TEMPLATES = [
 WSGI_APPLICATION = 'noctis_pro.wsgi.application'
 ASGI_APPLICATION = 'noctis_pro.asgi.application'
 
-# Database - PostgreSQL for production
+# Database - SQLite for demo (easier setup)
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME', 'noctis_pro'),
-        'USER': os.environ.get('DB_USER', 'noctis_user'),
-        'PASSWORD': os.environ.get('DB_PASSWORD'),
-        'HOST': os.environ.get('DB_HOST', 'localhost'),
-        'PORT': os.environ.get('DB_PORT', '5432'),
-        'OPTIONS': {
-            'charset': 'utf8',
-        },
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 

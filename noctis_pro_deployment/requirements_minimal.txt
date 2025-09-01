@@ -1,0 +1,21 @@
+# Minimal requirements for demo
+Django
+Pillow
+django-widget-tweaks
+python-dotenv
+gunicorn
+whitenoise
+psycopg2-binary
+dj-database-url
+redis
+django-redis
+djangorestframework
+django-cors-headers
+channels
+channels-redis
+daphne
+pydicom
+pynetdicom
+numpy
+requests
+django-extensions
