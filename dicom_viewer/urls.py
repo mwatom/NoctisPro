@@ -35,6 +35,7 @@ urlpatterns = [
     # Measurements and utilities
     path('api/study/<int:study_id>/measurements/', views.api_measurements, name='api_measurements'),
     path('api/measurements/', views.api_measurements, name='api_measurements_standalone'),
+    path('api/measurement/<int:measurement_id>/delete/', views.api_delete_measurement, name='api_delete_measurement'),
     path('api/calculate-distance/', views.api_calculate_distance, name='api_calculate_distance'),
     path('api/hounsfield/', views.api_hounsfield_units, name='api_hounsfield_units'),
     

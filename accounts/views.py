@@ -21,10 +21,20 @@ def login_view(request):
         return redirect('worklist:dashboard')
     
     # Clear any existing messages to prevent admin messages from showing
+    # This ensures no admin activity messages leak to login page
     storage = messages.get_messages(request)
     if storage:
-        list(storage)
+        list(storage)  # Consume all messages
         storage.used = True
+    
+    # Clear session messages as well
+    if 'messages' in request.session:
+        del request.session['messages']
+    
+    # Clear any admin-specific session data
+    admin_keys = [key for key in request.session.keys() if 'admin' in key.lower()]
+    for key in admin_keys:
+        del request.session[key]
     
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()

@@ -186,7 +186,7 @@ def viewer(request):
             logger.warning(f"Could not update study status: {e}")
     
     # Use improved viewer template with all enhanced features
-    return render(request, 'dicom_viewer/viewer_bulletproof.html', context)
+    return render(request, 'dicom_viewer/viewer_complete.html', context)
 
 @csrf_exempt
 def api_studies_list(request):
@@ -1355,6 +1355,48 @@ def api_measurements(request, study_id=None):
     
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@login_required
+@csrf_exempt
+def api_delete_measurement(request, measurement_id):
+    """Delete a specific measurement with proper error handling"""
+    if request.method not in ['DELETE', 'POST']:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        # Check user authentication
+        if not request.user.is_authenticated:
+            return JsonResponse({'error': 'Authentication required'}, status=401)
+        
+        # Get measurement with proper error handling
+        try:
+            measurement = get_object_or_404(Measurement, id=measurement_id)
+        except Exception as e:
+            logger.error(f"Measurement not found: {measurement_id}")
+            return JsonResponse({'error': 'Measurement not found'}, status=404)
+        
+        # Check if user owns this measurement or is admin
+        if measurement.user != request.user and not request.user.is_admin():
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        try:
+            # Delete the measurement
+            measurement.delete()
+            
+            logger.info(f"Measurement {measurement_id} deleted successfully by user {request.user.username}")
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Measurement deleted successfully'
+            })
+            
+        except Exception as e:
+            logger.error(f"Error deleting measurement {measurement_id}: {e}")
+            return JsonResponse({'error': f'Failed to delete measurement: {str(e)}'}, status=500)
+            
+    except Exception as e:
+        logger.error(f"Unexpected error in api_delete_measurement: {e}")
+        return JsonResponse({'error': 'Internal server error'}, status=500)
 
 @login_required
 @csrf_exempt
