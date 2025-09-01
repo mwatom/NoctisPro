@@ -892,6 +892,29 @@ def facility_delete(request, facility_id):
 
 @login_required
 @user_passes_test(is_admin)
+def upload_facilities(request):
+    """Admin-only upload facilities for DICOM studies"""
+    if request.method == 'POST':
+        try:
+            # Import here to avoid circular imports
+            from worklist.views import upload_study
+            # Delegate to the worklist upload function
+            return upload_study(request)
+        except Exception as e:
+            logger.error(f"Error in upload facilities: {e}")
+            messages.error(request, f"Upload error: {str(e)}")
+            return redirect('admin_panel:upload_facilities')
+    
+    # GET request - show upload form
+    facilities = Facility.objects.filter(is_active=True).order_by('name')
+    context = {
+        'facilities': facilities,
+        'is_admin_upload': True,
+    }
+    return render(request, 'admin_panel/upload_facilities.html', context)
+
+@login_required
+@user_passes_test(is_admin)
 @csrf_exempt
 def api_admin_dashboard(request):
     """API endpoint for admin dashboard data"""

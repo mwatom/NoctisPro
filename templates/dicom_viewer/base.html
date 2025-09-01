@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <title>Noctis Pro DICOM Viewer</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     {% load static %}
@@ -1093,7 +1094,10 @@
     </div>
 
     <!-- Hidden file input for DICOM loading -->
-    <input type="file" id="fileInput" accept=".dcm,.dicom" multiple style="display: none;">
+    <input type="file" id="fileInput" accept=".dcm,.dicom,*" multiple style="display: none;">
+    
+    <!-- CSRF Token for AJAX requests -->
+    {% csrf_token %}
 
     <script>
         // Global variables - Enhanced from PyQt implementation
@@ -1759,8 +1763,10 @@
         }
 
         function selectLocalFiles() {
-            document.getElementById('fileInput').removeAttribute('webkitdirectory');
-            document.getElementById('fileInput').click();
+            const fileInput = document.getElementById('fileInput');
+            fileInput.removeAttribute('webkitdirectory');
+            fileInput.setAttribute('accept', '.dcm,.dicom,*');
+            fileInput.click();
             document.querySelector('.modal-overlay').remove();
         }
 
@@ -2649,8 +2655,32 @@
         }
 
         function getCSRFToken() {
+            // Try multiple methods to get CSRF token
+            let token = '';
+            
+            // Method 1: From cookie
             const cookie = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
-            return cookie ? cookie.split('=')[1] : '';
+            if (cookie) {
+                token = cookie.split('=')[1];
+            }
+            
+            // Method 2: From meta tag
+            if (!token) {
+                const metaTag = document.querySelector('meta[name="csrf-token"]');
+                if (metaTag) {
+                    token = metaTag.getAttribute('content');
+                }
+            }
+            
+            // Method 3: From hidden input
+            if (!token) {
+                const hiddenInput = document.querySelector('input[name="csrfmiddlewaretoken"]');
+                if (hiddenInput) {
+                    token = hiddenInput.value;
+                }
+            }
+            
+            return token || '';
         }
 
         // Handle study selection from dropdown
