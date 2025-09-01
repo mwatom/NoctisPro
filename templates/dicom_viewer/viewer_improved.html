@@ -875,12 +875,37 @@
             if (studyId) {
                 loadStudy(studyId);
             }
+            
+            // Initialize additional functionality
+            setTimeout(() => {
+                initializeHUMeasurement();
+                detectPrinters();
+                
+                // Initialize Hounsfield ROI system if available
+                if (typeof HounsfieldROI !== 'undefined') {
+                    HounsfieldROI.init();
+                }
+                
+                // Load JSZip for series export
+                if (typeof JSZip === 'undefined') {
+                    const script = document.createElement('script');
+                    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+                    document.head.appendChild(script);
+                }
+            }, 1000);
         });
 
         function initializeViewer() {
-            setupMouseEvents();
-            setupKeyboardShortcuts();
-            setupFileInput();
+            try {
+                console.log('Initializing DICOM viewer...');
+                setupMouseEvents();
+                setupKeyboardShortcuts();
+                setupFileInput();
+                console.log('DICOM viewer initialized successfully');
+            } catch (error) {
+                console.error('Error initializing DICOM viewer:', error);
+                showToast('Error initializing viewer: ' + error.message, 'error');
+            }
             
             showToast('DICOM Viewer Ready', 'success');
         }
@@ -1932,25 +1957,8 @@
             }
         }
 
-        // Initialize HU measurement when DOM is loaded
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(() => {
-                initializeHUMeasurement();
-                detectPrinters();
-                
-                // Initialize Hounsfield ROI system if available
-                if (typeof HounsfieldROI !== 'undefined') {
-                    HounsfieldROI.init();
-                }
-                
-                // Load JSZip for series export
-                if (typeof JSZip === 'undefined') {
-                    const script = document.createElement('script');
-                    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
-                    document.head.appendChild(script);
-                }
-            }, 1000);
-        });
+        // Consolidated initialization - merge with main DOMContentLoaded
+        // This code is integrated into the main initialization above
     </script>
 </body>
 </html>
