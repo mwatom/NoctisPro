@@ -166,8 +166,8 @@ def viewer(request):
         except Exception as e:
             logger.warning(f"Could not update study status: {e}")
     
-    # Use production viewer template
-    return render(request, 'dicom_viewer/viewer_improved.html', context)
+    # Use full production viewer template with all features
+    return render(request, 'dicom_viewer/base.html', context)
 
 @login_required
 @csrf_exempt
