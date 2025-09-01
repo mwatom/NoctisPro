@@ -2548,33 +2548,442 @@
        }
      });
 
-     // Override the existing draw function to include crosshair rendering
+     // Advanced 3D Reconstruction System
+     let reconstructionCache = new Map();
+     let mprSynchronized = true;
+     let crosshairPosition3D = { x: 50, y: 50, z: 50 }; // 3D position in percentage
+     
+     async function generateAdvancedReconstruction() {
+       if (!currentSeries) {
+         showToast('No series loaded', 'error');
+         return;
+       }
+       
+       const reconType = document.getElementById('advancedReconType').value;
+       if (!reconType) {
+         showToast('Please select a reconstruction type', 'warning');
+         return;
+       }
+       
+       const progressEl = document.getElementById('reconProgress');
+       const progressBar = document.getElementById('reconProgressBar');
+       progressEl.style.display = 'block';
+       
+       try {
+         // Show immediate progress
+         updateProgress(10);
+         showToast(`Starting ${reconType.toUpperCase()} reconstruction...`, 'info');
+         
+         // Check cache first for super fast loading
+         const cacheKey = `${currentSeries.id}_${reconType}`;
+         if (reconstructionCache.has(cacheKey)) {
+           const cached = reconstructionCache.get(cacheKey);
+           displayReconstruction(cached);
+           updateProgress(100);
+           showToast('Reconstruction loaded from cache', 'success');
+           return;
+         }
+         
+         updateProgress(30);
+         
+         // Call optimized reconstruction API
+         const response = await fetch(`/dicom-viewer/api/fast-reconstruction/${currentSeries.id}/`, {
+           method: 'POST',
+           headers: {
+             'Content-Type': 'application/json',
+             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+           },
+           body: JSON.stringify({
+             type: reconType,
+             quality: 'high',
+             optimize_for_speed: true,
+             enable_gpu: true
+           })
+         });
+         
+         updateProgress(60);
+         
+         if (response.ok) {
+           const result = await response.json();
+           updateProgress(80);
+           
+           if (result.success) {
+             // Cache the result
+             reconstructionCache.set(cacheKey, result);
+             displayReconstruction(result);
+             updateProgress(100);
+             showToast(`${reconType.toUpperCase()} reconstruction completed`, 'success');
+             
+             // Auto-enable MPR controls if MPR reconstruction
+             if (reconType === 'mpr') {
+               enableMPRMode();
+             }
+           } else {
+             throw new Error(result.error || 'Reconstruction failed');
+           }
+         } else {
+           throw new Error('Reconstruction service unavailable');
+         }
+         
+       } catch (error) {
+         console.error('Reconstruction error:', error);
+         showToast(`Reconstruction failed: ${error.message}`, 'error');
+       } finally {
+         setTimeout(() => {
+           progressEl.style.display = 'none';
+           updateProgress(0);
+         }, 1000);
+       }
+     }
+     
+     function updateProgress(percent) {
+       document.getElementById('reconProgressBar').style.width = percent + '%';
+     }
+     
+     function displayReconstruction(result) {
+       if (result.type === 'mpr' && result.views) {
+         // Display MPR views with synchronized crosshairs
+         displayMPRViews(result.views);
+         document.getElementById('mprControls').style.display = 'block';
+         document.getElementById('reconThumbnails').style.display = 'block';
+       } else if (result.images) {
+         // Display other reconstruction types
+         reconMode = result.type;
+         reconImgs = result.images;
+         reconIndex = 0;
+         requestDraw();
+       }
+     }
+     
+     function displayMPRViews(views) {
+       mprMode = true;
+       
+       // Load and display all three planes simultaneously
+       const planes = ['axial', 'sagittal', 'coronal'];
+       planes.forEach((plane, index) => {
+         if (views[plane]) {
+           const img = document.getElementById(`thumb${plane.charAt(0).toUpperCase() + plane.slice(1)}`);
+           if (img) {
+             img.src = views[plane];
+             img.onload = () => {
+               if (index === 0) {
+                 // Switch to MPR view when first image loads
+                 switchToMPRView();
+               }
+             };
+           }
+         }
+       });
+       
+       // Initialize synchronized crosshairs
+       initializeSynchronizedCrosshairs();
+     }
+     
+     function enableMPRMode() {
+       mprMode = true;
+       document.getElementById('mprControls').style.display = 'block';
+       showToast('MPR mode enabled - crosshairs synchronized', 'info');
+     }
+     
+     function switchToMPRView() {
+       // Switch canvas to MPR grid view
+       mprMode = true;
+       requestDraw();
+     }
+     
+     // Synchronized Crosshair System
+     function initializeSynchronizedCrosshairs() {
+       crosshairEnabled = true;
+       mprSynchronized = true;
+       
+       // Add mouse listeners for crosshair synchronization
+       canvas.addEventListener('mousemove', handleSynchronizedCrosshair);
+       canvas.addEventListener('click', lockCrosshairPosition);
+       
+       showToast('Synchronized crosshairs enabled', 'info');
+     }
+     
+     function handleSynchronizedCrosshair(e) {
+       if (!crosshairEnabled || !mprMode) return;
+       
+       const rect = canvas.getBoundingClientRect();
+       const x = ((e.clientX - rect.left) / rect.width) * 100;
+       const y = ((e.clientY - rect.top) / rect.height) * 100;
+       
+       // Update 3D crosshair position based on current MPR plane
+       updateCrosshair3DPosition(x, y);
+       
+       // Synchronize across all planes
+       if (mprSynchronized) {
+         synchronizeAllPlanes();
+       }
+       
+       requestDraw();
+     }
+     
+     function lockCrosshairPosition(e) {
+       if (!crosshairEnabled || !mprMode) return;
+       
+       const rect = canvas.getBoundingClientRect();
+       const x = ((e.clientX - rect.left) / rect.width) * 100;
+       const y = ((e.clientY - rect.top) / rect.height) * 100;
+       
+       updateCrosshair3DPosition(x, y);
+       synchronizeAllPlanes();
+       
+       showToast(`Crosshair locked at position (${Math.round(x)}, ${Math.round(y)})`, 'info');
+     }
+     
+     function updateCrosshair3DPosition(x, y) {
+       // Determine which plane we're in and update 3D coordinates
+       const currentPlane = getCurrentMPRPlane();
+       
+       switch(currentPlane) {
+         case 'axial':
+           crosshairPosition3D.x = x;
+           crosshairPosition3D.y = y;
+           break;
+         case 'sagittal':
+           crosshairPosition3D.z = x;
+           crosshairPosition3D.y = y;
+           break;
+         case 'coronal':
+           crosshairPosition3D.x = x;
+           crosshairPosition3D.z = y;
+           break;
+       }
+     }
+     
+     function getCurrentMPRPlane() {
+       // Determine current plane based on canvas quadrant or active selection
+       if (mprMode) {
+         const rect = canvas.getBoundingClientRect();
+         const halfW = rect.width / 2;
+         const halfH = rect.height / 2;
+         
+         // Simple quadrant detection (can be enhanced)
+         return 'axial'; // Default to axial for now
+       }
+       return 'axial';
+     }
+     
+     function synchronizeAllPlanes() {
+       // Update all MPR slice positions based on crosshair
+       updateMPRSlice('axial', crosshairPosition3D.z);
+       updateMPRSlice('sagittal', crosshairPosition3D.x);
+       updateMPRSlice('coronal', crosshairPosition3D.y);
+       
+       // Update UI sliders
+       document.getElementById('axialSlice').value = crosshairPosition3D.z;
+       document.getElementById('sagittalSlice').value = crosshairPosition3D.x;
+       document.getElementById('coronalSlice').value = crosshairPosition3D.y;
+       
+       // Update value displays
+       document.getElementById('axialSliceVal').textContent = Math.round(crosshairPosition3D.z);
+       document.getElementById('sagittalSliceVal').textContent = Math.round(crosshairPosition3D.x);
+       document.getElementById('coronalSliceVal').textContent = Math.round(crosshairPosition3D.y);
+     }
+     
+     function updateMPRSlice(plane, value) {
+       if (!mprMode) return;
+       
+       // Update the specific plane slice
+       crosshairPosition3D[plane === 'axial' ? 'z' : plane === 'sagittal' ? 'x' : 'y'] = value;
+       
+       // Request new slice from server if needed
+       if (currentSeries) {
+         loadMPRSlice(plane, value);
+       }
+       
+       // Synchronize other planes if enabled
+       if (mprSynchronized) {
+         synchronizeAllPlanes();
+       }
+     }
+     
+     async function loadMPRSlice(plane, sliceIndex) {
+       try {
+         const response = await fetch(`/dicom-viewer/api/mpr-slice/${currentSeries.id}/${plane}/${sliceIndex}/`);
+         if (response.ok) {
+           const blob = await response.blob();
+           const imageUrl = URL.createObjectURL(blob);
+           
+           // Update the appropriate view
+           const img = document.getElementById(`thumb${plane.charAt(0).toUpperCase() + plane.slice(1)}`);
+           if (img) {
+             img.src = imageUrl;
+           }
+         }
+       } catch (error) {
+         console.error(`Failed to load ${plane} slice:`, error);
+       }
+     }
+     
+     function synchronizeMPR() {
+       mprSynchronized = !mprSynchronized;
+       const btn = event.target;
+       
+       if (mprSynchronized) {
+         btn.innerHTML = '<i class="fas fa-link"></i> Sync ON';
+         btn.style.backgroundColor = 'var(--accent-color)';
+         showToast('MPR synchronization enabled', 'success');
+         synchronizeAllPlanes();
+       } else {
+         btn.innerHTML = '<i class="fas fa-unlink"></i> Sync OFF';
+         btn.style.backgroundColor = 'var(--card-bg)';
+         showToast('MPR synchronization disabled', 'info');
+       }
+     }
+     
+     function focusPlane(plane) {
+       // Switch to single plane view
+       mprFullPlane = plane;
+       showToast(`Focused on ${plane} plane`, 'info');
+       requestDraw();
+     }
+     
+     // Enhanced draw function with MPR crosshairs
      const originalDraw = draw;
      draw = async function() {
        await originalDraw();
        
-       if (crosshairEnabled && !mprMode && !reconMode) {
-         // Draw crosshair overlay
-         ctx.save();
-         ctx.strokeStyle = 'rgba(0, 212, 255, 0.8)';
-         ctx.lineWidth = 1;
-         ctx.setLineDash([5, 5]);
-         
-         // Vertical line
-         ctx.beginPath();
-         ctx.moveTo(crosshairPosition.x, 0);
-         ctx.lineTo(crosshairPosition.x, canvas.height);
-         ctx.stroke();
-         
-         // Horizontal line
-         ctx.beginPath();
-         ctx.moveTo(0, crosshairPosition.y);
-         ctx.lineTo(canvas.width, crosshairPosition.y);
-         ctx.stroke();
-         
-         ctx.restore();
+       if (crosshairEnabled) {
+         if (mprMode) {
+           // Draw synchronized crosshairs on MPR views
+           drawMPRCrosshairs();
+         } else {
+           // Draw single view crosshair
+           drawSingleCrosshair();
+         }
        }
      };
+     
+     function drawMPRCrosshairs() {
+       const halfW = canvas.width / 2;
+       const halfH = canvas.height / 2;
+       
+       ctx.save();
+       ctx.strokeStyle = 'rgba(0, 212, 255, 0.8)';
+       ctx.lineWidth = 1;
+       ctx.setLineDash([3, 3]);
+       
+       // Draw crosshairs in each quadrant based on 3D position
+       // Axial quadrant (bottom-left)
+       const axialX = (crosshairPosition3D.x / 100) * halfW;
+       const axialY = halfH + (crosshairPosition3D.y / 100) * halfH;
+       
+       ctx.beginPath();
+       ctx.moveTo(axialX, halfH);
+       ctx.lineTo(axialX, canvas.height);
+       ctx.moveTo(0, axialY);
+       ctx.lineTo(halfW, axialY);
+       ctx.stroke();
+       
+       // Sagittal quadrant (top-left)
+       const sagittalX = (crosshairPosition3D.z / 100) * halfW;
+       const sagittalY = (crosshairPosition3D.y / 100) * halfH;
+       
+       ctx.beginPath();
+       ctx.moveTo(sagittalX, 0);
+       ctx.lineTo(sagittalX, halfH);
+       ctx.moveTo(0, sagittalY);
+       ctx.lineTo(halfW, sagittalY);
+       ctx.stroke();
+       
+       // Coronal quadrant (top-right)
+       const coronalX = halfW + (crosshairPosition3D.x / 100) * halfW;
+       const coronalY = (crosshairPosition3D.z / 100) * halfH;
+       
+       ctx.beginPath();
+       ctx.moveTo(coronalX, 0);
+       ctx.lineTo(coronalX, halfH);
+       ctx.moveTo(halfW, coronalY);
+       ctx.lineTo(canvas.width, coronalY);
+       ctx.stroke();
+       
+       ctx.restore();
+     }
+     
+     function drawSingleCrosshair() {
+       ctx.save();
+       ctx.strokeStyle = 'rgba(0, 212, 255, 0.8)';
+       ctx.lineWidth = 1;
+       ctx.setLineDash([5, 5]);
+       
+       const x = (crosshairPosition3D.x / 100) * canvas.width;
+       const y = (crosshairPosition3D.y / 100) * canvas.height;
+       
+       // Vertical line
+       ctx.beginPath();
+       ctx.moveTo(x, 0);
+       ctx.lineTo(x, canvas.height);
+       ctx.stroke();
+       
+       // Horizontal line
+       ctx.beginPath();
+       ctx.moveTo(0, y);
+       ctx.lineTo(canvas.width, y);
+       ctx.stroke();
+       
+       ctx.restore();
+     }
+     
+     // Update reconstruction options based on modality
+     function updateReconOptions(type) {
+       const ctOptions = document.getElementById('ctOptions');
+       const mriOptions = document.getElementById('mriOptions');
+       
+       // Hide all options first
+       ctOptions.style.display = 'none';
+       mriOptions.style.display = 'none';
+       
+       // Show relevant options based on type and current modality
+       if (currentSeries && currentSeries.modality) {
+         const modality = currentSeries.modality.toUpperCase();
+         
+         if (modality === 'CT' && ['bone', 'vessel'].includes(type)) {
+           ctOptions.style.display = 'block';
+         } else if (modality === 'MR' && ['brain', 'mpr'].includes(type)) {
+           mriOptions.style.display = 'block';
+         }
+       }
+     }
+     
+     function updateThreshold(type, value) {
+       document.getElementById(`${type}ThresholdVal`).textContent = value;
+     }
+     
+     // Toast notification system
+     function showToast(message, type = 'info', duration = 3000) {
+       const container = document.getElementById('toastContainer');
+       const toast = document.createElement('div');
+       toast.className = `toast ${type}`;
+       
+       const iconMap = {
+         success: 'fas fa-check-circle',
+         error: 'fas fa-exclamation-circle', 
+         warning: 'fas fa-exclamation-triangle',
+         info: 'fas fa-info-circle'
+       };
+       
+       toast.innerHTML = `
+         <div class="toast-content">
+           <i class="${iconMap[type]} toast-icon"></i>
+           <span class="toast-message">${message}</span>
+         </div>
+       `;
+       
+       container.appendChild(toast);
+       
+       // Animate in
+       setTimeout(() => toast.classList.add('show'), 10);
+       
+       // Auto remove
+       setTimeout(() => {
+         toast.classList.remove('show');
+         setTimeout(() => container.removeChild(toast), 300);
+       }, duration);
+     }
 
      })();
  </script>
