@@ -781,29 +781,44 @@ def attachment_comments(request, attachment_id):
 @login_required
 @csrf_exempt
 def delete_attachment(request, attachment_id):
-    """Delete attachment"""
+    """Delete attachment with enhanced error handling"""
     try:
-        attachment = get_object_or_404(StudyAttachment, id=attachment_id)
+        # Validate attachment exists and user has permission
+        try:
+            attachment = get_object_or_404(StudyAttachment, id=attachment_id)
+        except Exception as e:
+            logger.error(f"Attachment not found: {attachment_id}")
+            return JsonResponse({'error': 'Attachment not found'}, status=404)
+        
         user = request.user
         
-        # All authenticated users can delete attachments
+        # Check user authentication
+        if not user.is_authenticated:
+            return JsonResponse({'error': 'Authentication required'}, status=401)
         
         if request.method == 'POST':
             try:
                 study_id = attachment.study.id
-                attachment_name = attachment.name
+                attachment_name = attachment.name or f"Attachment {attachment_id}"
                 
-                # Delete file from storage
-                if attachment.file:
-                    attachment.file.delete()
+                # Safely delete file from storage
+                try:
+                    if attachment.file and hasattr(attachment.file, 'delete'):
+                        attachment.file.delete(save=False)
+                except Exception as file_error:
+                    logger.warning(f"Could not delete file for attachment {attachment_id}: {file_error}")
                 
-                # Delete thumbnail if exists
-                if attachment.thumbnail:
-                    attachment.thumbnail.delete()
+                # Safely delete thumbnail if exists
+                try:
+                    if attachment.thumbnail and hasattr(attachment.thumbnail, 'delete'):
+                        attachment.thumbnail.delete(save=False)
+                except Exception as thumb_error:
+                    logger.warning(f"Could not delete thumbnail for attachment {attachment_id}: {thumb_error}")
                 
                 # Delete attachment record
                 attachment.delete()
                 
+                logger.info(f"Attachment {attachment_id} deleted successfully by user {user.username}")
                 messages.success(request, f'Attachment "{attachment_name}" deleted successfully')
                 
                 return JsonResponse({
@@ -812,12 +827,14 @@ def delete_attachment(request, attachment_id):
                 })
                 
             except Exception as e:
-                return JsonResponse({'error': str(e)}, status=500)
+                logger.error(f"Error deleting attachment {attachment_id}: {e}")
+                return JsonResponse({'error': f'Failed to delete attachment: {str(e)}'}, status=500)
         
         return JsonResponse({'error': 'Method not allowed'}, status=405)
+        
     except Exception as e:
-        logger.error(f"Error in delete_attachment: {e}")
-        return JsonResponse({'error': str(e)}, status=500)
+        logger.error(f"Unexpected error in delete_attachment: {e}")
+        return JsonResponse({'error': 'Internal server error'}, status=500)
 
 @login_required
 @csrf_exempt
@@ -919,23 +936,38 @@ def api_delete_study(request, study_id):
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
     try:
-        # Check if user is admin
-        if not hasattr(request.user, 'is_admin') or not request.user.is_admin():
-            return JsonResponse({'error': 'Permission denied. Only administrators can delete studies.'}, status=403)
+        # Check user authentication
+        if not request.user.is_authenticated:
+            return JsonResponse({'error': 'Authentication required'}, status=401)
         
-        study = get_object_or_404(Study, id=study_id)
+        # Check if user is admin with proper error handling
+        try:
+            if not hasattr(request.user, 'is_admin') or not request.user.is_admin():
+                return JsonResponse({'error': 'Permission denied. Only administrators can delete studies.'}, status=403)
+        except Exception as perm_error:
+            logger.error(f"Permission check error: {perm_error}")
+            return JsonResponse({'error': 'Permission check failed'}, status=500)
+        
+        # Get study with proper error handling
+        try:
+            study = get_object_or_404(Study, id=study_id)
+        except Exception as e:
+            logger.error(f"Study not found: {study_id}")
+            return JsonResponse({'error': 'Study not found'}, status=404)
         
         try:
             # Store study info for logging
             study_info = {
                 'id': study.id,
-                'accession_number': study.accession_number,
-                'patient_name': study.patient.full_name,
+                'accession_number': getattr(study, 'accession_number', f'Study {study_id}'),
+                'patient_name': getattr(study.patient, 'full_name', 'Unknown') if hasattr(study, 'patient') and study.patient else 'Unknown',
                 'deleted_by': request.user.username
             }
             
             # Delete the study (this will cascade to related objects)
             study.delete()
+            
+            logger.info(f"Study {study_info['accession_number']} deleted successfully by {request.user.username}")
             
             return JsonResponse({
                 'success': True,
@@ -944,10 +976,12 @@ def api_delete_study(request, study_id):
             })
             
         except Exception as e:
+            logger.error(f"Error deleting study {study_id}: {e}")
             return JsonResponse({'error': f'Failed to delete study: {str(e)}'}, status=500)
+            
     except Exception as e:
-        logger.error(f"Error in api_delete_study: {e}")
-        return JsonResponse({'error': str(e)}, status=500)
+        logger.error(f"Unexpected error in api_delete_study: {e}")
+        return JsonResponse({'error': 'Internal server error'}, status=500)
 
 @login_required
 def api_refresh_worklist(request):

@@ -17,6 +17,7 @@ urlpatterns = [
     
     # Advanced reconstruction endpoints
     path('api/mpr/<int:series_id>/', views.api_mpr_reconstruction, name='api_mpr_reconstruction'),
+    path('api/mpr/<int:series_id>/update/', views.api_mpr_update, name='api_mpr_update'),
     path('api/mip/<int:series_id>/', views.api_mip_reconstruction, name='api_mip_reconstruction'),
     path('api/bone/<int:series_id>/', views.api_bone_reconstruction, name='api_bone_reconstruction'),
     path('api/series/<int:series_id>/mpr/', views.api_mpr_reconstruction, name='api_series_mpr_reconstruction'),
@@ -35,6 +36,7 @@ urlpatterns = [
     # Measurements and utilities
     path('api/study/<int:study_id>/measurements/', views.api_measurements, name='api_measurements'),
     path('api/measurements/', views.api_measurements, name='api_measurements_standalone'),
+    path('api/measurement/<int:measurement_id>/delete/', views.api_delete_measurement, name='api_delete_measurement'),
     path('api/calculate-distance/', views.api_calculate_distance, name='api_calculate_distance'),
     path('api/hounsfield/', views.api_hounsfield_units, name='api_hounsfield_units'),
     
