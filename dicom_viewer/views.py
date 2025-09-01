@@ -166,8 +166,8 @@ def viewer(request):
         except Exception as e:
             logger.warning(f"Could not update study status: {e}")
     
-    # Use improved viewer template
-    return render(request, 'dicom_viewer/viewer_improved.html', context)
+    # Use bulletproof viewer template for demo
+    return render(request, 'dicom_viewer/viewer_bulletproof.html', context)
 
 @login_required
 @csrf_exempt
@@ -1172,6 +1172,9 @@ def upload_dicom(request):
     except Exception as e:
         logger.error(f"Error in DICOM upload: {e}")
         return JsonResponse({'success': False, 'error': str(e)})
+
+# Import bulletproof functions for demo
+from .views_bulletproof import api_study_data_bulletproof, api_image_display_bulletproof, web_series_images_bulletproof
 
 @login_required
 @csrf_exempt
