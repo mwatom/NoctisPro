@@ -1,0 +1,16 @@
+WARNING 2025-09-01 13:38:58,156 misc 2623 140010597880064 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+WARNING 2025-09-01 13:38:58,158 misc 2623 140010597880064 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+WARNING 2025-09-01 13:39:01,694 misc 2659 140647715434752 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+WARNING 2025-09-01 13:39:01,696 misc 2659 140647715434752 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+WARNING 2025-09-01 13:39:25,033 misc 2829 139924901191936 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+WARNING 2025-09-01 13:39:25,190 misc 2829 139924901191936 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+WARNING 2025-09-01 13:39:27,094 misc 2899 139687702225152 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+WARNING 2025-09-01 13:39:27,228 misc 2899 139687702225152 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+WARNING 2025-09-01 13:39:47,149 misc 3266 140194779578624 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+WARNING 2025-09-01 13:39:47,326 misc 3266 140194779578624 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+WARNING 2025-09-01 13:39:49,189 misc 3293 140464503746816 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+WARNING 2025-09-01 13:39:49,354 misc 3293 140464503746816 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+WARNING 2025-09-01 13:40:00,146 misc 3578 140322594664704 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+WARNING 2025-09-01 13:40:02,194 misc 3613 140556365029632 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+WARNING 2025-09-01 13:40:20,460 misc 3674 140007614320896 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+WARNING 2025-09-01 13:40:22,524 misc 3706 140334939889920 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead

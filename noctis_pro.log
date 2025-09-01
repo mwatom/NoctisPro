@@ -1062,3 +1062,22 @@ Service Unavailable: /health/
 Not Found: /dicom-viewer/api/studies/
 Not Found: /static/css/style.css
 Not Found: /static/js/main.js
+Watching for file changes with StatReloader
+[32mHTTP HEAD / 302 [0.01, 127.0.0.1:60734][0m
+[32mHTTP HEAD /worklist/ 302 [0.00, 127.0.0.1:60738][0m
+[32mHTTP HEAD /admin/ 302 [0.01, 127.0.0.1:60754][0m
+[mHTTP GET /login/ 200 [0.01, 127.0.0.1:54302][0m
+Forbidden (CSRF cookie not set.): /login/
+[31;1mHTTP POST /login/ 403 [0.01, 127.0.0.1:44042][0m
+[32mHTTP GET /worklist/api/studies/ 302 [0.00, 127.0.0.1:43858][0m
+[32mHTTP GET /dicom-viewer/ 302 [0.00, 127.0.0.1:43872][0m
+[32mHTTP GET / 302 [0.00, 127.0.0.1:43886][0m
+[mHTTP GET /login/ 200 [0.00, 127.0.0.1:43890][0m
+[32mHTTP GET /worklist/ 302 [0.00, 127.0.0.1:47332][0m
+[mHTTP GET /health/ 200 [0.00, 127.0.0.1:49276][0m
+[32mHTTP GET / 302 [0.01, 127.0.0.1:45438][0m
+[mHTTP GET /login/ 200 [0.00, 127.0.0.1:45450][0m
+[mHTTP GET /health/ 200 [0.00, 127.0.0.1:45454][0m
+[32mHTTP GET /admin/ 302 [0.00, 127.0.0.1:45458][0m
+[32mHTTP GET /worklist/ 302 [0.00, 127.0.0.1:45472][0m
+[32mHTTP GET /dicom-viewer/ 302 [0.00, 127.0.0.1:45486][0m
