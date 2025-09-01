@@ -1,50 +1,10 @@
-# Core Django Framework
-Django>=4.2
-djangorestframework
-django-cors-headers
-django-extensions
-django-health-check
-django-redis
-django-widget-tweaks
-
-# ASGI Server and WebSocket Support
-daphne
-channels
-channels-redis
-
-# Database and Caching
-redis
-
-# Authentication and Security
-cryptography
-
-# Image Processing and Medical Imaging
-Pillow
-pydicom
-scikit-image
-SimpleITK
-
-# Scientific Computing
-numpy
-scipy
-matplotlib
-plotly
-
-# Async Task Processing
-celery
-
-# PDF Generation
-reportlab
-
-# HTTP Requests
-requests
-
-# Environment Configuration
-python-dotenv
-
-# Production Server
-gunicorn
-whitenoise
-
-# Development Tools
-django-extensions
+Django==4.2.7
+djangorestframework==3.14.0
+Pillow==10.0.1
+numpy==1.24.3
+pydicom==2.4.3
+python-decouple==3.8
+django-cors-headers==4.3.1
+channels==4.0.0
+daphne==4.0.0
+gunicorn==21.2.0
