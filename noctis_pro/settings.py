@@ -40,9 +40,6 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'rest_framework',
-    'corsheaders',  # Re-enabled for API access
-    'channels',  # Re-enabled for real-time features
     
     # Custom apps
     'accounts',
@@ -55,8 +52,26 @@ INSTALLED_APPS = [
     'ai_analysis',
 ]
 
+# Add optional apps if they're available
+try:
+    import rest_framework
+    INSTALLED_APPS.append('rest_framework')
+except ImportError:
+    pass
+
+try:
+    import corsheaders
+    INSTALLED_APPS.append('corsheaders')
+except ImportError:
+    pass
+
+try:
+    import channels
+    INSTALLED_APPS.append('channels')
+except ImportError:
+    pass
+
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # Re-enabled
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -70,6 +85,13 @@ MIDDLEWARE = [
     # 'noctis_pro.middleware.ImageOptimizationMiddleware',  # Image optimization
     # 'noctis_pro.middleware.SessionTimeoutWarningMiddleware',  # Session timeout warnings
 ]
+
+# Add optional middleware if available
+try:
+    import corsheaders
+    MIDDLEWARE.insert(0, 'corsheaders.middleware.CorsMiddleware')
+except ImportError:
+    pass
 
 ROOT_URLCONF = 'noctis_pro.urls'
 
