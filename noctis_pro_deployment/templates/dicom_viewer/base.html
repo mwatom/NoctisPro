@@ -257,71 +257,113 @@
         <div id="priorityInfo" style="color:var(--text-secondary);font-size:11px;margin-top:4px;">Priority: -</div>
       </div>
       <div class="panel">
-        <h3>Clinical Tools</h3>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
-          <button class="btn-control" onclick="toggleHUProbe()"><i class="fas fa-thermometer-half"></i> HU Probe</button>
-          <button class="btn-control" onclick="toggleAngleTools()"><i class="fas fa-drafting-compass"></i> Angles</button>
-          <button class="btn-control" onclick="toggleAreaMeasure()"><i class="fas fa-vector-square"></i> Area</button>
-          <button class="btn-control" onclick="toggleEllipseROI()"><i class="fas fa-circle"></i> ROI</button>
-        </div>
+        <h3>Advanced 3D Reconstruction</h3>
         <div class="control">
-          <label style="font-size:11px;color:#ccc;margin-bottom:4px;">Clinical Presets:</label>
-          <select id="clinicalPresets" class="select" onchange="applyClinicalPreset(this.value)">
-            <option value="">Select Clinical View</option>
-            <option value="chest_lung">Chest - Lung Window</option>
-            <option value="chest_mediastinum">Chest - Mediastinum</option>
-            <option value="abdomen_soft">Abdomen - Soft Tissue</option>
-            <option value="abdomen_liver">Abdomen - Liver</option>
-            <option value="head_brain">Head - Brain</option>
-            <option value="head_bone">Head - Bone</option>
-            <option value="spine_bone">Spine - Bone</option>
-            <option value="spine_soft">Spine - Soft Tissue</option>
+          <label style="font-size:11px;color:#ccc;margin-bottom:4px;">Reconstruction Type:</label>
+          <select id="advancedReconType" class="select" onchange="updateReconOptions(this.value)">
+            <option value="">Select Reconstruction</option>
+            <option value="mpr">MPR (Multi-Planar)</option>
+            <option value="mip">MIP (Maximum Intensity)</option>
+            <option value="minip">MinIP (Minimum Intensity)</option>
+            <option value="vr">Volume Rendering</option>
+            <option value="bone">Bone 3D</option>
+            <option value="vessel">Vessel Analysis</option>
+            <option value="cardiac">Cardiac 4D</option>
+            <option value="brain">Brain Analysis</option>
           </select>
+        </div>
+        
+        <!-- Modality-specific options -->
+        <div id="ctOptions" class="recon-options" style="display:none;">
+          <div class="control">
+            <div class="label"><span>Bone Threshold (HU)</span><span id="boneThresholdVal">300</span></div>
+            <input type="range" id="boneThreshold" min="100" max="1500" value="300" onchange="updateThreshold('bone', this.value)">
+          </div>
+          <div class="control">
+            <div class="label"><span>Vessel Threshold (HU)</span><span id="vesselThresholdVal">150</span></div>
+            <input type="range" id="vesselThreshold" min="50" max="500" value="150" onchange="updateThreshold('vessel', this.value)">
+          </div>
+        </div>
+
+        <div id="mriOptions" class="recon-options" style="display:none;">
+          <div class="control">
+            <label style="font-size:11px;color:#ccc;">MRI Sequence:</label>
+            <select id="mriSequence" class="select">
+              <option value="t1">T1-Weighted</option>
+              <option value="t2">T2-Weighted</option>
+              <option value="flair">FLAIR</option>
+              <option value="dwi">Diffusion (DWI)</option>
+              <option value="adc">ADC Map</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="control">
+          <button class="btn-control" onclick="generateAdvancedReconstruction()" style="width:100%;margin-top:8px;">
+            <i class="fas fa-cube"></i> Generate 3D
+          </button>
+        </div>
+        
+        <div id="reconProgress" style="display:none;margin-top:8px;">
+          <div style="background:var(--secondary-bg);border-radius:4px;padding:8px;">
+            <div style="font-size:11px;color:var(--accent-color);">Processing...</div>
+            <div class="progress-bar" style="background:var(--border-color);height:4px;border-radius:2px;margin-top:4px;">
+              <div id="reconProgressBar" style="background:var(--accent-color);height:100%;border-radius:2px;width:0%;transition:width 0.3s;"></div>
+            </div>
+          </div>
         </div>
       </div>
 
       <div class="panel">
-        <h3>Measurements & ROI</h3>
+        <h3>MPR Navigation</h3>
+        <div id="mprControls" style="display:none;">
+          <div class="control">
+            <div class="label"><span>Axial Slice</span><span id="axialSliceVal">1</span></div>
+            <input type="range" id="axialSlice" min="0" max="100" value="50" onchange="updateMPRSlice('axial', this.value)">
+          </div>
+          <div class="control">
+            <div class="label"><span>Sagittal Slice</span><span id="sagittalSliceVal">1</span></div>
+            <input type="range" id="sagittalSlice" min="0" max="100" value="50" onchange="updateMPRSlice('sagittal', this.value)">
+          </div>
+          <div class="control">
+            <div class="label"><span>Coronal Slice</span><span id="coronalSliceVal">1</span></div>
+            <input type="range" id="coronalSlice" min="0" max="100" value="50" onchange="updateMPRSlice('coronal', this.value)">
+          </div>
+          <div class="control">
+            <button class="btn-control" onclick="synchronizeMPR()" style="width:100%;">
+              <i class="fas fa-link"></i> Sync Crosshairs
+            </button>
+          </div>
+        </div>
+        
+        <!-- 3D Reconstruction Thumbnails -->
+        <div id="reconThumbnails" style="display:none;margin-top:8px;">
+          <div class="row-3">
+            <img id="thumbAxial" alt="Axial" style="cursor:pointer;" onclick="focusPlane('axial')">
+            <img id="thumbSagittal" alt="Sagittal" style="cursor:pointer;" onclick="focusPlane('sagittal')">
+            <img id="thumbCoronal" alt="Coronal" style="cursor:pointer;" onclick="focusPlane('coronal')">
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Diagnostic Tools</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+          <button class="btn-control" onclick="toggleHUProbe()"><i class="fas fa-thermometer-half"></i> HU Values</button>
+          <button class="btn-control" onclick="toggleCrosshair()"><i class="fas fa-crosshairs"></i> Crosshair</button>
+        </div>
+        <div id="huProbeResult" style="background:var(--secondary-bg);border:1px solid var(--border-color);border-radius:4px;padding:8px;margin:8px 0;display:none;">
+          <div style="font-size:11px;color:var(--accent-color);font-weight:bold;">Hounsfield Units:</div>
+          <div id="huValues" style="font-size:12px;color:var(--text-primary);font-weight:bold;">Click on image</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Measurements</h3>
         <div class="control">
           <button id="btnClearMeasurements" class="btn">Clear All</button>
         </div>
-        <div id="huProbeResult" style="background:var(--secondary-bg);border:1px solid var(--border-color);border-radius:4px;padding:8px;margin:8px 0;display:none;">
-          <div style="font-size:11px;color:var(--accent-color);font-weight:bold;">HU Values:</div>
-          <div id="huValues" style="font-size:11px;color:var(--text-secondary);"></div>
-        </div>
         <ul id="measurementsList" style="list-style:none;padding-left:0;margin:0;color:var(--text-secondary);font-size:11px;"></ul>
-      </div>
-
-      <div class="panel">
-        <h3>Patient Safety</h3>
-        <div id="patientVerification" style="background:var(--secondary-bg);border:1px solid var(--border-color);border-radius:4px;padding:8px;margin-bottom:8px;">
-          <div style="font-size:11px;color:var(--accent-color);font-weight:bold;">Patient ID Verification:</div>
-          <div id="patientIdDisplay" style="font-size:12px;color:var(--text-primary);font-weight:bold;">-</div>
-          <div id="patientNameDisplay" style="font-size:11px;color:var(--text-secondary);">-</div>
-          <div id="studyDateDisplay" style="font-size:11px;color:var(--text-secondary);">-</div>
-        </div>
-        <div class="control">
-          <button class="btn-control" onclick="verifyPatientIdentity()" style="width:100%;">
-            <i class="fas fa-shield-alt"></i> Verify Patient
-          </button>
-        </div>
-      </div>
-
-      <div class="panel">
-        <h3>Reporting Tools</h3>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
-          <button class="btn-control" onclick="addCriticalFinding()"><i class="fas fa-exclamation-triangle"></i> Critical</button>
-          <button class="btn-control" onclick="addNormalFinding()"><i class="fas fa-check-circle"></i> Normal</button>
-        </div>
-        <div class="control">
-          <textarea id="clinicalNotes" placeholder="Clinical notes and findings..." 
-                    style="width:100%;height:60px;background:var(--secondary-bg);border:1px solid var(--border-color);color:var(--text-primary);border-radius:4px;padding:8px;font-size:11px;resize:vertical;"></textarea>
-        </div>
-        <div class="control">
-          <button class="btn-control" onclick="saveReport()" style="width:100%;">
-            <i class="fas fa-save"></i> Save Report
-          </button>
-        </div>
       </div>
     </div>
   </div>
