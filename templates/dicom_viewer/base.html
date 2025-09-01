@@ -8,6 +8,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     {% load static %}
     <link href="{% static 'css/dicom-viewer-buttons.css' %}" rel="stylesheet">
+    <link href="{% static 'css/dicom-viewer-fixes.css' %}" rel="stylesheet">
     <style>
         :root {
             --primary-bg: #0a0a0a;
@@ -2745,5 +2746,12 @@
             }
         });
     </script>
+    
+    <!-- Enhanced DICOM Viewer Fixes -->
+    <script src="{% static 'js/dicom-viewer-mouse-fix.js' %}"></script>
+    <script src="{% static 'js/dicom-print-export-fix.js' %}"></script>
+    <script src="{% static 'js/delete-button-fix.js' %}"></script>
+    <script src="{% static 'js/dicom-loading-fix.js' %}"></script>
+    <script src="{% static 'js/ai-reporting-enhancement.js' %}"></script>
 </body>
 </html>

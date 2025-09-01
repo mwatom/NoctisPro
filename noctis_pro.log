@@ -1081,3 +1081,4 @@ Forbidden (CSRF cookie not set.): /login/
 [32mHTTP GET /admin/ 302 [0.00, 127.0.0.1:45458][0m
 [32mHTTP GET /worklist/ 302 [0.00, 127.0.0.1:45472][0m
 [32mHTTP GET /dicom-viewer/ 302 [0.00, 127.0.0.1:45486][0m
+Watching for file changes with StatReloader
