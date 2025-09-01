@@ -1051,3 +1051,6 @@ Watching for file changes with StatReloader
 [mHTTP GET /login/?next=/worklist/api/studies/ 200 [0.00, 127.0.0.1:51620][0m
 [32mHTTP GET /worklist/api/upload-stats/ 302 [0.00, 127.0.0.1:51620][0m
 [mHTTP GET /login/?next=/worklist/api/upload-stats/ 200 [0.00, 127.0.0.1:51620][0m
+Watching for file changes with StatReloader
+[32mHTTP GET / 302 [0.01, 127.0.0.1:50212][0m
+[32mHTTP GET / 302 [0.00, 127.0.0.1:59748][0m
