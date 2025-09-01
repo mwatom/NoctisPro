@@ -4,7 +4,7 @@ Django>=4.2,<5.0
 djangorestframework>=3.14.0
 
 # Database & Storage
-sqlite3
+# sqlite3 is built into Python
 
 # Image Processing & DICOM
 Pillow>=10.0.0

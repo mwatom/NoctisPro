@@ -1,0 +1,26 @@
+[Unit]
+Description=NoctisPro V2 Django Application
+After=network.target
+Wants=network.target
+
+[Service]
+Type=exec
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/workspace/noctis_pro_v2
+Environment=DJANGO_SETTINGS_MODULE=noctis_pro.settings
+Environment=DEBUG=False
+Environment=PYTHONPATH=/workspace/noctis_pro_v2
+ExecStartPre=/bin/bash -c 'cd /workspace/noctis_pro_v2 && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt'
+ExecStartPre=/bin/bash -c 'cd /workspace/noctis_pro_v2 && source venv/bin/activate && python manage.py migrate --noinput'
+ExecStartPre=/bin/bash -c 'cd /workspace/noctis_pro_v2 && source venv/bin/activate && python manage.py collectstatic --noinput'
+ExecStartPre=/bin/bash -c 'cd /workspace/noctis_pro_v2 && source venv/bin/activate && python manage.py shell -c "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='\''admin'\'').exists() or User.objects.create_superuser('\''admin'\'', '\''admin@noctispro.com'\'', '\''admin123'\'')"'
+ExecStart=/bin/bash -c 'cd /workspace/noctis_pro_v2 && source venv/bin/activate && python manage.py runserver 0.0.0.0:8000'
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=noctispro-v2
+
+[Install]
+WantedBy=multi-user.target
