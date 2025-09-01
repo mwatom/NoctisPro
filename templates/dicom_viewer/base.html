@@ -123,29 +123,47 @@
             grid-row: 2;
             background: var(--secondary-bg);
             border-right: 1px solid var(--border-color);
-            padding: 10px 6px;
+            padding: 8px 4px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 6px;
             overflow-y: auto;
+            overflow-x: hidden;
+            min-width: 76px;
+            max-width: 76px;
         }
 
         .tool {
             width: 68px;
-            height: 50px;
+            height: 46px;
             background: var(--card-bg);
             border: 1px solid var(--border-color);
-            border-radius: 6px;
+            border-radius: 4px;
             color: var(--text-primary);
             cursor: pointer;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            font-size: 10px;
+            font-size: 9px;
             transition: all 0.2s ease;
             font-weight: 500;
             position: relative;
+            flex-shrink: 0;
+        }
+
+        .tool-separator {
+            width: 100%;
+            height: 1px;
+            background: var(--border-color);
+            margin: 4px 0;
+            flex-shrink: 0;
+        }
+
+        .tool-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
         }
 
         .tool.active {
@@ -958,54 +976,81 @@
 
         <!-- Left Toolbar -->
         <div class="toolbar">
-            <button class="tool active" data-tool="window" onclick="setTool('window')" title="Window/Level">
-                <i class="fas fa-adjust"></i>
-                <span>Window</span>
-            </button>
-            <button class="tool" data-tool="zoom" onclick="setTool('zoom')" title="Zoom">
-                <i class="fas fa-search-plus"></i>
-                <span>Zoom</span>
-            </button>
-            <button class="tool" data-tool="pan" onclick="setTool('pan')" title="Pan">
-                <i class="fas fa-hand-paper"></i>
-                <span>Pan</span>
-            </button>
-            <button class="tool" data-tool="measure" onclick="setTool('measure')" title="Measure">
-                <i class="fas fa-ruler"></i>
-                <span>Measure</span>
-            </button>
-            <button class="tool" data-tool="annotate" onclick="setTool('annotate')" title="Annotate">
-                <i class="fas fa-comment"></i>
-                <span>Annotate</span>
-            </button>
-            <button class="tool" data-tool="crosshair" onclick="toggleCrosshair()" title="Crosshair">
-                <i class="fas fa-crosshairs"></i>
-                <span>Crosshair</span>
-            </button>
-            <button class="tool" data-tool="invert" onclick="toggleInvert()" title="Invert">
-                <i class="fas fa-adjust"></i>
-                <span>Invert</span>
-            </button>
-            <button class="tool" data-tool="reset" onclick="resetView()" title="Reset View">
-                <i class="fas fa-undo"></i>
-                <span>Reset</span>
-            </button>
-            <button class="tool" data-tool="mpr" onclick="toggleMPR()" title="MPR Views">
-                <i class="fas fa-cube"></i>
-                <span>MPR</span>
-            </button>
-            <button class="tool" data-tool="3d" onclick="launch3DViewer()" title="3D Reconstruction">
-                <i class="fas fa-cubes"></i>
-                <span>3D</span>
-            </button>
-            <button class="tool" data-tool="ai" onclick="toggleAIPanel()" title="AI Analysis">
-                <i class="fas fa-brain"></i>
-                <span>AI</span>
-            </button>
-            <button class="tool" data-tool="print" onclick="showPrintDialog()" title="Print/Export">
-                <i class="fas fa-print"></i>
-                <span>Print</span>
-            </button>
+            <!-- Basic Tools Group -->
+            <div class="tool-group">
+                <button class="tool active" data-tool="window" onclick="setTool('window')" title="Window/Level">
+                    <i class="fas fa-adjust"></i>
+                    <span>Window</span>
+                </button>
+                <button class="tool" data-tool="zoom" onclick="setTool('zoom')" title="Zoom">
+                    <i class="fas fa-search-plus"></i>
+                    <span>Zoom</span>
+                </button>
+                <button class="tool" data-tool="pan" onclick="setTool('pan')" title="Pan">
+                    <i class="fas fa-hand-paper"></i>
+                    <span>Pan</span>
+                </button>
+                <button class="tool" data-tool="reset" onclick="resetView()" title="Reset View">
+                    <i class="fas fa-undo"></i>
+                    <span>Reset</span>
+                </button>
+            </div>
+            
+            <div class="tool-separator"></div>
+            
+            <!-- Measurement & Annotation Group -->
+            <div class="tool-group">
+                <button class="tool" data-tool="measure" onclick="setTool('measure')" title="Measure">
+                    <i class="fas fa-ruler"></i>
+                    <span>Measure</span>
+                </button>
+                <button class="tool" data-tool="annotate" onclick="setTool('annotate')" title="Annotate">
+                    <i class="fas fa-comment"></i>
+                    <span>Annotate</span>
+                </button>
+                <button class="tool" data-tool="crosshair" onclick="toggleCrosshair()" title="Crosshair">
+                    <i class="fas fa-crosshairs"></i>
+                    <span>Crosshair</span>
+                </button>
+            </div>
+            
+            <div class="tool-separator"></div>
+            
+            <!-- Advanced Tools Group -->
+            <div class="tool-group">
+                <button class="tool" data-tool="invert" onclick="toggleInvert()" title="Invert">
+                    <i class="fas fa-adjust"></i>
+                    <span>Invert</span>
+                </button>
+                <button class="tool" data-tool="mpr" onclick="toggleMPR()" title="MPR Views">
+                    <i class="fas fa-cube"></i>
+                    <span>MPR</span>
+                </button>
+            </div>
+            
+            <div class="tool-separator"></div>
+            
+            <!-- AI & 3D Group -->
+            <div class="tool-group">
+                <button class="tool" data-tool="3d" onclick="toggle3DPanel()" title="3D Reconstruction">
+                    <i class="fas fa-cubes"></i>
+                    <span>3D</span>
+                </button>
+                <button class="tool" data-tool="ai" onclick="toggleAIPanel()" title="AI Analysis">
+                    <i class="fas fa-brain"></i>
+                    <span>AI</span>
+                </button>
+            </div>
+            
+            <div class="tool-separator"></div>
+            
+            <!-- Export Group -->
+            <div class="tool-group">
+                <button class="tool" data-tool="print" onclick="showPrintDialog()" title="Print/Export">
+                    <i class="fas fa-print"></i>
+                    <span>Print</span>
+                </button>
+            </div>
         </div>
 
         <!-- Main Viewport -->
