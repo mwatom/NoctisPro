@@ -439,7 +439,10 @@ def upload_study(request):
 	
 	# Provide facilities for admin/radiologist to target uploads
 	facilities = Facility.objects.filter(is_active=True).order_by('name') if ((hasattr(request.user, 'is_admin') and request.user.is_admin()) or (hasattr(request.user, 'is_radiologist') and request.user.is_radiologist())) else []
-	return render(request, 'worklist/upload.html', {'facilities': facilities})
+	return render(request, 'worklist/upload.html', {
+		'facilities': facilities,
+		'hide_navbar': True  # Hide base template navbar to avoid duplication
+	})
 
 @login_required
 def modern_worklist(request):

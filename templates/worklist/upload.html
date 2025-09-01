@@ -806,8 +806,8 @@ document.addEventListener('DOMContentLoaded', function() {
     async function uploadFilesInChunks() {
         const url = '{% url "worklist:upload_study" %}';
         const token = document.querySelector('[name=csrfmiddlewaretoken]').value;
-        const CHUNK_SIZE = 100; // Reduced chunk size for better memory management
-        const MAX_PARALLEL = 2; // Reduced parallel requests for large uploads
+        const CHUNK_SIZE = 50; // Optimized chunk size for better performance
+        const MAX_PARALLEL = 3; // Increased parallel requests for better throughput
 
         const totalFiles = selectedFiles.length;
         let uploadedCount = 0;
@@ -910,9 +910,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="stat-label">Series Processed</div>
                     </div>
                 </div>
+                <div class="background-processing-info" style="margin-top: 15px; padding: 10px; background: var(--card-bg); border-radius: 6px; border-left: 3px solid var(--accent-color);">
+                    <i class="fas fa-info-circle"></i> <strong>Background Processing:</strong> 
+                    DICOM images are being processed in the background. You can continue using the system while processing completes.
+                </div>
             `;
             
-            showNotification(`Successfully uploaded ${uploadedCount} files creating ${studiesCreated} studies with ${totalSeries} series!`, 'success');
+            showNotification(`Successfully uploaded ${uploadedCount} files creating ${studiesCreated} studies with ${totalSeries} series! Images are being processed in the background.`, 'success');
         } else if (uploadedCount > 0) {
             showNotification(`Upload completed with some errors. Processed ${uploadedCount} of ${totalFiles} files, created ${studiesCreated} studies.`, 'warning');
             resetUploadState();

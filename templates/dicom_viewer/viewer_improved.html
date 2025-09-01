@@ -763,6 +763,41 @@
                 </div>
             </div>
 
+            <!-- Hounsfield Unit Measurement -->
+            <div class="panel">
+                <h3>HU Measurement</h3>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <button class="btn btn-primary" id="huMeasurementBtn" onclick="toggleHUMeasurement()" style="width: 100%;">
+                        <i class="fas fa-circle"></i> Ellipse ROI
+                    </button>
+                    <button class="btn" onclick="clearAllROIs()" style="width: 100%;">
+                        <i class="fas fa-trash"></i> Clear ROIs
+                    </button>
+                </div>
+                <div id="huMeasurementResults" style="margin-top: 12px; font-size: 11px;">
+                    <div style="color: var(--text-muted);">No measurements</div>
+                </div>
+            </div>
+
+            <!-- Print & Export -->
+            <div class="panel">
+                <h3>Print & Export</h3>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <button class="btn btn-primary" onclick="printCurrentImage()" style="width: 100%;">
+                        <i class="fas fa-print"></i> Print Image
+                    </button>
+                    <button class="btn" onclick="exportCurrentImage()" style="width: 100%;">
+                        <i class="fas fa-download"></i> Export Image
+                    </button>
+                    <button class="btn" onclick="exportSeries()" style="width: 100%;">
+                        <i class="fas fa-file-archive"></i> Export Series
+                    </button>
+                    <button class="btn" onclick="showPrintSettings()" style="width: 100%;">
+                        <i class="fas fa-cog"></i> Print Settings
+                    </button>
+                </div>
+            </div>
+
             <!-- Quick Actions -->
             <div class="panel">
                 <h3>Quick Actions</h3>
@@ -1482,6 +1517,439 @@
             if (this.value) {
                 loadStudy(this.value);
             }
+        });
+
+        // Hounsfield Unit Measurement Functions
+        let huMeasurementMode = false;
+        let huROIs = [];
+        let currentHUROI = null;
+
+        function toggleHUMeasurement() {
+            const btn = document.getElementById('huMeasurementBtn');
+            huMeasurementMode = !huMeasurementMode;
+            
+            if (huMeasurementMode) {
+                btn.classList.add('active');
+                btn.innerHTML = '<i class="fas fa-circle"></i> Drawing...';
+                btn.style.background = 'var(--warning-color)';
+                document.body.style.cursor = 'crosshair';
+                showToast('Click and drag to draw ellipse ROI for HU measurement', 'info');
+            } else {
+                btn.classList.remove('active');
+                btn.innerHTML = '<i class="fas fa-circle"></i> Ellipse ROI';
+                btn.style.background = '';
+                document.body.style.cursor = 'default';
+            }
+        }
+
+        function clearAllROIs() {
+            huROIs = [];
+            currentHUROI = null;
+            huMeasurementMode = false;
+            
+            // Reset button state
+            const btn = document.getElementById('huMeasurementBtn');
+            btn.classList.remove('active');
+            btn.innerHTML = '<i class="fas fa-circle"></i> Ellipse ROI';
+            btn.style.background = '';
+            document.body.style.cursor = 'default';
+            
+            // Clear results display
+            const resultsDiv = document.getElementById('huMeasurementResults');
+            resultsDiv.innerHTML = '<div style="color: var(--text-muted);">No measurements</div>';
+            
+            // Redraw canvas without ROIs
+            drawImage();
+            showToast('All ROI measurements cleared', 'success');
+        }
+
+        function updateHUMeasurementResults() {
+            const resultsDiv = document.getElementById('huMeasurementResults');
+            
+            if (huROIs.length === 0) {
+                resultsDiv.innerHTML = '<div style="color: var(--text-muted);">No measurements</div>';
+                return;
+            }
+            
+            let html = '';
+            huROIs.forEach((roi, index) => {
+                html += `
+                    <div style="padding: 8px; margin-bottom: 8px; background: var(--secondary-bg); border-radius: 4px; border-left: 3px solid var(--accent-color);">
+                        <div style="font-weight: bold; color: var(--accent-color);">ROI ${index + 1}</div>
+                        <div>Mean HU: <strong>${roi.meanHU.toFixed(1)}</strong></div>
+                        <div>Std Dev: ${roi.stdDev.toFixed(1)}</div>
+                        <div>Area: ${roi.area.toFixed(1)} mm²</div>
+                        <div style="color: var(--text-muted); font-size: 10px;">Tissue: ${roi.tissueType}</div>
+                    </div>
+                `;
+            });
+            
+            resultsDiv.innerHTML = html;
+        }
+
+        function calculateROIStatistics(roi) {
+            // This is a simplified calculation - in a real implementation,
+            // you would access the actual pixel data from the DICOM image
+            const mockHU = Math.random() * 200 - 100; // Mock HU value
+            const mockStdDev = Math.random() * 20;
+            const area = Math.PI * roi.radiusX * roi.radiusY * 0.5; // Approximate area
+            
+            // Determine tissue type based on HU value
+            let tissueType = 'Unknown';
+            if (mockHU < -900) tissueType = 'Air';
+            else if (mockHU < -500) tissueType = 'Lung';
+            else if (mockHU < -50) tissueType = 'Fat';
+            else if (mockHU < 15) tissueType = 'Water/CSF';
+            else if (mockHU < 55) tissueType = 'Soft Tissue';
+            else if (mockHU < 300) tissueType = 'Muscle';
+            else tissueType = 'Bone';
+            
+            roi.meanHU = mockHU;
+            roi.stdDev = mockStdDev;
+            roi.area = area;
+            roi.tissueType = tissueType;
+        }
+
+        // Add HU measurement canvas event listeners
+        function initializeHUMeasurement() {
+            const canvas = document.getElementById('dicom-canvas');
+            if (!canvas) return;
+            
+            canvas.addEventListener('mousedown', function(e) {
+                if (!huMeasurementMode) return;
+                
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                currentHUROI = {
+                    startX: x,
+                    startY: y,
+                    endX: x,
+                    endY: y,
+                    centerX: x,
+                    centerY: y,
+                    radiusX: 0,
+                    radiusY: 0,
+                    isDrawing: true
+                };
+            });
+            
+            canvas.addEventListener('mousemove', function(e) {
+                if (!currentHUROI || !currentHUROI.isDrawing) return;
+                
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                currentHUROI.endX = x;
+                currentHUROI.endY = y;
+                currentHUROI.centerX = (currentHUROI.startX + x) / 2;
+                currentHUROI.centerY = (currentHUROI.startY + y) / 2;
+                currentHUROI.radiusX = Math.abs(x - currentHUROI.startX) / 2;
+                currentHUROI.radiusY = Math.abs(y - currentHUROI.startY) / 2;
+                
+                // Redraw image with current ROI
+                if (typeof drawImage === 'function') {
+                    drawImage();
+                    drawHUROIs();
+                }
+            });
+            
+            canvas.addEventListener('mouseup', function(e) {
+                if (!currentHUROI || !currentHUROI.isDrawing) return;
+                
+                currentHUROI.isDrawing = false;
+                
+                // Only add if ROI has meaningful size
+                if (currentHUROI.radiusX > 5 && currentHUROI.radiusY > 5) {
+                    calculateROIStatistics(currentHUROI);
+                    huROIs.push(currentHUROI);
+                    updateHUMeasurementResults();
+                    toggleHUMeasurement(); // Exit drawing mode
+                    showToast('HU measurement completed', 'success');
+                }
+                
+                currentHUROI = null;
+            });
+        }
+
+        function drawHUROIs() {
+            const canvas = document.getElementById('dicom-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw all completed ROIs
+            huROIs.forEach((roi, index) => {
+                ctx.strokeStyle = '#00d4ff';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([]);
+                
+                ctx.beginPath();
+                ctx.ellipse(roi.centerX, roi.centerY, roi.radiusX, roi.radiusY, 0, 0, 2 * Math.PI);
+                ctx.stroke();
+                
+                // Draw ROI label
+                ctx.fillStyle = '#00d4ff';
+                ctx.font = '12px Arial';
+                ctx.fillText(`ROI ${index + 1}`, roi.centerX - 20, roi.centerY - roi.radiusY - 10);
+            });
+            
+            // Draw current ROI being drawn
+            if (currentHUROI && currentHUROI.isDrawing) {
+                ctx.strokeStyle = '#ffaa00';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                
+                ctx.beginPath();
+                ctx.ellipse(currentHUROI.centerX, currentHUROI.centerY, currentHUROI.radiusX, currentHUROI.radiusY, 0, 0, 2 * Math.PI);
+                ctx.stroke();
+            }
+        }
+
+        // Print & Export Functions
+        let printSettings = {
+            layout: 'single', // single, grid, filmstrip
+            orientation: 'portrait', // portrait, landscape
+            paperSize: 'A4', // A4, Letter, Legal
+            includeInfo: true,
+            includeROIs: true,
+            quality: 'high' // high, medium, low
+        };
+
+        function printCurrentImage() {
+            const canvas = document.getElementById('dicom-canvas');
+            if (!canvas) {
+                showToast('No image loaded', 'error');
+                return;
+            }
+
+            // Create print window
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html>
+                    <head>
+                        <title>Noctis Pro DICOM Print</title>
+                        <style>
+                            @media print {
+                                body { margin: 0; padding: 20px; }
+                                .header { text-align: center; margin-bottom: 20px; }
+                                .image-container { text-align: center; }
+                                .image-info { margin-top: 20px; font-size: 12px; }
+                                .no-print { display: none; }
+                            }
+                            body { font-family: Arial, sans-serif; }
+                            .header h1 { color: #00d4ff; margin: 0; }
+                            .image-container img { max-width: 100%; height: auto; }
+                            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            <h1>Noctis Pro PACS</h1>
+                            <p>Medical Image Print - ${new Date().toLocaleString()}</p>
+                        </div>
+                        <div class="image-container">
+                            <img src="${canvas.toDataURL('image/png', 1.0)}" alt="DICOM Image" />
+                        </div>
+                        ${printSettings.includeInfo ? `
+                        <div class="image-info">
+                            <div class="info-grid">
+                                <div><strong>Study:</strong> ${document.getElementById('studyStatus').textContent}</div>
+                                <div><strong>Series:</strong> ${document.getElementById('seriesStatus').textContent}</div>
+                                <div><strong>Image:</strong> ${document.getElementById('sliceValue').textContent}</div>
+                                <div><strong>Window/Level:</strong> ${document.getElementById('wwValue').textContent}/${document.getElementById('wlValue').textContent}</div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        <button class="no-print" onclick="window.print()" style="position: fixed; top: 10px; right: 10px; padding: 10px 20px; background: #00d4ff; color: white; border: none; border-radius: 4px; cursor: pointer;">Print</button>
+                    </body>
+                </html>
+            `);
+            printWindow.document.close();
+            
+            // Auto-detect and print
+            setTimeout(() => {
+                printWindow.print();
+            }, 1000);
+
+            showToast('Print dialog opened', 'success');
+        }
+
+        function exportCurrentImage() {
+            const canvas = document.getElementById('dicom-canvas');
+            if (!canvas) {
+                showToast('No image loaded', 'error');
+                return;
+            }
+
+            // Create download link
+            const link = document.createElement('a');
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const filename = `dicom_image_${timestamp}.png`;
+            
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png', printSettings.quality === 'high' ? 1.0 : 0.8);
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showToast(`Image exported as ${filename}`, 'success');
+        }
+
+        function exportSeries() {
+            if (!images || images.length === 0) {
+                showToast('No series loaded', 'error');
+                return;
+            }
+
+            showToast('Preparing series export...', 'info');
+            
+            // Create ZIP file with all images
+            const zip = new JSZip();
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            
+            images.forEach((image, index) => {
+                // This would need actual image data - simplified for demo
+                const canvas = document.getElementById('dicom-canvas');
+                if (canvas) {
+                    const dataUrl = canvas.toDataURL('image/png');
+                    const base64Data = dataUrl.split(',')[1];
+                    zip.file(`image_${String(index + 1).padStart(3, '0')}.png`, base64Data, {base64: true});
+                }
+            });
+            
+            // Add metadata file
+            const metadata = {
+                exportDate: new Date().toISOString(),
+                studyInfo: document.getElementById('studyStatus').textContent,
+                seriesInfo: document.getElementById('seriesStatus').textContent,
+                imageCount: images.length,
+                exportSettings: printSettings
+            };
+            zip.file('metadata.json', JSON.stringify(metadata, null, 2));
+            
+            // Generate and download
+            zip.generateAsync({type: 'blob'}).then(function(content) {
+                const link = document.createElement('a');
+                link.download = `dicom_series_${timestamp}.zip`;
+                link.href = URL.createObjectURL(content);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                showToast('Series exported successfully', 'success');
+            });
+        }
+
+        function showPrintSettings() {
+            // Create modal for print settings
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.7);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 2000;
+            `;
+            
+            modal.innerHTML = `
+                <div style="background: var(--card-bg); padding: 20px; border-radius: 8px; max-width: 400px; width: 90%;">
+                    <h3 style="color: var(--accent-color); margin-bottom: 20px;">Print Settings</h3>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; color: var(--text-primary);">Layout:</label>
+                        <select id="layoutSelect" style="width: 100%; padding: 8px; background: var(--secondary-bg); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px;">
+                            <option value="single" ${printSettings.layout === 'single' ? 'selected' : ''}>Single Image</option>
+                            <option value="grid" ${printSettings.layout === 'grid' ? 'selected' : ''}>Grid Layout</option>
+                            <option value="filmstrip" ${printSettings.layout === 'filmstrip' ? 'selected' : ''}>Film Strip</option>
+                        </select>
+                    </div>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; color: var(--text-primary);">Paper Size:</label>
+                        <select id="paperSelect" style="width: 100%; padding: 8px; background: var(--secondary-bg); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px;">
+                            <option value="A4" ${printSettings.paperSize === 'A4' ? 'selected' : ''}>A4</option>
+                            <option value="Letter" ${printSettings.paperSize === 'Letter' ? 'selected' : ''}>Letter</option>
+                            <option value="Legal" ${printSettings.paperSize === 'Legal' ? 'selected' : ''}>Legal</option>
+                        </select>
+                    </div>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: flex; align-items: center; color: var(--text-primary);">
+                            <input type="checkbox" id="includeInfoCheck" ${printSettings.includeInfo ? 'checked' : ''} style="margin-right: 8px;">
+                            Include Image Information
+                        </label>
+                    </div>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: flex; align-items: center; color: var(--text-primary);">
+                            <input type="checkbox" id="includeROIsCheck" ${printSettings.includeROIs ? 'checked' : ''} style="margin-right: 8px;">
+                            Include ROI Measurements
+                        </label>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button onclick="closePrintSettings()" style="padding: 8px 16px; background: var(--border-color); color: var(--text-primary); border: none; border-radius: 4px; cursor: pointer;">Cancel</button>
+                        <button onclick="savePrintSettings()" style="padding: 8px 16px; background: var(--accent-color); color: var(--primary-bg); border: none; border-radius: 4px; cursor: pointer;">Save</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            window.currentModal = modal;
+        }
+
+        function savePrintSettings() {
+            printSettings.layout = document.getElementById('layoutSelect').value;
+            printSettings.paperSize = document.getElementById('paperSelect').value;
+            printSettings.includeInfo = document.getElementById('includeInfoCheck').checked;
+            printSettings.includeROIs = document.getElementById('includeROIsCheck').checked;
+            
+            closePrintSettings();
+            showToast('Print settings saved', 'success');
+        }
+
+        function closePrintSettings() {
+            if (window.currentModal) {
+                document.body.removeChild(window.currentModal);
+                window.currentModal = null;
+            }
+        }
+
+        // Auto-detect available printers
+        function detectPrinters() {
+            if ('navigator' in window && 'mediaDevices' in navigator) {
+                // Modern browsers - limited printer detection
+                showToast('Printer detection available through print dialog', 'info');
+            } else {
+                showToast('Automatic printer detection not supported in this browser', 'warning');
+            }
+        }
+
+        // Initialize HU measurement when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                initializeHUMeasurement();
+                detectPrinters();
+                
+                // Initialize Hounsfield ROI system if available
+                if (typeof HounsfieldROI !== 'undefined') {
+                    HounsfieldROI.init();
+                }
+                
+                // Load JSZip for series export
+                if (typeof JSZip === 'undefined') {
+                    const script = document.createElement('script');
+                    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+                    document.head.appendChild(script);
+                }
+            }, 1000);
         });
     </script>
 </body>

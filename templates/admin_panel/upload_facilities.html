@@ -434,8 +434,11 @@
             </div>
             
             <div class="upload-actions" id="uploadActions" style="display: none;">
+                <a href="{% url 'worklist:dashboard' %}" class="btn-admin secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Worklist
+                </a>
                 <a href="{% url 'admin_panel:dashboard' %}" class="btn-admin secondary">
-                    <i class="fas fa-arrow-left"></i> Cancel
+                    <i class="fas fa-times"></i> Cancel
                 </a>
                 <button type="submit" class="btn-admin" id="uploadBtn" disabled>
                     <i class="fas fa-upload"></i> Upload Studies
@@ -444,8 +447,11 @@
             
             <!-- Initial actions -->
             <div class="upload-actions" id="initialActions">
+                <a href="{% url 'worklist:dashboard' %}" class="btn-admin secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Worklist
+                </a>
                 <a href="{% url 'admin_panel:dashboard' %}" class="btn-admin secondary">
-                    <i class="fas fa-arrow-left"></i> Back to Admin Panel
+                    <i class="fas fa-cog"></i> Admin Panel
                 </a>
             </div>
         </form>
