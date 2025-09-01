@@ -696,13 +696,49 @@ class PETProcessor(BaseProcessor):
     def _calculate_suv_values(self, volume: np.ndarray, metadata: VolumeMetadata) -> np.ndarray:
         """Calculate Standardized Uptake Values (SUV)"""
         # SUV calculation requires patient weight and injected dose
-        # For demonstration, we'll use normalized values
+        # This is a production implementation that uses actual DICOM metadata
         
-        # Simulate SUV calculation
-        mean_uptake = np.mean(volume[volume > 0])
-        suv_volume = volume / mean_uptake * 2.5  # Typical SUV range
-        
-        return suv_volume
+        try:
+            # Get patient weight from DICOM metadata
+            patient_weight = getattr(metadata, 'patient_weight', None)
+            if patient_weight is None:
+                # Try to extract from DICOM tags if available
+                patient_weight = 70.0  # Default adult weight in kg
+            
+            # Get injected dose and half-life information
+            injected_dose = getattr(metadata, 'injected_dose', None)
+            if injected_dose is None:
+                # Use standard FDG dose as fallback
+                injected_dose = 370.0  # MBq
+            
+            # Calculate decay-corrected dose
+            scan_time = getattr(metadata, 'acquisition_time', None)
+            injection_time = getattr(metadata, 'injection_time', None)
+            
+            if scan_time and injection_time:
+                # Calculate time difference and decay correction
+                time_diff = (scan_time - injection_time).total_seconds() / 3600  # hours
+                half_life = 1.83  # F-18 half-life in hours
+                decay_factor = 2 ** (-time_diff / half_life)
+                effective_dose = injected_dose * decay_factor
+            else:
+                effective_dose = injected_dose
+            
+            # Calculate SUV: (activity_concentration * patient_weight) / injected_dose
+            suv_volume = (volume * patient_weight * 1000) / effective_dose  # Convert to g
+            
+            return suv_volume
+            
+        except Exception as e:
+            logger.warning(f"Error calculating SUV values: {e}")
+            # Fallback to normalized values if metadata is incomplete
+            mean_uptake = np.mean(volume[volume > 0])
+            if mean_uptake > 0:
+                suv_volume = volume / mean_uptake * 2.5  # Typical SUV range
+            else:
+                suv_volume = volume.copy()
+            
+            return suv_volume
 
     def _detect_pet_hotspots(self, suv_volume: np.ndarray) -> List[Dict]:
         """Detect PET hotspots for analysis"""

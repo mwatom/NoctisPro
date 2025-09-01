@@ -12,9 +12,9 @@ urlpatterns = [
     path('api/study/<int:study_id>/', views.api_study_data, name='api_study_data'),
     path('api/image/<int:image_id>/display/', views.api_image_display, name='api_image_display'),
     
-    # Bulletproof demo endpoints - guaranteed no 500 errors
-    path('api/study/<int:study_id>/bulletproof/', views.api_study_data_bulletproof, name='api_study_data_bulletproof'),
-    path('api/image/<int:image_id>/display/bulletproof/', views.api_image_display_bulletproof, name='api_image_display_bulletproof'),
+    # Demo endpoints - available but not prioritized in production
+    # path('api/study/<int:study_id>/bulletproof/', views.api_study_data_bulletproof, name='api_study_data_bulletproof'),
+    # path('api/image/<int:image_id>/display/bulletproof/', views.api_image_display_bulletproof, name='api_image_display_bulletproof'),
     
     # Basic reconstruction
     path('api/mpr/<int:series_id>/', views.api_mpr_reconstruction, name='api_mpr_reconstruction'),
@@ -41,7 +41,7 @@ urlpatterns = [
     
     # Web viewer endpoints
     path('web/series/<int:series_id>/images/', views.web_series_images, name='web_series_images'),
-    path('web/series/<int:series_id>/images/bulletproof/', views.web_series_images_bulletproof, name='web_series_images_bulletproof'),
+    # path('web/series/<int:series_id>/images/bulletproof/', views.web_series_images_bulletproof, name='web_series_images_bulletproof'),
     
     # HU Calibration endpoints
     path('hu-calibration/', views.hu_calibration_dashboard, name='hu_calibration_dashboard'),
