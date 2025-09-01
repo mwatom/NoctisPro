@@ -1092,5 +1092,23 @@
     
     <!-- Backup System -->
     <script src="{% static 'js/backup-system.js' %}"></script>
+    
+    <script>
+        // Initialize backup system when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof BackupSystem !== 'undefined') {
+                BackupSystem.init();
+            }
+        });
+        
+        // Toggle backup panel function
+        function toggleBackupPanel() {
+            if (typeof BackupSystem !== 'undefined') {
+                BackupSystem.togglePanel();
+            } else {
+                console.error('Backup system not loaded');
+            }
+        }
+    </script>
 </body>
 </html>
