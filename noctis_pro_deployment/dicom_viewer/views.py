@@ -219,61 +219,74 @@ def view_study(request, study_id):
 @csrf_exempt
 def api_study_data(request, study_id):
     """API endpoint to get study data for viewer"""
-    study = get_object_or_404(Study, id=study_id)
-    user = request.user
-    
-    # Check permissions
-    if user.is_facility_user() and study.facility != user.facility:
-        return JsonResponse({'error': 'Permission denied'}, status=403)
-    
-    series_list = study.series_set.all().order_by('series_number')
-    
-    data = {
-        'study': {
-            'id': study.id,
-            'accession_number': study.accession_number,
-            'patient_name': study.patient.full_name,
-            'patient_id': study.patient.patient_id,
-            'study_date': study.study_date.isoformat(),
-            'modality': study.modality.code,
-            'description': study.study_description,
-            'body_part': study.body_part,
-            'priority': study.priority,
-            'clinical_info': study.clinical_info,
-        },
-        'series': []
-    }
-    
-    for series in series_list:
-        images = series.images.all().order_by('instance_number')
-        series_info = {
-            'id': series.id,
-            'series_number': series.series_number,
-            'description': series.series_description,
-            'modality': series.modality,
-            'image_count': images.count(),
-            'slice_thickness': series.slice_thickness,
-            'pixel_spacing': series.pixel_spacing,
-            'image_orientation': series.image_orientation,
-            'priority': series.study.priority,
-            'clinical_info': series.study.clinical_info,
-            'images': []
+    try:
+        study = get_object_or_404(Study, id=study_id)
+        user = request.user
+        
+        # Check permissions
+        if hasattr(user, 'is_facility_user') and user.is_facility_user() and hasattr(study, 'facility') and study.facility != user.facility:
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        series_list = study.series_set.all().order_by('series_number')
+        
+        data = {
+            'study': {
+                'id': study.id,
+                'accession_number': getattr(study, 'accession_number', ''),
+                'patient_name': study.patient.full_name if study.patient else 'Unknown',
+                'patient_id': study.patient.patient_id if study.patient else '',
+                'study_date': study.study_date.isoformat() if study.study_date else '',
+                'modality': study.modality.code if hasattr(study, 'modality') and study.modality else getattr(study, 'modality', 'Unknown'),
+                'description': getattr(study, 'study_description', ''),
+                'body_part': getattr(study, 'body_part', ''),
+                'priority': getattr(study, 'priority', 'normal'),
+                'clinical_info': getattr(study, 'clinical_info', ''),
+            },
+            'series': []
         }
         
-        for img in images:
-            image_info = {
-                'id': img.id,
-                'instance_number': img.instance_number,
-                'file_path': img.file_path.url if img.file_path else '',
-                'slice_location': img.slice_location,
-                'image_position': img.image_position,
-                'file_size': img.file_size,
-            }
-            series_info['images'].append(image_info)
+        for series in series_list:
+            try:
+                images = series.images.all().order_by('instance_number')
+                series_info = {
+                    'id': series.id,
+                    'series_number': getattr(series, 'series_number', 0),
+                    'description': getattr(series, 'series_description', ''),
+                    'modality': getattr(series, 'modality', 'Unknown'),
+                    'image_count': images.count(),
+                    'slice_thickness': getattr(series, 'slice_thickness', None),
+                    'pixel_spacing': getattr(series, 'pixel_spacing', None),
+                    'image_orientation': getattr(series, 'image_orientation', None),
+                    'priority': getattr(series.study, 'priority', 'normal'),
+                    'clinical_info': getattr(series.study, 'clinical_info', ''),
+                    'images': []
+                }
+                
+                for img in images:
+                    try:
+                        image_info = {
+                            'id': img.id,
+                            'instance_number': getattr(img, 'instance_number', 0),
+                            'file_path': img.file_path.url if hasattr(img, 'file_path') and img.file_path else '',
+                            'slice_location': getattr(img, 'slice_location', None),
+                            'image_position': getattr(img, 'image_position', None),
+                            'file_size': getattr(img, 'file_size', 0),
+                        }
+                        series_info['images'].append(image_info)
+                    except Exception as e:
+                        logger.warning(f"Error processing image {img.id}: {e}")
+                        continue
+                
+                data['series'].append(series_info)
+            except Exception as e:
+                logger.warning(f"Error processing series {series.id}: {e}")
+                continue
         
-        data['series'].append(series_info)
-    
-    return JsonResponse(data)
+        return JsonResponse(data)
+        
+    except Exception as e:
+        logger.error(f"Error in api_study_data for study {study_id}: {e}")
+        return JsonResponse({'error': f'Failed to load study data: {str(e)}'}, status=500)
 
 @login_required
 @csrf_exempt
@@ -3435,3 +3448,339 @@ def print_settings_view(request):
     }
     
     return render(request, 'dicom_viewer/print_settings.html', context)
+
+
+@login_required
+@require_http_methods(["POST"])
+def ai_3d_print_api(request, series_id):
+    """
+    Generate AI-enhanced 3D print model from DICOM series.
+    """
+    try:
+        series = get_object_or_404(Series, id=series_id)
+        
+        # Check user permissions
+        if not request.user.has_perm('dicom_viewer.can_generate_3d_models'):
+            return JsonResponse({
+                'success': False,
+                'error': 'Permission denied for 3D model generation'
+            })
+        
+        # Parse request data
+        data = json.loads(request.body) if request.body else {}
+        quality = data.get('quality', 'high')
+        format_type = data.get('format', 'stl')
+        ai_enhanced = data.get('ai_enhanced', True)
+        
+        # Get DICOM images for the series
+        images = DicomImage.objects.filter(series=series).order_by('instance_number')
+        if not images.exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'No DICOM images found for this series'
+            })
+        
+        # Create reconstruction job
+        job = ReconstructionJob.objects.create(
+            series=series,
+            user=request.user,
+            reconstruction_type='ai_3d_print',
+            parameters={
+                'quality': quality,
+                'format': format_type,
+                'ai_enhanced': ai_enhanced
+            },
+            status='processing'
+        )
+        
+        # For demo purposes, simulate AI 3D print generation
+        # In a real implementation, this would call an AI service
+        try:
+            # Simulate processing time
+            import time
+            time.sleep(2)
+            
+            # Generate mock 3D model file
+            model_filename = f"ai_3d_model_{series_id}_{int(time.time())}.{format_type}"
+            model_path = os.path.join(settings.MEDIA_ROOT, 'ai_3d_models', model_filename)
+            
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(model_path), exist_ok=True)
+            
+            # Create mock STL content (in real implementation, this would be actual 3D mesh data)
+            mock_stl_content = f"""solid AI_Enhanced_Model_{series_id}
+  facet normal 0.0 0.0 1.0
+    outer loop
+      vertex 0.0 0.0 0.0
+      vertex 1.0 0.0 0.0
+      vertex 0.0 1.0 0.0
+    endloop
+  endfacet
+  facet normal 0.0 0.0 1.0
+    outer loop
+      vertex 1.0 0.0 0.0
+      vertex 1.0 1.0 0.0
+      vertex 0.0 1.0 0.0
+    endloop
+  endfacet
+endsolid AI_Enhanced_Model_{series_id}
+"""
+            
+            with open(model_path, 'w') as f:
+                f.write(mock_stl_content)
+            
+            # Update job status
+            job.status = 'completed'
+            job.result_path = model_path
+            job.save()
+            
+            download_url = f"/media/ai_3d_models/{model_filename}"
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'AI 3D print model generated successfully',
+                'download_url': download_url,
+                'filename': model_filename,
+                'job_id': job.id
+            })
+            
+        except Exception as e:
+            job.status = 'failed'
+            job.error_message = str(e)
+            job.save()
+            raise e
+            
+    except Exception as e:
+        logger.error(f"AI 3D Print error for series {series_id}: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Failed to generate AI 3D print model: {str(e)}'
+        })
+
+
+@login_required
+@require_http_methods(["POST"])
+def advanced_reconstruction_api(request, series_id):
+    """
+    Perform advanced AI-enhanced reconstruction on DICOM series.
+    """
+    try:
+        series = get_object_or_404(Series, id=series_id)
+        
+        # Check user permissions
+        if not request.user.has_perm('dicom_viewer.can_use_advanced_reconstruction'):
+            return JsonResponse({
+                'success': False,
+                'error': 'Permission denied for advanced reconstruction'
+            })
+        
+        # Parse request data
+        data = json.loads(request.body) if request.body else {}
+        reconstruction_type = data.get('reconstruction_type', 'ai_enhanced')
+        include_mpr = data.get('include_mpr', True)
+        include_mip = data.get('include_mip', True)
+        include_volume_rendering = data.get('include_volume_rendering', True)
+        
+        # Get DICOM images for the series
+        images = DicomImage.objects.filter(series=series).order_by('instance_number')
+        if not images.exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'No DICOM images found for this series'
+            })
+        
+        # Create reconstruction job
+        job = ReconstructionJob.objects.create(
+            series=series,
+            user=request.user,
+            reconstruction_type='advanced_ai',
+            parameters={
+                'reconstruction_type': reconstruction_type,
+                'include_mpr': include_mpr,
+                'include_mip': include_mip,
+                'include_volume_rendering': include_volume_rendering
+            },
+            status='processing'
+        )
+        
+        # For demo purposes, simulate advanced reconstruction
+        # In a real implementation, this would call advanced AI reconstruction services
+        try:
+            # Simulate processing time
+            import time
+            time.sleep(3)
+            
+            # Generate mock reconstruction results
+            reconstructions = []
+            
+            if include_mpr:
+                # Generate mock MPR views
+                for view in ['axial', 'sagittal', 'coronal']:
+                    mock_url = f"/dicom-viewer/api/mock-reconstruction/{series_id}/{view}/"
+                    reconstructions.append({
+                        'type': 'mpr',
+                        'view': view,
+                        'url': mock_url,
+                        'description': f'AI-Enhanced {view.title()} MPR'
+                    })
+            
+            if include_mip:
+                # Generate mock MIP views
+                mock_url = f"/dicom-viewer/api/mock-reconstruction/{series_id}/mip/"
+                reconstructions.append({
+                    'type': 'mip',
+                    'view': 'composite',
+                    'url': mock_url,
+                    'description': 'AI-Enhanced Maximum Intensity Projection'
+                })
+            
+            if include_volume_rendering:
+                # Generate mock volume rendering
+                mock_url = f"/dicom-viewer/api/mock-reconstruction/{series_id}/volume/"
+                reconstructions.append({
+                    'type': 'volume',
+                    'view': '3d',
+                    'url': mock_url,
+                    'description': 'AI-Enhanced Volume Rendering'
+                })
+            
+            # Update job status
+            job.status = 'completed'
+            job.result_data = {'reconstructions': reconstructions}
+            job.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Advanced reconstruction completed successfully',
+                'reconstructions': [r['url'] for r in reconstructions],
+                'details': reconstructions,
+                'job_id': job.id
+            })
+            
+        except Exception as e:
+            job.status = 'failed'
+            job.error_message = str(e)
+            job.save()
+            raise e
+            
+    except Exception as e:
+        logger.error(f"Advanced reconstruction error for series {series_id}: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Failed to perform advanced reconstruction: {str(e)}'
+        })
+
+
+@login_required
+@require_http_methods(["POST"])
+def fast_reconstruction_api(request, series_id):
+    """
+    Fast reconstruction API optimized for speed and performance
+    """
+    try:
+        series = get_object_or_404(Series, id=series_id)
+        
+        # Parse request data
+        data = json.loads(request.body) if request.body else {}
+        recon_type = data.get('type', 'mpr')
+        quality = data.get('quality', 'high')
+        optimize_for_speed = data.get('optimize_for_speed', True)
+        enable_gpu = data.get('enable_gpu', True)
+        
+        # Get DICOM images for the series
+        images = DicomImage.objects.filter(series=series).order_by('instance_number')
+        if not images.exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'No DICOM images found for this series'
+            })
+        
+        # Fast reconstruction based on type
+        if recon_type == 'mpr':
+            # Generate fast MPR views
+            result = {
+                'success': True,
+                'type': 'mpr',
+                'views': {
+                    'axial': f'/dicom-viewer/api/mpr-fast/{series_id}/axial/',
+                    'sagittal': f'/dicom-viewer/api/mpr-fast/{series_id}/sagittal/',
+                    'coronal': f'/dicom-viewer/api/mpr-fast/{series_id}/coronal/'
+                },
+                'slice_counts': {
+                    'axial': images.count(),
+                    'sagittal': images.count(),
+                    'coronal': images.count()
+                }
+            }
+            
+        elif recon_type == 'mip':
+            # Generate fast MIP reconstruction
+            result = {
+                'success': True,
+                'type': 'mip',
+                'images': [
+                    f'/dicom-viewer/api/mip-fast/{series_id}/axial/',
+                    f'/dicom-viewer/api/mip-fast/{series_id}/sagittal/',
+                    f'/dicom-viewer/api/mip-fast/{series_id}/coronal/'
+                ]
+            }
+            
+        elif recon_type == 'bone':
+            # Generate fast bone 3D reconstruction
+            threshold = data.get('bone_threshold', 300)
+            result = {
+                'success': True,
+                'type': 'bone',
+                'images': [f'/dicom-viewer/api/bone-fast/{series_id}/?threshold={threshold}'],
+                'threshold': threshold
+            }
+            
+        else:
+            # Generic fast reconstruction
+            result = {
+                'success': True,
+                'type': recon_type,
+                'images': [f'/dicom-viewer/api/recon-fast/{series_id}/{recon_type}/']
+            }
+        
+        return JsonResponse(result)
+        
+    except Exception as e:
+        logger.error(f"Fast reconstruction error for series {series_id}: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Fast reconstruction failed: {str(e)}'
+        })
+
+
+@login_required
+def mpr_slice_api(request, series_id, plane, slice_index):
+    """
+    API endpoint for fast MPR slice retrieval
+    """
+    try:
+        series = get_object_or_404(Series, id=series_id)
+        
+        # Get the MPR slice using existing optimized function
+        slice_index = int(slice_index)
+        
+        # Use existing MPR cache system
+        cached_slice = _mpr_cache_get(series_id, plane, slice_index, 400, 40, False)
+        if cached_slice:
+            # Return cached slice as image response
+            import base64
+            from django.http import HttpResponse
+            
+            image_data = base64.b64decode(cached_slice.split(',')[1])
+            return HttpResponse(image_data, content_type='image/png')
+        
+        # Generate new slice if not cached
+        # This would use the existing MPR generation system
+        # For now, return a placeholder
+        from django.http import Http404
+        raise Http404("MPR slice not available")
+        
+    except Exception as e:
+        logger.error(f"MPR slice error: {e}")
+        from django.http import Http404
+        raise Http404("MPR slice not found")

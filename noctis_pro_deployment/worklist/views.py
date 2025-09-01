@@ -822,32 +822,95 @@ def api_delete_study(request, study_id):
     if request.method not in ['DELETE', 'POST']:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
-    # Check if user is admin
-    if not request.user.is_admin():
+    # Check if user is admin or superuser
+    if not (request.user.is_admin() or request.user.is_superuser):
         return JsonResponse({'error': 'Permission denied. Only administrators can delete studies.'}, status=403)
     
-    study = get_object_or_404(Study, id=study_id)
-    
     try:
-        # Store study info for logging
+        study = get_object_or_404(Study, id=study_id)
+        
+        # Store study info for logging before deletion
         study_info = {
             'id': study.id,
             'accession_number': study.accession_number,
-            'patient_name': study.patient.full_name,
-            'deleted_by': request.user.username
+            'patient_name': study.patient.full_name if study.patient else 'Unknown',
+            'deleted_by': request.user.username,
+            'study_date': study.study_date.isoformat() if study.study_date else None,
+            'modality': study.modality
         }
+        
+        # Get related objects count for logging
+        series_count = study.series_set.count()
+        images_count = sum(series.images.count() for series in study.series_set.all())
+        
+        # Import required modules for file cleanup
+        import os
+        from django.conf import settings
+        
+        # Clean up associated files before deletion
+        file_paths_to_delete = []
+        
+        # Collect all DICOM file paths
+        for series in study.series_set.all():
+            for image in series.images.all():
+                if image.file and hasattr(image.file, 'path'):
+                    try:
+                        if os.path.exists(image.file.path):
+                            file_paths_to_delete.append(image.file.path)
+                    except (ValueError, AttributeError):
+                        pass  # Skip if file path is invalid
+        
+        # Collect attachment file paths
+        for attachment in study.attachments.all():
+            if attachment.file and hasattr(attachment.file, 'path'):
+                try:
+                    if os.path.exists(attachment.file.path):
+                        file_paths_to_delete.append(attachment.file.path)
+                except (ValueError, AttributeError):
+                    pass
+                    
+            # Also collect thumbnail paths
+            if attachment.thumbnail and hasattr(attachment.thumbnail, 'path'):
+                try:
+                    if os.path.exists(attachment.thumbnail.path):
+                        file_paths_to_delete.append(attachment.thumbnail.path)
+                except (ValueError, AttributeError):
+                    pass
         
         # Delete the study (this will cascade to related objects)
         study.delete()
         
+        # Clean up files after successful database deletion
+        files_deleted = 0
+        for file_path in file_paths_to_delete:
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    files_deleted += 1
+            except OSError as e:
+                print(f"Warning: Could not delete file {file_path}: {e}")
+        
         return JsonResponse({
             'success': True,
             'message': f'Study {study_info["accession_number"]} deleted successfully',
-            'deleted_study': study_info
+            'deleted_study': study_info,
+            'statistics': {
+                'series_deleted': series_count,
+                'images_deleted': images_count,
+                'files_cleaned': files_deleted
+            }
         })
         
+    except Study.DoesNotExist:
+        return JsonResponse({'error': 'Study not found'}, status=404)
     except Exception as e:
-        return JsonResponse({'error': f'Failed to delete study: {str(e)}'}, status=500)
+        import traceback
+        error_details = {
+            'error': f'Failed to delete study: {str(e)}',
+            'error_type': type(e).__name__,
+            'traceback': traceback.format_exc() if settings.DEBUG else None
+        }
+        return JsonResponse(error_details, status=500)
 
 @login_required
 def api_refresh_worklist(request):
