@@ -5,7 +5,8 @@
 echo "🌐 Starting Ngrok Tunnel for NoctisPro"
 echo "======================================"
 
-cd /workspace
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
 # Check if ngrok is configured
 if ! ./ngrok config check > /dev/null 2>&1; then

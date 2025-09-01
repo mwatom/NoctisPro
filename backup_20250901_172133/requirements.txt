@@ -1,0 +1,12 @@
+Django
+djangorestframework
+Pillow
+numpy
+pydicom
+python-decouple
+django-cors-headers
+channels
+daphne
+gunicorn
+redis
+python-dotenv
