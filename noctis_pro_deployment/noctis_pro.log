@@ -68,3 +68,6 @@ Not Found: /static/css/style.css
 Not Found: /static/js/main.js
 "GET /static/js/main.js HTTP/1.1" 404 179
 "GET / HTTP/1.1" 302 0
+"GET /login/ HTTP/1.1" 200 7929
+"GET /worklist/ HTTP/1.1" 302 0
+"GET /dicom-viewer/ HTTP/1.1" 302 0
