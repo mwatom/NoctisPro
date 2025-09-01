@@ -257,14 +257,77 @@
         <div id="priorityInfo" style="color:var(--text-secondary);font-size:11px;margin-top:4px;">Priority: -</div>
       </div>
       <div class="panel">
-        <h3>Measurements</h3>
+        <h3>Clinical Tools</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+          <button class="btn-control" onclick="toggleHUProbe()"><i class="fas fa-thermometer-half"></i> HU Probe</button>
+          <button class="btn-control" onclick="toggleAngleTools()"><i class="fas fa-drafting-compass"></i> Angles</button>
+          <button class="btn-control" onclick="toggleAreaMeasure()"><i class="fas fa-vector-square"></i> Area</button>
+          <button class="btn-control" onclick="toggleEllipseROI()"><i class="fas fa-circle"></i> ROI</button>
+        </div>
+        <div class="control">
+          <label style="font-size:11px;color:#ccc;margin-bottom:4px;">Clinical Presets:</label>
+          <select id="clinicalPresets" class="select" onchange="applyClinicalPreset(this.value)">
+            <option value="">Select Clinical View</option>
+            <option value="chest_lung">Chest - Lung Window</option>
+            <option value="chest_mediastinum">Chest - Mediastinum</option>
+            <option value="abdomen_soft">Abdomen - Soft Tissue</option>
+            <option value="abdomen_liver">Abdomen - Liver</option>
+            <option value="head_brain">Head - Brain</option>
+            <option value="head_bone">Head - Bone</option>
+            <option value="spine_bone">Spine - Bone</option>
+            <option value="spine_soft">Spine - Soft Tissue</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Measurements & ROI</h3>
         <div class="control">
           <button id="btnClearMeasurements" class="btn">Clear All</button>
         </div>
+        <div id="huProbeResult" style="background:var(--secondary-bg);border:1px solid var(--border-color);border-radius:4px;padding:8px;margin:8px 0;display:none;">
+          <div style="font-size:11px;color:var(--accent-color);font-weight:bold;">HU Values:</div>
+          <div id="huValues" style="font-size:11px;color:var(--text-secondary);"></div>
+        </div>
         <ul id="measurementsList" style="list-style:none;padding-left:0;margin:0;color:var(--text-secondary);font-size:11px;"></ul>
+      </div>
+
+      <div class="panel">
+        <h3>Patient Safety</h3>
+        <div id="patientVerification" style="background:var(--secondary-bg);border:1px solid var(--border-color);border-radius:4px;padding:8px;margin-bottom:8px;">
+          <div style="font-size:11px;color:var(--accent-color);font-weight:bold;">Patient ID Verification:</div>
+          <div id="patientIdDisplay" style="font-size:12px;color:var(--text-primary);font-weight:bold;">-</div>
+          <div id="patientNameDisplay" style="font-size:11px;color:var(--text-secondary);">-</div>
+          <div id="studyDateDisplay" style="font-size:11px;color:var(--text-secondary);">-</div>
+        </div>
+        <div class="control">
+          <button class="btn-control" onclick="verifyPatientIdentity()" style="width:100%;">
+            <i class="fas fa-shield-alt"></i> Verify Patient
+          </button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Reporting Tools</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+          <button class="btn-control" onclick="addCriticalFinding()"><i class="fas fa-exclamation-triangle"></i> Critical</button>
+          <button class="btn-control" onclick="addNormalFinding()"><i class="fas fa-check-circle"></i> Normal</button>
+        </div>
+        <div class="control">
+          <textarea id="clinicalNotes" placeholder="Clinical notes and findings..." 
+                    style="width:100%;height:60px;background:var(--secondary-bg);border:1px solid var(--border-color);color:var(--text-primary);border-radius:4px;padding:8px;font-size:11px;resize:vertical;"></textarea>
+        </div>
+        <div class="control">
+          <button class="btn-control" onclick="saveReport()" style="width:100%;">
+            <i class="fas fa-save"></i> Save Report
+          </button>
+        </div>
       </div>
     </div>
   </div>
+
+  <!-- Toast notification container -->
+  <div class="toast-container" id="toastContainer"></div>
 
   <!-- Three.js for rotatable bone mesh (loaded only if used) -->
   <!-- Removed deprecated UMD scripts; using ES Modules via importmap -->
