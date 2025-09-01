@@ -56,7 +56,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # Re-enabled
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -64,11 +64,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    # Temporarily disabled problematic middleware for debugging
-    # 'noctis_pro.middleware.SlowConnectionOptimizationMiddleware',  # Connection detection
-    'noctis_pro.middleware.SessionTimeoutMiddleware',  # Session timeout handling - moved after auth
-    # 'noctis_pro.middleware.ImageOptimizationMiddleware',  # Image optimization
-    # 'noctis_pro.middleware.SessionTimeoutWarningMiddleware',  # Session timeout warnings
+    # Keep custom middlewares after auth to ensure request.user exists
+    'noctis_pro.middleware.SessionTimeoutMiddleware',
 ]
 
 ROOT_URLCONF = 'noctis_pro.urls'

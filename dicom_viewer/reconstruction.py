@@ -27,10 +27,27 @@ from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
 import logging
 
-# Scientific computing libraries
-from skimage import measure, morphology, filters
-from scipy import ndimage
-from scipy.interpolate import RegularGridInterpolator
+# Scientific computing libraries (optional at import time)
+RECON_OPTIONAL_DEPS_OK = True
+try:
+    from skimage import measure, morphology, filters  # type: ignore
+except Exception:
+    RECON_OPTIONAL_DEPS_OK = False
+    measure = None  # type: ignore
+    morphology = None  # type: ignore
+    filters = None  # type: ignore
+
+try:
+    from scipy import ndimage  # type: ignore
+    from scipy.interpolate import RegularGridInterpolator  # type: ignore
+except Exception:
+    RECON_OPTIONAL_DEPS_OK = False
+    class _MissingDep:
+        pass
+    ndimage = _MissingDep()  # type: ignore
+    class RegularGridInterpolator:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            raise ImportError("scipy is required for this operation but is not installed")
 import pydicom
 from PIL import Image
 
@@ -123,6 +140,8 @@ class BaseProcessor:
     def load_series_volume(self, series, progress_tracker: Optional[ProgressTracker] = None) -> Tuple[np.ndarray, VolumeMetadata]:
         """Load DICOM series into 3D volume with enhanced error handling"""
         try:
+            if not RECON_OPTIONAL_DEPS_OK:
+                logger.warning("Optional reconstruction dependencies (scikit-image/scipy) are missing. Basic volume load still works; advanced recon may be unavailable.")
             images = series.images.all().order_by('instance_number')
             if not images:
                 raise ValueError("No images found in series")

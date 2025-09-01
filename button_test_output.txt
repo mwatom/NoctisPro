@@ -1,0 +1,23 @@
+🔍 Testing Worklist Button Endpoints
+= ==================================================
+
+📋 Testing Worklist Endpoints:
+Testing Dashboard... 🔄 REDIRECT (Expected for auth-protected endpoints)
+Testing Study List... 🔄 REDIRECT (Expected for auth-protected endpoints)
+Testing Upload Study... 🔄 REDIRECT (Expected for auth-protected endpoints)
+Testing Studies API... 🔄 REDIRECT (Expected for auth-protected endpoints)
+Testing Refresh Worklist API... 🔄 REDIRECT (Expected for auth-protected endpoints)
+Testing Upload Stats API... 🔄 REDIRECT (Expected for auth-protected endpoints)
+
+📋 Testing DICOM Viewer Endpoints:
+Testing DICOM Viewer... 🔄 REDIRECT (Expected for auth-protected endpoints)
+Testing DICOM API Study... 🔄 REDIRECT (Expected for auth-protected endpoints)
+Testing DICOM API Image... 🔄 REDIRECT (Expected for auth-protected endpoints)
+
+📋 Testing Other System Endpoints:
+Testing Admin Panel... 🔄 REDIRECT (Expected for auth-protected endpoints)
+Testing Notifications... 🔄 REDIRECT (Expected for auth-protected endpoints)
+Testing Chat Rooms... 🔄 REDIRECT (Expected for auth-protected endpoints)
+Testing Login Page... ✅ OK
+
+📊 Test completed. Check for any 💥 ERROR_500 entries above.
