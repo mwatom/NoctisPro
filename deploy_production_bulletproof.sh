@@ -267,7 +267,7 @@ install_dependencies() {
         log_info "Installing Python packages..."
         pip install -r requirements.txt || {
             log_warning "Some packages failed to install, trying essential ones only..."
-            pip install django daphne redis python-dotenv pillow pydicom numpy scipy matplotlib || {
+            pip install django djangorestframework daphne redis python-dotenv pillow pydicom numpy scipy matplotlib django-cors-headers channels || {
                 log_error "Failed to install essential packages"
                 exit 1
             }
