@@ -1057,3 +1057,8 @@ Watching for file changes with StatReloader
 Watching for file changes with StatReloader
 /home/ubuntu/.local/lib/python3.13/site-packages/numpy/lib/_datasource.py changed, reloading.
 Watching for file changes with StatReloader
+Service Unavailable: /health/
+Service Unavailable: /health/
+Not Found: /dicom-viewer/api/studies/
+Not Found: /static/css/style.css
+Not Found: /static/js/main.js

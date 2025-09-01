@@ -1,45 +1,123 @@
 {
   "verification_summary": {
-    "timestamp": "2025-08-30 17:48:26",
-    "overall_score": 94.3,
+    "timestamp": "2025-09-01 09:56:31",
+    "overall_score": 61.2,
     "individual_scores": {
-      "button_types": 100.0,
-      "aria_labels": 100.0,
-      "modal_roles": 71.4,
+      "button_types": 67.4,
+      "aria_labels": 92.3,
+      "modal_roles": 29.4,
       "css_enhancements": 100.0,
-      "javascript_utilities": 100.0
+      "javascript_utilities": 16.7
     }
   },
   "detailed_results": {
     "button_types": {
-      "total_buttons": 187,
-      "buttons_with_type": 187,
-      "buttons_without_type": 0,
-      "missing_type_buttons": [],
-      "percentage_fixed": 100.0
-    },
-    "aria_labels": {
-      "total_icon_buttons": 12,
-      "icon_buttons_with_labels": 12,
-      "icon_buttons_without_labels": 0,
-      "missing_label_buttons": [],
-      "percentage_fixed": 100.0
-    },
-    "modal_roles": {
-      "total_modals": 7,
-      "modals_with_roles": 5,
-      "modals_without_roles": 2,
-      "missing_role_modals": [
+      "total_buttons": 227,
+      "buttons_with_type": 153,
+      "buttons_without_type": 74,
+      "missing_type_buttons": [
         {
           "file": "templates/dicom_viewer/base.html",
-          "modal": "<div id=\"dicomModal\">"
+          "button": "<button class=\"btn-dicom-viewer\" onclick=\"loadFromExternalMedia()\" title=\"Load DICOM from USB/DVD\">"
         },
         {
           "file": "templates/dicom_viewer/base.html",
-          "modal": "<div id=\"printModal\">"
+          "button": "<button class=\"btn-dicom-viewer btn-secondary\" onclick=\"saveMeasurements()\">"
+        },
+        {
+          "file": "templates/dicom_viewer/base.html",
+          "button": "<button class=\"btn-dicom-viewer btn-secondary\" onclick=\"exportImage()\">"
+        },
+        {
+          "file": "templates/dicom_viewer/base.html",
+          "button": "<button class=\"tool active\" data-tool=\"window\" onclick=\"setTool('window')\" title=\"Window/Level\">"
+        },
+        {
+          "file": "templates/dicom_viewer/base.html",
+          "button": "<button class=\"tool\" data-tool=\"zoom\" onclick=\"setTool('zoom')\" title=\"Zoom\">"
+        },
+        {
+          "file": "templates/dicom_viewer/base.html",
+          "button": "<button class=\"tool\" data-tool=\"pan\" onclick=\"setTool('pan')\" title=\"Pan\">"
+        },
+        {
+          "file": "templates/dicom_viewer/base.html",
+          "button": "<button class=\"tool\" data-tool=\"measure\" onclick=\"setTool('measure')\" title=\"Measure\">"
+        },
+        {
+          "file": "templates/dicom_viewer/base.html",
+          "button": "<button class=\"tool\" data-tool=\"annotate\" onclick=\"setTool('annotate')\" title=\"Annotate\">"
+        },
+        {
+          "file": "templates/dicom_viewer/base.html",
+          "button": "<button class=\"tool\" data-tool=\"crosshair\" onclick=\"toggleCrosshair()\" title=\"Crosshair\">"
+        },
+        {
+          "file": "templates/dicom_viewer/base.html",
+          "button": "<button class=\"tool\" data-tool=\"invert\" onclick=\"toggleInvert()\" title=\"Invert\">"
         }
       ],
-      "percentage_fixed": 71.42857142857143
+      "percentage_fixed": 67.40088105726872
+    },
+    "aria_labels": {
+      "total_icon_buttons": 13,
+      "icon_buttons_with_labels": 12,
+      "icon_buttons_without_labels": 1,
+      "missing_label_buttons": [
+        {
+          "file": "templates/dicom_viewer/base.html",
+          "button": "<button class=\"measurement-delete\" onclick=\"deleteMeasurement(${index})\">\n                        <i..."
+        }
+      ],
+      "percentage_fixed": 92.3076923076923
+    },
+    "modal_roles": {
+      "total_modals": 17,
+      "modals_with_roles": 5,
+      "modals_without_roles": 12,
+      "missing_role_modals": [
+        {
+          "file": "templates/dicom_viewer/base.html",
+          "modal": "<div class=\"modal-overlay\" id=\"threeDModal\">"
+        },
+        {
+          "file": "templates/dicom_viewer/base.html",
+          "modal": "<div class=\"modal-content\">"
+        },
+        {
+          "file": "templates/dicom_viewer/base.html",
+          "modal": "<div class=\"modal-header\">"
+        },
+        {
+          "file": "templates/dicom_viewer/base.html",
+          "modal": "<div class=\"modal-title\">"
+        },
+        {
+          "file": "templates/dicom_viewer/base.html",
+          "modal": "<div class=\"modal-content\" style=\"width: 500px; height: auto;\">"
+        },
+        {
+          "file": "templates/dicom_viewer/base.html",
+          "modal": "<div class=\"modal-header\">"
+        },
+        {
+          "file": "templates/dicom_viewer/base.html",
+          "modal": "<div class=\"modal-title\">"
+        },
+        {
+          "file": "templates/dicom_viewer/base.html",
+          "modal": "<div id=\"modalitySpecificButtons\" style=\"margin-top: 8px;\">"
+        },
+        {
+          "file": "templates/dicom_viewer/base.html",
+          "modal": "<div class=\"modal-overlay\" id=\"threeDModal\">"
+        },
+        {
+          "file": "templates/dicom_viewer/viewer_improved.html",
+          "modal": "<div class=\"modal-content\">"
+        }
+      ],
+      "percentage_fixed": 29.411764705882355
     },
     "css_enhancements": {
       "hover_states": true,
@@ -50,23 +128,25 @@
     },
     "javascript_utilities": {
       "file_exists": true,
-      "click_protection": true,
-      "keyboard_support": true,
-      "loading_states": true,
-      "error_handling": true,
-      "modal_handling": true
+      "click_protection": false,
+      "keyboard_support": false,
+      "loading_states": false,
+      "error_handling": false,
+      "modal_handling": false
     },
     "ui_patterns": {
       "form_buttons": 15,
-      "navigation_buttons": 69,
-      "action_buttons": 225,
+      "navigation_buttons": 79,
+      "action_buttons": 266,
       "modal_triggers": 3,
-      "interactive_elements": 274
+      "interactive_elements": 332
     }
   },
   "recommendations": [
+    "Add type attributes to remaining buttons",
     "Add proper ARIA roles to modal dialogs",
-    "Good progress! Minor improvements needed"
+    "Implement remaining JavaScript utility functions",
+    "Significant work still needed to improve UI functionality"
   ],
-  "status": "PASS"
+  "status": "NEEDS_IMPROVEMENT"
 }
