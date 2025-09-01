@@ -493,6 +493,134 @@
             cursor: pointer;
         }
 
+        /* Floating Panels */
+        .floating-panel {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            width: 320px;
+            max-height: calc(100vh - 100px);
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-title {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .panel-content {
+            padding: 16px;
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
+        }
+
+        .close-btn {
+            background: var(--danger-color);
+            border: none;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .close-btn:hover {
+            background: #c82333;
+        }
+
+        .ai-controls, .reconstruction-controls {
+            margin-bottom: 16px;
+        }
+
+        .analysis-types {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .analysis-types label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .ai-results, .reconstruction-results {
+            background: var(--primary-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 12px;
+            min-height: 100px;
+            font-size: 12px;
+        }
+
+        .no-results {
+            color: var(--text-muted);
+            text-align: center;
+            font-style: italic;
+        }
+
+        /* Print Modal Styles */
+        .modal-body {
+            padding: 20px;
+        }
+
+        .print-options {
+            margin-bottom: 20px;
+        }
+
+        .option-group {
+            margin-bottom: 15px;
+        }
+
+        .option-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .option-group label input[type="checkbox"] {
+            margin-right: 8px;
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 8px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 12px;
+        }
+
+        .print-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .print-actions button {
+            flex: 1;
+        }
+
         /* 3D Modal */
         .modal-overlay {
             position: fixed;
@@ -870,9 +998,13 @@
                 <i class="fas fa-cubes"></i>
                 <span>3D</span>
             </button>
-            <button class="tool" data-tool="ai" onclick="runAIAnalysis()" title="AI Analysis">
+            <button class="tool" data-tool="ai" onclick="toggleAIPanel()" title="AI Analysis">
                 <i class="fas fa-brain"></i>
                 <span>AI</span>
+            </button>
+            <button class="tool" data-tool="print" onclick="showPrintDialog()" title="Print/Export">
+                <i class="fas fa-print"></i>
+                <span>Print</span>
             </button>
         </div>
 
@@ -1079,17 +1211,118 @@
         </div>
     </div>
 
-    <!-- 3D Modal -->
-    <div class="modal-overlay" id="threeDModal">
+    <!-- AI Analysis Panel -->
+    <div class="floating-panel" id="aiPanel" style="display: none;">
+        <div class="panel-header">
+            <div class="panel-title">
+                <i class="fas fa-brain"></i> AI Analysis
+            </div>
+            <button class="close-btn" onclick="closeAIPanel()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="panel-content">
+            <div class="ai-controls">
+                <button class="btn-dicom-viewer btn-primary" onclick="runAIAnalysis()" style="width: 100%; margin-bottom: 10px;">
+                    <i class="fas fa-play"></i> Run AI Analysis
+                </button>
+                <div class="analysis-types">
+                    <label><input type="checkbox" checked> Pathology Detection</label>
+                    <label><input type="checkbox" checked> Measurements</label>
+                    <label><input type="checkbox" checked> Annotations</label>
+                </div>
+            </div>
+            <div id="aiResults" class="ai-results">
+                <div class="no-results">No analysis results yet. Click "Run AI Analysis" to start.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3D Reconstruction Panel -->
+    <div class="floating-panel" id="threeDPanel" style="display: none;">
+        <div class="panel-header">
+            <div class="panel-title">
+                <i class="fas fa-cubes"></i> 3D Reconstruction
+            </div>
+            <button class="close-btn" onclick="close3DPanel()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="panel-content">
+            <div class="reconstruction-controls">
+                <button class="btn-dicom-viewer btn-primary" onclick="generateMPR()" style="width: 100%; margin-bottom: 6px;">
+                    <i class="fas fa-cube"></i> MPR Views
+                </button>
+                <button class="btn-dicom-viewer btn-primary" onclick="generateMIP()" style="width: 100%; margin-bottom: 6px;">
+                    <i class="fas fa-layer-group"></i> MIP Views
+                </button>
+                <button class="btn-dicom-viewer btn-primary" onclick="launch3DViewer()" style="width: 100%; margin-bottom: 6px;">
+                    <i class="fas fa-cubes"></i> 3D Viewer
+                </button>
+            </div>
+            <div id="reconstructionResults" class="reconstruction-results">
+                <div class="no-results">No reconstruction results yet. Click a reconstruction type to start.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3D Modal (for full 3D viewer) -->
+    <div class="modal-overlay" id="threeDModal" style="display: none;">
         <div class="modal-content">
             <div class="modal-header">
-                <div class="modal-title">3D Reconstruction</div>
+                <div class="modal-title">3D Reconstruction Viewer</div>
                 <button class="close-btn" onclick="close3DModal()">
                     <i class="fas fa-times"></i> Close
                 </button>
             </div>
             <div id="threeDContent" style="width: 100%; height: calc(100% - 60px);">
                 <!-- 3D content will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Print Dialog Modal -->
+    <div class="modal-overlay" id="printModal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <div class="modal-title">Print/Export Options</div>
+                <button class="close-btn" onclick="closePrintDialog()">
+                    <i class="fas fa-times"></i> Close
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="print-options">
+                    <div class="option-group">
+                        <label>Export Format:</label>
+                        <select id="exportFormat" class="form-select">
+                            <option value="jpeg">JPEG Image</option>
+                            <option value="png">PNG Image</option>
+                            <option value="pdf">PDF Document</option>
+                        </select>
+                    </div>
+                    <div class="option-group">
+                        <label>Include:</label>
+                        <label><input type="checkbox" id="includePatientInfo" checked> Patient Information</label>
+                        <label><input type="checkbox" id="includeMeasurements" checked> Measurements</label>
+                        <label><input type="checkbox" id="includeAnnotations" checked> Annotations</label>
+                    </div>
+                    <div class="option-group">
+                        <label>Quality:</label>
+                        <select id="exportQuality" class="form-select">
+                            <option value="high">High Quality</option>
+                            <option value="medium">Medium Quality</option>
+                            <option value="low">Low Quality</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="print-actions">
+                    <button class="btn-dicom-viewer btn-primary" onclick="exportImage()">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                    <button class="btn-dicom-viewer btn-secondary" onclick="printImage()">
+                        <i class="fas fa-print"></i> Print
+                    </button>
+                </div>
             </div>
         </div>
     </div>
