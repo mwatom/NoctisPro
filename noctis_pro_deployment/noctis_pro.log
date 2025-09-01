@@ -1,0 +1,18 @@
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+[32mHTTP HEAD / 302 [0.01, 127.0.0.1:53108][0m
+[32mHTTP GET / 302 [0.00, 127.0.0.1:53112][0m
+[32mHTTP GET /worklist/ 302 [0.00, 127.0.0.1:60958][0m
+Not Found: /admin/login/
+[33mHTTP GET /admin/login/ 404 [0.01, 127.0.0.1:43848][0m
+[32mHTTP GET /worklist/ 302 [0.00, 127.0.0.1:43864][0m
+[32mHTTP GET /admin/ 302 [0.00, 127.0.0.1:60190][0m
+[32mHTTP GET /dicom-viewer/ 302 [0.00, 127.0.0.1:60192][0m
+Not Found: /static/js/dicom-viewer-utils.js
+[33mHTTP GET /static/js/dicom-viewer-utils.js 404 [0.00, 127.0.0.1:53544][0m
+Not Found: /static/js/button-utils.js
+[33mHTTP HEAD /static/js/button-utils.js 404 [0.00, 127.0.0.1:48568][0m
+Not Found: /admin/login/
+[33mHTTP GET /admin/login/ 404 [0.00, 127.0.0.1:34758][0m
+[32mHTTP GET /worklist/ 302 [0.00, 127.0.0.1:33578][0m
