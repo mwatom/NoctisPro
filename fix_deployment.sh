@@ -7,7 +7,8 @@ echo "🔧 Fixing NoctisPro Deployment Issues"
 echo "====================================="
 
 # Navigate to project directory
-cd /workspace
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
 # 1. Create virtual environment if it doesn't exist
 if [ ! -d "venv" ]; then

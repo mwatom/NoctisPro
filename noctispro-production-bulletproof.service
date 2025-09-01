@@ -1,0 +1,47 @@
+[Unit]
+Description=NoctisPro Production DICOM System
+Documentation=https://github.com/mwatom/NoctisPro
+After=network.target redis-server.service
+Wants=redis-server.service
+
+[Service]
+Type=forking
+User=noctispro
+Group=noctispro
+WorkingDirectory=/home/noctispro/NoctisPro
+Environment=DJANGO_SETTINGS_MODULE=noctis_pro.settings
+Environment=PYTHONPATH=/home/noctispro/NoctisPro
+Environment=PATH=/home/noctispro/NoctisPro/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Pre-execution setup
+ExecStartPre=/bin/bash -c 'cd /home/noctispro/NoctisPro && source venv/bin/activate && python manage.py collectstatic --noinput'
+
+# Main service
+ExecStart=/bin/bash -c 'cd /home/noctispro/NoctisPro && source venv/bin/activate && daphne -b 0.0.0.0 -p 8000 --access-log logs/daphne-access.log noctis_pro.asgi:application'
+
+# Reload and stop
+ExecReload=/bin/kill -HUP $MAINPID
+ExecStop=/bin/kill -TERM $MAINPID
+
+# Service management
+Restart=always
+RestartSec=10
+KillMode=mixed
+TimeoutStartSec=60
+TimeoutStopSec=30
+
+# Security
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/home/noctispro/NoctisPro/logs
+ReadWritePaths=/home/noctispro/NoctisPro/media
+ReadWritePaths=/home/noctispro/NoctisPro/staticfiles
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=noctispro
+
+[Install]
+WantedBy=multi-user.target

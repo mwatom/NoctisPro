@@ -6,7 +6,8 @@ echo "🚀 Quick Ngrok Setup for NoctisPro"
 echo "=================================="
 echo ""
 
-cd /workspace
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
 # Step 1: Check if NoctisPro is running
 echo "1️⃣ Checking NoctisPro status..."

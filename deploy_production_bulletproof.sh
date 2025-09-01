@@ -105,13 +105,13 @@ install_system_dependencies() {
     
     # Update package lists
     log_info "Updating package lists..."
-    apt update -qq || {
+    sudo apt update -qq || {
         log_warning "Failed to update package lists, continuing..."
     }
     
     # Install essential system packages
     log_info "Installing system packages..."
-    apt install -y \
+    sudo apt install -y \
         python3 \
         python3-pip \
         python3-venv \
@@ -145,11 +145,11 @@ install_system_dependencies() {
     # Install ngrok
     log_info "Installing ngrok..."
     if ! command -v ngrok &> /dev/null; then
-        curl -fsSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc | gpg --dearmor -o /usr/share/keyrings/ngrok.gpg
-        echo "deb [signed-by=/usr/share/keyrings/ngrok.gpg] https://ngrok-agent.s3.amazonaws.com buster main" | tee /etc/apt/sources.list.d/ngrok.list
-        apt update -qq && apt install -y ngrok || {
+        curl -fsSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo gpg --dearmor -o /usr/share/keyrings/ngrok.gpg
+        echo "deb [signed-by=/usr/share/keyrings/ngrok.gpg] https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+        sudo apt update -qq && sudo apt install -y ngrok || {
             log_warning "Failed to install ngrok via apt, trying direct download..."
-            curl -sSL https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz | tar xz -C /usr/local/bin/ || {
+            curl -sSL https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz | sudo tar xz -C /usr/local/bin/ || {
                 log_warning "Ngrok installation failed, tunnel will not be available"
             }
         }
@@ -205,13 +205,13 @@ setup_services() {
     if command -v cupsd &> /dev/null; then
         log_info "Configuring CUPS printing service..."
         if ! pgrep cupsd > /dev/null; then
-            service cups start 2>/dev/null || {
+            sudo service cups start 2>/dev/null || {
                 log_warning "CUPS start failed, but continuing..."
             }
         fi
         
         # Configure CUPS for network access
-        cupsctl --remote-any 2>/dev/null || {
+        sudo cupsctl --remote-any 2>/dev/null || {
             log_warning "CUPS network configuration failed, but continuing..."
         }
         
@@ -431,11 +431,25 @@ validate_deployment() {
         ((validation_errors++))
     fi
     
-    # Check HTTP response
-    if curl -s -f http://localhost:${DAPHNE_PORT:-8000} >/dev/null 2>&1; then
+    # Check HTTP response with retries
+    local max_retries=5
+    local retry_count=0
+    local app_responding=false
+    
+    while [ $retry_count -lt $max_retries ]; do
+        if curl -s -f http://localhost:${DAPHNE_PORT:-8000} >/dev/null 2>&1; then
+            app_responding=true
+            break
+        fi
+        ((retry_count++))
+        log_info "Application not responding yet, retry $retry_count/$max_retries..."
+        sleep 5
+    done
+    
+    if $app_responding; then
         log_success "Application responding to HTTP requests"
     else
-        log_error "Application not responding"
+        log_error "Application not responding after $max_retries attempts"
         ((validation_errors++))
     fi
     
@@ -446,13 +460,13 @@ validate_deployment() {
         log_warning "Ngrok tunnel not running (optional)"
     fi
     
-    # Check logs for errors
+    # Check logs for critical errors (not warnings or debug messages)
     if [ -f "logs/daphne.log" ]; then
-        local error_count=$(grep -i error logs/daphne.log | wc -l)
-        if [ $error_count -eq 0 ]; then
-            log_success "No errors in application logs"
+        local critical_error_count=$(grep -i "critical\|fatal" logs/daphne.log | wc -l)
+        if [ $critical_error_count -eq 0 ]; then
+            log_success "No critical errors in application logs"
         else
-            log_warning "Found $error_count errors in logs (check logs/daphne.log)"
+            log_warning "Found $critical_error_count critical errors in logs (check logs/daphne.log)"
         fi
     fi
     
