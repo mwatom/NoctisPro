@@ -257,9 +257,9 @@ install_dependencies() {
         exit 1
     }
     
-    # Upgrade pip safely
-    python -m pip install --upgrade pip --quiet || {
-        log_warning "Pip upgrade failed, continuing with current version"
+    # Upgrade pip and setuptools safely
+    python -m pip install --upgrade pip setuptools wheel --quiet || {
+        log_warning "Pip/setuptools upgrade failed, continuing with current version"
     }
     
     # Install requirements with error handling
@@ -267,7 +267,7 @@ install_dependencies() {
         log_info "Installing Python packages..."
         pip install -r requirements.txt || {
             log_warning "Some packages failed to install, trying essential ones only..."
-            pip install django daphne redis python-dotenv pillow pydicom numpy scipy matplotlib || {
+            pip install django djangorestframework django-cors-headers channels daphne redis python-dotenv pillow pydicom numpy scipy matplotlib scikit-image || {
                 log_error "Failed to install essential packages"
                 exit 1
             }
@@ -276,7 +276,7 @@ install_dependencies() {
     fi
     
     # Verify critical packages
-    python -c "import django, daphne" || {
+    python -c "import django, daphne, rest_framework" || {
         log_error "Critical packages not available"
         exit 1
     }
