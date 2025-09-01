@@ -868,23 +868,50 @@ def facility_delete(request, facility_id):
     if request.method == 'POST':
         facility_name = facility.name
         
-        # Check if facility has users
-        if facility.user_set.exists():
-            messages.error(request, 'Cannot delete facility with existing users. Please reassign or delete users first.')
-            return redirect('admin_panel:facility_management')
+        try:
+            # Check if facility has users
+            if facility.user_set.exists():
+                messages.error(request, 'Cannot delete facility with existing users. Please reassign or delete users first.')
+                return redirect('admin_panel:facility_management')
+            
+            # Check for related studies
+            from worklist.models import Study
+            if Study.objects.filter(facility=facility).exists():
+                messages.error(request, 'Cannot delete facility with existing studies. Please reassign or delete studies first.')
+                return redirect('admin_panel:facility_management')
+            
+            # Check for related notifications
+            from notifications.models import Notification
+            if Notification.objects.filter(facility=facility).exists():
+                # Delete related notifications first
+                Notification.objects.filter(facility=facility).delete()
+            
+            # Check for related chat messages
+            try:
+                from chat.models import ChatMessage
+                if ChatMessage.objects.filter(facility=facility).exists():
+                    # Delete related chat messages first
+                    ChatMessage.objects.filter(facility=facility).delete()
+            except ImportError:
+                pass  # Chat app might not be available
+            
+            # Log the action before deleting
+            AuditLog.objects.create(
+                user=request.user,
+                action='delete',
+                model_name='Facility',
+                object_id=str(facility.id),
+                object_repr=str(facility),
+                description=f'Deleted facility {facility_name}'
+            )
+            
+            facility.delete()
+            messages.success(request, f'Facility {facility_name} deleted successfully')
+            
+        except Exception as e:
+            logger.error(f'Error deleting facility {facility_id}: {str(e)}')
+            messages.error(request, f'Error deleting facility: {str(e)}. Please check for related data and try again.')
         
-        # Log the action before deleting
-        AuditLog.objects.create(
-            user=request.user,
-            action='delete',
-            model_name='Facility',
-            object_id=str(facility.id),
-            object_repr=str(facility),
-            description=f'Deleted facility {facility_name}'
-        )
-        
-        facility.delete()
-        messages.success(request, f'Facility {facility_name} deleted successfully')
         return redirect('admin_panel:facility_management')
     
     context = {'facility': facility}

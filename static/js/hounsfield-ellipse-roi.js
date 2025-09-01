@@ -173,16 +173,21 @@
         // Toggle ROI drawing mode
         toggleROIMode: function() {
             const btn = document.getElementById('roi-ellipse-btn');
+            const measurementInfo = document.getElementById('measurement-info');
             isDrawingROI = !isDrawingROI;
             
             if (isDrawingROI) {
                 btn.classList.add('active');
                 btn.innerHTML = '<i class="fas fa-circle"></i> Drawing...';
                 document.body.style.cursor = 'crosshair';
+                // Show measurement instructions only when needed
+                this.showMeasurementInstructions('Click and drag to draw ellipse ROI for measurement');
             } else {
                 btn.classList.remove('active');
                 btn.innerHTML = '<i class="fas fa-circle"></i> Ellipse ROI';
                 document.body.style.cursor = 'default';
+                // Hide measurement instructions when not measuring
+                this.hideMeasurementInstructions();
             }
         },
         
@@ -236,9 +241,70 @@
                 roiList.push(currentROI);
                 this.updateROIList();
                 this.toggleROIMode(); // Exit drawing mode
+                this.showMeasurementComplete('Measurement completed successfully');
             }
             
             currentROI = null;
+        },
+
+        // Show measurement instructions
+        showMeasurementInstructions: function(message) {
+            let instructionsDiv = document.getElementById('measurement-instructions');
+            if (!instructionsDiv) {
+                instructionsDiv = document.createElement('div');
+                instructionsDiv.id = 'measurement-instructions';
+                instructionsDiv.style.cssText = `
+                    position: fixed;
+                    top: 70px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: var(--accent-color, #00d4ff);
+                    color: #000;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    font-weight: bold;
+                    z-index: 2000;
+                    animation: slideDown 0.3s ease;
+                `;
+                document.body.appendChild(instructionsDiv);
+            }
+            instructionsDiv.textContent = message;
+            instructionsDiv.style.display = 'block';
+        },
+
+        // Hide measurement instructions
+        hideMeasurementInstructions: function() {
+            const instructionsDiv = document.getElementById('measurement-instructions');
+            if (instructionsDiv) {
+                instructionsDiv.style.display = 'none';
+            }
+        },
+
+        // Show measurement completion message
+        showMeasurementComplete: function(message) {
+            this.hideMeasurementInstructions();
+            const completeDiv = document.createElement('div');
+            completeDiv.style.cssText = `
+                position: fixed;
+                top: 70px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: var(--success-color, #00ff88);
+                color: #000;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-size: 12px;
+                font-weight: bold;
+                z-index: 2000;
+            `;
+            completeDiv.textContent = message;
+            document.body.appendChild(completeDiv);
+            setTimeout(() => {
+                if (completeDiv.parentNode) {
+                    completeDiv.remove();
+                }
+            }, 3000);
         },
         
         // Draw ROI ellipse on canvas

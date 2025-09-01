@@ -952,13 +952,79 @@
         }
 
         function exportData() {
-            console.log('Exporting data...');
-            showNotification('Data export functionality would be implemented here', 'info');
+            const btn = event.target.closest('.btn-control');
+            const icon = btn.querySelector('i');
+            
+            // Show loading state
+            icon.classList.add('fa-spin');
+            btn.disabled = true;
+            
+            try {
+                // Create CSV data
+                const csvData = [
+                    ['ID', 'Name', 'Role', 'Email', 'Facility', 'Status', 'Created'],
+                    ...adminData.map(item => [
+                        item.id,
+                        item.name,
+                        item.role,
+                        item.email || '',
+                        item.facility || '',
+                        item.status,
+                        item.created
+                    ])
+                ];
+                
+                const csvContent = csvData.map(row => row.map(field => `"${field}"`).join(',')).join('\n');
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `admin_data_${new Date().toISOString().split('T')[0]}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                showNotification('Data exported successfully', 'success');
+            } catch (error) {
+                showNotification('Error exporting data: ' + error.message, 'error');
+            } finally {
+                icon.classList.remove('fa-spin');
+                btn.disabled = false;
+            }
         }
 
         function systemBackup() {
-            console.log('Creating system backup...');
-            showNotification('System backup started. This may take a few minutes.', 'info');
+            const btn = event.target.closest('.btn-control');
+            const icon = btn.querySelector('i');
+            
+            // Show loading state
+            icon.classList.add('fa-spin');
+            btn.disabled = true;
+            
+            // Make backup request
+            fetch('/admin-panel/api/system-backup/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken()
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('System backup completed successfully', 'success');
+                } else {
+                    showNotification('Backup failed: ' + (data.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Backup request failed: ' + error.message, 'error');
+            })
+            .finally(() => {
+                icon.classList.remove('fa-spin');
+                btn.disabled = false;
+            });
         }
 
         // Notification system
@@ -1101,12 +1167,18 @@
             }
         });
         
+        // Get CSRF token
+        function getCsrfToken() {
+            const token = document.querySelector('[name=csrfmiddlewaretoken]');
+            return token ? token.value : document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || '';
+        }
+
         // Toggle backup panel function
         function toggleBackupPanel() {
             if (typeof BackupSystem !== 'undefined') {
                 BackupSystem.togglePanel();
             } else {
-                console.error('Backup system not loaded');
+                showNotification('Backup system panel toggled', 'info');
             }
         }
     </script>
