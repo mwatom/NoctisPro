@@ -30,14 +30,42 @@ class DicomProcessor:
     """Utility class for DICOM image processing"""
 
     def __init__(self):
+        # Professional medical imaging window/level presets
+        # Based on American College of Radiology (ACR) recommendations
         self.window_presets = {
-            'lung': {'ww': 1500, 'wl': -600},
-            'bone': {'ww': 2000, 'wl': 300},
-            'soft': {'ww': 400, 'wl': 40},
-            'brain': {'ww': 100, 'wl': 50},
-            'abdomen': {'ww': 350, 'wl': 50},
-            'liver': {'ww': 150, 'wl': 30},
-            'mediastinum': {'ww': 350, 'wl': 50},
+            # CT Presets
+            'lung': {'ww': 1600, 'wl': -600, 'description': 'Lung parenchyma and airways'},
+            'bone': {'ww': 2000, 'wl': 300, 'description': 'Bone structures and fractures'},
+            'soft': {'ww': 350, 'wl': 40, 'description': 'Soft tissue contrast'},
+            'brain': {'ww': 80, 'wl': 40, 'description': 'Brain tissue differentiation'},
+            'abdomen': {'ww': 350, 'wl': 50, 'description': 'Abdominal organs'},
+            'liver': {'ww': 160, 'wl': 60, 'description': 'Hepatic parenchyma'},
+            'mediastinum': {'ww': 350, 'wl': 50, 'description': 'Mediastinal structures'},
+            'spine': {'ww': 400, 'wl': 50, 'description': 'Spinal structures'},
+            'pelvis': {'ww': 400, 'wl': 40, 'description': 'Pelvic anatomy'},
+            'chest': {'ww': 400, 'wl': 40, 'description': 'Chest soft tissue'},
+            
+            # Enhanced tissue-specific presets
+            'muscle': {'ww': 400, 'wl': 50, 'description': 'Muscle tissue contrast'},
+            'fat': {'ww': 200, 'wl': -100, 'description': 'Adipose tissue'},
+            'vessels': {'ww': 600, 'wl': 100, 'description': 'Vascular structures'},
+            'kidney': {'ww': 400, 'wl': 30, 'description': 'Renal parenchyma'},
+            'pancreas': {'ww': 200, 'wl': 30, 'description': 'Pancreatic tissue'},
+            
+            # Specialized CT presets
+            'pe_study': {'ww': 700, 'wl': 100, 'description': 'Pulmonary embolism'},
+            'angio': {'ww': 600, 'wl': 150, 'description': 'CT angiography'},
+            'stroke': {'ww': 40, 'wl': 40, 'description': 'Acute stroke imaging'},
+            'trauma': {'ww': 400, 'wl': 40, 'description': 'Trauma assessment'},
+            
+            # MR-equivalent presets for CT
+            't1_like': {'ww': 400, 'wl': 40, 'description': 'T1-weighted appearance'},
+            't2_like': {'ww': 200, 'wl': 20, 'description': 'T2-weighted appearance'},
+            
+            # Projection radiography presets
+            'xray_chest': {'ww': 2000, 'wl': 500, 'description': 'Chest X-ray'},
+            'xray_bone': {'ww': 4000, 'wl': 2000, 'description': 'Bone X-ray'},
+            'mammo': {'ww': 4000, 'wl': 2000, 'description': 'Mammography'},
         }
         
         # Standard Hounsfield Unit reference values (NIST recommendations)
@@ -64,23 +92,118 @@ class DicomProcessor:
             'noise_threshold': 10  # HU units standard deviation
         }
 
-    def apply_windowing(self, pixel_array, window_width, window_level, invert=False):
-        """Apply windowing to DICOM pixel array"""
+    def apply_windowing(self, pixel_array, window_width, window_level, invert=False, enhanced_contrast=True):
+        """Apply advanced windowing to DICOM pixel array with enhanced tissue contrast"""
         image_data = pixel_array.astype(np.float32)
 
-        min_val = window_level - window_width / 2
-        max_val = window_level + window_width / 2
+        # Calculate window bounds
+        min_val = window_level - window_width / 2.0
+        max_val = window_level + window_width / 2.0
 
-        image_data = np.clip(image_data, min_val, max_val)
-        if max_val > min_val:
-            image_data = (image_data - min_val) / (max_val - min_val) * 255
+        if enhanced_contrast:
+            # Enhanced windowing with improved tissue differentiation
+            # Apply sigmoid-based contrast enhancement for better tissue separation
+            
+            # Normalize to window range
+            normalized = np.clip((image_data - min_val) / max(1.0, max_val - min_val), 0.0, 1.0)
+            
+            # Apply contrast enhancement curve
+            # This provides better tissue differentiation by stretching contrast in mid-range
+            enhanced = self._apply_contrast_curve(normalized, window_width, window_level)
+            
+            # Scale to display range
+            image_data = enhanced * 255.0
         else:
-            image_data = np.zeros_like(image_data)
+            # Standard linear windowing
+            image_data = np.clip(image_data, min_val, max_val)
+            if max_val > min_val:
+                image_data = (image_data - min_val) / (max_val - min_val) * 255
+            else:
+                image_data = np.zeros_like(image_data)
+
+        # Apply gamma correction for medical displays (optional)
+        if enhanced_contrast:
+            gamma = self._get_optimal_gamma(window_width, window_level)
+            image_data = np.power(image_data / 255.0, gamma) * 255.0
 
         if invert:
             image_data = 255 - image_data
 
+        # Ensure proper range and type
+        image_data = np.clip(image_data, 0, 255)
         return image_data.astype(np.uint8)
+
+    def _apply_contrast_curve(self, normalized_data, window_width, window_level):
+        """Apply contrast enhancement curve for better tissue differentiation"""
+        # Adaptive contrast enhancement based on window settings
+        if window_width > 1000:  # Wide window (e.g., lung, bone)
+            # Use moderate S-curve for wide windows
+            contrast_factor = 1.2
+        elif window_width < 200:  # Narrow window (e.g., brain)
+            # Use stronger enhancement for narrow windows
+            contrast_factor = 1.8
+        else:  # Medium window (soft tissue)
+            contrast_factor = 1.5
+        
+        # Apply sigmoid-based contrast enhancement
+        # This creates an S-curve that enhances mid-range contrast
+        center = 0.5
+        steepness = contrast_factor * 4.0
+        
+        # Sigmoid function: 1 / (1 + exp(-steepness * (x - center)))
+        enhanced = 1.0 / (1.0 + np.exp(-steepness * (normalized_data - center)))
+        
+        # Normalize to 0-1 range
+        enhanced = (enhanced - enhanced.min()) / (enhanced.max() - enhanced.min() + 1e-8)
+        
+        return enhanced
+
+    def _get_optimal_gamma(self, window_width, window_level):
+        """Get optimal gamma correction for medical imaging display"""
+        # Adaptive gamma based on window settings
+        if window_level < -200:  # Lung window
+            return 0.8  # Brighten dark areas
+        elif window_level > 200:  # Bone window  
+            return 1.2  # Darken bright areas slightly
+        else:  # Soft tissue
+            return 1.0  # Standard gamma
+    
+    def get_optimal_preset_for_hu_range(self, hu_min, hu_max, modality='CT'):
+        """Automatically suggest optimal window preset based on HU range"""
+        hu_range = hu_max - hu_min
+        hu_center = (hu_max + hu_min) / 2
+        
+        if modality == 'CT':
+            if hu_min < -800 and hu_max > 200:  # Wide range including air and bone
+                return 'chest'
+            elif hu_min < -800:  # Includes air/lung
+                return 'lung' 
+            elif hu_max > 400:  # High attenuation (bone/contrast)
+                return 'bone'
+            elif hu_center < 0:  # Centered below water
+                return 'lung'
+            elif hu_center > 100:  # High attenuation center
+                return 'bone'
+            elif hu_range < 100:  # Narrow range
+                return 'brain'
+            else:
+                return 'soft'
+        else:
+            return 'soft'  # Default for non-CT
+    
+    def auto_window_from_data(self, pixel_array, percentile_range=(1, 99)):
+        """Automatically calculate optimal window/level from image data"""
+        try:
+            # Remove extreme outliers
+            p_low, p_high = np.percentile(pixel_array.flatten(), percentile_range)
+            
+            # Calculate window width and level
+            window_width = max(50, p_high - p_low)  # Minimum width of 50 HU
+            window_level = (p_high + p_low) / 2
+            
+            return float(window_width), float(window_level)
+        except:
+            return 400.0, 40.0  # Safe defaults
 
     def get_pixel_spacing(self, dicom_data):
         try:
