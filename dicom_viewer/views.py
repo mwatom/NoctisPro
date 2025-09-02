@@ -459,23 +459,27 @@ def api_image_display(request, image_id):
                 img_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
                 placeholder_url = f'data:image/png;base64,{img_data}'
             
-                return JsonResponse({
-                    'image_data': placeholder_url,
-                    'image_info': {
-                        'id': image.id,
-                        'error': str(e),
-                        'dimensions': [512, 512],
-                        'pixel_spacing': [1.0, 1.0],
-                        'default_window_width': 400.0,
-                        'default_window_level': 40.0
-                    },
-                    'windowing': {
-                        'window_width': window_width,
-                        'window_level': window_level,
-                        'inverted': inverted
-                    },
-                    'error': str(e)
-                })
+            except Exception:
+                # Fallback to simple placeholder
+                placeholder_url = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAGA'
+            
+            return JsonResponse({
+                'image_data': placeholder_url,
+                'image_info': {
+                    'id': image.id,
+                    'error': str(e),
+                    'dimensions': [512, 512],
+                    'pixel_spacing': [1.0, 1.0],
+                    'default_window_width': 400.0,
+                    'default_window_level': 40.0
+                },
+                'windowing': {
+                    'window_width': window_width,
+                    'window_level': window_level,
+                    'inverted': inverted
+                },
+                'error': str(e)
+            })
             
     except Exception as e:
         logger.error(f"Fatal error in api_image_display: {e}")
@@ -1513,9 +1517,13 @@ def api_delete_measurement(request, measurement_id):
             logger.error(f"Measurement not found: {measurement_id}")
             return JsonResponse({'error': 'Measurement not found'}, status=404)
         
-        # Check if user owns this measurement or is admin - ADMIN ONLY FOR DELETE
-        if measurement.user != request.user and not (hasattr(request.user, 'is_admin') and request.user.is_admin()):
-            return JsonResponse({'error': 'Permission denied - Admin required for delete'}, status=403)
+        # Check if user owns this measurement or has admin/radiologist permissions
+        can_delete = (measurement.user == request.user or 
+                     (hasattr(request.user, 'is_admin') and request.user.is_admin()) or
+                     (hasattr(request.user, 'is_radiologist') and request.user.is_radiologist()))
+        
+        if not can_delete:
+            return JsonResponse({'error': 'Permission denied - Admin or Radiologist required for delete'}, status=403)
         
         try:
             # Delete the measurement
@@ -2084,7 +2092,6 @@ def web_viewer(request):
 from django.contrib.auth.decorators import user_passes_test
 
 @login_required
-@user_passes_test(lambda u: hasattr(u, 'is_admin') and u.is_admin())
 def hu_calibration_dashboard(request):
     """Hounsfield Unit calibration dashboard"""
     try:
@@ -2149,7 +2156,7 @@ def hu_calibration_dashboard(request):
     return render(request, 'dicom_viewer/hu_calibration_dashboard.html', context)
 
 @login_required
-@user_passes_test(lambda u: hasattr(u, 'is_admin') and u.is_admin())
+@user_passes_test(lambda u: (hasattr(u, 'is_admin') and u.is_admin()) or (hasattr(u, 'is_radiologist') and u.is_radiologist()))
 def manage_qa_phantoms(request):
     """Manage QA phantoms for HU calibration"""
     try:
