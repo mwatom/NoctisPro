@@ -817,8 +817,8 @@
                 <select class="select" id="studySelect" onchange="if(this.value) loadStudy(this.value)">
                     <option value="">Select Study from System</option>
                 </select>
-                <button class="btn btn-primary" onclick="loadFromExternalMedia()" title="Load DICOM from USB/DVD">
-                    <i class="fas fa-compact-disc"></i> Load from USB/DVD
+                <button class="btn btn-primary" onclick="loadFromExternalMedia()" title="Load DICOM Files">
+                    <i class="fas fa-compact-disc"></i> Load DICOM
                 </button>
                 <button class="btn" onclick="saveMeasurements()" title="Save Measurements">
                     <i class="fas fa-save"></i> Save
@@ -927,7 +927,7 @@
                 <div class="welcome-actions">
                     <button class="welcome-btn primary" onclick="loadFromExternalMedia()">
                         <i class="fas fa-compact-disc"></i>
-                        Load from USB/DVD
+                        Load DICOM Files
                     </button>
                     <a href="/worklist/" class="welcome-btn">
                         <i class="fas fa-database"></i>
@@ -1817,14 +1817,13 @@
             }
         }
 
-        // File Loading Functions
+        // File Loading Functions - Direct upload, no dialogue
         function loadFromExternalMedia() {
             const fileInput = document.getElementById('fileInput');
             fileInput.removeAttribute('webkitdirectory');
             fileInput.setAttribute('accept', '.dcm,.dicom,*');
             fileInput.multiple = true;
             fileInput.click();
-            showToast('Please select DICOM files from USB/DVD or local storage', 'info');
         }
 
 
