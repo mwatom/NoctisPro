@@ -1124,7 +1124,6 @@ def api_hu_value(request):
         logger.error(f"Error calculating HU value: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@login_required
 @csrf_exempt
 def upload_dicom(request):
     """Professional DICOM upload with enhanced processing and error handling"""
@@ -1213,22 +1212,24 @@ def upload_dicom(request):
                 }
             )
             
-            # Get or create facility
-            facility = getattr(request.user, 'facility', None)
+            # Get or create facility - Allow all users to upload
+            facility = None
+            if request.user.is_authenticated:
+                facility = getattr(request.user, 'facility', None)
+            
             if not facility:
                 facility = Facility.objects.filter(is_active=True).first()
+            
             if not facility:
-                if hasattr(request.user, 'is_admin') and request.user.is_admin():
-                    facility = Facility.objects.create(
-                        name='Default Facility',
-                        address='N/A',
-                        phone='N/A',
-                        email='default@example.com',
-                        license_number=f'DEFAULT-{upload_id[:8]}',
-                        is_active=True
-                    )
-                else:
-                    return JsonResponse({'success': False, 'error': 'No facility configured'})
+                # Create default facility for any user (removed admin restriction)
+                facility = Facility.objects.create(
+                    name='Upload Facility',
+                    address='N/A',
+                    phone='N/A',
+                    email='upload@facility.com',
+                    license_number=f'UPLOAD-{upload_id[:8]}',
+                    is_active=True
+                )
             
             # Create modality and study
             modality_code = getattr(first_ds, 'Modality', 'OT')
@@ -1265,7 +1266,7 @@ def upload_dicom(request):
                     'referring_physician': str(getattr(first_ds, 'ReferringPhysicianName', 'UNKNOWN')).replace('^', ' '),
                     'status': 'completed',
                     'priority': 'normal',
-                    'uploaded_by': request.user,
+                    'uploaded_by': request.user if request.user.is_authenticated else None,
                 }
             )
             
