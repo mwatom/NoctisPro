@@ -459,7 +459,7 @@ def api_image_display(request, image_id):
                 img_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
                 placeholder_url = f'data:image/png;base64,{img_data}'
             
-            return JsonResponse({
+                return JsonResponse({
                 'image_data': placeholder_url,
                 'image_info': {
                     'id': image.id,
