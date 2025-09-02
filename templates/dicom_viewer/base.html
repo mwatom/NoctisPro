@@ -240,15 +240,17 @@
             background: transparent;
         }
 
-        /* MPR Grid Layout */
+        /* MPR Grid Layout - Fixed for proper display */
         .mpr-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             grid-template-rows: 1fr 1fr;
-            gap: 2px;
+            gap: 3px;
             width: 100%;
             height: 100%;
-            background: var(--border-color);
+            background: var(--secondary-bg);
+            padding: 3px;
+            border-radius: 4px;
         }
 
         .mpr-viewport {
@@ -257,17 +259,31 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            border: 1px solid var(--border-color);
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            overflow: hidden;
+            min-height: 200px;
+            cursor: crosshair;
+        }
+
+        .mpr-viewport:hover {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
+            transform: scale(1.02);
+            transition: all 0.2s ease;
         }
 
         .mpr-viewport.active {
             border-color: var(--accent-color);
-            box-shadow: inset 0 0 0 2px var(--accent-color);
+            box-shadow: inset 0 0 0 3px var(--accent-color), 0 0 15px rgba(0, 212, 255, 0.5);
+            transform: scale(1.05);
         }
 
         .mpr-viewport img {
             max-width: 100%;
             max-height: 100%;
+            width: 100%;
+            height: 100%;
             image-rendering: -webkit-optimize-contrast;
             image-rendering: -moz-crisp-edges;
             image-rendering: crisp-edges;
@@ -278,6 +294,7 @@
             -webkit-filter: none !important;
             object-fit: contain;
             background: transparent;
+            display: block;
         }
 
         .mpr-label {
@@ -3256,27 +3273,37 @@
                 const plane = viewport.getAttribute('data-plane');
                 if (plane === '3d') return; // Skip 3D viewport
                 
-                viewport.addEventListener('mousemove', function(e) {
-                    if (orthogonalSync && mprMode) {
-                        const rect = viewport.getBoundingClientRect();
-                        const x = ((e.clientX - rect.left) / rect.width) * 100;
-                        const y = ((e.clientY - rect.top) / rect.height) * 100;
-                        
-                        // Update crosshair position based on plane
-                        updateCrosshairPosition(plane, x, y);
+                // Remove mousemove listener - crosshair should only move on click
+                viewport.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    setActivePlane(plane);
+                    
+                    // Always update crosshair position on click
+                    const rect = viewport.getBoundingClientRect();
+                    const x = ((e.clientX - rect.left) / rect.width) * 100;
+                    const y = ((e.clientY - rect.top) / rect.height) * 100;
+                    
+                    // Update crosshair position and lock it there
+                    updateCrosshairPosition(plane, x, y, true);
+                    
+                    // Show feedback
+                    showToast(`Crosshair positioned at ${Math.round(x)}, ${Math.round(y)} in ${plane} view`, 'info', 1500);
+                });
+                
+                // Add hover effect without moving crosshair
+                viewport.addEventListener('mouseenter', function() {
+                    if (!viewport.classList.contains('active')) {
+                        viewport.style.borderColor = 'var(--accent-color)';
+                        viewport.style.opacity = '0.9';
                     }
                 });
                 
-                viewport.addEventListener('click', function(e) {
-                    setActivePlane(plane);
-                    
-                    if (orthogonalSync) {
-                        const rect = viewport.getBoundingClientRect();
-                        const x = ((e.clientX - rect.left) / rect.width) * 100;
-                        const y = ((e.clientY - rect.top) / rect.height) * 100;
-                        
-                        // Lock crosshair position
-                        updateCrosshairPosition(plane, x, y, true);
+                viewport.addEventListener('mouseleave', function() {
+                    if (!viewport.classList.contains('active')) {
+                        viewport.style.borderColor = 'var(--border-color)';
+                        viewport.style.opacity = '1';
                     }
                 });
             });
