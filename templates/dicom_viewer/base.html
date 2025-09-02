@@ -48,7 +48,7 @@
 
         .viewer-container {
             display: grid;
-            grid-template-columns: 80px 1fr 300px;
+            grid-template-columns: 80px 1fr 60px;
             grid-template-rows: 60px 1fr 40px;
             height: 100vh;
             width: 100vw;
@@ -401,23 +401,125 @@
             box-shadow: inset 0 0 0 3px var(--accent-color);
         }
 
-        /* Right Panel */
+        /* Professional Icon-Based Right Panel */
         .right-panel {
             grid-column: 3;
             grid-row: 2;
             background: var(--secondary-bg);
             border-left: 1px solid var(--border-color);
-            padding: 16px;
-            overflow-y: auto;
-            overflow-x: hidden;
+            padding: 8px;
+            overflow: visible;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            width: 60px;
+            min-width: 60px;
+            max-width: 60px;
         }
 
-        .panel {
+        /* Icon-based control buttons */
+        .control-icon {
+            width: 44px;
+            height: 44px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .control-icon:hover {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+            border-color: var(--accent-color);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 212, 255, 0.3);
+        }
+
+        .control-icon.active {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+            border-color: var(--accent-color);
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.4);
+        }
+
+        /* Popup panels for detailed controls */
+        .control-popup {
+            position: absolute;
+            right: 50px;
+            top: 0;
+            width: 280px;
             background: var(--card-bg);
             border: 1px solid var(--border-color);
             border-radius: 8px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            display: none;
+            animation: slideInLeft 0.2s ease-out;
+        }
+
+        .control-popup.active {
+            display: block;
+        }
+
+        @keyframes slideInLeft {
+            from {
+                transform: translateX(20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .popup-header {
+            background: var(--header-bg);
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-color);
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .popup-title {
+            color: var(--accent-color);
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .popup-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 2px;
+        }
+
+        .popup-close:hover {
+            color: var(--danger-color);
+        }
+
+        .popup-content {
             padding: 12px;
-            margin-bottom: 16px;
+        }
+
+        .panel {
+            background: transparent;
+            border: none;
+            border-radius: 0;
+            padding: 0;
+            margin-bottom: 12px;
         }
 
         .panel h3 {
@@ -499,38 +601,105 @@
             border-color: var(--accent-color);
         }
 
-        /* Measurements List */
+        /* Professional Measurements List */
         .measurements-list {
-            max-height: 200px;
+            max-height: 220px;
             overflow-y: auto;
+            overflow-x: hidden;
         }
 
         .measurement-item {
             background: var(--secondary-bg);
             border: 1px solid var(--border-color);
-            border-radius: 4px;
-            padding: 8px;
-            margin-bottom: 6px;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 8px;
             font-size: 11px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .measurement-item:hover {
+            border-color: var(--accent-color);
+            background: var(--card-bg);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 212, 255, 0.2);
+        }
+
+        .measurement-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        .measurement-value {
+        .measurement-type {
             color: var(--accent-color);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 10px;
+        }
+
+        .measurement-value {
+            color: var(--text-primary);
             font-weight: bold;
             font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .measurement-details {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-secondary);
+            font-size: 10px;
+        }
+
+        .measurement-actions {
+            display: flex;
+            gap: 4px;
         }
 
         .measurement-delete {
             background: var(--danger-color);
             border: none;
             color: var(--text-primary);
-            padding: 2px 6px;
-            border-radius: 2px;
+            padding: 4px 6px;
+            border-radius: 3px;
             font-size: 9px;
             cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .measurement-delete:hover {
+            background: #ff6666;
+            transform: scale(1.1);
+        }
+
+        .measurement-edit {
+            background: var(--warning-color);
+            border: none;
+            color: var(--primary-bg);
+            padding: 4px 6px;
+            border-radius: 3px;
+            font-size: 9px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .measurement-edit:hover {
+            background: #ffcc33;
+            transform: scale(1.1);
+        }
+
+        .no-measurements {
+            text-align: center;
+            color: var(--text-muted);
+            font-style: italic;
+            padding: 20px;
+            font-size: 11px;
         }
 
         /* Floating Panels */
@@ -800,6 +969,24 @@
             100% { transform: rotate(360deg); }
         }
 
+        @keyframes highlightPulse {
+            0% { 
+                opacity: 0;
+                transform: scale(0.8);
+                border-color: #ffaa00;
+            }
+            50% { 
+                opacity: 1;
+                transform: scale(1.05);
+                border-color: #ff6600;
+            }
+            100% { 
+                opacity: 0;
+                transform: scale(1.0);
+                border-color: #ffaa00;
+            }
+        }
+
         /* Professional High-Quality Image Display */
         .image-container {
             position: relative;
@@ -984,7 +1171,7 @@
         /* Responsive Design */
         @media (max-width: 1200px) {
             .viewer-container {
-                grid-template-columns: 70px 1fr 250px;
+                grid-template-columns: 70px 1fr 55px;
             }
             
             .tool {
@@ -995,6 +1182,28 @@
             
             .tool i {
                 font-size: 16px;
+            }
+            
+            .control-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 14px;
+            }
+            
+            .control-popup {
+                width: 250px;
+                right: 45px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .viewer-container {
+                grid-template-columns: 60px 1fr 50px;
+            }
+            
+            .control-popup {
+                width: 220px;
+                right: 40px;
             }
         }
     </style>
@@ -1164,126 +1373,201 @@
             </div>
         </div>
 
-        <!-- Right Panel -->
+        <!-- Professional Icon-Based Right Panel -->
         <div class="right-panel">
-            <!-- Window/Level Controls -->
-            <div class="panel">
-                <h3>Window/Level</h3>
-                <div class="control">
-                    <div class="control-label">
-                        <span>Window Width</span>
-                        <span id="wwValue">400</span>
+            <!-- Window/Level Control Icon -->
+            <div class="control-icon" id="windowLevelIcon" onclick="toggleControlPopup('windowLevel')" title="Window/Level">
+                <i class="fas fa-adjust"></i>
+                <div class="control-popup" id="windowLevelPopup">
+                    <div class="popup-header">
+                        <div class="popup-title">Window/Level</div>
+                        <button class="popup-close" onclick="closeControlPopup('windowLevel')">×</button>
                     </div>
-                    <input type="range" class="slider" id="wwSlider" min="1" max="4000" value="400" oninput="updateWindowWidth(this.value)">
-                </div>
-                <div class="control">
-                    <div class="control-label">
-                        <span>Window Level</span>
-                        <span id="wlValue">40</span>
-                    </div>
-                    <input type="range" class="slider" id="wlSlider" min="-1000" max="1000" value="40" oninput="updateWindowLevel(this.value)">
-                </div>
-                <div class="preset-grid">
-                    <button class="preset-btn" onclick="applyPreset('lung')">Lung</button>
-                    <button class="preset-btn" onclick="applyPreset('bone')">Bone</button>
-                    <button class="preset-btn" onclick="applyPreset('soft')">Soft</button>
-                    <button class="preset-btn" onclick="applyPreset('brain')">Brain</button>
-                </div>
-            </div>
-
-            <!-- Navigation Controls -->
-            <div class="panel">
-                <h3>Navigation</h3>
-                <div class="control">
-                    <div class="control-label">
-                        <span>Slice</span>
-                        <span id="sliceValue">1/1</span>
-                    </div>
-                    <input type="range" class="slider" id="sliceSlider" min="0" max="0" value="0" oninput="updateSlice(this.value)">
-                </div>
-                <div class="control">
-                    <div class="control-label">
-                        <span>Zoom</span>
-                        <span id="zoomValue">100%</span>
-                    </div>
-                    <input type="range" class="slider" id="zoomSlider" min="25" max="500" value="100" oninput="updateZoom(this.value)">
-                </div>
-            </div>
-
-            <!-- Series Selection -->
-            <div class="panel">
-                <h3>Series</h3>
-                <select class="select" id="seriesSelect" onchange="loadSeries(this.value)">
-                    <option value="">Select Series</option>
-                </select>
-                <div style="margin-top: 8px; font-size: 11px; color: var(--text-muted);" id="seriesInfo">
-                    No series loaded
-                </div>
-            </div>
-
-            <!-- Image Information -->
-            <div class="panel">
-                <h3>Image Info</h3>
-                <div style="font-size: 11px; line-height: 1.4;">
-                    <div id="imageInfo">
-                        <div>Dimensions: -</div>
-                        <div>Pixel Spacing: -</div>
-                        <div>Slice Thickness: -</div>
-                        <div>Modality: -</div>
-                        <div>Institution: -</div>
+                    <div class="popup-content">
+                        <div class="panel">
+                            <div class="control">
+                                <div class="control-label">
+                                    <span>Window Width</span>
+                                    <span id="wwValue">400</span>
+                                </div>
+                                <input type="range" class="slider" id="wwSlider" min="1" max="4000" value="400" oninput="updateWindowWidth(this.value)">
+                            </div>
+                            <div class="control">
+                                <div class="control-label">
+                                    <span>Window Level</span>
+                                    <span id="wlValue">40</span>
+                                </div>
+                                <input type="range" class="slider" id="wlSlider" min="-1000" max="1000" value="40" oninput="updateWindowLevel(this.value)">
+                            </div>
+                            <div class="preset-grid">
+                                <button class="preset-btn" onclick="applyPreset('lung')">Lung</button>
+                                <button class="preset-btn" onclick="applyPreset('bone')">Bone</button>
+                                <button class="preset-btn" onclick="applyPreset('soft')">Soft</button>
+                                <button class="preset-btn" onclick="applyPreset('brain')">Brain</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Measurements -->
-            <div class="panel">
-                <h3>Measurements</h3>
-                <button class="btn-dicom-viewer btn-secondary" onclick="clearMeasurements()" style="width: 100%; margin-bottom: 8px;">
-                    <i class="fas fa-trash"></i> Clear All
-                </button>
-                <div class="measurements-list" id="measurementsList">
-                    <!-- Measurements will be populated here -->
+            <!-- Navigation Control Icon -->
+            <div class="control-icon" id="navigationIcon" onclick="toggleControlPopup('navigation')" title="Navigation">
+                <i class="fas fa-arrows-alt"></i>
+                <div class="control-popup" id="navigationPopup">
+                    <div class="popup-header">
+                        <div class="popup-title">Navigation</div>
+                        <button class="popup-close" onclick="closeControlPopup('navigation')">×</button>
+                    </div>
+                    <div class="popup-content">
+                        <div class="panel">
+                            <div class="control">
+                                <div class="control-label">
+                                    <span>Slice</span>
+                                    <span id="sliceValue">1/1</span>
+                                </div>
+                                <input type="range" class="slider" id="sliceSlider" min="0" max="0" value="0" oninput="updateSlice(this.value)">
+                            </div>
+                            <div class="control">
+                                <div class="control-label">
+                                    <span>Zoom</span>
+                                    <span id="zoomValue">100%</span>
+                                </div>
+                                <input type="range" class="slider" id="zoomSlider" min="25" max="500" value="100" oninput="updateZoom(this.value)">
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Advanced Reconstruction -->
-            <div class="panel">
-                <h3>Reconstruction</h3>
-                <div id="reconstructionButtons">
-                    <!-- Basic reconstruction -->
-                    <button class="btn-dicom-viewer btn-secondary" onclick="generateMPR()" style="width: 100%; margin-bottom: 6px;">
-                        <i class="fas fa-cube"></i> MPR Views
-                    </button>
-                    <button class="btn-dicom-viewer btn-secondary" onclick="generateMIP()" style="width: 100%; margin-bottom: 6px;">
-                        <i class="fas fa-layer-group"></i> MIP Views
-                    </button>
-                    
-                    <!-- Modality-specific reconstruction (populated dynamically) -->
-                    <div id="modalitySpecificButtons" style="margin-top: 8px;">
-                        <!-- Buttons will be added based on detected modality -->
+            <!-- Series Selection Icon -->
+            <div class="control-icon" id="seriesIcon" onclick="toggleControlPopup('series')" title="Series">
+                <i class="fas fa-layer-group"></i>
+                <div class="control-popup" id="seriesPopup">
+                    <div class="popup-header">
+                        <div class="popup-title">Series</div>
+                        <button class="popup-close" onclick="closeControlPopup('series')">×</button>
+                    </div>
+                    <div class="popup-content">
+                        <div class="panel">
+                            <select class="select" id="seriesSelect" onchange="loadSeries(this.value)">
+                                <option value="">Select Series</option>
+                            </select>
+                            <div style="margin-top: 8px; font-size: 11px; color: var(--text-muted);" id="seriesInfo">
+                                No series loaded
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-            
-            <!-- Crosshair Controls -->
-            <div class="panel">
-                <h3>Crosshair Control</h3>
-                <div class="control">
-                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                        <input type="checkbox" id="orthogonalSync" checked onchange="toggleOrthogonalSync()">
-                        <span>Orthogonal Sync</span>
-                    </label>
-                </div>
-                <div class="control">
-                    <div class="control-label">
-                        <span>Active Plane</span>
-                        <span id="activePlaneLabel">Axial</span>
+
+            <!-- Image Information Icon -->
+            <div class="control-icon" id="imageInfoIcon" onclick="toggleControlPopup('imageInfo')" title="Image Info">
+                <i class="fas fa-info-circle"></i>
+                <div class="control-popup" id="imageInfoPopup">
+                    <div class="popup-header">
+                        <div class="popup-title">Image Information</div>
+                        <button class="popup-close" onclick="closeControlPopup('imageInfo')">×</button>
+                    </div>
+                    <div class="popup-content">
+                        <div class="panel">
+                            <div style="font-size: 11px; line-height: 1.4;">
+                                <div id="imageInfo">
+                                    <div>Dimensions: -</div>
+                                    <div>Pixel Spacing: -</div>
+                                    <div>Slice Thickness: -</div>
+                                    <div>Modality: -</div>
+                                    <div>Institution: -</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="control">
-                    <div class="control-label">
-                        <span>Crosshair Position</span>
-                        <span id="crosshairPosition">-</span>
+            </div>
+
+            <!-- Professional Measurements Icon -->
+            <div class="control-icon" id="measurementsIcon" onclick="toggleControlPopup('measurements')" title="Measurements">
+                <i class="fas fa-ruler-combined"></i>
+                <div class="control-popup" id="measurementsPopup">
+                    <div class="popup-header">
+                        <div class="popup-title">Measurements</div>
+                        <button class="popup-close" onclick="closeControlPopup('measurements')">×</button>
+                    </div>
+                    <div class="popup-content">
+                        <div class="panel">
+                            <div style="display: flex; gap: 6px; margin-bottom: 12px;">
+                                <button class="btn-dicom-viewer btn-secondary" onclick="clearMeasurements()" style="flex: 1; font-size: 10px;">
+                                    <i class="fas fa-trash"></i> Clear
+                                </button>
+                                <button class="btn-dicom-viewer btn-primary" onclick="exportMeasurements()" style="flex: 1; font-size: 10px;">
+                                    <i class="fas fa-download"></i> Export
+                                </button>
+                            </div>
+                            <div class="measurements-list" id="measurementsList">
+                                <!-- Measurements will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reconstruction Icon -->
+            <div class="control-icon" id="reconstructionIcon" onclick="toggleControlPopup('reconstruction')" title="Reconstruction">
+                <i class="fas fa-cube"></i>
+                <div class="control-popup" id="reconstructionPopup">
+                    <div class="popup-header">
+                        <div class="popup-title">3D Reconstruction</div>
+                        <button class="popup-close" onclick="closeControlPopup('reconstruction')">×</button>
+                    </div>
+                    <div class="popup-content">
+                        <div class="panel">
+                            <div id="reconstructionButtons">
+                                <!-- Basic reconstruction -->
+                                <button class="btn-dicom-viewer btn-secondary" onclick="generateMPR()" style="width: 100%; margin-bottom: 6px;">
+                                    <i class="fas fa-cube"></i> MPR Views
+                                </button>
+                                <button class="btn-dicom-viewer btn-secondary" onclick="generateMIP()" style="width: 100%; margin-bottom: 6px;">
+                                    <i class="fas fa-layer-group"></i> MIP Views
+                                </button>
+                                
+                                <!-- Modality-specific reconstruction (populated dynamically) -->
+                                <div id="modalitySpecificButtons" style="margin-top: 8px;">
+                                    <!-- Buttons will be added based on detected modality -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Crosshair Control Icon -->
+            <div class="control-icon" id="crosshairIcon" onclick="toggleControlPopup('crosshair')" title="Crosshair">
+                <i class="fas fa-crosshairs"></i>
+                <div class="control-popup" id="crosshairPopup">
+                    <div class="popup-header">
+                        <div class="popup-title">Crosshair Control</div>
+                        <button class="popup-close" onclick="closeControlPopup('crosshair')">×</button>
+                    </div>
+                    <div class="popup-content">
+                        <div class="panel">
+                            <div class="control">
+                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                    <input type="checkbox" id="orthogonalSync" checked onchange="toggleOrthogonalSync()">
+                                    <span>Orthogonal Sync</span>
+                                </label>
+                            </div>
+                            <div class="control">
+                                <div class="control-label">
+                                    <span>Active Plane</span>
+                                    <span id="activePlaneLabel">Axial</span>
+                                </div>
+                            </div>
+                            <div class="control">
+                                <div class="control-label">
+                                    <span>Position</span>
+                                    <span id="crosshairPosition">-</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1698,40 +1982,69 @@
             });
         }
 
-        // Tool Management
+        // Professional Tool Management with Enhanced Feedback
         function setTool(tool) {
+            const previousTool = activeTool;
             activeTool = tool;
             
-            // Update toolbar visual state
+            // Update toolbar visual state with animation
             document.querySelectorAll('.tool').forEach(btn => {
                 btn.classList.remove('active');
+                if (btn.getAttribute('data-tool') === tool) {
+                    btn.classList.add('active');
+                    // Add selection feedback
+                    btn.style.transform = 'scale(0.95)';
+                    setTimeout(() => btn.style.transform = '', 150);
+                }
             });
-            document.querySelector(`[data-tool="${tool}"]`).classList.add('active');
             
-            // Update cursor
+            // Update cursor with professional styling
             const imageContainer = document.getElementById('imageContainer');
+            const canvas = document.getElementById('dicomCanvas');
+            
             switch(tool) {
                 case 'window':
                     imageContainer.style.cursor = 'crosshair';
+                    if (canvas) canvas.style.cursor = 'crosshair';
                     break;
                 case 'zoom':
                     imageContainer.style.cursor = 'zoom-in';
+                    if (canvas) canvas.style.cursor = 'zoom-in';
                     break;
                 case 'pan':
                     imageContainer.style.cursor = 'move';
+                    if (canvas) canvas.style.cursor = 'move';
                     break;
                 case 'measure':
                     imageContainer.style.cursor = 'crosshair';
+                    if (canvas) canvas.style.cursor = 'crosshair';
                     break;
                 case 'annotate':
                     imageContainer.style.cursor = 'text';
+                    if (canvas) canvas.style.cursor = 'text';
                     break;
                 default:
                     imageContainer.style.cursor = 'default';
+                    if (canvas) canvas.style.cursor = 'default';
             }
             
-            // Update status
-            document.getElementById('activeTool').textContent = tool.charAt(0).toUpperCase() + tool.slice(1);
+            // Update status with professional formatting
+            const activeToolElement = document.getElementById('activeTool');
+            if (activeToolElement) {
+                activeToolElement.textContent = tool.charAt(0).toUpperCase() + tool.slice(1);
+            }
+            
+            // Show tool change notification
+            if (previousTool !== tool) {
+                showToast(`${tool.charAt(0).toUpperCase() + tool.slice(1)} tool activated`, 'info', 1500);
+            }
+            
+            // Tool-specific initialization
+            if (tool === 'measure') {
+                showToast('Click and drag to measure distances', 'info', 2000);
+            } else if (tool === 'annotate') {
+                showToast('Click to add annotations', 'info', 2000);
+            }
         }
 
         // Window/Level Management - Professional grade from PyQt
@@ -1749,16 +2062,40 @@
 
         function applyPreset(preset) {
             if (windowPresets[preset]) {
+                // Add visual feedback
+                const button = event?.target?.closest('button');
+                if (button) {
+                    button.style.transform = 'scale(0.95)';
+                    setTimeout(() => button.style.transform = '', 100);
+                }
+                
                 windowWidth = windowPresets[preset].ww;
                 windowLevel = windowPresets[preset].wl;
                 
-                document.getElementById('wwSlider').value = windowWidth;
-                document.getElementById('wlSlider').value = windowLevel;
-                document.getElementById('wwValue').textContent = windowWidth;
-                document.getElementById('wlValue').textContent = windowLevel;
+                // Update UI with smooth transitions
+                const wwSlider = document.getElementById('wwSlider');
+                const wlSlider = document.getElementById('wlSlider');
+                const wwValue = document.getElementById('wwValue');
+                const wlValue = document.getElementById('wlValue');
+                
+                if (wwSlider) wwSlider.value = windowWidth;
+                if (wlSlider) wlSlider.value = windowLevel;
+                if (wwValue) wwValue.textContent = windowWidth;
+                if (wlValue) wlValue.textContent = windowLevel;
                 
                 updateImageDisplay();
-                showToast(`Applied ${preset} preset`, 'success');
+                showToast(`Applied ${preset.toUpperCase()} preset (WW:${windowWidth}, WL:${windowLevel})`, 'success');
+                
+                // Briefly highlight the active preset
+                if (button) {
+                    const originalBg = button.style.background;
+                    button.style.background = 'var(--success-color)';
+                    button.style.color = 'var(--primary-bg)';
+                    setTimeout(() => {
+                        button.style.background = originalBg;
+                        button.style.color = '';
+                    }, 1000);
+                }
             }
         }
 
@@ -2332,7 +2669,22 @@
         }
 
         async function generateMPR() {
-            await generateMPRViews();
+            const button = event?.target?.closest('button');
+            if (button) {
+                // Add professional loading state
+                const originalContent = button.innerHTML;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+                button.disabled = true;
+                
+                try {
+                    await generateMPRViews();
+                } finally {
+                    button.innerHTML = originalContent;
+                    button.disabled = false;
+                }
+            } else {
+                await generateMPRViews();
+            }
         }
 
         async function generateMPRViews() {
@@ -2369,6 +2721,26 @@
                 showToast('Please load a series first', 'warning');
                 return;
             }
+            
+            const button = event?.target?.closest('button');
+            if (button) {
+                // Add professional loading state
+                const originalContent = button.innerHTML;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+                button.disabled = true;
+                
+                try {
+                    await generateMIPViews();
+                } finally {
+                    button.innerHTML = originalContent;
+                    button.disabled = false;
+                }
+            } else {
+                await generateMIPViews();
+            }
+        }
+
+        async function generateMIPViews() {
             
             try {
                 showLoading('Generating MIP views...');
@@ -2889,22 +3261,43 @@
             const length = Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2));
             const angle = Math.atan2(end.y - start.y, end.x - start.x) * 180 / Math.PI;
             
-            // Create line element
+            // Create professional measurement line
             const line = document.createElement('div');
             line.className = 'measurement-line';
             line.style.cssText = `
+                position: absolute;
                 left: ${start.x}px;
                 top: ${start.y}px;
                 width: ${length}px;
                 height: 2px;
                 transform-origin: 0 0;
                 transform: rotate(${angle}deg);
-                background: ${isTemp ? '#ffff00' : '#ff0000'};
-                opacity: ${isTemp ? 0.7 : 1.0};
+                background: ${isTemp ? 'linear-gradient(90deg, #ffff00, #ffaa00)' : 'linear-gradient(90deg, #00ff88, #00d4ff)'};
+                opacity: ${isTemp ? 0.8 : 1.0};
+                box-shadow: 0 0 4px ${isTemp ? 'rgba(255, 255, 0, 0.5)' : 'rgba(0, 255, 136, 0.5)'};
+                pointer-events: none;
             `;
             overlay.appendChild(line);
             
-            // Create label
+            // Add professional measurement endpoints
+            [{ x: start.x, y: start.y }, { x: end.x, y: end.y }].forEach(point => {
+                const endpoint = document.createElement('div');
+                endpoint.style.cssText = `
+                    position: absolute;
+                    left: ${point.x - 4}px;
+                    top: ${point.y - 4}px;
+                    width: 8px;
+                    height: 8px;
+                    background: ${isTemp ? '#ffff00' : '#00ff88'};
+                    border: 2px solid #ffffff;
+                    border-radius: 50%;
+                    box-shadow: 0 0 6px ${isTemp ? 'rgba(255, 255, 0, 0.7)' : 'rgba(0, 255, 136, 0.7)'};
+                    pointer-events: none;
+                `;
+                overlay.appendChild(endpoint);
+            });
+            
+            // Create professional measurement label
             const label = document.createElement('div');
             label.className = 'measurement-label';
             const midX = (start.x + end.x) / 2;
@@ -2912,23 +3305,44 @@
             
             let labelText = `${measurement.distance?.pixels || 'N/A'} px`;
             if (measurement.distance?.mm !== 'N/A') {
-                labelText = `${measurement.distance.mm} mm / ${measurement.distance.cm} cm`;
+                labelText = `${measurement.distance.mm} mm`;
             }
             
             label.style.cssText = `
+                position: absolute;
                 left: ${midX}px;
-                top: ${midY - 15}px;
-                transform: translateX(-50%);
-                background: rgba(0, 0, 0, 0.8);
-                color: ${isTemp ? '#ffff00' : '#ff0000'};
-                opacity: ${isTemp ? 0.7 : 1.0};
+                top: ${midY - 30}px;
+                transform: translate(-50%, 0);
+                background: linear-gradient(135deg, rgba(0, 0, 0, 0.95), rgba(0, 20, 40, 0.95));
+                color: ${isTemp ? '#ffff00' : '#00ff88'};
+                padding: 6px 10px;
+                border-radius: 6px;
+                font-size: 11px;
+                font-family: 'Courier New', monospace;
+                font-weight: bold;
+                pointer-events: none;
+                border: 1px solid ${isTemp ? 'rgba(255, 255, 0, 0.3)' : 'rgba(0, 255, 136, 0.3)'};
+                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+                opacity: ${isTemp ? 0.8 : 1.0};
             `;
-            label.textContent = labelText;
+            
+            label.innerHTML = `
+                <div style="text-align: center;">
+                    <div style="color: #00d4ff; font-size: 9px; margin-bottom: 2px;">${measurement.type?.toUpperCase() || 'LENGTH'} #${index + 1}</div>
+                    <div>${labelText}</div>
+                </div>
+            `;
             overlay.appendChild(label);
         }
 
         function updateMeasurementsList() {
             const list = document.getElementById('measurementsList');
+            
+            if (measurements.length === 0) {
+                list.innerHTML = '<div class="no-measurements">No measurements yet.<br>Use the measure tool to start.</div>';
+                return;
+            }
+            
             list.innerHTML = '';
             
             measurements.forEach((measurement, index) => {
@@ -2936,37 +3350,116 @@
                 item.className = 'measurement-item';
                 
                 let distanceText = `${measurement.distance?.pixels || 'N/A'} px`;
+                let unit = 'px';
                 if (measurement.distance?.mm !== 'N/A') {
                     distanceText = `${measurement.distance.mm} mm`;
+                    unit = 'mm';
                 }
                 
                 item.innerHTML = `
-                    <div>
-                        <div>Measurement ${index + 1}</div>
-                        <div class="measurement-value">${distanceText}</div>
+                    <div class="measurement-header">
+                        <div class="measurement-type">${measurement.type || 'Length'}</div>
+                        <div class="measurement-actions">
+                            <button class="measurement-edit" onclick="editMeasurement(${index})" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="measurement-delete" onclick="deleteMeasurement(${index})" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
                     </div>
-                    <button class="measurement-delete" onclick="deleteMeasurement(${index})">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                    <div class="measurement-value">${distanceText}</div>
+                    <div class="measurement-details">
+                        <span>Slice: ${(measurement.imageIndex || currentImageIndex) + 1}</span>
+                        <span>${unit}</span>
+                    </div>
                 `;
+                
+                // Add click handler to highlight measurement
+                item.addEventListener('click', function() {
+                    highlightMeasurement(index);
+                });
                 
                 list.appendChild(item);
             });
         }
 
+        function highlightMeasurement(index) {
+            if (measurements[index]) {
+                const measurement = measurements[index];
+                
+                // Switch to the image containing this measurement if needed
+                const targetImageIndex = measurement.imageIndex || currentImageIndex;
+                if (targetImageIndex !== currentImageIndex && targetImageIndex < images.length) {
+                    currentImageIndex = targetImageIndex;
+                    document.getElementById('sliceSlider').value = currentImageIndex;
+                    updateSlice(currentImageIndex);
+                }
+                
+                // Add highlight animation
+                setTimeout(() => {
+                    const overlay = document.getElementById('measurementOverlay');
+                    const highlight = document.createElement('div');
+                    const start = measurement.start;
+                    const end = measurement.end;
+                    
+                    highlight.style.cssText = `
+                        position: absolute;
+                        left: ${Math.min(start.x, end.x) - 15}px;
+                        top: ${Math.min(start.y, end.y) - 15}px;
+                        width: ${Math.abs(end.x - start.x) + 30}px;
+                        height: ${Math.abs(end.y - start.y) + 30}px;
+                        border: 3px solid #ffaa00;
+                        border-radius: 8px;
+                        background: rgba(255, 170, 0, 0.1);
+                        pointer-events: none;
+                        animation: highlightPulse 2s ease-out;
+                    `;
+                    
+                    overlay.appendChild(highlight);
+                    setTimeout(() => highlight.remove(), 2000);
+                }, 100);
+                
+                showToast(`Measurement #${index + 1} highlighted`, 'info', 1500);
+            }
+        }
+
+        function editMeasurement(index) {
+            showToast('Measurement editing feature coming soon', 'info');
+        }
+
         function deleteMeasurement(index) {
-            measurements.splice(index, 1);
-            updateMeasurementsList();
-            updateMeasurementOverlay();
+            if (index >= 0 && index < measurements.length) {
+                measurements.splice(index, 1);
+                updateMeasurementsList();
+                updateMeasurementOverlay();
+                showToast('Measurement deleted', 'success');
+            }
         }
 
         function clearMeasurements() {
+            if (measurements.length === 0) {
+                showToast('No measurements to clear', 'info');
+                return;
+            }
+            
+            // Professional confirmation
+            const measurementCount = measurements.length;
+            
+            // Add visual feedback to button
+            const button = event?.target?.closest('button');
+            if (button) {
+                button.style.transform = 'scale(0.95)';
+                setTimeout(() => button.style.transform = '', 100);
+            }
+            
             measurements = [];
             annotations = [];
             updateMeasurementsList();
             updateMeasurementOverlay();
             updateAnnotationOverlay();
-            showToast('Measurements cleared', 'success');
+            
+            showToast(`Cleared ${measurementCount} measurement${measurementCount > 1 ? 's' : ''}`, 'success');
         }
 
         // Annotation System
@@ -3205,6 +3698,118 @@
         document.getElementById('studySelect').addEventListener('change', function() {
             if (this.value) {
                 loadStudy(this.value);
+            }
+        });
+
+        // Professional Control Popup Management
+        let activePopup = null;
+
+        function toggleControlPopup(popupId) {
+            const popup = document.getElementById(popupId + 'Popup');
+            const icon = document.getElementById(popupId + 'Icon');
+            
+            if (!popup || !icon) return;
+            
+            // Close any other open popup
+            if (activePopup && activePopup !== popup) {
+                closeControlPopup(activePopup.id.replace('Popup', ''));
+            }
+            
+            if (popup.classList.contains('active')) {
+                closeControlPopup(popupId);
+            } else {
+                openControlPopup(popupId);
+            }
+        }
+
+        function openControlPopup(popupId) {
+            const popup = document.getElementById(popupId + 'Popup');
+            const icon = document.getElementById(popupId + 'Icon');
+            
+            if (!popup || !icon) return;
+            
+            popup.classList.add('active');
+            icon.classList.add('active');
+            activePopup = popup;
+            
+            // Position popup to avoid screen edges
+            const rect = icon.getBoundingClientRect();
+            const popupRect = popup.getBoundingClientRect();
+            
+            if (rect.top + popupRect.height > window.innerHeight) {
+                popup.style.top = 'auto';
+                popup.style.bottom = '0';
+            } else {
+                popup.style.top = '0';
+                popup.style.bottom = 'auto';
+            }
+        }
+
+        function closeControlPopup(popupId) {
+            const popup = document.getElementById(popupId + 'Popup');
+            const icon = document.getElementById(popupId + 'Icon');
+            
+            if (!popup || !icon) return;
+            
+            popup.classList.remove('active');
+            icon.classList.remove('active');
+            
+            if (activePopup === popup) {
+                activePopup = null;
+            }
+        }
+
+        function closeAllPopups() {
+            document.querySelectorAll('.control-popup.active').forEach(popup => {
+                const popupId = popup.id.replace('Popup', '');
+                closeControlPopup(popupId);
+            });
+        }
+
+
+
+        // Professional measurement export function
+        function exportMeasurements() {
+            if (measurements.length === 0) {
+                showToast('No measurements to export', 'warning');
+                return;
+            }
+            
+            const data = {
+                study: currentStudy?.patient_name || 'Unknown',
+                series: currentSeries?.series_description || 'Unknown',
+                modality: currentSeries?.modality || 'Unknown',
+                export_date: new Date().toISOString(),
+                measurements: measurements.map((m, index) => ({
+                    id: index + 1,
+                    type: m.type || 'Length',
+                    value: m.distance?.mm || m.distance?.pixels || 'N/A',
+                    unit: m.distance?.mm ? 'mm' : 'px',
+                    slice: (m.imageIndex || currentImageIndex) + 1,
+                    coordinates: {
+                        start: m.start,
+                        end: m.end
+                    },
+                    notes: m.notes || '',
+                    timestamp: new Date().toISOString()
+                }))
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `measurements_${currentStudy?.patient_name || 'study'}_${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+            
+            showToast(`Exported ${measurements.length} measurements`, 'success');
+        }
+
+        // Close popups when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.control-icon') && !e.target.closest('.control-popup')) {
+                closeAllPopups();
             }
         });
     </script>
