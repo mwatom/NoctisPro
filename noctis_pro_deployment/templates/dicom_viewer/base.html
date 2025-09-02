@@ -1710,24 +1710,32 @@
         // Image Display Management
         async function updateImageDisplay() {
             if (!images.length || currentImageIndex < 0 || currentImageIndex >= images.length) {
+                console.log('No images to display or invalid index');
                 return;
             }
             
             const currentImage = images[currentImageIndex];
-            if (!currentImage) return;
+            if (!currentImage) {
+                console.log('No current image');
+                return;
+            }
             
             try {
                 // Show loading
                 showLoading('Processing image...');
+                console.log('Loading image:', currentImage.id, 'with WW:', windowWidth, 'WL:', windowLevel);
                 
                 // Get processed image with current window/level settings
-                const url = `/dicom-viewer/api/image/${currentImage.id}/display/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`;
+                const url = `/dicom-viewer/api/image/${currentImage.id}/display/?window_width=${windowWidth}&window_level=${windowLevel}&inverted=${inverted}`;
+                console.log('Fetching from URL:', url);
                 
                 const response = await fetch(url);
                 const data = await response.json();
+                console.log('Image API response:', data);
                 
                 if (data.image_data) {
                     const dicomImage = document.getElementById('dicomImage');
+                    dicomImage.style.display = 'block';
                     dicomImage.src = data.image_data;
                     dicomImage.onload = function() {
                         hideLoading();
@@ -1735,10 +1743,17 @@
                         updateOverlayInfo();
                         updateMeasurementOverlay();
                         updateAnnotationOverlay();
+                        console.log('Image loaded successfully');
+                    };
+                    dicomImage.onerror = function() {
+                        hideLoading();
+                        showToast('Failed to render image', 'error');
+                        console.error('Image failed to load');
                     };
                 } else {
                     hideLoading();
-                    showToast('Failed to load image data', 'error');
+                    showToast('No image data received', 'error');
+                    console.error('API response missing image_data:', data);
                 }
                 
             } catch (error) {
@@ -1806,9 +1821,11 @@
             
             try {
                 showLoading('Loading study data...');
+                console.log('Loading study:', studyId);
                 
-                const response = await fetch(`/dicom-viewer/api/study/${studyId}/`);
+                const response = await fetch(`/dicom-viewer/api/study/${studyId}/data/`);
                 const data = await response.json();
+                console.log('Study data received:', data);
                 
                 if (data.study && data.series) {
                     currentStudy = data.study;
@@ -1852,14 +1869,18 @@
             
             try {
                 showLoading('Loading series images...');
+                console.log('Loading series:', seriesId);
                 
-                const response = await fetch(`/dicom-viewer/web/series/${seriesId}/images/`);
+                const response = await fetch(`/dicom-viewer/series/${seriesId}/images/`);
                 const data = await response.json();
+                console.log('Series data received:', data);
                 
                 if (data.series && data.images) {
                     currentSeries = data.series;
                     images = data.images;
                     currentImageIndex = 0;
+                    
+                    console.log(`Loaded ${images.length} images for series ${seriesId}`);
                     
                     // Update series status
                     document.getElementById('seriesStatus').textContent = 
@@ -1878,16 +1899,17 @@
                         <div>Thickness: ${currentSeries.slice_thickness || 'N/A'}</div>
                     `;
                     
-                    // Load modality-specific reconstruction options
-                    await loadModalityReconstructionOptions(seriesId);
-                    
-                    // Load first image
-                    await updateImageDisplay();
+                    // Load first image immediately
+                    if (images.length > 0) {
+                        console.log('Loading first image:', images[0]);
+                        await updateImageDisplay();
+                    }
                     
                     hideLoading();
                     showToast(`Loaded ${images.length} images`, 'success');
                 } else {
                     hideLoading();
+                    console.error('Invalid series data:', data);
                     showToast('Failed to load series images', 'error');
                 }
                 
@@ -1898,66 +1920,7 @@
             }
         }
 
-        async function loadModalityReconstructionOptions(seriesId) {
-            try {
-                const response = await fetch(`/dicom-viewer/api/modality-options/${seriesId}/`);
-                const data = await response.json();
-                
-                if (data.modality) {
-                    const modalityButtons = document.getElementById('modalitySpecificButtons');
-                    modalityButtons.innerHTML = '';
-                    
-                    // Add modality-specific reconstruction buttons
-                    const modality = data.modality;
-                    
-                    if (modality === 'CT') {
-                        modalityButtons.innerHTML = `
-                            <button class="btn-dicom-viewer btn-secondary" onclick="generateBone3D()" style="width: 100%; margin-bottom: 6px;">
-                                <i class="fas fa-bone"></i> Bone 3D
-                            </button>
-                            <button class="btn-dicom-viewer btn-secondary" onclick="generateVolumeRender()" style="width: 100%; margin-bottom: 6px;">
-                                <i class="fas fa-cubes"></i> Volume Render
-                            </button>
-                        `;
-                    } else if (modality === 'MR' || modality === 'MRI') {
-                        modalityButtons.innerHTML = `
-                            <button class="btn-dicom-viewer btn-secondary" onclick="generateMRI('brain')" style="width: 100%; margin-bottom: 6px;">
-                                <i class="fas fa-brain"></i> MRI Brain
-                            </button>
-                            <button class="btn-dicom-viewer btn-secondary" onclick="generateMRI('spine')" style="width: 100%; margin-bottom: 6px;">
-                                <i class="fas fa-spine"></i> MRI Spine
-                            </button>
-                            <button class="btn-dicom-viewer btn-secondary" onclick="generateMRI('cardiac')" style="width: 100%; margin-bottom: 6px;">
-                                <i class="fas fa-heart"></i> MRI Cardiac
-                            </button>
-                        `;
-                    } else if (modality === 'PT' || modality === 'PET') {
-                        modalityButtons.innerHTML = `
-                            <button class="btn-dicom-viewer btn-secondary" onclick="generatePET()" style="width: 100%; margin-bottom: 6px;">
-                                <i class="fas fa-radiation"></i> PET SUV
-                            </button>
-                            <button class="btn-dicom-viewer btn-secondary" onclick="generatePETHotspots()" style="width: 100%; margin-bottom: 6px;">
-                                <i class="fas fa-fire"></i> PET Hotspots
-                            </button>
-                        `;
-                    } else if (modality === 'NM' || modality === 'SPECT') {
-                        modalityButtons.innerHTML = `
-                            <button class="btn-dicom-viewer btn-secondary" onclick="generateSPECT('tc99m')" style="width: 100%; margin-bottom: 6px;">
-                                <i class="fas fa-heart-pulse"></i> SPECT Cardiac
-                            </button>
-                            <button class="btn-dicom-viewer btn-secondary" onclick="generateSPECT('tl201')" style="width: 100%; margin-bottom: 6px;">
-                                <i class="fas fa-lungs"></i> SPECT Perfusion
-                            </button>
-                            <button class="btn-dicom-viewer btn-secondary" onclick="generateNuclear('tc99m')" style="width: 100%; margin-bottom: 6px;">
-                                <i class="fas fa-atom"></i> Nuclear Med
-                            </button>
-                        `;
-                    }
-                }
-            } catch (error) {
-                console.error('Error loading modality options:', error);
-            }
-        }
+
 
         // Professional External Media Loading (USB/DVD)
         function loadFromExternalMedia() {
@@ -2141,16 +2104,16 @@
             try {
                 showLoading('Generating MPR views...');
                 
-                const response = await fetch(`/dicom_viewer/api/mpr/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
+                const response = await fetch(`/dicom-viewer/api/series/${currentSeries.id}/mpr/?window_width=${windowWidth}&window_level=${windowLevel}&inverted=${inverted}`);
                 const data = await response.json();
                 
-                if (data.views) {
-                    document.getElementById('mprAxial').src = data.views.axial;
-                    document.getElementById('mprSagittal').src = data.views.sagittal;
-                    document.getElementById('mprCoronal').src = data.views.coronal;
+                if (data.mpr_views) {
+                    document.getElementById('mprAxial').src = data.mpr_views.axial;
+                    document.getElementById('mprSagittal').src = data.mpr_views.sagittal;
+                    document.getElementById('mprCoronal').src = data.mpr_views.coronal;
                     
-                    mprImages = data.views;
-                    volumeMetadata = data.metadata;
+                    mprImages = data.mpr_views;
+                    volumeMetadata = data.series_info;
                     
                     hideLoading();
                     showToast('MPR views generated', 'success');
@@ -2175,10 +2138,10 @@
             try {
                 showLoading('Generating MIP views...');
                 
-                const response = await fetch(`/dicom_viewer/api/mip/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
+                const response = await fetch(`/dicom-viewer/api/series/${currentSeries.id}/mip/?window_width=${windowWidth}&window_level=${windowLevel}&inverted=${inverted}`);
                 const data = await response.json();
                 
-                if (data.success && data.mip_views) {
+                if (data.mip_views) {
                     // Display MIP views in MPR grid
                     document.getElementById('mprAxial').src = data.mip_views.axial;
                     document.getElementById('mprSagittal').src = data.mip_views.sagittal;
@@ -2212,7 +2175,7 @@
             try {
                 showLoading('Generating bone 3D reconstruction...');
                 
-                const response = await fetch(`/dicom_viewer/api/bone/${currentSeries.id}/?threshold=200&mesh=true&quality=normal`);
+                const response = await fetch(`/dicom-viewer/api/series/${currentSeries.id}/bone/?threshold=200&mesh=true&quality=normal`);
                 const data = await response.json();
                 
                 if (data.bone_views) {
@@ -2810,36 +2773,36 @@
 
         // Mouse Info and HU Values
         function updateMouseInfo(event) {
-            const rect = event.target.getBoundingClientRect();
-            const x = Math.round(event.clientX - rect.left);
-            const y = Math.round(event.clientY - rect.top);
+            const dicomImage = document.getElementById('dicomImage');
+            if (!dicomImage || !dicomImage.naturalWidth || !dicomImage.naturalHeight) return;
             
-            document.getElementById('mousePosition').textContent = `${x}, ${y}`;
+            const rect = dicomImage.getBoundingClientRect();
+            const x = Math.round((event.clientX - rect.left) * (dicomImage.naturalWidth / rect.width));
+            const y = Math.round((event.clientY - rect.top) * (dicomImage.naturalHeight / rect.height));
             
-            // Calculate HU value if available
-            if (images[currentImageIndex]) {
-                calculateHUValue(x, y);
+            // Ensure coordinates are within image bounds
+            if (x >= 0 && y >= 0 && x < dicomImage.naturalWidth && y < dicomImage.naturalHeight) {
+                document.getElementById('mousePosition').textContent = `${x}, ${y}`;
+                
+                // Calculate HU value if available
+                if (images[currentImageIndex]) {
+                    calculateHUValue(x, y);
+                }
             }
         }
 
         async function calculateHUValue(x, y) {
             try {
-                const response = await fetch('/dicom-viewer/api/hounsfield/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCSRFToken()
-                    },
-                    body: JSON.stringify({
-                        x: x,
-                        y: y,
-                        image_id: images[currentImageIndex].id
-                    })
-                });
+                if (!images[currentImageIndex]) return;
                 
+                const imageId = images[currentImageIndex].id;
+                const url = `/dicom-viewer/api/hu/?mode=series&image_id=${imageId}&x=${x}&y=${y}`;
+                
+                const response = await fetch(url);
                 const data = await response.json();
-                if (data.hu_value !== undefined) {
-                    document.getElementById('huValue').textContent = `${data.hu_value} HU`;
+                
+                if (data.hu !== undefined) {
+                    document.getElementById('huValue').textContent = `${data.hu} HU`;
                 }
             } catch (error) {
                 // Silently fail for HU calculation
@@ -3009,18 +2972,8 @@
         });
     </script>
     
-    <!-- Enhanced DICOM Viewer Fixes -->
-    <script src="{% static 'js/dicom-viewer-mouse-fix.js' %}"></script>
-    <script src="{% static 'js/dicom-print-export-fix.js' %}"></script>
-    <script src="{% static 'js/delete-button-fix.js' %}"></script>
-    <script src="{% static 'js/dicom-loading-fix.js' %}"></script>
-    <script src="{% static 'js/ai-reporting-enhancement.js' %}"></script>
-    
-    <!-- Advanced DICOM Features -->
-    <script src="{% static 'js/hounsfield-ellipse-roi.js' %}"></script>
-    <script src="{% static 'js/movable-annotations.js' %}"></script>
-    <script src="{% static 'js/3d-reconstruction.js' %}"></script>
-    <script src="{% static 'js/ai-auto-learning.js' %}"></script>
+    <!-- Available DICOM Viewer Scripts -->
+    <script src="{% static 'js/dicom-viewer-utils.js' %}"></script>
     
     <script>
         // Panel Management Functions
