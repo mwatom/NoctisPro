@@ -1205,3 +1205,13 @@ Watching for file changes with StatReloader
 [32mHTTP HEAD / 302 [0.01, 127.0.0.1:60794][0m
 Watching for file changes with StatReloader
 HTTP GET / 302 [0.02, 127.0.0.1:43206]
+Watching for file changes with StatReloader
+HTTP GET / 302 [0.01, 127.0.0.1:40548]
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+HTTP GET / 302 [0.01, 127.0.0.1:45486]
+HTTP GET /dicom-viewer/ 200 [0.01, 127.0.0.1:45492]
+HTTP HEAD /admin/ 302 [0.01, 127.0.0.1:45498]
+HTTP HEAD /dicom-viewer/api/studies/ 200 [0.01, 127.0.0.1:45510]
+Watching for file changes with StatReloader
+HTTP GET / 302 [0.01, 127.0.0.1:37368]
