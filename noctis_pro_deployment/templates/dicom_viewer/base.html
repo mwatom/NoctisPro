@@ -1825,6 +1825,16 @@
         let renderingQueue = [];
         let isRendering = false;
         
+        // Real-time MPR slice cache for instant crosshair updates
+        let mprSliceCache = new Map(); // Key: seriesId_plane_slice_ww_wl_invert
+        let mprSliceQueue = [];
+        let isLoadingMPRSlice = false;
+        
+        // Crosshair update throttling for performance
+        let crosshairUpdateTimeout = null;
+        let lastCrosshairUpdate = 0;
+        const CROSSHAIR_UPDATE_DELAY = 50; // 50ms = 20 FPS for smooth updates
+        
         // High-Quality Canvas Rendering Function
         function renderImageToCanvas(imgElement, canvas) {
             if (!imgElement || !canvas || !imgElement.complete) return;
@@ -2105,68 +2115,44 @@
             });
         }
 
-        // Professional Tool Management with Enhanced Feedback
+        // Optimized Tool Management - Fast Response
         function setTool(tool) {
             const previousTool = activeTool;
             activeTool = tool;
             
-            // Update toolbar visual state with animation
+            // Fast toolbar visual update without animation delays
             document.querySelectorAll('.tool').forEach(btn => {
                 btn.classList.remove('active');
                 if (btn.getAttribute('data-tool') === tool) {
                     btn.classList.add('active');
-                    // Add selection feedback
+                    // Immediate feedback
                     btn.style.transform = 'scale(0.95)';
-                    setTimeout(() => btn.style.transform = '', 150);
+                    setTimeout(() => btn.style.transform = '', 100);
                 }
             });
             
-            // Update cursor with professional styling
+            // Fast cursor updates
             const imageContainer = document.getElementById('imageContainer');
             const canvas = document.getElementById('dicomCanvas');
             
-            switch(tool) {
-                case 'window':
-                    imageContainer.style.cursor = 'crosshair';
-                    if (canvas) canvas.style.cursor = 'crosshair';
-                    break;
-                case 'zoom':
-                    imageContainer.style.cursor = 'zoom-in';
-                    if (canvas) canvas.style.cursor = 'zoom-in';
-                    break;
-                case 'pan':
-                    imageContainer.style.cursor = 'move';
-                    if (canvas) canvas.style.cursor = 'move';
-                    break;
-                case 'measure':
-                    imageContainer.style.cursor = 'crosshair';
-                    if (canvas) canvas.style.cursor = 'crosshair';
-                    break;
-                case 'annotate':
-                    imageContainer.style.cursor = 'text';
-                    if (canvas) canvas.style.cursor = 'text';
-                    break;
-                default:
-                    imageContainer.style.cursor = 'default';
-                    if (canvas) canvas.style.cursor = 'default';
-            }
+            const cursors = {
+                'window': 'crosshair',
+                'zoom': 'zoom-in', 
+                'pan': 'move',
+                'measure': 'crosshair',
+                'annotate': 'text'
+            };
             
-            // Update status with professional formatting
-            const activeToolElement = document.getElementById('activeTool');
-            if (activeToolElement) {
-                activeToolElement.textContent = tool.charAt(0).toUpperCase() + tool.slice(1);
-            }
+            const cursor = cursors[tool] || 'default';
+            imageContainer.style.cursor = cursor;
+            if (canvas) canvas.style.cursor = cursor;
             
-            // Show tool change notification
+            // Fast status update
+            document.getElementById('activeTool').textContent = tool.charAt(0).toUpperCase() + tool.slice(1);
+            
+            // Minimal notifications for speed
             if (previousTool !== tool) {
-                showToast(`${tool.charAt(0).toUpperCase() + tool.slice(1)} tool activated`, 'info', 1500);
-            }
-            
-            // Tool-specific initialization
-            if (tool === 'measure') {
-                showToast('Click and drag to measure distances', 'info', 2000);
-            } else if (tool === 'annotate') {
-                showToast('Click to add annotations', 'info', 2000);
+                showToast(`${tool.charAt(0).toUpperCase() + tool.slice(1)}`, 'info', 1000);
             }
         }
 
@@ -2185,43 +2171,36 @@
 
         function applyPreset(preset) {
             if (windowPresets[preset]) {
-                // Add visual feedback
+                // Immediate visual feedback without delay
                 const button = event?.target?.closest('button');
                 if (button) {
                     button.style.transform = 'scale(0.95)';
-                    setTimeout(() => button.style.transform = '', 100);
+                    button.style.background = 'var(--success-color)';
+                    button.style.color = 'var(--primary-bg)';
+                    
+                    // Reset after short time
+                    setTimeout(() => {
+                        button.style.transform = '';
+                        button.style.background = '';
+                        button.style.color = '';
+                    }, 150);
                 }
                 
                 windowWidth = windowPresets[preset].ww;
                 windowLevel = windowPresets[preset].wl;
                 
-                // Update UI with smooth transitions
-                const wwSlider = document.getElementById('wwSlider');
-                const wlSlider = document.getElementById('wlSlider');
-                const wwValue = document.getElementById('wwValue');
-                const wlValue = document.getElementById('wlValue');
+                // Fast UI updates without checking existence
+                document.getElementById('wwSlider').value = windowWidth;
+                document.getElementById('wlSlider').value = windowLevel;
+                document.getElementById('wwValue').textContent = windowWidth;
+                document.getElementById('wlValue').textContent = windowLevel;
                 
-                if (wwSlider) wwSlider.value = windowWidth;
-                if (wlSlider) wlSlider.value = windowLevel;
-                if (wwValue) wwValue.textContent = windowWidth;
-                if (wlValue) wlValue.textContent = windowLevel;
-                
+                // Immediate image update
                 updateImageDisplay();
                 
-                // Show enhanced notification with description
+                // Quick notification
                 const desc = windowPresets[preset].desc || preset;
-                showToast(`Applied ${preset.toUpperCase()} preset: ${desc} (WW:${windowWidth}, WL:${windowLevel})`, 'success', 3000);
-                
-                // Briefly highlight the active preset
-                if (button) {
-                    const originalBg = button.style.background;
-                    button.style.background = 'var(--success-color)';
-                    button.style.color = 'var(--primary-bg)';
-                    setTimeout(() => {
-                        button.style.background = originalBg;
-                        button.style.color = '';
-                    }, 1000);
-                }
+                showToast(`${preset.toUpperCase()}: ${desc}`, 'success', 2000);
             }
         }
 
@@ -2873,16 +2852,18 @@
         async function generateMPR() {
             const button = event?.target?.closest('button');
             if (button) {
-                // Add professional loading state
+                // Fast loading state
                 const originalContent = button.innerHTML;
-                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
                 button.disabled = true;
+                button.style.opacity = '0.7';
                 
                 try {
                     await generateMPRViews();
                 } finally {
                     button.innerHTML = originalContent;
                     button.disabled = false;
+                    button.style.opacity = '';
                 }
             } else {
                 await generateMPRViews();
@@ -2896,16 +2877,39 @@
                 const response = await fetch(`/dicom_viewer/api/mpr/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
                 const data = await response.json();
                 
-                if (data.views) {
+                if (data.mpr_views) {
+                    // Load initial views
+                    document.getElementById('mprAxial').src = data.mpr_views.axial;
+                    document.getElementById('mprSagittal').src = data.mpr_views.sagittal;
+                    document.getElementById('mprCoronal').src = data.mpr_views.coronal;
+                    
+                    mprImages = data.mpr_views;
+                    volumeMetadata = data;
+                    
+                    // Initialize slice indices to middle
+                    if (data.counts) {
+                        mprIndices.axial = Math.floor(data.counts.axial / 2);
+                        mprIndices.sagittal = Math.floor(data.counts.sagittal / 2);
+                        mprIndices.coronal = Math.floor(data.counts.coronal / 2);
+                    }
+                    
+                    hideLoading();
+                    showToast('MPR views ready', 'success', 1500);
+                    
+                    // Preload adjacent slices for smooth interaction
+                    setTimeout(() => preloadAdjacentMPRSlices(), 500);
+                    
+                } else if (data.views) {
+                    // Fallback for old API response format
                     document.getElementById('mprAxial').src = data.views.axial;
                     document.getElementById('mprSagittal').src = data.views.sagittal;
                     document.getElementById('mprCoronal').src = data.views.coronal;
                     
                     mprImages = data.views;
-                    volumeMetadata = data.metadata;
+                    volumeMetadata = data.metadata || data;
                     
                     hideLoading();
-                    showToast('MPR views generated', 'success');
+                    showToast('MPR views ready', 'success', 1500);
                 } else {
                     hideLoading();
                     showToast('Failed to generate MPR views', 'error');
@@ -2916,6 +2920,30 @@
                 console.error('Error generating MPR:', error);
                 showToast('Error generating MPR views', 'error');
             }
+        }
+
+        // Preload adjacent slices for instant crosshair response
+        function preloadAdjacentMPRSlices() {
+            if (!volumeMetadata || !volumeMetadata.counts) return;
+            
+            const preloadRange = 2; // Preload 2 slices in each direction
+            
+            ['axial', 'sagittal', 'coronal'].forEach(plane => {
+                const currentSlice = mprIndices[plane];
+                const maxSlice = volumeMetadata.counts[plane] - 1;
+                
+                for (let offset = -preloadRange; offset <= preloadRange; offset++) {
+                    if (offset === 0) continue; // Skip current slice
+                    
+                    const sliceIndex = currentSlice + offset;
+                    if (sliceIndex >= 0 && sliceIndex <= maxSlice) {
+                        // Preload in background with low priority
+                        setTimeout(() => {
+                            loadMPRSlice(plane, sliceIndex, false);
+                        }, Math.abs(offset) * 100); // Stagger preloading
+                    }
+                }
+            });
         }
 
         async function generateMIP() {
@@ -3372,6 +3400,8 @@
 
         function updateCrosshairPosition(plane, x, y, lock = false) {
             // Update crosshair coordinates based on plane
+            const oldCrosshair = { ...mprCrosshair };
+            
             if (plane === 'axial') {
                 mprCrosshair.x = x;
                 mprCrosshair.y = y;
@@ -3384,13 +3414,34 @@
             }
             
             // Update crosshair display on all planes
-            if (lock) {
-                updateCrosshairDisplay();
-            }
+            updateCrosshairDisplay();
             
             // Update position display
             document.getElementById('crosshairPosition').textContent = 
                 `X:${Math.round(mprCrosshair.x)} Y:${Math.round(mprCrosshair.y)} Z:${Math.round(mprCrosshair.z)}`;
+            
+            // Real-time orthogonal slice updates with throttling
+            if (orthogonalSync && mprMode && volumeMetadata) {
+                // Check if crosshair actually moved significantly
+                const moved = Math.abs(oldCrosshair.x - mprCrosshair.x) > 1 || 
+                             Math.abs(oldCrosshair.y - mprCrosshair.y) > 1 || 
+                             Math.abs(oldCrosshair.z - mprCrosshair.z) > 1;
+                
+                if (moved || lock) {
+                    // Throttle updates for smooth performance
+                    const now = Date.now();
+                    if (now - lastCrosshairUpdate > CROSSHAIR_UPDATE_DELAY || lock) {
+                        lastCrosshairUpdate = now;
+                        updateOrthogonalSlices(plane, lock);
+                    } else {
+                        // Schedule delayed update
+                        clearTimeout(crosshairUpdateTimeout);
+                        crosshairUpdateTimeout = setTimeout(() => {
+                            updateOrthogonalSlices(plane, true);
+                        }, CROSSHAIR_UPDATE_DELAY);
+                    }
+                }
+            }
         }
 
         function updateCrosshairDisplay() {
@@ -3442,24 +3493,97 @@
             }
         }
 
-        // Load specific slice for MPR plane
-        async function loadMPRSlice(plane, sliceIndex) {
+        // Load specific slice for MPR plane with caching
+        async function loadMPRSlice(plane, sliceIndex, priority = false) {
+            const cacheKey = `${currentSeries.id}_${plane}_${sliceIndex}_${Math.round(windowWidth)}_${Math.round(windowLevel)}_${inverted}`;
+            
+            // Check cache first for instant loading
+            if (mprSliceCache.has(cacheKey)) {
+                const cachedImage = mprSliceCache.get(cacheKey);
+                const img = document.getElementById(`mpr${plane.charAt(0).toUpperCase() + plane.slice(1)}`);
+                if (img && cachedImage) {
+                    img.src = cachedImage;
+                    img.onload = () => applyMPRViewportTransform(plane);
+                    return;
+                }
+            }
+            
+            // Add to queue if not priority
+            if (!priority && isLoadingMPRSlice) {
+                mprSliceQueue.push({ plane, sliceIndex, cacheKey });
+                return;
+            }
+            
             try {
+                isLoadingMPRSlice = true;
+                
                 const response = await fetch(
                     `/dicom_viewer/api/mpr/${currentSeries.id}/?plane=${plane}&slice=${sliceIndex}&ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`
                 );
                 const data = await response.json();
                 
                 if (data.image) {
+                    // Cache the image for future use
+                    mprSliceCache.set(cacheKey, data.image);
+                    
+                    // Limit cache size to prevent memory issues
+                    if (mprSliceCache.size > 200) {
+                        const firstKey = mprSliceCache.keys().next().value;
+                        mprSliceCache.delete(firstKey);
+                    }
+                    
                     const img = document.getElementById(`mpr${plane.charAt(0).toUpperCase() + plane.slice(1)}`);
                     if (img) {
                         img.src = data.image;
                         img.onload = () => applyMPRViewportTransform(plane);
                     }
                 }
+                
+                isLoadingMPRSlice = false;
+                
+                // Process queue
+                if (mprSliceQueue.length > 0) {
+                    const next = mprSliceQueue.shift();
+                    setTimeout(() => loadMPRSlice(next.plane, next.sliceIndex, false), 10);
+                }
+                
             } catch (error) {
                 console.error(`Error loading ${plane} slice ${sliceIndex}:`, error);
+                isLoadingMPRSlice = false;
             }
+        }
+
+        // Fast orthogonal slice updates based on crosshair position
+        function updateOrthogonalSlices(activePlane, immediate = false) {
+            if (!volumeMetadata || !volumeMetadata.counts) return;
+            
+            // Calculate slice indices from crosshair position (0-100% to slice numbers)
+            const axialSlice = Math.round((mprCrosshair.z / 100) * (volumeMetadata.counts.axial - 1));
+            const sagittalSlice = Math.round((mprCrosshair.x / 100) * (volumeMetadata.counts.sagittal - 1));
+            const coronalSlice = Math.round((mprCrosshair.y / 100) * (volumeMetadata.counts.coronal - 1));
+            
+            // Update slices for planes other than the active one
+            const updates = [];
+            
+            if (activePlane !== 'axial' && axialSlice !== mprIndices.axial) {
+                mprIndices.axial = axialSlice;
+                updates.push({ plane: 'axial', slice: axialSlice });
+            }
+            
+            if (activePlane !== 'sagittal' && sagittalSlice !== mprIndices.sagittal) {
+                mprIndices.sagittal = sagittalSlice;
+                updates.push({ plane: 'sagittal', slice: sagittalSlice });
+            }
+            
+            if (activePlane !== 'coronal' && coronalSlice !== mprIndices.coronal) {
+                mprIndices.coronal = coronalSlice;
+                updates.push({ plane: 'coronal', slice: coronalSlice });
+            }
+            
+            // Load updated slices with priority for immediate updates
+            updates.forEach(update => {
+                loadMPRSlice(update.plane, update.slice, immediate);
+            });
         }
 
         // Reset MPR viewport to default view
