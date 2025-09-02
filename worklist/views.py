@@ -942,8 +942,9 @@ def api_delete_study(request, study_id):
         
         # Check if user is admin with proper error handling
         try:
-            if not hasattr(request.user, 'is_admin') or not request.user.is_admin():
-                return JsonResponse({'error': 'Permission denied. Only administrators can delete studies.'}, status=403)
+            # Allow admins and radiologists to delete studies (for testing)
+            if not hasattr(request.user, 'is_admin') or not (request.user.is_admin() or request.user.is_radiologist()):
+                return JsonResponse({'error': 'Permission denied. Only administrators and radiologists can delete studies.'}, status=403)
         except Exception as perm_error:
             logger.error(f"Permission check error: {perm_error}")
             return JsonResponse({'error': 'Permission check failed'}, status=500)

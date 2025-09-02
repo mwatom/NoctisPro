@@ -2037,6 +2037,51 @@
             try {
                 showLoading('Processing DICOM files...');
                 
+                // Create optimized upload with progress tracking
+                const uploadId = await startOptimizedUpload(files);
+                
+                if (uploadId) {
+                    // Start progress monitoring
+                    const progressInterval = setInterval(async () => {
+                        try {
+                            const progressResponse = await fetch(`/dicom-viewer/api/upload/progress/${uploadId}/`);
+                            const progressData = await progressResponse.json();
+                            
+                            updateLoadingProgress(progressData.percentage, progressData.status);
+                            
+                            if (progressData.status === 'completed') {
+                                clearInterval(progressInterval);
+                                hideLoading();
+                                
+                                // Reload study list to show new uploads
+                                await loadStudiesList();
+                                
+                                showToast(`Upload completed: ${progressData.current} files processed`, 'success');
+                                
+                                // Auto-load the first study if available
+                                if (window.lastUploadedStudyId) {
+                                    await loadStudy(window.lastUploadedStudyId);
+                                }
+                            } else if (progressData.status === 'failed') {
+                                clearInterval(progressInterval);
+                                hideLoading();
+                                showToast('Upload failed: ' + (progressData.errors?.[0] || 'Unknown error'), 'error');
+                            }
+                        } catch (e) {
+                            console.error('Progress check error:', e);
+                        }
+                    }, 1000); // Check progress every second
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error('Error processing files:', error);
+                showToast('Error processing DICOM files', 'error');
+            }
+        }
+
+        async function startOptimizedUpload(files) {
+            try {
                 const formData = new FormData();
                 files.forEach(file => {
                     formData.append('dicom_files', file);
@@ -2052,18 +2097,33 @@
                 
                 const data = await response.json();
                 
-                if (data.success && data.study_id) {
-                    await loadStudy(data.study_id);
-                    showToast(`Uploaded ${data.processed_files} files`, 'success');
+                if (data.success) {
+                    // Store study ID for auto-loading
+                    if (data.study_id) {
+                        window.lastUploadedStudyId = data.study_id;
+                    }
+                    return data.upload_id;
                 } else {
-                    hideLoading();
-                    showToast(data.error || 'Upload failed', 'error');
+                    throw new Error(data.error || 'Upload failed');
                 }
                 
             } catch (error) {
-                hideLoading();
-                console.error('Error processing files:', error);
-                showToast('Error processing DICOM files', 'error');
+                console.error('Upload start error:', error);
+                showToast('Failed to start upload: ' + error.message, 'error');
+                return null;
+            }
+        }
+
+        function updateLoadingProgress(percentage, status) {
+            const loadingMessage = document.getElementById('loadingMessage');
+            if (loadingMessage) {
+                loadingMessage.innerHTML = `
+                    <div style="margin-bottom: 10px;">${status.charAt(0).toUpperCase() + status.slice(1)}...</div>
+                    <div style="background: var(--border-color); border-radius: 10px; overflow: hidden; height: 20px;">
+                        <div style="background: var(--accent-color); height: 100%; width: ${percentage}%; transition: width 0.3s ease;"></div>
+                    </div>
+                    <div style="margin-top: 5px; font-size: 12px; color: var(--text-secondary);">${percentage}% complete</div>
+                `;
             }
         }
 
