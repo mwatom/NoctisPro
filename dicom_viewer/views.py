@@ -215,16 +215,29 @@ def _apply_windowing_enhanced(image, window_width, window_level, invert=False, m
         
         # Apply modality-specific enhancements
         if modality in ['DX', 'CR', 'MG']:  # Digital Radiography, Computed Radiography, Mammography
-            # Enhanced contrast for radiographic images
-            gamma = 0.8
+            # Enhanced contrast for radiographic images with professional quality
+            gamma = 0.75  # More aggressive contrast enhancement for radiographs
             normalized = np.power(normalized, gamma)
-            # Apply edge enhancement
+            
+            # Apply advanced edge enhancement for better bone/tissue definition
             try:
                 from scipy import ndimage
-                edge_enhanced = ndimage.laplace(normalized) * 0.1
+                # Multi-scale edge enhancement for radiographic detail
+                laplacian = ndimage.laplace(normalized)
+                edge_enhanced = laplacian * 0.15  # Stronger edge enhancement
                 normalized = np.clip(normalized + edge_enhanced, 0, 1)
+                
+                # Apply subtle sharpening for fine detail
+                gaussian_blur = ndimage.gaussian_filter(normalized, sigma=0.5)
+                sharpened = normalized + (normalized - gaussian_blur) * 0.3
+                normalized = np.clip(sharpened, 0, 1)
+                
             except ImportError:
-                pass
+                # Fallback enhancement without scipy
+                # Simple contrast stretching
+                p2, p98 = np.percentile(normalized, (2, 98))
+                if p98 > p2:
+                    normalized = np.clip((normalized - p2) / (p98 - p2), 0, 1)
         elif modality in ['CT']:  # Computed Tomography
             # Standard gamma for CT with slight enhancement
             gamma = 0.9
@@ -696,13 +709,34 @@ def api_image_display(request, image_id):
             modality = getattr(ds, 'Modality', '').upper()
             photometric = getattr(ds, 'PhotometricInterpretation', '').upper()
             
+            # Enhanced DX/CR handling with proper windowing
             if modality in ['DX', 'CR', 'XA', 'RF', 'MG']:
-                if request.GET.get('ww') is None:
-                    window_width = 3000.0
-                if request.GET.get('wl') is None:
-                    window_level = 1500.0
+                # Auto-detect optimal window/level for radiographic images
+                if request.GET.get('ww') is None or request.GET.get('wl') is None:
+                    # Calculate optimal windowing from pixel data statistics
+                    pixel_min, pixel_max = pixel_array.min(), pixel_array.max()
+                    pixel_range = pixel_max - pixel_min
+                    
+                    if pixel_range > 0:
+                        # Use data-driven windowing for optimal contrast
+                        if request.GET.get('ww') is None:
+                            window_width = pixel_range * 0.8  # Use 80% of data range
+                        if request.GET.get('wl') is None:
+                            window_level = pixel_min + (pixel_range * 0.5)  # Center of data range
+                        
+                        logger.info(f"Auto-calculated DX/CR windowing: WW={window_width}, WL={window_level} from data range {pixel_min}-{pixel_max}")
+                    else:
+                        # Fallback to standard radiographic settings
+                        if request.GET.get('ww') is None:
+                            window_width = 4000.0
+                        if request.GET.get('wl') is None:
+                            window_level = 2000.0
+                
+                # Auto-invert MONOCHROME1 images (common in radiography)
                 if request.GET.get('invert') is None:
                     inverted = (photometric == 'MONOCHROME1')
+                    if inverted:
+                        logger.info("Auto-inverting MONOCHROME1 radiographic image")
             
             # Apply high-quality windowing with modality-specific enhancements
             logger.info(f"Applying windowing: WW={window_width}, WL={window_level}, invert={inverted}, modality={modality}")
@@ -718,7 +752,7 @@ def api_image_display(request, image_id):
                 logger.error("Failed to generate image data URL")
                 raise ValueError("Failed to generate image data")
             
-            # Prepare image info
+            # Prepare enhanced image info with DX/CR specific metadata
             image_info = {
                 'id': image.id,
                 'instance_number': image.instance_number,
@@ -735,6 +769,17 @@ def api_image_display(request, image_id):
                 'institution': str(getattr(ds, 'InstitutionName', '')),
                 'bits_allocated': getattr(ds, 'BitsAllocated', 16),
                 'photometric_interpretation': photometric,
+                # DX/CR specific metadata
+                'body_part_examined': str(getattr(ds, 'BodyPartExamined', '')),
+                'view_position': str(getattr(ds, 'ViewPosition', '')),
+                'patient_orientation': getattr(ds, 'PatientOrientation', []),
+                'image_orientation': getattr(ds, 'ImageOrientationPatient', []),
+                'kvp': getattr(ds, 'KVP', None),
+                'exposure_time': getattr(ds, 'ExposureTime', None),
+                'x_ray_tube_current': getattr(ds, 'XRayTubeCurrent', None),
+                'exposure': getattr(ds, 'Exposure', None),
+                'detector_type': str(getattr(ds, 'DetectorType', '')),
+                'grid': str(getattr(ds, 'Grid', '')),
             }
             
             return JsonResponse({

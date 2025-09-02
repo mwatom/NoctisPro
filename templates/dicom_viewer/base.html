@@ -1064,6 +1064,28 @@
             background: transparent;
         }
 
+        /* Modality-specific image enhancements */
+        .dicom-image[data-modality="DX"],
+        .dicom-image[data-modality="CR"],
+        .dicom-image[data-modality="MG"] {
+            /* Enhanced rendering for radiographic images */
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: high-quality;
+            /* Better contrast for bone/tissue visualization */
+            image-rendering: optimizeQuality;
+        }
+
+        .dicom-image[data-modality="CT"] {
+            /* Optimized for CT images */
+            image-rendering: crisp-edges;
+        }
+
+        .dicom-image[data-modality="MR"],
+        .dicom-image[data-modality="MRI"] {
+            /* Optimized for MR images */
+            image-rendering: high-quality;
+        }
+
         /* Measurement Overlays */
         .measurement-overlay {
             position: absolute;
@@ -1481,7 +1503,7 @@
                                     <span>Zoom</span>
                                     <span id="zoomValue">100%</span>
                                 </div>
-                                <input type="range" class="slider" id="zoomSlider" min="25" max="500" value="100" oninput="updateZoom(this.value)">
+                                <input type="range" class="slider" id="zoomSlider" min="25" max="1000" value="100" oninput="updateZoom(this.value)">
                             </div>
                         </div>
                     </div>
@@ -1760,14 +1782,25 @@
         let annotations = [];
         let currentMeasurement = null;
         
-        // Window presets - Professional medical presets
+        // Window presets - Professional medical presets including DX/CR
         const windowPresets = {
             'lung': { ww: 1500, wl: -600 },
             'bone': { ww: 2000, wl: 300 },
             'soft': { ww: 400, wl: 40 },
             'brain': { ww: 100, wl: 50 },
             'liver': { ww: 160, wl: 60 },
-            'mediastinum': { ww: 350, wl: 50 }
+            'mediastinum': { ww: 350, wl: 50 },
+            // DX/CR specific presets
+            'chest_dx': { ww: 2000, wl: 1000 },
+            'abdomen_dx': { ww: 3000, wl: 1500 },
+            'extremity_dx': { ww: 2500, wl: 1200 },
+            'spine_dx': { ww: 2200, wl: 1100 },
+            'pelvis_dx': { ww: 2800, wl: 1400 },
+            'skull_dx': { ww: 2000, wl: 1000 },
+            // CR specific presets
+            'chest_cr': { ww: 1800, wl: 900 },
+            'abdomen_cr': { ww: 2500, wl: 1250 },
+            'extremity_cr': { ww: 2000, wl: 1000 }
         };
         
         // MPR and 3D state - Enhanced for fast orthogonal transforms
@@ -2230,10 +2263,14 @@
         }
 
         function setZoom(factor) {
-            zoomFactor = Math.max(0.1, Math.min(5.0, factor));
+            // Allow higher zoom for DX/CR images for detail examination
+            const currentModality = document.getElementById('dicomImage')?.getAttribute('data-modality');
+            const maxZoom = (currentModality === 'DX' || currentModality === 'CR') ? 10.0 : 5.0;
+            
+            zoomFactor = Math.max(0.1, Math.min(maxZoom, factor));
             const zoomPercent = Math.round(zoomFactor * 100);
             
-            document.getElementById('zoomSlider').value = zoomPercent;
+            document.getElementById('zoomSlider').value = Math.min(zoomPercent, 500); // UI slider max
             document.getElementById('zoomValue').textContent = zoomPercent + '%';
             document.getElementById('zoomInfo').textContent = `Zoom: ${zoomPercent}%`;
             
@@ -2336,10 +2373,18 @@
                         dicomImage.style.maxWidth = '100%';
                         dicomImage.style.maxHeight = '100%';
                         dicomImage.style.objectFit = 'contain';
-                        dicomImage.style.imageRendering = 'crisp-edges';
                         dicomImage.style.display = 'block';
                         dicomImage.style.visibility = 'visible';
                         dicomImage.style.opacity = '1';
+                        
+                        // Apply modality-specific image rendering
+                        if (modality === 'DX' || modality === 'CR' || modality === 'MG') {
+                            // High-quality rendering for radiographic images
+                            dicomImage.style.imageRendering = 'high-quality';
+                            dicomImage.style.imageRendering = '-webkit-optimize-contrast';
+                        } else {
+                            dicomImage.style.imageRendering = 'crisp-edges';
+                        }
                         
                         // Remove any problematic filters
                         dicomImage.style.filter = 'none';
@@ -2367,11 +2412,19 @@
                             naturalWidth: dicomImage.naturalWidth,
                             naturalHeight: dicomImage.naturalHeight,
                             src: data.image_data.substring(0, 50) + '...',
-                            modality: modality
+                            modality: modality,
+                            photometric: data.image_info?.photometric_interpretation
                         });
                         
-                        // Show success message
-                        showToast('Image loaded successfully', 'success');
+                        // Auto-optimize for DX/CR images
+                        if (modality === 'DX' || modality === 'CR') {
+                            optimizeForRadiography(data.image_info);
+                            // Update zoom slider range for detailed examination
+                            updateZoomRangeForModality(modality);
+                        }
+                        
+                        // Show success message with modality info
+                        showToast(`${modality} image loaded successfully`, 'success');
                     };
                     
                     dicomImage.onerror = function() {
@@ -2403,17 +2456,107 @@
             if (!info) return;
             
             const imageInfoDiv = document.getElementById('imageInfo');
-            imageInfoDiv.innerHTML = `
+            
+            let infoHTML = `
                 <div>Dimensions: ${info.dimensions[1]}×${info.dimensions[0]}</div>
                 <div>Pixel Spacing: ${Array.isArray(info.pixel_spacing) ? info.pixel_spacing.join('×') : info.pixel_spacing}</div>
-                <div>Slice Thickness: ${info.slice_thickness || 'N/A'}</div>
                 <div>Modality: ${info.modality}</div>
-                <div>Institution: ${info.institution || 'N/A'}</div>
+                <div>Photometric: ${info.photometric_interpretation || 'N/A'}</div>
             `;
+            
+            // Add DX/CR specific information
+            if (info.modality === 'DX' || info.modality === 'CR') {
+                infoHTML += `
+                    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-color); color: var(--accent-color); font-weight: bold;">
+                        Radiographic Info:
+                    </div>
+                `;
+                
+                if (info.body_part_examined) {
+                    infoHTML += `<div>Body Part: ${info.body_part_examined}</div>`;
+                }
+                if (info.view_position) {
+                    infoHTML += `<div>View: ${info.view_position}</div>`;
+                }
+                if (info.kvp) {
+                    infoHTML += `<div>kVp: ${info.kvp}</div>`;
+                }
+                if (info.exposure_time) {
+                    infoHTML += `<div>Exposure: ${info.exposure_time}ms</div>`;
+                }
+                if (info.detector_type) {
+                    infoHTML += `<div>Detector: ${info.detector_type}</div>`;
+                }
+            } else {
+                if (info.slice_thickness) {
+                    infoHTML += `<div>Slice Thickness: ${info.slice_thickness}</div>`;
+                }
+            }
+            
+            if (info.institution) {
+                infoHTML += `<div>Institution: ${info.institution}</div>`;
+            }
+            
+            imageInfoDiv.innerHTML = infoHTML;
             
             // Update patient info
             document.getElementById('patientInfo').textContent = 
                 `Patient: ${info.patient_name} | Study Date: ${info.study_date} | Modality: ${info.modality}`;
+            
+            // Update presets based on modality
+            updatePresetsForModality(info.modality);
+        }
+
+        function updatePresetsForModality(modality) {
+            const presetContainer = document.querySelector('.preset-grid');
+            if (!presetContainer) return;
+            
+            // Clear existing presets
+            presetContainer.innerHTML = '';
+            
+            let presets = [];
+            
+            if (modality === 'DX') {
+                presets = [
+                    { key: 'chest_dx', label: 'Chest' },
+                    { key: 'abdomen_dx', label: 'Abdomen' },
+                    { key: 'extremity_dx', label: 'Extremity' },
+                    { key: 'spine_dx', label: 'Spine' },
+                    { key: 'pelvis_dx', label: 'Pelvis' },
+                    { key: 'skull_dx', label: 'Skull' }
+                ];
+            } else if (modality === 'CR') {
+                presets = [
+                    { key: 'chest_cr', label: 'Chest' },
+                    { key: 'abdomen_cr', label: 'Abdomen' },
+                    { key: 'extremity_cr', label: 'Extremity' },
+                    { key: 'bone', label: 'Bone' }
+                ];
+            } else if (modality === 'CT') {
+                presets = [
+                    { key: 'lung', label: 'Lung' },
+                    { key: 'bone', label: 'Bone' },
+                    { key: 'soft', label: 'Soft' },
+                    { key: 'brain', label: 'Brain' }
+                ];
+            } else {
+                // Default presets for other modalities
+                presets = [
+                    { key: 'soft', label: 'Soft' },
+                    { key: 'bone', label: 'Bone' },
+                    { key: 'lung', label: 'Lung' },
+                    { key: 'brain', label: 'Brain' }
+                ];
+            }
+            
+            // Create preset buttons
+            presets.forEach(preset => {
+                const button = document.createElement('button');
+                button.className = 'preset-btn';
+                button.textContent = preset.label;
+                button.onclick = () => applyPreset(preset.key);
+                presetContainer.appendChild(button);
+            });
         }
 
         function updateOverlayInfo() {
@@ -2827,6 +2970,88 @@
                 hideLoading();
                 console.error('Error loading test image:', error);
                 showToast('Error loading test image', 'error');
+            }
+        }
+
+        // DX/CR Optimization Function
+        function optimizeForRadiography(imageInfo) {
+            console.log('Optimizing display for radiographic image:', imageInfo);
+            
+            const modality = imageInfo?.modality;
+            const photometric = imageInfo?.photometric_interpretation;
+            
+            // Auto-suggest appropriate preset based on DICOM metadata and image characteristics
+            if (modality === 'DX' || modality === 'CR') {
+                let suggestedPreset = '';
+                
+                // First, try to use DICOM body part information
+                const bodyPart = imageInfo?.body_part_examined?.toLowerCase() || '';
+                const viewPosition = imageInfo?.view_position?.toLowerCase() || '';
+                const seriesDesc = imageInfo?.series_description?.toLowerCase() || '';
+                
+                if (bodyPart.includes('chest') || seriesDesc.includes('chest') || viewPosition.includes('pa') || viewPosition.includes('ap')) {
+                    suggestedPreset = modality === 'DX' ? 'chest_dx' : 'chest_cr';
+                } else if (bodyPart.includes('abdomen') || seriesDesc.includes('abdomen') || seriesDesc.includes('kub')) {
+                    suggestedPreset = modality === 'DX' ? 'abdomen_dx' : 'abdomen_cr';
+                } else if (bodyPart.includes('spine') || seriesDesc.includes('spine') || seriesDesc.includes('cervical') || seriesDesc.includes('lumbar')) {
+                    suggestedPreset = modality === 'DX' ? 'spine_dx' : 'extremity_cr';
+                } else if (bodyPart.includes('pelvis') || seriesDesc.includes('pelvis') || seriesDesc.includes('hip')) {
+                    suggestedPreset = modality === 'DX' ? 'pelvis_dx' : 'abdomen_cr';
+                } else if (bodyPart.includes('skull') || bodyPart.includes('head') || seriesDesc.includes('skull') || seriesDesc.includes('head')) {
+                    suggestedPreset = modality === 'DX' ? 'skull_dx' : 'extremity_cr';
+                } else if (bodyPart.includes('hand') || bodyPart.includes('foot') || bodyPart.includes('arm') || bodyPart.includes('leg') || seriesDesc.includes('extremity')) {
+                    suggestedPreset = modality === 'DX' ? 'extremity_dx' : 'extremity_cr';
+                } else {
+                    // Fallback to image dimensions analysis
+                    const width = imageInfo?.dimensions?.[1] || 0;
+                    const height = imageInfo?.dimensions?.[0] || 0;
+                    const aspectRatio = width / height;
+                    
+                    if (aspectRatio > 1.2) {
+                        // Wide image - likely chest
+                        suggestedPreset = modality === 'DX' ? 'chest_dx' : 'chest_cr';
+                    } else if (aspectRatio < 0.8) {
+                        // Tall image - likely spine or extremity
+                        suggestedPreset = modality === 'DX' ? 'spine_dx' : 'extremity_cr';
+                    } else {
+                        // Square-ish - likely abdomen or pelvis
+                        suggestedPreset = modality === 'DX' ? 'abdomen_dx' : 'abdomen_cr';
+                    }
+                }
+                
+                // Show optimization suggestion and auto-apply if appropriate
+                if (suggestedPreset && windowPresets[suggestedPreset]) {
+                    const preset = windowPresets[suggestedPreset];
+                    
+                    // Auto-apply if using default windowing values
+                    if (windowWidth === 400 && windowLevel === 40) {
+                        setTimeout(() => {
+                            applyPreset(suggestedPreset);
+                            showToast(`✨ Auto-applied ${suggestedPreset.replace('_', ' ').toUpperCase()} preset for optimal ${modality} viewing`, 'success', 4000);
+                        }, 1000);
+                    } else {
+                        showToast(`💡 Suggested preset for ${modality}: ${suggestedPreset.replace('_', ' ').toUpperCase()} (WW:${preset.ww}, WL:${preset.wl})`, 'info', 5000);
+                    }
+                }
+                
+                // Show inversion status for MONOCHROME1 images
+                if (photometric === 'MONOCHROME1') {
+                    showToast('📷 MONOCHROME1 image - automatically inverted for proper display', 'info', 3000);
+                }
+            }
+        }
+
+        function updateZoomRangeForModality(modality) {
+            const zoomSlider = document.getElementById('zoomSlider');
+            if (!zoomSlider) return;
+            
+            if (modality === 'DX' || modality === 'CR') {
+                // Higher zoom range for radiographic detail examination
+                zoomSlider.max = '1000';  // 10x zoom
+                showToast('📷 Radiographic mode: Enhanced zoom range (up to 10x) for detail examination', 'info', 3000);
+            } else {
+                // Standard zoom range for other modalities
+                zoomSlider.max = '500';   // 5x zoom
             }
         }
 

@@ -1062,7 +1062,7 @@
                         <span>Zoom</span>
                         <span id="zoomValue">100%</span>
                     </div>
-                    <input type="range" class="slider" id="zoomSlider" min="25" max="500" value="100" oninput="updateZoom(this.value)">
+                    <input type="range" class="slider" id="zoomSlider" min="25" max="1000" value="100" oninput="updateZoom(this.value)">
                 </div>
             </div>
 
@@ -1313,7 +1313,7 @@
         let annotations = [];
         let currentMeasurement = null;
         
-        // Window presets - Professional medical presets from PyQt
+        // Window presets - Professional medical presets including DX/CR
         const windowPresets = {
             'lung': { ww: 1500, wl: -600 },
             'bone': { ww: 2000, wl: 300 },
@@ -1321,7 +1321,18 @@
             'brain': { ww: 100, wl: 50 },
             'liver': { ww: 160, wl: 60 },
             'mediastinum': { ww: 350, wl: 50 },
-            'cine': { ww: 800, wl: 200 }
+            'cine': { ww: 800, wl: 200 },
+            // DX/CR specific presets
+            'chest_dx': { ww: 2000, wl: 1000 },
+            'abdomen_dx': { ww: 3000, wl: 1500 },
+            'extremity_dx': { ww: 2500, wl: 1200 },
+            'spine_dx': { ww: 2200, wl: 1100 },
+            'pelvis_dx': { ww: 2800, wl: 1400 },
+            'skull_dx': { ww: 2000, wl: 1000 },
+            // CR specific presets
+            'chest_cr': { ww: 1800, wl: 900 },
+            'abdomen_cr': { ww: 2500, wl: 1250 },
+            'extremity_cr': { ww: 2000, wl: 1000 }
         };
         
         // Professional caching for performance (PyQt-inspired)
