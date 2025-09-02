@@ -1196,40 +1196,7 @@
             box-shadow: 0 0 0 1px var(--accent-color);
         }
 
-        /* Toast Notifications */
-        .toast {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-left: 4px solid var(--accent-color);
-            color: var(--text-primary);
-            padding: 12px 16px;
-            border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            z-index: 2000;
-            font-size: 12px;
-            max-width: 300px;
-            transform: translateX(100%);
-            transition: transform 0.3s ease;
-        }
-
-        .toast.show {
-            transform: translateX(0);
-        }
-
-        .toast.error {
-            border-left-color: var(--danger-color);
-        }
-
-        .toast.success {
-            border-left-color: var(--success-color);
-        }
-
-        .toast.warning {
-            border-left-color: var(--warning-color);
-        }
+        /* Toast Notifications - Disabled */
 
         /* Responsive Design */
         @media (max-width: 1200px) {
@@ -1919,10 +1886,7 @@
                 }
             });
             
-            // Show help tooltip for window/level control
-            setTimeout(() => {
-                showToast('💡 Tip: Right-click or Shift+click and drag on image to adjust brightness/contrast', 'info', 6000);
-            }, 2000);
+
             loadAvailableStudies();
             
             // Check for study ID in URL
@@ -1948,7 +1912,7 @@
             // Initialize crosshair system
             mprCrosshair = { x: 50, y: 50, z: 50 }; // Center position
             
-            showToast('Professional DICOM Viewer initialized', 'success');
+
         }
         
         function setupCanvasResizeHandler() {
@@ -2176,17 +2140,9 @@
                 activeToolElement.textContent = tool.charAt(0).toUpperCase() + tool.slice(1);
             }
             
-            // Show tool change notification
-            if (previousTool !== tool) {
-                showToast(`${tool.charAt(0).toUpperCase() + tool.slice(1)} tool activated`, 'info', 1500);
-            }
+
             
-            // Tool-specific initialization
-            if (tool === 'measure') {
-                showToast('Click and drag to measure distances', 'info', 2000);
-            } else if (tool === 'annotate') {
-                showToast('Click to add annotations', 'info', 2000);
-            }
+
         }
 
         // Window/Level Management - Professional grade from PyQt
@@ -2226,7 +2182,6 @@
                 if (wlValue) wlValue.textContent = windowLevel;
                 
                 updateImageDisplay();
-                showToast(`Applied ${preset.toUpperCase()} preset (WW:${windowWidth}, WL:${windowLevel})`, 'success');
                 
                 // Briefly highlight the active preset
                 if (button) {
@@ -2423,32 +2378,23 @@
                             updateZoomRangeForModality(modality);
                         }
                         
-                        // Show success message with modality info
-                        showToast(`${modality} image loaded successfully`, 'success');
+
                     };
                     
                     dicomImage.onerror = function() {
                         console.error('Failed to load image:', data.image_data.substring(0, 100));
                         hideLoading();
-                        showToast('Failed to load image', 'error');
                     };
                 } else {
                     hideLoading();
                     console.error('No image data in response:', data);
                     
-                    // Try loading test image as fallback
-                    if (!data.test) {
-                        showToast('Failed to load image data - trying test image', 'warning');
-                        setTimeout(() => loadTestImage(), 1000);
-                    } else {
-                        showToast('Failed to load image data', 'error');
-                    }
+
                 }
                 
             } catch (error) {
                 hideLoading();
                 console.error('Error updating image display:', error);
-                showToast('Error loading image', 'error');
             }
         }
 
@@ -2573,7 +2519,6 @@
                                 applyPreset(preset.key);
                             } catch (e) {
                                 console.error('Error applying preset:', e);
-                                showToast('Error applying preset', 'error');
                             }
                         };
                         presetContainer.appendChild(button);
@@ -2670,16 +2615,13 @@
                     }
                     
                     hideLoading();
-                    showToast('Study loaded successfully', 'success');
                 } else {
                     hideLoading();
-                    showToast('Failed to load study data', 'error');
                 }
                 
             } catch (error) {
                 hideLoading();
                 console.error('Error loading study:', error);
-                showToast('Error loading study', 'error');
             }
         }
 
@@ -2721,16 +2663,13 @@
                     await updateImageDisplay();
                     
                     hideLoading();
-                    showToast(`Loaded ${images.length} images`, 'success');
                 } else {
                     hideLoading();
-                    showToast('Failed to load series images', 'error');
                 }
                 
             } catch (error) {
                 hideLoading();
                 console.error('Error loading series:', error);
-                showToast('Error loading series', 'error');
             }
         }
 
@@ -2795,79 +2734,17 @@
             }
         }
 
-        // Professional External Media Loading (USB/DVD)
+        // Simple External Media Loading (no annoying dialog)
         function loadFromExternalMedia() {
-            // Show professional media selection dialog
-            showMediaSelectionDialog();
-        }
-
-        function showMediaSelectionDialog() {
-            const dialog = document.createElement('div');
-            dialog.className = 'modal-overlay';
-            dialog.innerHTML = `
-                <div class="modal-content" style="width: 500px; height: auto;">
-                    <div class="modal-header">
-                        <div class="modal-title">
-                            <i class="fas fa-compact-disc"></i> Load DICOM from External Media
-                        </div>
-                        <button class="close-btn" onclick="this.closest('.modal-overlay').remove()">
-                            <i class="fas fa-times"></i> Close
-                        </button>
-                    </div>
-                    <div style="padding: 20px;">
-                        <div style="text-align: center; margin-bottom: 20px;">
-                            <div style="font-size: 48px; color: var(--accent-color); margin-bottom: 16px;">
-                                <i class="fas fa-compact-disc"></i>
-                            </div>
-                            <h3 style="color: var(--text-primary); margin-bottom: 8px;">Select DICOM Source</h3>
-                            <p style="color: var(--text-secondary); font-size: 12px;">Choose DICOM files from USB drive, DVD, or local storage</p>
-                        </div>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
-                            <button class="btn-dicom-viewer btn-lg" onclick="selectUSBDrive()" style="padding: 16px; flex-direction: column; gap: 8px;">
-                                <i class="fas fa-usb" style="font-size: 24px;"></i>
-                                <span>USB Drive</span>
-                            </button>
-                            <button class="btn-dicom-viewer btn-lg" onclick="selectDVD()" style="padding: 16px; flex-direction: column; gap: 8px;">
-                                <i class="fas fa-compact-disc" style="font-size: 24px;"></i>
-                                <span>DVD/CD</span>
-                            </button>
-                        </div>
-                        
-                        <div style="text-align: center;">
-                            <button class="btn-dicom-viewer btn-secondary" onclick="selectLocalFiles()" style="width: 100%;">
-                                <i class="fas fa-folder-open"></i> Browse Local Files
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            dialog.classList.add('active');
-            document.body.appendChild(dialog);
-        }
-
-        function selectUSBDrive() {
-            showToast('Please ensure USB drive is connected and contains DICOM files', 'info');
-            document.getElementById('fileInput').setAttribute('webkitdirectory', '');
-            document.getElementById('fileInput').click();
-            document.querySelector('.modal-overlay').remove();
-        }
-
-        function selectDVD() {
-            showToast('Please ensure DVD/CD is inserted and contains DICOM files', 'info');
-            document.getElementById('fileInput').setAttribute('webkitdirectory', '');
-            document.getElementById('fileInput').click();
-            document.querySelector('.modal-overlay').remove();
-        }
-
-        function selectLocalFiles() {
+            // Directly open file browser
             const fileInput = document.getElementById('fileInput');
             fileInput.removeAttribute('webkitdirectory');
             fileInput.setAttribute('accept', '.dcm,.dicom,*');
+            fileInput.multiple = true;
             fileInput.click();
-            document.querySelector('.modal-overlay').remove();
         }
+
+
 
         async function processDicomFiles(files) {
             try {
@@ -2892,7 +2769,7 @@
                                 // Reload study list to show new uploads
                                 await loadStudiesList();
                                 
-                                showToast(`Upload completed: ${progressData.current} files processed`, 'success');
+
                                 
                                 // Auto-load the first study if available
                                 if (window.lastUploadedStudyId) {
@@ -2901,7 +2778,7 @@
                             } else if (progressData.status === 'failed') {
                                 clearInterval(progressInterval);
                                 hideLoading();
-                                showToast('Upload failed: ' + (progressData.errors?.[0] || 'Unknown error'), 'error');
+
                             }
                         } catch (e) {
                             console.error('Progress check error:', e);
@@ -2912,7 +2789,6 @@
             } catch (error) {
                 hideLoading();
                 console.error('Error processing files:', error);
-                showToast('Error processing DICOM files', 'error');
             }
         }
 
@@ -2945,7 +2821,6 @@
                 
             } catch (error) {
                 console.error('Upload start error:', error);
-                showToast('Failed to start upload: ' + error.message, 'error');
                 return null;
             }
         }
@@ -2995,23 +2870,19 @@
                         
                         hideLoading();
                         updateImageInfo(data.image_info);
-                        showToast('Test image loaded - image processing pipeline is working!', 'success');
                     };
                     
                     dicomImage.onerror = function() {
                         console.error('Test image failed to load');
                         hideLoading();
-                        showToast('Test image failed to load', 'error');
                     };
                 } else {
                     hideLoading();
-                    showToast('Failed to generate test image', 'error');
                 }
                 
             } catch (error) {
                 hideLoading();
                 console.error('Error loading test image:', error);
-                showToast('Error loading test image', 'error');
             }
         }
 
@@ -3076,14 +2947,10 @@
                         setTimeout(() => {
                             try {
                                 applyPreset(suggestedPreset);
-                                showToast(`✨ Auto-applied ${suggestedPreset.replace('_', ' ').toUpperCase()} preset for optimal ${modality} viewing`, 'success', 4000);
                             } catch (e) {
                                 console.error('Error auto-applying preset:', e);
-                                showToast('Error applying suggested preset', 'warning');
                             }
                         }, 1000);
-                    } else {
-                        showToast(`💡 Suggested preset for ${modality}: ${suggestedPreset.replace('_', ' ').toUpperCase()} (WW:${preset.ww}, WL:${preset.wl})`, 'info', 5000);
                     }
                 }
                 
@@ -3092,10 +2959,10 @@
                     // Continue without preset suggestion
                 }
                 
-                // Show inversion status for MONOCHROME1 images with error handling
+                // Handle MONOCHROME1 images silently
                 try {
                     if (photometric === 'MONOCHROME1') {
-                        showToast('📷 MONOCHROME1 image - automatically inverted for proper display', 'info', 3000);
+                        console.log('MONOCHROME1 image - automatically inverted for proper display');
                     }
                 } catch (e) {
                     console.warn('Error checking photometric interpretation:', e);
@@ -3120,7 +2987,6 @@
                 if (['DX', 'CR', 'MG'].includes(modalityUpper)) {
                     // Higher zoom range for radiographic detail examination
                     zoomSlider.max = '1000';  // 10x zoom
-                    showToast(`📷 ${modalityUpper} mode: Enhanced zoom range (up to 10x) for detail examination`, 'info', 3000);
                 } else {
                     // Standard zoom range for other modalities
                     zoomSlider.max = '500';   // 5x zoom
@@ -3172,13 +3038,11 @@
             
             applyTransform();
             updateZoomInfo();
-            showToast('View reset', 'success');
         }
 
         // MPR Implementation
         async function toggleMPR() {
             if (!currentSeries) {
-                showToast('Please load a series first', 'warning');
                 return;
             }
             
@@ -3202,7 +3066,7 @@
                 // Optimize for current screen resolution
                 optimizeMPRForResolution();
                 
-                showToast(`MPR fullscreen mode (${screen.width}x${screen.height}) - Click on images to position crosshair`, 'info', 3000);
+
             } else {
                 exitMPRFullscreen();
             }
@@ -3275,14 +3139,13 @@
                 mprTool.classList.remove('active');
             }
             
-            showToast('Exited MPR fullscreen view', 'info');
+
         }
 
         function resetCrosshair() {
             // Reset crosshair to center position
             mprCrosshair = { x: 50, y: 50, z: 50 };
             updateCrosshairDisplay();
-            showToast('Crosshair reset to center', 'success');
         }
 
         async function generateMPR() {
@@ -3335,7 +3198,6 @@
                         if (loadedCount === totalImages) {
                             hideLoading();
                             updateCrosshairDisplay();
-                            showToast(`MPR views loaded at ${viewportWidth}×${viewportHeight} resolution`, 'success');
                         }
                     };
                     
@@ -3344,7 +3206,6 @@
                         loadedCount++;
                         if (loadedCount === totalImages) {
                             hideLoading();
-                            showToast('Some MPR views failed to load', 'warning');
                         }
                     };
                     
@@ -3365,19 +3226,16 @@
                     
                 } else {
                     hideLoading();
-                    showToast('Failed to generate MPR views', 'error');
                 }
                 
             } catch (error) {
                 hideLoading();
                 console.error('Error generating MPR:', error);
-                showToast('Error generating MPR views', 'error');
             }
         }
 
         async function generateMIP() {
             if (!currentSeries) {
-                showToast('Please load a series first', 'warning');
                 return;
             }
             
@@ -3419,16 +3277,14 @@
                     mprMode = true;
                     
                     hideLoading();
-                    showToast('MIP views generated', 'success');
+
                 } else {
                     hideLoading();
-                    showToast('Failed to generate MIP views', 'error');
                 }
                 
             } catch (error) {
                 hideLoading();
                 console.error('Error generating MIP:', error);
-                showToast('Error generating MIP views', 'error');
             }
         }
 
@@ -3752,9 +3608,6 @@
                     
                     // Update crosshair position and lock it there
                     updateCrosshairPosition(plane, x, y, true);
-                    
-                    // Show feedback
-                    showToast(`Crosshair positioned at ${Math.round(x)}, ${Math.round(y)} in ${plane} view`, 'info', 1500);
                 });
                 
                 // Add hover effect without moving crosshair
@@ -4151,13 +4004,12 @@
             updateMeasurementOverlay();
             updateAnnotationOverlay();
             
-            showToast(`Cleared ${measurementCount} measurement${measurementCount > 1 ? 's' : ''}`, 'success');
+
         }
 
         // Annotation System
         function addAnnotation(event) {
-            const text = prompt('Enter annotation text:');
-            if (!text) return;
+            const text = `Annotation ${annotations.length + 1}`;  // Auto-generate annotation text
             
             const rect = event.target.getBoundingClientRect();
             const x = event.clientX - rect.left;
@@ -4328,7 +4180,7 @@
         function showLoading(message = 'Loading...') {
             const overlay = document.getElementById('loadingOverlay');
             const messageEl = document.getElementById('loadingMessage');
-            messageEl.textContent = message;
+            messageEl.textContent = 'Loading...';  // Keep simple, no custom messages
             overlay.classList.add('active');
         }
 
@@ -4338,23 +4190,8 @@
         }
 
         function showToast(message, type = 'info', duration = 3000) {
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'exclamation-triangle' : 'info-circle'}"></i>
-                    <span>${message}</span>
-                </div>
-            `;
-            
-            document.body.appendChild(toast);
-            
-            setTimeout(() => toast.classList.add('show'), 10);
-            
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => toast.remove(), 300);
-            }, duration);
+            // Disabled - no more annoying popups
+            console.log(`[${type.toUpperCase()}] ${message}`);
         }
 
         function getCSRFToken() {
