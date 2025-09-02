@@ -244,8 +244,12 @@
             cursor: crosshair;
             user-select: none;
             transition: none;
-            filter: contrast(1.15) brightness(1.08) sharpen(0.3);
-            -webkit-filter: contrast(1.15) brightness(1.08);
+            /* Remove filters that could cause white images */
+            filter: none !important;
+            -webkit-filter: none !important;
+            /* Ensure proper display */
+            object-fit: contain;
+            background: transparent;
         }
 
         /* Overlay Information */
@@ -950,14 +954,14 @@
             <!-- Single Image View -->
             <div class="viewport-content" id="singleView">
                 <div class="image-container" id="imageContainer">
-                    <img class="dicom-image" id="dicomImage" alt="DICOM Image">
+                    <img class="dicom-image" id="dicomImage" alt="DICOM Image" style="display: block; max-width: 100%; max-height: 100%; object-fit: contain;">
+                    <canvas class="dicom-canvas" id="dicomCanvas" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
                     <div class="crosshair-overlay" id="crosshairOverlay" style="display: none;">
                         <div class="crosshair-line-h"></div>
                         <div class="crosshair-line-v"></div>
                     </div>
                     <div class="measurement-overlay" id="measurementOverlay"></div>
                 </div>
-
             </div>
 
             <!-- Professional 2x2 Orthogonal View Grid -->
@@ -1565,8 +1569,23 @@
 
         function applyTransform() {
             const dicomImage = document.getElementById('dicomImage');
+            const dicomCanvas = document.getElementById('dicomCanvas');
+            
+            // Always use image element for better compatibility and quality
             if (dicomImage) {
-                dicomImage.style.transform = `scale(${zoomFactor}) translate(${panX/zoomFactor}px, ${panY/zoomFactor}px)`;
+                const transform = `scale(${zoomFactor}) translate(${panX/zoomFactor}px, ${panY/zoomFactor}px)`;
+                dicomImage.style.transform = transform;
+                dicomImage.style.transformOrigin = 'center center';
+                
+                // Ensure image is visible and properly styled
+                dicomImage.style.display = 'block';
+                dicomImage.style.maxWidth = '100%';
+                dicomImage.style.maxHeight = '100%';
+                dicomImage.style.objectFit = 'contain';
+                
+                if (dicomCanvas) {
+                    dicomCanvas.style.display = 'none';
+                }
             }
         }
 

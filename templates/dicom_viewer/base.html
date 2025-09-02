@@ -230,12 +230,14 @@
             cursor: crosshair;
             transition: transform 0.1s ease;
             /* Filters disabled to prevent white image issue */
-            filter: none;
-            -webkit-filter: none;
+            filter: none !important;
+            -webkit-filter: none !important;
             /* Hardware acceleration for smooth rendering */
             transform: translateZ(0);
             -webkit-transform: translateZ(0);
             will-change: transform;
+            /* Ensure proper canvas display */
+            background: transparent;
         }
 
         /* MPR Grid Layout */
@@ -271,8 +273,11 @@
             image-rendering: crisp-edges;
             image-rendering: high-quality;
             cursor: crosshair;
-            filter: contrast(1.15) brightness(1.08) sharpen(0.3);
-            -webkit-filter: contrast(1.15) brightness(1.08);
+            /* Remove problematic filters that could cause white images */
+            filter: none !important;
+            -webkit-filter: none !important;
+            object-fit: contain;
+            background: transparent;
         }
 
         .mpr-label {
@@ -1014,13 +1019,16 @@
             cursor: crosshair;
             user-select: none;
             transition: none;
-            /* Filters disabled to prevent white image issue */
-            filter: none;
-            -webkit-filter: none;
+            /* Ensure no filters that could cause white images */
+            filter: none !important;
+            -webkit-filter: none !important;
             /* Hardware acceleration for smooth rendering */
             transform: translateZ(0);
             -webkit-transform: translateZ(0);
             will-change: transform;
+            /* Ensure proper display */
+            object-fit: contain;
+            background: transparent;
         }
 
         /* Measurement Overlays */
@@ -1228,6 +1236,9 @@
                 <button class="btn-dicom-viewer" onclick="loadFromExternalMedia()" title="Load DICOM from USB/DVD">
                     <i class="fas fa-compact-disc"></i>
                 </button>
+                <button class="btn-dicom-viewer btn-secondary" onclick="loadTestImage()" title="Load Test Image">
+                    <i class="fas fa-vial"></i>
+                </button>
                 <button class="btn-dicom-viewer btn-secondary" onclick="saveMeasurements()" title="Save Measurements">
                     <i class="fas fa-save"></i>
                 </button>
@@ -1310,8 +1321,8 @@
             <!-- Single Image View -->
             <div class="viewport-content" id="singleView">
                 <div class="image-container" id="imageContainer">
-                    <img class="dicom-image medical-image" id="dicomImage" alt="DICOM Image" style="display: none;">
-                    <canvas class="dicom-canvas medical-image" id="dicomCanvas"></canvas>
+                    <img class="dicom-image medical-image" id="dicomImage" alt="DICOM Image" style="display: block; max-width: 100%; max-height: 100%;">
+                    <canvas class="dicom-canvas medical-image" id="dicomCanvas" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
                     <div class="crosshair-overlay" id="crosshairOverlay" style="display: none;">
                         <div class="crosshair-line-h"></div>
                         <div class="crosshair-line-v"></div>
@@ -1794,9 +1805,37 @@
             ctx.restore();
         }
 
+        // Debug function to help troubleshoot image display issues
+        function debugImageDisplay() {
+            const dicomImage = document.getElementById('dicomImage');
+            const dicomCanvas = document.getElementById('dicomCanvas');
+            const imageContainer = document.getElementById('imageContainer');
+            
+            console.log('Debug Image Display:', {
+                imageElement: !!dicomImage,
+                canvasElement: !!dicomCanvas,
+                containerElement: !!imageContainer,
+                imageSrc: dicomImage?.src ? dicomImage.src.substring(0, 50) + '...' : 'null',
+                imageDisplay: dicomImage?.style.display,
+                imageVisibility: dicomImage?.style.visibility,
+                imageOpacity: dicomImage?.style.opacity,
+                canvasDisplay: dicomCanvas?.style.display,
+                containerBackground: imageContainer?.style.background,
+                naturalDimensions: dicomImage ? `${dicomImage.naturalWidth}x${dicomImage.naturalHeight}` : 'null',
+                computedStyle: dicomImage ? window.getComputedStyle(dicomImage).filter : 'null'
+            });
+        }
+
         // Professional initialization
         document.addEventListener('DOMContentLoaded', function() {
             initializeViewer();
+            
+            // Add debug shortcut
+            document.addEventListener('keydown', function(e) {
+                if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+                    debugImageDisplay();
+                }
+            });
             
             // Show help tooltip for window/level control
             setTimeout(() => {
@@ -2166,12 +2205,17 @@
             const dicomImage = document.getElementById('dicomImage');
             const dicomCanvas = document.getElementById('dicomCanvas');
             
-            if (dicomCanvas && dicomImage && dicomImage.complete) {
-                // Re-render to canvas with new transform
-                renderImageToCanvas(dicomImage, dicomCanvas);
-            } else if (dicomImage) {
-                // Fallback to image transform
-                dicomImage.style.transform = `scale(${zoomFactor}) translate(${panX/zoomFactor}px, ${panY/zoomFactor}px)`;
+            // Always use image element for better compatibility and quality
+            if (dicomImage) {
+                const transform = `scale(${zoomFactor}) translate(${panX/zoomFactor}px, ${panY/zoomFactor}px)`;
+                dicomImage.style.transform = transform;
+                dicomImage.style.transformOrigin = 'center center';
+                
+                // Ensure image is visible
+                dicomImage.style.display = 'block';
+                if (dicomCanvas) {
+                    dicomCanvas.style.display = 'none';
+                }
             }
         }
 
@@ -2211,12 +2255,25 @@
                 const response = await fetch(url);
                 const data = await response.json();
                 
+                console.log('API Response:', {
+                    hasImageData: !!data.image_data,
+                    imageDataStart: data.image_data ? data.image_data.substring(0, 50) + '...' : 'null',
+                    imageInfo: data.image_info,
+                    error: data.error
+                });
+                
                 if (data.image_data) {
                     const dicomImage = document.getElementById('dicomImage');
                     const dicomCanvas = document.getElementById('dicomCanvas');
                     
+                    // Show the image element directly for better compatibility
+                    dicomImage.style.display = 'block';
+                    dicomCanvas.style.display = 'none';
+                    
                     dicomImage.src = data.image_data;
                     dicomImage.onload = function() {
+                        console.log('Image onload triggered');
+                        
                         // Set modality attribute for CSS targeting
                         const modality = data.image_info?.modality || '';
                         if (modality) {
@@ -2224,18 +2281,64 @@
                             dicomCanvas.setAttribute('data-modality', modality);
                         }
                         
-                        // Render to high-quality canvas with modality-specific optimization
-                        renderImageToCanvas(dicomImage, dicomCanvas, modality);
+                        // Apply proper styling for medical image display
+                        dicomImage.style.maxWidth = '100%';
+                        dicomImage.style.maxHeight = '100%';
+                        dicomImage.style.objectFit = 'contain';
+                        dicomImage.style.imageRendering = 'crisp-edges';
+                        dicomImage.style.display = 'block';
+                        dicomImage.style.visibility = 'visible';
+                        dicomImage.style.opacity = '1';
+                        
+                        // Remove any problematic filters
+                        dicomImage.style.filter = 'none';
+                        dicomImage.style.webkitFilter = 'none';
+                        
+                        // Ensure container is properly styled
+                        const imageContainer = document.getElementById('imageContainer');
+                        if (imageContainer) {
+                            imageContainer.style.background = '#000000';
+                            imageContainer.style.display = 'flex';
+                            imageContainer.style.alignItems = 'center';
+                            imageContainer.style.justifyContent = 'center';
+                        }
+                        
+                        // Apply zoom and pan transformations
+                        applyTransform();
                         
                         hideLoading();
                         updateImageInfo(data.image_info);
                         updateOverlayInfo();
                         updateMeasurementOverlay();
                         updateAnnotationOverlay();
+                        
+                        console.log('Image loaded successfully:', {
+                            naturalWidth: dicomImage.naturalWidth,
+                            naturalHeight: dicomImage.naturalHeight,
+                            src: data.image_data.substring(0, 50) + '...',
+                            modality: modality
+                        });
+                        
+                        // Show success message
+                        showToast('Image loaded successfully', 'success');
+                    };
+                    
+                    dicomImage.onerror = function() {
+                        console.error('Failed to load image:', data.image_data.substring(0, 100));
+                        hideLoading();
+                        showToast('Failed to load image', 'error');
                     };
                 } else {
                     hideLoading();
-                    showToast('Failed to load image data', 'error');
+                    console.error('No image data in response:', data);
+                    
+                    // Try loading test image as fallback
+                    if (!data.test) {
+                        showToast('Failed to load image data - trying test image', 'warning');
+                        setTimeout(() => loadTestImage(), 1000);
+                    } else {
+                        showToast('Failed to load image data', 'error');
+                    }
                 }
                 
             } catch (error) {
@@ -2621,6 +2724,58 @@
                     </div>
                     <div style="margin-top: 5px; font-size: 12px; color: var(--text-secondary);">${percentage}% complete</div>
                 `;
+            }
+        }
+
+        // Test function to verify image processing pipeline
+        async function loadTestImage() {
+            try {
+                showLoading('Loading test image...');
+                
+                const url = `/dicom-viewer/api/test-image/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                console.log('Test Image Response:', data);
+                
+                if (data.image_data) {
+                    const dicomImage = document.getElementById('dicomImage');
+                    const dicomCanvas = document.getElementById('dicomCanvas');
+                    
+                    // Show the image element directly
+                    dicomImage.style.display = 'block';
+                    dicomCanvas.style.display = 'none';
+                    
+                    dicomImage.src = data.image_data;
+                    dicomImage.onload = function() {
+                        console.log('Test image loaded successfully');
+                        
+                        // Apply proper styling
+                        dicomImage.style.maxWidth = '100%';
+                        dicomImage.style.maxHeight = '100%';
+                        dicomImage.style.objectFit = 'contain';
+                        dicomImage.style.filter = 'none';
+                        dicomImage.style.webkitFilter = 'none';
+                        
+                        hideLoading();
+                        updateImageInfo(data.image_info);
+                        showToast('Test image loaded - image processing pipeline is working!', 'success');
+                    };
+                    
+                    dicomImage.onerror = function() {
+                        console.error('Test image failed to load');
+                        hideLoading();
+                        showToast('Test image failed to load', 'error');
+                    };
+                } else {
+                    hideLoading();
+                    showToast('Failed to generate test image', 'error');
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error('Error loading test image:', error);
+                showToast('Error loading test image', 'error');
             }
         }
 
