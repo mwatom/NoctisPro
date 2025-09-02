@@ -862,13 +862,21 @@ def api_mpr_reconstruction(request, series_id):
         if hasattr(request.user, 'is_facility_user') and request.user.is_facility_user() and getattr(request.user, 'facility', None) and series.study.facility != request.user.facility:
             return JsonResponse({'error': 'Permission denied'}, status=403)
         
-        # Get parameters
+        # Get parameters including resolution for high-quality display
         window_width = float(request.GET.get('ww', 400))
         window_level = float(request.GET.get('wl', 40))
         invert = request.GET.get('invert', 'false').lower() == 'true'
+        target_width = int(request.GET.get('width', 512))
+        target_height = int(request.GET.get('height', 512))
+        
+        # Clamp resolution to reasonable limits
+        target_width = min(max(target_width, 256), 2048)
+        target_height = min(max(target_height, 256), 2048)
+        
+        logger.info(f"MPR reconstruction requested: resolution={target_width}x{target_height}, WW={window_width}, WL={window_level}")
         
         # Check cache first
-        cache_key = f"mpr_{series_id}_{window_width}_{window_level}_{invert}"
+        cache_key = f"mpr_{series_id}_{window_width}_{window_level}_{invert}_{target_width}_{target_height}"
         with _VOLUME_CACHE_LOCK:
             cached_result = _VOLUME_CACHE.get(cache_key)
             if cached_result:

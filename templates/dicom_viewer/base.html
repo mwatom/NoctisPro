@@ -240,17 +240,20 @@
             background: transparent;
         }
 
-        /* MPR Grid Layout - Fixed for proper display */
+        /* MPR Grid Layout - Full screen resolution optimized */
         .mpr-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             grid-template-rows: 1fr 1fr;
-            gap: 3px;
-            width: 100%;
-            height: 100%;
-            background: var(--secondary-bg);
-            padding: 3px;
-            border-radius: 4px;
+            gap: 2px;
+            width: 100vw;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background: var(--primary-bg);
+            z-index: 1000;
+            padding: 2px;
         }
 
         .mpr-viewport {
@@ -260,10 +263,15 @@
             align-items: center;
             justify-content: center;
             border: 2px solid var(--border-color);
-            border-radius: 4px;
+            border-radius: 2px;
             overflow: hidden;
-            min-height: 200px;
             cursor: crosshair;
+            /* Use full available space */
+            width: 100%;
+            height: 100%;
+            /* High-DPI optimization */
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: pixelated;
         }
 
         .mpr-viewport:hover {
@@ -299,15 +307,19 @@
 
         .mpr-label {
             position: absolute;
-            top: 8px;
-            left: 8px;
-            background: rgba(0, 0, 0, 0.8);
+            top: 12px;
+            left: 12px;
+            background: rgba(0, 0, 0, 0.9);
             color: var(--accent-color);
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 11px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
             font-weight: bold;
             text-transform: uppercase;
+            border: 1px solid var(--accent-color);
+            z-index: 20;
+            pointer-events: none;
+            letter-spacing: 1px;
         }
 
         /* Overlay Information */
@@ -384,26 +396,30 @@
 
         .crosshair-line-h-mpr {
             position: absolute;
-            height: 2px;
+            height: 3px;
             background: #00ffff;
             width: 100%;
             top: 50%;
             left: 0;
             opacity: 0.9;
-            box-shadow: 0 0 4px rgba(0, 255, 255, 0.6);
+            box-shadow: 0 0 6px rgba(0, 255, 255, 0.8), 0 0 2px rgba(0, 0, 0, 0.8);
             transform: translateY(-1px);
+            z-index: 10;
+            pointer-events: none;
         }
 
         .crosshair-line-v-mpr {
             position: absolute;
-            width: 2px;
+            width: 3px;
             background: #00ffff;
             height: 100%;
             left: 50%;
             top: 0;
             opacity: 0.9;
-            box-shadow: 0 0 4px rgba(0, 255, 255, 0.6);
+            box-shadow: 0 0 6px rgba(0, 255, 255, 0.8), 0 0 2px rgba(0, 0, 0, 0.8);
             transform: translateX(-1px);
+            z-index: 10;
+            pointer-events: none;
         }
 
         /* Enhanced MPR viewport interactions */
@@ -1253,9 +1269,7 @@
                 <button class="btn-dicom-viewer" onclick="loadFromExternalMedia()" title="Load DICOM from USB/DVD">
                     <i class="fas fa-compact-disc"></i>
                 </button>
-                <button class="btn-dicom-viewer btn-secondary" onclick="loadTestImage()" title="Load Test Image">
-                    <i class="fas fa-vial"></i>
-                </button>
+
                 <button class="btn-dicom-viewer btn-secondary" onclick="saveMeasurements()" title="Save Measurements">
                     <i class="fas fa-save"></i>
                 </button>
@@ -1357,35 +1371,53 @@
                 </div>
             </div>
 
-            <!-- Professional 2x2 Orthogonal View Grid -->
+            <!-- Professional 2x2 Orthogonal View Grid - Full Screen -->
             <div class="mpr-grid" id="mprView" style="display: none;">
-                <div class="mpr-viewport" data-plane="axial" onclick="setActivePlane('axial')">
+                <!-- MPR Controls Bar -->
+                <div style="position: absolute; top: 10px; left: 10px; right: 10px; z-index: 1001; display: flex; justify-content: space-between; align-items: center; background: rgba(0, 0, 0, 0.8); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color);">
+                    <div style="color: var(--accent-color); font-weight: bold; font-size: 16px;">
+                        <i class="fas fa-cube"></i> MPR Fullscreen Mode
+                    </div>
+                    <div style="color: var(--text-secondary); font-size: 12px;" id="mprResolutionInfo">
+                        Resolution: Loading...
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button style="background: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px;" onclick="resetCrosshair()">
+                            <i class="fas fa-crosshairs"></i> Center
+                        </button>
+                        <button style="background: var(--danger-color); border: none; color: white; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 14px;" onclick="exitMPRFullscreen()">
+                            <i class="fas fa-times"></i> Exit
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="mpr-viewport" data-plane="axial">
                     <div class="mpr-label">Axial (Z)</div>
-                    <img id="mprAxial" alt="Axial View" onload="updateCrosshairOverlay('axial')">
+                    <img id="mprAxial" alt="Axial View" style="width: 100%; height: 100%; object-fit: contain;">
                     <div class="crosshair-overlay-mpr" id="crosshairAxial">
                         <div class="crosshair-line-h-mpr"></div>
                         <div class="crosshair-line-v-mpr"></div>
                     </div>
                 </div>
-                <div class="mpr-viewport" data-plane="sagittal" onclick="setActivePlane('sagittal')">
+                <div class="mpr-viewport" data-plane="sagittal">
                     <div class="mpr-label">Sagittal (X)</div>
-                    <img id="mprSagittal" alt="Sagittal View" onload="updateCrosshairOverlay('sagittal')">
+                    <img id="mprSagittal" alt="Sagittal View" style="width: 100%; height: 100%; object-fit: contain;">
                     <div class="crosshair-overlay-mpr" id="crosshairSagittal">
                         <div class="crosshair-line-h-mpr"></div>
                         <div class="crosshair-line-v-mpr"></div>
                     </div>
                 </div>
-                <div class="mpr-viewport" data-plane="coronal" onclick="setActivePlane('coronal')">
+                <div class="mpr-viewport" data-plane="coronal">
                     <div class="mpr-label">Coronal (Y)</div>
-                    <img id="mprCoronal" alt="Coronal View" onload="updateCrosshairOverlay('coronal')">
+                    <img id="mprCoronal" alt="Coronal View" style="width: 100%; height: 100%; object-fit: contain;">
                     <div class="crosshair-overlay-mpr" id="crosshairCoronal">
                         <div class="crosshair-line-h-mpr"></div>
                         <div class="crosshair-line-v-mpr"></div>
                     </div>
                 </div>
-                <div class="mpr-viewport" data-plane="3d" onclick="setActivePlane('3d')">
+                <div class="mpr-viewport" data-plane="3d">
                     <div class="mpr-label">3D Volume</div>
-                    <div id="threeDContainer" class="three-container"></div>
+                    <div id="threeDContainer" class="three-container" style="width: 100%; height: 100%;"></div>
                 </div>
             </div>
         </div>
@@ -2041,6 +2073,8 @@
                     case 'Escape':
                         if (document.getElementById('threeDModal').classList.contains('active')) {
                             close3DModal();
+                        } else if (mprMode) {
+                            exitMPRFullscreen();
                         }
                         break;
                 }
@@ -2851,15 +2885,100 @@
                 document.getElementById('singleView').style.display = 'none';
                 document.getElementById('mprView').style.display = 'grid';
                 
-                // Update tool state
-                document.querySelector('[data-tool="mpr"]').classList.add('active');
-            } else {
-                document.getElementById('singleView').style.display = 'flex';
-                document.getElementById('mprView').style.display = 'none';
+                // Disable body scrolling for fullscreen MPR
+                document.body.style.overflow = 'hidden';
                 
                 // Update tool state
-                document.querySelector('[data-tool="mpr"]').classList.remove('active');
+                document.querySelector('[data-tool="mpr"]').classList.add('active');
+                
+                // Initialize crosshair position to center
+                mprCrosshair = { x: 50, y: 50, z: 50 };
+                updateCrosshairDisplay();
+                
+                // Optimize for current screen resolution
+                optimizeMPRForResolution();
+                
+                showToast(`MPR fullscreen mode (${screen.width}x${screen.height}) - Click on images to position crosshair`, 'info', 3000);
+            } else {
+                exitMPRFullscreen();
             }
+        }
+
+        function optimizeMPRForResolution() {
+            const mprView = document.getElementById('mprView');
+            if (!mprView) return;
+            
+            // Get actual screen dimensions
+            const screenWidth = screen.width;
+            const screenHeight = screen.height;
+            const pixelRatio = window.devicePixelRatio || 1;
+            
+            console.log(`Optimizing MPR for resolution: ${screenWidth}x${screenHeight}, DPR: ${pixelRatio}`);
+            
+            // Adjust grid gap based on resolution
+            const gap = screenWidth > 1920 ? '3px' : screenWidth > 1280 ? '2px' : '1px';
+            mprView.style.gap = gap;
+            
+            // Adjust viewport borders based on resolution
+            const viewports = mprView.querySelectorAll('.mpr-viewport');
+            viewports.forEach(viewport => {
+                const borderWidth = screenWidth > 1920 ? '3px' : '2px';
+                viewport.style.borderWidth = borderWidth;
+                
+                // Optimize image quality for high-DPI displays
+                const img = viewport.querySelector('img');
+                if (img && pixelRatio > 1) {
+                    img.style.imageRendering = 'crisp-edges';
+                    img.style.transform = `scale(${1/pixelRatio})`;
+                    img.style.transformOrigin = 'top left';
+                }
+            });
+            
+            // Adjust crosshair thickness for better visibility on high-res displays
+            const crosshairLines = mprView.querySelectorAll('.crosshair-line-h-mpr, .crosshair-line-v-mpr');
+            crosshairLines.forEach(line => {
+                const thickness = screenWidth > 1920 ? '4px' : '3px';
+                if (line.classList.contains('crosshair-line-h-mpr')) {
+                    line.style.height = thickness;
+                } else {
+                    line.style.width = thickness;
+                }
+            });
+            
+            // Update resolution info display
+            const resolutionInfo = document.getElementById('mprResolutionInfo');
+            if (resolutionInfo) {
+                resolutionInfo.textContent = `${screenWidth}×${screenHeight} (${pixelRatio}x DPR)`;
+            }
+        }
+
+        function exitMPRFullscreen() {
+            const mprView = document.getElementById('mprView');
+            const singleView = document.getElementById('singleView');
+            
+            // Hide MPR fullscreen view
+            mprView.style.display = 'none';
+            singleView.style.display = 'flex';
+            
+            // Re-enable body scrolling
+            document.body.style.overflow = '';
+            
+            mprMode = false;
+            
+            // Update tool state
+            const mprTool = document.querySelector('[data-tool="mpr"]');
+            if (mprTool) {
+                mprTool.classList.remove('active');
+            }
+            
+            showToast('Exited MPR fullscreen view', 'info');
+        }
+
+        function resetCrosshair() {
+            // Reset crosshair to center position
+            mprCrosshair = { x: 50, y: 50, z: 50 };
+            updateCrosshairDisplay();
+            showToast('Crosshair reset to center', 'success');
         }
 
         async function generateMPR() {
@@ -2883,21 +3002,63 @@
 
         async function generateMPRViews() {
             try {
-                showLoading('Generating MPR views...');
+                showLoading('Generating high-resolution MPR views...');
                 
-                const response = await fetch(`/dicom_viewer/api/mpr/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
+                // Get screen resolution for optimal image size
+                const screenWidth = screen.width;
+                const screenHeight = screen.height;
+                const pixelRatio = window.devicePixelRatio || 1;
+                
+                // Calculate optimal image dimensions for each viewport (half screen size)
+                const viewportWidth = Math.floor((screenWidth / 2) * pixelRatio);
+                const viewportHeight = Math.floor((screenHeight / 2) * pixelRatio);
+                
+                const url = `/dicom_viewer/api/mpr/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}&width=${viewportWidth}&height=${viewportHeight}`;
+                const response = await fetch(url);
                 const data = await response.json();
                 
                 if (data.views) {
-                    document.getElementById('mprAxial').src = data.views.axial;
-                    document.getElementById('mprSagittal').src = data.views.sagittal;
-                    document.getElementById('mprCoronal').src = data.views.coronal;
+                    // Load images with proper error handling
+                    const axialImg = document.getElementById('mprAxial');
+                    const sagittalImg = document.getElementById('mprSagittal');
+                    const coronalImg = document.getElementById('mprCoronal');
+                    
+                    let loadedCount = 0;
+                    const totalImages = 3;
+                    
+                    const imageLoadHandler = () => {
+                        loadedCount++;
+                        if (loadedCount === totalImages) {
+                            hideLoading();
+                            updateCrosshairDisplay();
+                            showToast(`MPR views loaded at ${viewportWidth}×${viewportHeight} resolution`, 'success');
+                        }
+                    };
+                    
+                    const imageErrorHandler = (plane) => {
+                        console.error(`Failed to load ${plane} MPR view`);
+                        loadedCount++;
+                        if (loadedCount === totalImages) {
+                            hideLoading();
+                            showToast('Some MPR views failed to load', 'warning');
+                        }
+                    };
+                    
+                    axialImg.onload = imageLoadHandler;
+                    axialImg.onerror = () => imageErrorHandler('axial');
+                    axialImg.src = data.views.axial;
+                    
+                    sagittalImg.onload = imageLoadHandler;
+                    sagittalImg.onerror = () => imageErrorHandler('sagittal');
+                    sagittalImg.src = data.views.sagittal;
+                    
+                    coronalImg.onload = imageLoadHandler;
+                    coronalImg.onerror = () => imageErrorHandler('coronal');
+                    coronalImg.src = data.views.coronal;
                     
                     mprImages = data.views;
                     volumeMetadata = data.metadata;
                     
-                    hideLoading();
-                    showToast('MPR views generated', 'success');
                 } else {
                     hideLoading();
                     showToast('Failed to generate MPR views', 'error');
@@ -3310,6 +3471,10 @@
         }
 
         function updateCrosshairPosition(plane, x, y, lock = false) {
+            // Clamp coordinates to valid range
+            x = Math.max(0, Math.min(100, x));
+            y = Math.max(0, Math.min(100, y));
+            
             // Update crosshair coordinates based on plane
             if (plane === 'axial') {
                 mprCrosshair.x = x;
@@ -3322,14 +3487,17 @@
                 mprCrosshair.z = y;
             }
             
-            // Update crosshair display on all planes
-            if (lock) {
-                updateCrosshairDisplay();
-            }
+            // Always update crosshair display when position changes
+            updateCrosshairDisplay();
             
             // Update position display
-            document.getElementById('crosshairPosition').textContent = 
-                `X:${Math.round(mprCrosshair.x)} Y:${Math.round(mprCrosshair.y)} Z:${Math.round(mprCrosshair.z)}`;
+            const positionElement = document.getElementById('crosshairPosition');
+            if (positionElement) {
+                positionElement.textContent = 
+                    `X:${Math.round(mprCrosshair.x)} Y:${Math.round(mprCrosshair.y)} Z:${Math.round(mprCrosshair.z)}`;
+            }
+            
+            console.log(`Crosshair updated - Plane: ${plane}, Position: (${Math.round(x)}, ${Math.round(y)})`);
         }
 
         function updateCrosshairDisplay() {
@@ -3339,18 +3507,34 @@
                 const crosshair = document.getElementById(`crosshair${plane.charAt(0).toUpperCase() + plane.slice(1)}`);
                 if (!crosshair) return;
                 
+                // Show crosshair if it's enabled
+                if (showCrosshair || mprMode) {
+                    crosshair.style.display = 'block';
+                    crosshair.classList.add('active');
+                } else {
+                    crosshair.style.display = 'none';
+                    crosshair.classList.remove('active');
+                    return;
+                }
+                
                 const hLine = crosshair.querySelector('.crosshair-line-h-mpr');
                 const vLine = crosshair.querySelector('.crosshair-line-v-mpr');
                 
-                if (plane === 'axial') {
-                    if (hLine) hLine.style.top = `${mprCrosshair.y}%`;
-                    if (vLine) vLine.style.left = `${mprCrosshair.x}%`;
-                } else if (plane === 'sagittal') {
-                    if (hLine) hLine.style.top = `${mprCrosshair.y}%`;
-                    if (vLine) vLine.style.left = `${mprCrosshair.z}%`;
-                } else if (plane === 'coronal') {
-                    if (hLine) hLine.style.top = `${mprCrosshair.z}%`;
-                    if (vLine) vLine.style.left = `${mprCrosshair.x}%`;
+                if (hLine && vLine) {
+                    if (plane === 'axial') {
+                        hLine.style.top = `${mprCrosshair.y}%`;
+                        vLine.style.left = `${mprCrosshair.x}%`;
+                    } else if (plane === 'sagittal') {
+                        hLine.style.top = `${mprCrosshair.y}%`;
+                        vLine.style.left = `${mprCrosshair.z}%`;
+                    } else if (plane === 'coronal') {
+                        hLine.style.top = `${mprCrosshair.z}%`;
+                        vLine.style.left = `${mprCrosshair.x}%`;
+                    }
+                    
+                    // Ensure crosshair lines are visible
+                    hLine.style.display = 'block';
+                    vLine.style.display = 'block';
                 }
             });
         }
