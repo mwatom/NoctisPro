@@ -1797,6 +1797,11 @@
         // Professional initialization
         document.addEventListener('DOMContentLoaded', function() {
             initializeViewer();
+            
+            // Show help tooltip for window/level control
+            setTimeout(() => {
+                showToast('💡 Tip: Right-click or Shift+click and drag on image to adjust brightness/contrast', 'info', 6000);
+            }, 2000);
             loadAvailableStudies();
             
             // Check for study ID in URL
@@ -1854,6 +1859,16 @@
                 lastMousePos = { x: e.clientX, y: e.clientY };
                 dragStart = { x: e.clientX, y: e.clientY };
                 
+                // Right-click OR Shift+Left-click for window/level adjustment
+                if (e.button === 2 || (e.button === 0 && e.shiftKey)) {
+                    e.preventDefault();
+                    activeTool = 'window-level-drag';
+                    imageContainer.style.cursor = 'crosshair';
+                    imageContainer.style.outline = '2px solid var(--accent-color)';
+                    showWindowLevelIndicator(true);
+                    return;
+                }
+                
                 if (activeTool === 'measure') {
                     startMeasurement(e);
                 } else if (activeTool === 'annotate') {
@@ -1867,7 +1882,7 @@
                     const deltaX = e.clientX - lastMousePos.x;
                     const deltaY = e.clientY - lastMousePos.y;
                     
-                    if (activeTool === 'window') {
+                    if (activeTool === 'window' || activeTool === 'window-level-drag') {
                         handleWindowing(deltaX, deltaY);
                     } else if (activeTool === 'zoom') {
                         handleZooming(deltaY);
@@ -1888,9 +1903,24 @@
                 if (mouseDown && activeTool === 'measure' && currentMeasurement) {
                     finishMeasurement(e);
                 }
+                
+                // Reset window/level drag mode
+                if (activeTool === 'window-level-drag') {
+                    activeTool = 'window'; // Return to normal window tool
+                    imageContainer.style.cursor = 'crosshair';
+                    imageContainer.style.outline = 'none';
+                    showWindowLevelIndicator(false);
+                }
+                
                 mouseDown = false;
                 isDragging = false;
                 currentMeasurement = null;
+            });
+            
+            // Disable context menu on right-click
+            imageContainer.addEventListener('contextmenu', function(e) {
+                e.preventDefault();
+                return false;
             });
             
             // Wheel event for slice navigation and zoom
@@ -2089,7 +2119,7 @@
         }
 
         function handleWindowing(deltaX, deltaY) {
-            const sensitivity = 2;
+            const sensitivity = 3; // Increased sensitivity for better control
             windowWidth = Math.max(1, windowWidth + deltaX * sensitivity);
             windowLevel = Math.max(-1000, Math.min(1000, windowLevel + deltaY * sensitivity));
             
@@ -2097,6 +2127,9 @@
             document.getElementById('wlSlider').value = windowLevel;
             document.getElementById('wwValue').textContent = Math.round(windowWidth);
             document.getElementById('wlValue').textContent = Math.round(windowLevel);
+            
+            // Show live feedback during dragging
+            updateWindowLevelIndicator(Math.round(windowWidth), Math.round(windowLevel));
             
             updateImageDisplay();
         }
@@ -3681,6 +3714,55 @@
             }
             
             return token || '';
+        }
+
+        // Window/Level Visual Indicator Functions
+        function showWindowLevelIndicator(show) {
+            let indicator = document.getElementById('windowLevelIndicator');
+            if (!indicator && show) {
+                indicator = document.createElement('div');
+                indicator.id = 'windowLevelIndicator';
+                indicator.style.cssText = `
+                    position: absolute;
+                    top: 20px;
+                    left: 20px;
+                    background: rgba(0, 0, 0, 0.8);
+                    color: var(--accent-color);
+                    padding: 8px 12px;
+                    border-radius: 6px;
+                    font-size: 12px;
+                    font-weight: bold;
+                    border: 1px solid var(--accent-color);
+                    z-index: 1000;
+                    pointer-events: none;
+                    display: none;
+                `;
+                document.querySelector('.viewport').appendChild(indicator);
+            }
+            
+            if (indicator) {
+                indicator.style.display = show ? 'block' : 'none';
+                if (show) {
+                    indicator.innerHTML = `
+                        <div style="margin-bottom: 4px;">
+                            <i class="fas fa-mouse-pointer"></i> Right-click or Shift+click & drag
+                        </div>
+                        <div>WW: ${Math.round(windowWidth)} | WL: ${Math.round(windowLevel)}</div>
+                    `;
+                }
+            }
+        }
+
+        function updateWindowLevelIndicator(ww, wl) {
+            const indicator = document.getElementById('windowLevelIndicator');
+            if (indicator && indicator.style.display !== 'none') {
+                indicator.innerHTML = `
+                                            <div style="margin-bottom: 4px;">
+                            <i class="fas fa-mouse-pointer"></i> Right-click or Shift+click & drag
+                        </div>
+                    <div>WW: ${ww} | WL: ${wl}</div>
+                `;
+            }
         }
 
         // Handle study selection from dropdown
