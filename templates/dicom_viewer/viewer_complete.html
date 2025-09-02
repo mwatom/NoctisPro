@@ -235,9 +235,11 @@
             max-height: 100%;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
+            image-rendering: -webkit-optimize-contrast;
             cursor: crosshair;
             user-select: none;
             transition: none;
+            filter: contrast(1.1) brightness(1.05);
         }
 
         /* Overlay Information */
@@ -918,7 +920,7 @@
                 <div class="welcome-icon">
                     <i class="fas fa-file-medical"></i>
                 </div>
-                <h2 class="welcome-title">Professional DICOM Viewer</h2>
+                <h2 class="welcome-title">DICOM Viewer</h2>
                 <p class="welcome-subtitle">
                     Load DICOM studies from the system database, local files, or external media.<br>
                     Complete PyQt-level functionality with all essential tools.
@@ -1017,6 +1019,8 @@
                     <button class="preset-btn" onclick="applyPreset('bone')">Bone</button>
                     <button class="preset-btn" onclick="applyPreset('soft')">Soft</button>
                     <button class="preset-btn" onclick="applyPreset('brain')">Brain</button>
+                    <button class="preset-btn" onclick="applyPreset('sine')">Sine</button>
+                    <button class="preset-btn" onclick="applyPreset('liver')">Liver</button>
                 </div>
             </div>
 
@@ -1100,24 +1104,31 @@
                 </div>
             </div>
             
-            <!-- Crosshair Controls -->
+            <!-- Plane Selection -->
             <div class="panel">
-                <h3>Crosshair Control</h3>
-                <div class="control">
-                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                        <input type="checkbox" id="orthogonalSync" checked onchange="toggleOrthogonalSync()">
-                        <span>Orthogonal Sync</span>
-                    </label>
-                </div>
+                <h3>Plane Selection</h3>
                 <div class="control">
                     <div class="control-label">
-                        <span>Active Plane</span>
-                        <span id="activePlaneLabel">Axial</span>
+                        <span>Reconstruction Plane</span>
                     </div>
+                    <select class="select" id="planeSelect" onchange="changePlane(this.value)" style="width: 100%; margin-bottom: 8px;">
+                        <option value="axial">Axial (Z)</option>
+                        <option value="sagittal">Sagittal (X)</option>
+                        <option value="coronal">Coronal (Y)</option>
+                        <option value="oblique">Oblique</option>
+                    </select>
                 </div>
                 <div class="control">
                     <div class="control-label">
-                        <span>Crosshair Position</span>
+                        <span>Crosshair</span>
+                    </div>
+                    <button class="btn" onclick="toggleCrosshair()" id="crosshairToggle" style="width: 100%;">
+                        <i class="fas fa-crosshairs"></i> <span id="crosshairStatus">Off</span>
+                    </button>
+                </div>
+                <div class="control">
+                    <div class="control-label">
+                        <span>Position</span>
                         <span id="crosshairPosition">X:50 Y:50 Z:50</span>
                     </div>
                 </div>
@@ -1216,7 +1227,8 @@
             'soft': { ww: 400, wl: 40 },
             'brain': { ww: 100, wl: 50 },
             'liver': { ww: 160, wl: 60 },
-            'mediastinum': { ww: 350, wl: 50 }
+            'mediastinum': { ww: 350, wl: 50 },
+            'sine': { ww: 800, wl: 200 }
         };
         
         // Professional caching for performance (PyQt-inspired)
@@ -1492,18 +1504,35 @@
 
         // Slice Navigation
         function updateSlice(value) {
-            currentImageIndex = parseInt(value);
-            document.getElementById('sliceValue').textContent = `${currentImageIndex + 1}/${images.length}`;
-            updateImageDisplay();
+            if (currentPlane !== 'axial' && planeImages[currentPlane].length > 0) {
+                // Handle plane-specific slice navigation
+                currentPlaneIndex = parseInt(value);
+                updatePlaneDisplay();
+            } else {
+                // Handle regular image navigation
+                currentImageIndex = parseInt(value);
+                document.getElementById('sliceValue').textContent = `${currentImageIndex + 1}/${images.length}`;
+                updateImageDisplay();
+            }
         }
 
         function changeSlice(direction) {
-            const newIndex = currentImageIndex + direction;
-            if (newIndex >= 0 && newIndex < images.length) {
-                currentImageIndex = newIndex;
-                document.getElementById('sliceSlider').value = currentImageIndex;
-                document.getElementById('sliceValue').textContent = `${currentImageIndex + 1}/${images.length}`;
-                updateImageDisplay();
+            if (currentPlane !== 'axial' && planeImages[currentPlane].length > 0) {
+                // Handle plane-specific slice navigation
+                const newIndex = currentPlaneIndex + direction;
+                if (newIndex >= 0 && newIndex < planeImages[currentPlane].length) {
+                    currentPlaneIndex = newIndex;
+                    updatePlaneDisplay();
+                }
+            } else {
+                // Handle regular image navigation
+                const newIndex = currentImageIndex + direction;
+                if (newIndex >= 0 && newIndex < images.length) {
+                    currentImageIndex = newIndex;
+                    document.getElementById('sliceSlider').value = currentImageIndex;
+                    document.getElementById('sliceValue').textContent = `${currentImageIndex + 1}/${images.length}`;
+                    updateImageDisplay();
+                }
             }
         }
 
@@ -1521,13 +1550,18 @@
                 showLoading('Processing image...');
                 
                 // Get processed image with current window/level settings
-                const url = `/dicom-viewer/api/image/${currentImage.id}/display/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`;
+                const url = `/dicom-viewer/api/image/${currentImage.id}/display/?window_width=${windowWidth}&window_level=${windowLevel}&inverted=${inverted}`;
                 
                 const response = await fetch(url);
                 const data = await response.json();
                 
                 if (data.image_data) {
                     const dicomImage = document.getElementById('dicomImage');
+                    
+                    // Hide welcome screen and show image view
+                    document.getElementById('welcomeScreen').style.display = 'none';
+                    document.getElementById('singleView').style.display = 'flex';
+                    
                     dicomImage.src = data.image_data;
                     dicomImage.onload = function() {
                         hideLoading();
@@ -1535,10 +1569,24 @@
                         updateOverlayInfo();
                         updateMeasurementOverlay();
                         updateAnnotationOverlay();
+                        
+                        // Apply high-quality rendering
+                        dicomImage.style.imageRendering = 'pixelated';
+                        dicomImage.style.imageRendering = 'crisp-edges';
+                        dicomImage.style.maxWidth = '100%';
+                        dicomImage.style.maxHeight = '100%';
+                    };
+                    dicomImage.onerror = function() {
+                        hideLoading();
+                        showToast('Failed to load image', 'error');
                     };
                 } else {
                     hideLoading();
-                    showToast('Failed to load image data', 'error');
+                    if (data.warnings?.pixel_decode_error) {
+                        showToast('Image format not supported: ' + data.warnings.pixel_decode_error, 'warning');
+                    } else {
+                        showToast('Failed to load image data', 'error');
+                    }
                 }
                 
             } catch (error) {
@@ -1626,7 +1674,7 @@
                     
                     // Hide welcome screen and show image view
                     document.getElementById('welcomeScreen').style.display = 'none';
-                    document.getElementById('imageView').style.display = 'flex';
+                    document.getElementById('singleView').style.display = 'flex';
                     
                     // Update study status
                     document.getElementById('studyStatus').textContent = 
@@ -1748,7 +1796,7 @@
                         <button onclick="selectDVD(); document.body.removeChild(this.closest('div').parentElement)" style="padding: 12px; background: var(--accent-color); color: var(--primary-bg); border: none; border-radius: 4px; cursor: pointer;">
                             <i class="fas fa-compact-disc"></i> DVD/CD
                         </button>
-                        <button onclick="document.body.removeChild(this.closest('div').parentElement)" style="padding: 12px; background: var(--border-color); color: var(--text-primary); border: none; border-radius: 4px; cursor: pointer;">
+                        <button onclick="closeExternalMediaModal(this)" style="padding: 12px; background: var(--border-color); color: var(--text-primary); border: none; border-radius: 4px; cursor: pointer;">
                             Cancel
                         </button>
                     </div>
@@ -1768,6 +1816,11 @@
             showToast('Please ensure DVD/CD is inserted and contains DICOM files', 'info');
             document.getElementById('fileInput').setAttribute('webkitdirectory', '');
             document.getElementById('fileInput').click();
+        }
+
+        function closeExternalMediaModal(button) {
+            const modal = button.closest('div').parentElement;
+            document.body.removeChild(modal);
         }
 
         async function processDicomFiles(files) {
@@ -1812,11 +1865,92 @@
             
             // Update tool visual state
             const tool = document.querySelector('[data-tool="crosshair"]');
+            const statusSpan = document.getElementById('crosshairStatus');
+            const toggleButton = document.getElementById('crosshairToggle');
+            
             if (showCrosshair) {
-                tool.classList.add('active');
+                tool?.classList.add('active');
+                statusSpan.textContent = 'On';
+                toggleButton.style.background = 'var(--accent-color)';
+                toggleButton.style.color = 'var(--primary-bg)';
             } else {
-                tool.classList.remove('active');
+                tool?.classList.remove('active');
+                statusSpan.textContent = 'Off';
+                toggleButton.style.background = 'var(--card-bg)';
+                toggleButton.style.color = 'var(--text-primary)';
             }
+        }
+
+        // Plane selection functionality
+        let currentPlane = 'axial';
+        let planeImages = {
+            axial: [],
+            sagittal: [],
+            coronal: [],
+            oblique: []
+        };
+        let currentPlaneIndex = 0;
+
+        function changePlane(plane) {
+            currentPlane = plane;
+            currentPlaneIndex = 0;
+            
+            // Update active plane label
+            document.getElementById('activePlaneLabel')?.textContent = 
+                plane.charAt(0).toUpperCase() + plane.slice(1);
+            
+            // Generate plane images if needed
+            if (currentSeries && planeImages[plane].length === 0) {
+                generatePlaneImages(plane);
+            } else {
+                updatePlaneDisplay();
+            }
+            
+            showToast(`Switched to ${plane} plane`, 'success');
+        }
+
+        async function generatePlaneImages(plane) {
+            if (!currentSeries) return;
+            
+            try {
+                showLoading(`Generating ${plane} plane images...`);
+                
+                const response = await fetch(`/dicom-viewer/api/plane/${currentSeries.id}/${plane}/`);
+                const data = await response.json();
+                
+                if (data.success && data.images) {
+                    planeImages[plane] = data.images;
+                    updatePlaneDisplay();
+                    hideLoading();
+                    showToast(`${plane} plane ready - ${data.images.length} slices`, 'success');
+                } else {
+                    hideLoading();
+                    showToast(`Failed to generate ${plane} plane`, 'error');
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error(`Error generating ${plane} plane:`, error);
+                showToast(`Error generating ${plane} plane`, 'error');
+            }
+        }
+
+        function updatePlaneDisplay() {
+            const planeSlices = planeImages[currentPlane];
+            if (!planeSlices || planeSlices.length === 0) return;
+            
+            const dicomImage = document.getElementById('dicomImage');
+            if (dicomImage && planeSlices[currentPlaneIndex]) {
+                dicomImage.src = planeSlices[currentPlaneIndex];
+            }
+            
+            // Update slice info
+            document.getElementById('sliceValue').textContent = 
+                `${currentPlaneIndex + 1}/${planeSlices.length}`;
+            
+            const sliceSlider = document.getElementById('sliceSlider');
+            sliceSlider.max = Math.max(0, planeSlices.length - 1);
+            sliceSlider.value = currentPlaneIndex;
         }
 
         function toggleInvert() {
@@ -2343,12 +2477,7 @@
             return token || '';
         }
 
-        // Handle study selection from dropdown
-        document.getElementById('studySelect').addEventListener('change', function() {
-            if (this.value) {
-                loadStudy(this.value);
-            }
-        });
+
         
         // Crosshair control functions
         function toggleOrthogonalSync() {
