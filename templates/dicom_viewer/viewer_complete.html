@@ -1972,8 +1972,10 @@
             currentPlaneIndex = 0;
             
             // Update active plane label
-            document.getElementById('activePlaneLabel')?.textContent = 
-                plane.charAt(0).toUpperCase() + plane.slice(1);
+            const activePlaneLabel = document.getElementById('activePlaneLabel');
+            if (activePlaneLabel) {
+                activePlaneLabel.textContent = plane.charAt(0).toUpperCase() + plane.slice(1);
+            }
             
             // Generate plane images if needed
             if (currentSeries && planeImages[plane].length === 0) {

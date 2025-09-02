@@ -72,4 +72,7 @@ urlpatterns = [
 # Note: In production with a proper web server, this should be handled by nginx/apache
 if settings.DEBUG or getattr(settings, 'SERVE_MEDIA_FILES', False):
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    # Use custom static file view for proper MIME type handling
+    urlpatterns += [
+        re_path(r'^static/(?P<path>.*)$', views.StaticFileView.as_view(), name='static_files'),
+    ]

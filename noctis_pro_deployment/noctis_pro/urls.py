@@ -15,13 +15,14 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.http import HttpResponse
 from worklist import views as worklist_views  # RESTORED FOR FULL FUNCTIONALITY
 from django.views.generic.base import RedirectView
+from . import views
 
 def home_redirect(request):
     """Redirect home page to login or dashboard based on authentication"""
@@ -54,7 +55,11 @@ urlpatterns = [
     path('ai/', include('ai_analysis.urls')),  # RESTORED
 ]
 
-# Serve media files during development
-if settings.DEBUG:
+# Serve media files during development and production (for ngrok deployment)
+# Note: In production with a proper web server, this should be handled by nginx/apache
+if settings.DEBUG or getattr(settings, 'SERVE_MEDIA_FILES', False):
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    # Use custom static file view for proper MIME type handling
+    urlpatterns += [
+        re_path(r'^static/(?P<path>.*)$', views.StaticFileView.as_view(), name='static_files'),
+    ]

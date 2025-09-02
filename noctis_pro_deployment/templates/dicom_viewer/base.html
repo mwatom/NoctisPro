@@ -2403,8 +2403,10 @@
             document.querySelector(`[data-plane="${plane}"]`).classList.add('active');
             
             // Update label
-            document.getElementById('activePlaneLabel').textContent = 
-                plane.charAt(0).toUpperCase() + plane.slice(1);
+            const activePlaneLabel = document.getElementById('activePlaneLabel');
+            if (activePlaneLabel) {
+                activePlaneLabel.textContent = plane.charAt(0).toUpperCase() + plane.slice(1);
+            }
             
             // Update crosshairs if orthogonal sync is enabled
             if (orthogonalSync) {

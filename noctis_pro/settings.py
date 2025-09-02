@@ -178,6 +178,12 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # Force static file serving in development/testing
 SERVE_MEDIA_FILES = os.environ.get('SERVE_MEDIA_FILES', 'True').lower() == 'true'
 
+# Configure MIME types for static files
+import mimetypes
+mimetypes.add_type('application/javascript', '.js')
+mimetypes.add_type('text/css', '.css')
+mimetypes.add_type('application/json', '.json')
+
 # DICOM files storage
 DICOM_ROOT = os.path.join(MEDIA_ROOT, 'dicom')
 
