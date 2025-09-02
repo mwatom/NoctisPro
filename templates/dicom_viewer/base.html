@@ -141,14 +141,13 @@
 
         .tool {
             width: 68px;
-            height: 46px;
+            height: 40px;
             background: var(--card-bg);
             border: 1px solid var(--border-color);
-            border-radius: 4px;
+            border-radius: 6px;
             color: var(--text-primary);
             cursor: pointer;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
             font-size: 9px;
@@ -194,8 +193,7 @@
         }
 
         .tool i {
-            font-size: 18px;
-            margin-bottom: 4px;
+            font-size: 20px;
         }
 
         /* Main Viewport */
@@ -231,8 +229,9 @@
             /* Enhanced medical image display */
             cursor: crosshair;
             transition: transform 0.1s ease;
-            filter: contrast(1.15) brightness(1.08) saturate(1.05);
-            -webkit-filter: contrast(1.15) brightness(1.08) saturate(1.05);
+            /* Filters disabled to prevent white image issue */
+            filter: none;
+            -webkit-filter: none;
             /* Hardware acceleration for smooth rendering */
             transform: translateZ(0);
             -webkit-transform: translateZ(0);
@@ -1015,8 +1014,9 @@
             cursor: crosshair;
             user-select: none;
             transition: none;
-            filter: contrast(1.15) brightness(1.08) saturate(1.05);
-            -webkit-filter: contrast(1.15) brightness(1.08) saturate(1.05);
+            /* Filters disabled to prevent white image issue */
+            filter: none;
+            -webkit-filter: none;
             /* Hardware acceleration for smooth rendering */
             transform: translateZ(0);
             -webkit-transform: translateZ(0);
@@ -1226,16 +1226,16 @@
                     <option value="">Select Study from System</option>
                 </select>
                 <button class="btn-dicom-viewer" onclick="loadFromExternalMedia()" title="Load DICOM from USB/DVD">
-                    <i class="fas fa-compact-disc"></i> Load from USB/DVD
+                    <i class="fas fa-compact-disc"></i>
                 </button>
-                <button class="btn-dicom-viewer btn-secondary" onclick="saveMeasurements()">
-                    <i class="fas fa-save"></i> Save
+                <button class="btn-dicom-viewer btn-secondary" onclick="saveMeasurements()" title="Save Measurements">
+                    <i class="fas fa-save"></i>
                 </button>
-                <button class="btn-dicom-viewer btn-secondary" onclick="exportImage()">
-                    <i class="fas fa-download"></i> Export
+                <button class="btn-dicom-viewer btn-secondary" onclick="exportImage()" title="Export Image">
+                    <i class="fas fa-download"></i>
                 </button>
-                <a href="/worklist/" class="btn-dicom-viewer btn-secondary">
-                    <i class="fas fa-arrow-left"></i> Back to Worklist
+                <a href="/worklist/" class="btn-dicom-viewer btn-secondary" title="Back to Worklist">
+                    <i class="fas fa-arrow-left"></i>
                 </a>
             </div>
         </div>
@@ -1246,19 +1246,15 @@
             <div class="tool-group">
                 <button class="tool active" data-tool="window" onclick="setTool('window')" title="Window/Level">
                     <i class="fas fa-adjust"></i>
-                    <span>Window</span>
                 </button>
                 <button class="tool" data-tool="zoom" onclick="setTool('zoom')" title="Zoom">
                     <i class="fas fa-search-plus"></i>
-                    <span>Zoom</span>
                 </button>
                 <button class="tool" data-tool="pan" onclick="setTool('pan')" title="Pan">
                     <i class="fas fa-hand-paper"></i>
-                    <span>Pan</span>
                 </button>
                 <button class="tool" data-tool="reset" onclick="resetView()" title="Reset View">
                     <i class="fas fa-undo"></i>
-                    <span>Reset</span>
                 </button>
             </div>
             
@@ -1268,15 +1264,12 @@
             <div class="tool-group">
                 <button class="tool" data-tool="measure" onclick="setTool('measure')" title="Measure">
                     <i class="fas fa-ruler"></i>
-                    <span>Measure</span>
                 </button>
                 <button class="tool" data-tool="annotate" onclick="setTool('annotate')" title="Annotate">
                     <i class="fas fa-comment"></i>
-                    <span>Annotate</span>
                 </button>
                 <button class="tool" data-tool="crosshair" onclick="toggleCrosshair()" title="Crosshair">
                     <i class="fas fa-crosshairs"></i>
-                    <span>Crosshair</span>
                 </button>
             </div>
             
@@ -1286,11 +1279,9 @@
             <div class="tool-group">
                 <button class="tool" data-tool="invert" onclick="toggleInvert()" title="Invert">
                     <i class="fas fa-adjust"></i>
-                    <span>Invert</span>
                 </button>
                 <button class="tool" data-tool="mpr" onclick="toggleMPR()" title="MPR Views">
                     <i class="fas fa-cube"></i>
-                    <span>MPR</span>
                 </button>
             </div>
             
@@ -1300,11 +1291,9 @@
             <div class="tool-group">
                 <button class="tool" data-tool="ai" onclick="toggleAIPanel()" title="AI Analysis">
                     <i class="fas fa-brain"></i>
-                    <span>AI</span>
                 </button>
                 <button class="tool" data-tool="print" onclick="showPrintDialog()" title="Print/Export">
                     <i class="fas fa-print"></i>
-                    <span>Print</span>
                 </button>
             </div>
         </div>
@@ -1495,11 +1484,11 @@
                     <div class="popup-content">
                         <div class="panel">
                             <div style="display: flex; gap: 6px; margin-bottom: 12px;">
-                                <button class="btn-dicom-viewer btn-secondary" onclick="clearMeasurements()" style="flex: 1; font-size: 10px;">
-                                    <i class="fas fa-trash"></i> Clear
+                                <button class="btn-dicom-viewer btn-secondary" onclick="clearMeasurements()" style="flex: 1; font-size: 10px;" title="Clear Measurements">
+                                    <i class="fas fa-trash"></i>
                                 </button>
-                                <button class="btn-dicom-viewer btn-primary" onclick="exportMeasurements()" style="flex: 1; font-size: 10px;">
-                                    <i class="fas fa-download"></i> Export
+                                <button class="btn-dicom-viewer btn-primary" onclick="exportMeasurements()" style="flex: 1; font-size: 10px;" title="Export Measurements">
+                                    <i class="fas fa-download"></i>
                                 </button>
                             </div>
                             <div class="measurements-list" id="measurementsList">
@@ -1522,11 +1511,11 @@
                         <div class="panel">
                             <div id="reconstructionButtons">
                                 <!-- Basic reconstruction -->
-                                <button class="btn-dicom-viewer btn-secondary" onclick="generateMPR()" style="width: 100%; margin-bottom: 6px;">
-                                    <i class="fas fa-cube"></i> MPR Views
+                                <button class="btn-dicom-viewer btn-secondary" onclick="generateMPR()" style="width: 100%; margin-bottom: 6px;" title="Generate MPR Views">
+                                    <i class="fas fa-cube"></i>
                                 </button>
-                                <button class="btn-dicom-viewer btn-secondary" onclick="generateMIP()" style="width: 100%; margin-bottom: 6px;">
-                                    <i class="fas fa-layer-group"></i> MIP Views
+                                <button class="btn-dicom-viewer btn-secondary" onclick="generateMIP()" style="width: 100%; margin-bottom: 6px;" title="Generate MIP Views">
+                                    <i class="fas fa-layer-group"></i>
                                 </button>
                                 
                                 <!-- Modality-specific reconstruction (populated dynamically) -->
@@ -1808,6 +1797,11 @@
         // Professional initialization
         document.addEventListener('DOMContentLoaded', function() {
             initializeViewer();
+            
+            // Show help tooltip for window/level control
+            setTimeout(() => {
+                showToast('💡 Tip: Right-click or Shift+click and drag on image to adjust brightness/contrast', 'info', 6000);
+            }, 2000);
             loadAvailableStudies();
             
             // Check for study ID in URL
@@ -1865,6 +1859,16 @@
                 lastMousePos = { x: e.clientX, y: e.clientY };
                 dragStart = { x: e.clientX, y: e.clientY };
                 
+                // Right-click OR Shift+Left-click for window/level adjustment
+                if (e.button === 2 || (e.button === 0 && e.shiftKey)) {
+                    e.preventDefault();
+                    activeTool = 'window-level-drag';
+                    imageContainer.style.cursor = 'crosshair';
+                    imageContainer.style.outline = '2px solid var(--accent-color)';
+                    showWindowLevelIndicator(true);
+                    return;
+                }
+                
                 if (activeTool === 'measure') {
                     startMeasurement(e);
                 } else if (activeTool === 'annotate') {
@@ -1878,7 +1882,7 @@
                     const deltaX = e.clientX - lastMousePos.x;
                     const deltaY = e.clientY - lastMousePos.y;
                     
-                    if (activeTool === 'window') {
+                    if (activeTool === 'window' || activeTool === 'window-level-drag') {
                         handleWindowing(deltaX, deltaY);
                     } else if (activeTool === 'zoom') {
                         handleZooming(deltaY);
@@ -1899,9 +1903,24 @@
                 if (mouseDown && activeTool === 'measure' && currentMeasurement) {
                     finishMeasurement(e);
                 }
+                
+                // Reset window/level drag mode
+                if (activeTool === 'window-level-drag') {
+                    activeTool = 'window'; // Return to normal window tool
+                    imageContainer.style.cursor = 'crosshair';
+                    imageContainer.style.outline = 'none';
+                    showWindowLevelIndicator(false);
+                }
+                
                 mouseDown = false;
                 isDragging = false;
                 currentMeasurement = null;
+            });
+            
+            // Disable context menu on right-click
+            imageContainer.addEventListener('contextmenu', function(e) {
+                e.preventDefault();
+                return false;
             });
             
             // Wheel event for slice navigation and zoom
@@ -2100,7 +2119,7 @@
         }
 
         function handleWindowing(deltaX, deltaY) {
-            const sensitivity = 2;
+            const sensitivity = 3; // Increased sensitivity for better control
             windowWidth = Math.max(1, windowWidth + deltaX * sensitivity);
             windowLevel = Math.max(-1000, Math.min(1000, windowLevel + deltaY * sensitivity));
             
@@ -2108,6 +2127,9 @@
             document.getElementById('wlSlider').value = windowLevel;
             document.getElementById('wwValue').textContent = Math.round(windowWidth);
             document.getElementById('wlValue').textContent = Math.round(windowLevel);
+            
+            // Show live feedback during dragging
+            updateWindowLevelIndicator(Math.round(windowWidth), Math.round(windowLevel));
             
             updateImageDisplay();
         }
@@ -3692,6 +3714,55 @@
             }
             
             return token || '';
+        }
+
+        // Window/Level Visual Indicator Functions
+        function showWindowLevelIndicator(show) {
+            let indicator = document.getElementById('windowLevelIndicator');
+            if (!indicator && show) {
+                indicator = document.createElement('div');
+                indicator.id = 'windowLevelIndicator';
+                indicator.style.cssText = `
+                    position: absolute;
+                    top: 20px;
+                    left: 20px;
+                    background: rgba(0, 0, 0, 0.8);
+                    color: var(--accent-color);
+                    padding: 8px 12px;
+                    border-radius: 6px;
+                    font-size: 12px;
+                    font-weight: bold;
+                    border: 1px solid var(--accent-color);
+                    z-index: 1000;
+                    pointer-events: none;
+                    display: none;
+                `;
+                document.querySelector('.viewport').appendChild(indicator);
+            }
+            
+            if (indicator) {
+                indicator.style.display = show ? 'block' : 'none';
+                if (show) {
+                    indicator.innerHTML = `
+                        <div style="margin-bottom: 4px;">
+                            <i class="fas fa-mouse-pointer"></i> Right-click or Shift+click & drag
+                        </div>
+                        <div>WW: ${Math.round(windowWidth)} | WL: ${Math.round(windowLevel)}</div>
+                    `;
+                }
+            }
+        }
+
+        function updateWindowLevelIndicator(ww, wl) {
+            const indicator = document.getElementById('windowLevelIndicator');
+            if (indicator && indicator.style.display !== 'none') {
+                indicator.innerHTML = `
+                                            <div style="margin-bottom: 4px;">
+                            <i class="fas fa-mouse-pointer"></i> Right-click or Shift+click & drag
+                        </div>
+                    <div>WW: ${ww} | WL: ${wl}</div>
+                `;
+            }
         }
 
         // Handle study selection from dropdown

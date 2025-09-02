@@ -7,6 +7,7 @@
         :root {
             --primary-bg: #0a0a0a;
             --secondary-bg: #1a1a1a;
+            --card-bg: #252525;
             --card-surface: #252525;
             --header-bg: #333333;
             --border-color: #404040;
@@ -17,30 +18,179 @@
             --success-color: #00ff88;
             --warning-color: #ffaa00;
             --danger-color: #ff4444;
+            --urgent-color: #ff0066;
+            --scheduled-color: #4a90e2;
+            --in-progress-color: #f5a623;
+            --completed-color: #7ed321;
+            --cancelled-color: #d0021b;
         }
 
-    .upload-container {
-        background: var(--dark-bg);
-        min-height: 100vh;
-        padding: 2rem;
-    }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    .upload-card {
-        background: var(--card-bg);
-        border: 1px solid var(--border-color);
-        border-radius: 16px;
-        padding: 2rem;
-        max-width: 900px;
-        margin: 0 auto;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-    }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--primary-bg);
+            color: var(--text-primary);
+            font-size: 12px;
+        }
+
+        .upload-container {
+            background: var(--primary-bg);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Navigation - matching admin panel */
+        .top-navbar {
+            background: var(--header-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 50px;
+        }
+
+        .nav-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo {
+            color: var(--accent-color);
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 2px;
+        }
+
+        .nav-tab {
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 6px 12px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+
+        .nav-tab.active {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+            font-weight: bold;
+        }
+
+        .nav-tab:hover:not(.active) {
+            background: var(--card-bg);
+            color: var(--text-primary);
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            font-size: 11px;
+        }
+
+        .user-avatar {
+            width: 24px;
+            height: 24px;
+            background: var(--accent-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            color: var(--primary-bg);
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .upload-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 24px;
+            max-width: 900px;
+            width: 100%;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
 
     .upload-header { text-align: center; margin-bottom: 2rem; }
     .upload-icon { background: var(--gradient-accent); border-radius: 50%; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: white; margin: 0 auto 1rem; }
 
-    .drop-zone { border: 2px dashed var(--border-color); border-radius: 12px; padding: 3rem 2rem; text-align: center; cursor: pointer; transition: all 0.3s ease; background: rgba(255, 255, 255, 0.02); }
-    .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent-color); background: rgba(14, 165, 233, 0.05); }
-    .drop-zone.uploading { cursor: not-allowed; opacity: 0.7; }
+    .drop-zone { 
+        border: 2px dashed var(--border-color); 
+        border-radius: 12px; 
+        padding: 3rem 2rem; 
+        text-align: center; 
+        cursor: pointer; 
+        transition: all 0.3s ease; 
+        background: linear-gradient(135deg, rgba(0, 212, 255, 0.05) 0%, rgba(0, 212, 255, 0.02) 100%);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .drop-zone::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, var(--accent-color) 0%, transparent 70%);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+    }
+    
+    .drop-zone:hover::before, .drop-zone.dragover::before { 
+        opacity: 0.1;
+    }
+    
+    .drop-zone:hover, .drop-zone.dragover { 
+        border-color: var(--accent-color); 
+        background: linear-gradient(135deg, rgba(0, 212, 255, 0.1) 0%, rgba(0, 212, 255, 0.05) 100%);
+        transform: scale(1.01);
+        box-shadow: 0 10px 30px rgba(0, 212, 255, 0.2);
+    }
+    
+    .drop-zone.uploading { 
+        cursor: not-allowed; 
+        opacity: 0.7; 
+        animation: pulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(0, 212, 255, 0.4); }
+        70% { box-shadow: 0 0 0 20px rgba(0, 212, 255, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(0, 212, 255, 0); }
+    }
 
     .file-input { display: none; }
 
@@ -74,13 +224,73 @@
     .progress-section { margin-top: 2rem; display: none; }
 
     .file-list { margin-top: 2rem; }
-    .file-item { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; }
+    
+    .file-item { 
+        background: rgba(255, 255, 255, 0.05); 
+        border: 1px solid var(--border-color); 
+        border-radius: 8px; 
+        padding: 1rem; 
+        margin-bottom: 1rem; 
+        display: flex; 
+        align-items: center; 
+        justify-content: space-between;
+        animation: slideIn 0.3s ease-out;
+        transition: all 0.3s ease;
+    }
+    
+    .file-item:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: var(--accent-color);
+        transform: translateX(5px);
+    }
+    
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
     .file-info { display: flex; align-items: center; gap: 1rem; }
-    .file-icon { color: var(--accent-color); font-size: 1.5rem; }
-    .file-details h6 { margin: 0; color: var(--text-primary); }
+    
+    .file-icon { 
+        color: var(--accent-color); 
+        font-size: 1.5rem;
+        animation: fadeIn 0.5s ease-out;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: scale(0.8); }
+        to { opacity: 1; transform: scale(1); }
+    }
+    
+    .file-details h6 { margin: 0; color: var(--text-primary); font-weight: 600; }
     .file-size { color: var(--text-secondary); font-size: 0.9rem; }
-    .remove-file { background: var(--danger-color); border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: white; cursor: pointer; transition: all 0.3s ease; }
-    .remove-file:hover { background: #dc2626; transform: scale(1.1); }
+    
+    .remove-file { 
+        background: var(--danger-color); 
+        border: none; 
+        border-radius: 50%; 
+        width: 32px; 
+        height: 32px; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        color: white; 
+        cursor: pointer; 
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(255, 68, 68, 0.3);
+    }
+    
+    .remove-file:hover { 
+        background: #dc2626; 
+        transform: scale(1.1) rotate(90deg);
+        box-shadow: 0 4px 12px rgba(255, 68, 68, 0.5);
+    }
 
     .upload-stats {
         background: rgba(0, 212, 255, 0.1);
@@ -176,14 +386,41 @@
 
 {% block content %}
 <div class="upload-container">
-    <div class="upload-card">
-        <div class="upload-header">
-            <div class="upload-icon">
-                <i class="fas fa-cloud-upload-alt"></i>
+    <!-- Top Navigation - matching admin panel -->
+    <nav class="top-navbar">
+        <div class="nav-left">
+            <div class="logo">
+                <i class="fas fa-upload"></i> Noctis Pro PACS - Upload
             </div>
-            <h2 class="text-light">Upload DICOM Studies</h2>
-            <p class="text-secondary">Upload individual DICOM files or entire folders containing CT/MRI studies with multiple series</p>
+            <div class="nav-tabs">
+                <a href="{% url 'worklist:dashboard' %}" class="nav-tab">DASHBOARD</a>
+                <div class="nav-tab active">UPLOAD</div>
+                {% if user.role == 'admin' %}
+                <a href="{% url 'admin_panel:dashboard' %}" class="nav-tab">ADMIN</a>
+                {% endif %}
+            </div>
         </div>
+        <div class="nav-right">
+            <div class="user-info">
+                <div class="user-avatar">{{ user.get_full_name|default:user.username|slice:":2"|upper }}</div>
+                <div>
+                    <div style="font-weight: bold;">{{ user.get_full_name|default:user.username }}</div>
+                    <div>{{ user.get_role_display }}{% if user.facility %} - {{ user.facility.name }}{% endif %}</div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="upload-card">
+            <div class="upload-header">
+                <div class="upload-icon">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                </div>
+                <h2 class="text-light">Upload DICOM Studies</h2>
+                <p class="text-secondary">Upload individual DICOM files or entire folders containing CT/MRI studies with multiple series</p>
+            </div>
 
         <form id="uploadForm" enctype="multipart/form-data">
             {% csrf_token %}
@@ -286,7 +523,7 @@
                 <h4 class="text-light mb-2">Upload Successful!</h4>
                 <p class="text-secondary mb-3">Your DICOM studies have been uploaded successfully.</p>
                 <div id="uploadSummary" class="text-light mb-3"></div>
-                <button class="btn-control" onclick="redirectToDashboard()" type="button"   class="btn-control primary">
+                <button type="button" class="btn-control primary" onclick="redirectToDashboard()">
                     <i class="fas fa-arrow-left me-2"></i>Return to Worklist
                 </button>
             </div>
@@ -295,7 +532,7 @@
                 <a href="{% url 'worklist:dashboard' %}" class="btn-control">
                     <i class="fas fa-arrow-left me-2"></i>Cancel
                 </a>
-                <button type="submit" class="btn-control" id="uploadBtn" disabled class="btn-control primary">
+                <button type="submit" class="btn-control primary" id="uploadBtn" disabled>
                     <i class="fas fa-upload me-2"></i>Upload Studies
                 </button>
             </div>
@@ -307,6 +544,7 @@
                 </a>
             </div>
         </form>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -568,8 +806,8 @@ document.addEventListener('DOMContentLoaded', function() {
     async function uploadFilesInChunks() {
         const url = '{% url "worklist:upload_study" %}';
         const token = document.querySelector('[name=csrfmiddlewaretoken]').value;
-        const CHUNK_SIZE = 100; // Reduced chunk size for better memory management
-        const MAX_PARALLEL = 2; // Reduced parallel requests for large uploads
+        const CHUNK_SIZE = 50; // Optimized chunk size for better performance
+        const MAX_PARALLEL = 3; // Increased parallel requests for better throughput
 
         const totalFiles = selectedFiles.length;
         let uploadedCount = 0;
@@ -605,7 +843,19 @@ document.addEventListener('DOMContentLoaded', function() {
             if (assignToMe) { formData.append('assign_to_me', assignToMe.checked ? '1' : '0'); }
             try {
                 const res = await fetch(url, { method: 'POST', body: formData, headers: { 'X-CSRFToken': token } });
-                const data = await res.json();
+                
+                if (!res.ok) {
+                    errors.push(`Upload failed with status ${res.status}: ${res.statusText}`);
+                    return;
+                }
+                
+                let data;
+                try {
+                    data = await res.json();
+                } catch (jsonErr) {
+                    errors.push(`JSON parsing error: ${jsonErr.message}. Server returned status ${res.status}`);
+                    return;
+                }
                 
                 if (data.success) {
                     const processed = typeof data.processed_files === 'number' ? data.processed_files : chunk.length;
@@ -623,7 +873,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     errors.push(data.error || 'Unknown error');
                 }
             } catch (err) {
-                errors.push(String(err));
+                errors.push(`Network error: ${String(err)}`);
             }
         }
 
@@ -660,9 +910,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="stat-label">Series Processed</div>
                     </div>
                 </div>
+                <div class="background-processing-info" style="margin-top: 15px; padding: 10px; background: var(--card-bg); border-radius: 6px; border-left: 3px solid var(--accent-color);">
+                    <i class="fas fa-info-circle"></i> <strong>Background Processing:</strong> 
+                    DICOM images are being processed in the background. You can continue using the system while processing completes.
+                </div>
             `;
             
-            showNotification(`Successfully uploaded ${uploadedCount} files creating ${studiesCreated} studies with ${totalSeries} series!`, 'success');
+            showNotification(`Successfully uploaded ${uploadedCount} files creating ${studiesCreated} studies with ${totalSeries} series! Images are being processed in the background.`, 'success');
         } else if (uploadedCount > 0) {
             showNotification(`Upload completed with some errors. Processed ${uploadedCount} of ${totalFiles} files, created ${studiesCreated} studies.`, 'warning');
             resetUploadState();

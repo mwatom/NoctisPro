@@ -18,7 +18,7 @@
                         <i class="fas fa-hospital me-2"></i>Manage Facilities
                     </a>
                     {% endif %}
-                    <button class="btn btn-medical" onclick="refreshStatus()">
+                    <button type="button" class="btn btn-medical" onclick="refreshStatus()">
                         <i class="fas fa-sync me-2"></i>Refresh Status
                     </button>
                 </div>
@@ -134,7 +134,7 @@
                             </div>
                         </div>
                         
-                        <button class="btn btn-medical" onclick="testFacilityConnection({{ user_facility.id }})">
+                        <button type="button" class="btn btn-medical" onclick="testFacilityConnection({{ user_facility.id }})">
                             <i class="fas fa-plug me-2"></i>Test Connection
                         </button>
                     </div>
@@ -189,10 +189,10 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-info" onclick="showDicomConfig({{ stat.facility.id }})">
+                                    <button type="button" class="btn btn-sm btn-outline-info" onclick="showDicomConfig({{ stat.facility.id }})" aria-label="Settings">
                                         <i class="fas fa-cog"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-outline-success" onclick="testFacilityConnection({{ stat.facility.id }})">
+                                    <button type="button" class="btn btn-sm btn-outline-success" onclick="testFacilityConnection({{ stat.facility.id }})" aria-label="Plug">
                                         <i class="fas fa-plug"></i>
                                     </button>
                                 </td>
@@ -313,16 +313,16 @@
 </div>
 
 <!-- DICOM Configuration Modal -->
-<div class="modal fade" id="dicomConfigModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content bg-dark border-secondary">
-            <div class="modal-header border-secondary">
+<div  role="dialog" aria-modal="true" id="dicomConfigModal" tabindex="-1">
+    <div  role="dialog" aria-modal="true">
+        <div  role="dialog" aria-modal="true">
+            <div  role="dialog" aria-modal="true">
                 <h5 class="modal-title text-white">
                     <i class="fas fa-cog me-2"></i>DICOM Configuration
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div  role="dialog" aria-modal="true">
                 <div id="dicom-config-content">
                     <!-- Content loaded via JavaScript -->
                 </div>
@@ -332,16 +332,16 @@
 </div>
 
 <!-- Connection Test Modal -->
-<div class="modal fade" id="connectionTestModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content bg-dark border-secondary">
-            <div class="modal-header border-secondary">
+<div  role="dialog" aria-modal="true" id="connectionTestModal" tabindex="-1">
+    <div  role="dialog" aria-modal="true">
+        <div  role="dialog" aria-modal="true">
+            <div  role="dialog" aria-modal="true">
                 <h5 class="modal-title text-white">
                     <i class="fas fa-plug me-2"></i>Connection Test
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div  role="dialog" aria-modal="true">
                 <div id="connection-test-content">
                     <div class="text-center">
                         <div class="spinner-border text-info" role="status">
