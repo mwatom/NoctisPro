@@ -2923,6 +2923,51 @@ def create_dicom_image_from_dicom_metadata(metadata, series, uploaded_files):
     
     return dicom_image
 
+def create_placeholder_mpr_views():
+    """Create placeholder MPR views when DICOM loading fails"""
+    try:
+        # Create three different placeholder images for MPR views
+        views = {}
+        
+        for plane in ['axial', 'sagittal', 'coronal']:
+            img = Image.new('L', (512, 512), color=64)
+            draw = ImageDraw.Draw(img)
+            
+            # Draw plane-specific pattern
+            if plane == 'axial':
+                # Axial view - circular pattern
+                draw.ellipse([100, 100, 412, 412], outline=200, width=3)
+                draw.ellipse([200, 200, 312, 312], outline=150, width=2)
+            elif plane == 'sagittal':
+                # Sagittal view - vertical pattern
+                for i in range(5):
+                    x = 100 + i * 80
+                    draw.line([(x, 50), (x, 462)], fill=180, width=2)
+            else:  # coronal
+                # Coronal view - horizontal pattern
+                for i in range(5):
+                    y = 100 + i * 80
+                    draw.line([(50, y), (462, y)], fill=180, width=2)
+            
+            # Add plane label
+            draw.text((256, 50), plane.upper(), fill=255, anchor="mm")
+            
+            # Convert to base64
+            buffer = BytesIO()
+            img.save(buffer, format='PNG')
+            img_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            views[plane] = f'data:image/png;base64,{img_data}'
+        
+        return views
+        
+    except Exception as e:
+        logger.error(f"Error creating placeholder MPR views: {e}")
+        return {
+            'axial': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAGA',
+            'sagittal': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAGA',
+            'coronal': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAGA'
+        }
+
 @csrf_exempt
 def api_upload_progress(request, upload_id):
     """API endpoint for upload progress tracking"""
