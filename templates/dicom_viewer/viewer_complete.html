@@ -219,9 +219,17 @@
             image-rendering: crisp-edges;
             image-rendering: high-quality;
             cursor: crosshair;
-            transition: transform 0.1s ease;
-            filter: contrast(1.15) brightness(1.08) sharpen(0.3);
-            -webkit-filter: contrast(1.15) brightness(1.08);
+            transition: all 0.2s ease;
+            /* Professional medical image rendering */
+            filter: contrast(1.15) brightness(1.05) saturate(1.02) sharpen(0.2);
+            -webkit-filter: contrast(1.15) brightness(1.05) saturate(1.02);
+            /* Smooth loading transition */
+            opacity: 1;
+        }
+        
+        .dicom-canvas.loading {
+            opacity: 0.7;
+            filter: contrast(0.9) brightness(0.9) blur(0.5px);
         }
 
         .image-container {
@@ -237,15 +245,18 @@
         .dicom-image {
             max-width: 100%;
             max-height: 100%;
+            /* Professional medical image rendering optimized for X-rays */
             image-rendering: -webkit-optimize-contrast;
             image-rendering: -moz-crisp-edges;
             image-rendering: crisp-edges;
             image-rendering: high-quality;
+            image-rendering: pixelated;
+            /* Enhanced medical image filters - applied dynamically in JavaScript */
+            transition: all 0.3s ease;
+            /* Prevent image blurriness on scaling */
+            -ms-interpolation-mode: nearest-neighbor;
             cursor: crosshair;
             user-select: none;
-            transition: none;
-            /* Remove filters that could cause white images */
-            filter: none !important;
             -webkit-filter: none !important;
             /* Ensure proper display */
             object-fit: contain;
@@ -1623,7 +1634,7 @@
         }
 
         // Image Display Management
-        async function updateImageDisplay() {
+        async function updateImageDisplay(useProgressiveLoading = true) {
             if (!images.length || currentImageIndex < 0 || currentImageIndex >= images.length) {
                 return;
             }
@@ -1632,54 +1643,121 @@
             if (!currentImage) return;
             
             try {
-                // Show loading
-                showLoading('Processing image...');
+                const dicomImage = document.getElementById('dicomImage');
                 
-                // Get processed image with current window/level settings
-                const url = `/dicom-viewer/api/image/${currentImage.id}/display/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`;
+                // Hide welcome screen and show image view
+                const welcomeScreen = document.getElementById('welcomeScreen');
+                const singleView = document.getElementById('singleView');
+                if (welcomeScreen) welcomeScreen.style.display = 'none';
+                if (singleView) singleView.style.display = 'flex';
                 
-                const response = await fetch(url);
-                const data = await response.json();
-                
-                if (data.image_data) {
-                    const dicomImage = document.getElementById('dicomImage');
+                // PROGRESSIVE LOADING: Load fast preview first, then high quality
+                if (useProgressiveLoading) {
+                    // Step 1: Load fast preview for immediate feedback
+                    showLoading('Loading preview...');
                     
-                    // Hide welcome screen and show image view
-                    const welcomeScreen = document.getElementById('welcomeScreen');
-                    const singleView = document.getElementById('singleView');
-                    if (welcomeScreen) welcomeScreen.style.display = 'none';
-                    if (singleView) singleView.style.display = 'flex';
+                    const fastUrl = `/dicom-viewer/api/image/${currentImage.id}/display/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}&quality=fast`;
                     
-                    dicomImage.src = data.image_data;
-                    dicomImage.onload = function() {
-                        hideLoading();
-                        updateImageInfo(data.image_info);
-                        updateMeasurementOverlay();
-                        updateAnnotationOverlay();
+                    try {
+                        const fastResponse = await fetch(fastUrl);
+                        const fastData = await fastResponse.json();
                         
-                        // Apply high-quality rendering
-                        dicomImage.style.imageRendering = 'pixelated';
-                        dicomImage.style.imageRendering = 'crisp-edges';
-                        dicomImage.style.maxWidth = '100%';
-                        dicomImage.style.maxHeight = '100%';
-                    };
-                    dicomImage.onerror = function() {
-                        hideLoading();
-                        showToast('Failed to load image', 'error');
-                    };
-                } else {
-                    hideLoading();
-                    if (data.warnings?.pixel_decode_error) {
-                        showToast('Image format not supported: ' + data.warnings.pixel_decode_error, 'warning');
+                        if (fastData.image_data) {
+                            dicomImage.src = fastData.image_data;
+                            dicomImage.style.filter = 'brightness(0.95) contrast(0.95)'; // Slightly dim to indicate preview
+                            updateImageInfo(fastData.image_info);
+                            showLoading('Enhancing image quality...');
+                        }
+                    } catch (error) {
+                        console.warn('Fast preview failed, loading full quality:', error);
+                    }
+                    
+                    // Step 2: Load high quality version
+                    const highQualityUrl = `/dicom-viewer/api/image/${currentImage.id}/display/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}&quality=high`;
+                    
+                    const response = await fetch(highQualityUrl);
+                    const data = await response.json();
+                    
+                    if (data.image_data) {
+                        // Smooth transition to high quality
+                        const tempImg = new Image();
+                        tempImg.onload = function() {
+                            dicomImage.src = data.image_data;
+                            dicomImage.style.filter = ''; // Remove preview filter
+                            
+                            // Apply professional medical image rendering
+                            dicomImage.style.imageRendering = '-webkit-optimize-contrast';
+                            dicomImage.style.imageRendering = 'crisp-edges';
+                            dicomImage.style.imageRendering = 'pixelated';
+                            dicomImage.style.maxWidth = '100%';
+                            dicomImage.style.maxHeight = '100%';
+                            
+                            // Apply medical-grade image enhancements for X-ray visibility
+                            dicomImage.style.filter = 'contrast(1.15) brightness(1.05) saturate(1.02)';
+                            
+                            hideLoading();
+                            updateImageInfo(data.image_info);
+                            updateMeasurementOverlay();
+                            updateAnnotationOverlay();
+                            showToast('✓ Professional image quality loaded', 'success');
+                        };
+                        tempImg.onerror = function() {
+                            hideLoading();
+                            showToast('Failed to load high-quality image', 'error');
+                        };
+                        tempImg.src = data.image_data;
                     } else {
-                        showToast('Failed to load image data', 'error');
+                        hideLoading();
+                        if (data.warnings?.pixel_decode_error) {
+                            showToast('Image format not supported: ' + data.warnings.pixel_decode_error, 'warning');
+                        } else {
+                            showToast(data.error || 'Failed to load image data', 'error');
+                        }
+                    }
+                    
+                } else {
+                    // Standard loading without progressive enhancement
+                    showLoading('Processing image...');
+                    
+                    const url = `/dicom-viewer/api/image/${currentImage.id}/display/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}&quality=high`;
+                    
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    
+                    if (data.image_data) {
+                        dicomImage.src = data.image_data;
+                        dicomImage.onload = function() {
+                            hideLoading();
+                            updateImageInfo(data.image_info);
+                            updateMeasurementOverlay();
+                            updateAnnotationOverlay();
+                            
+                            // Apply professional medical image rendering
+                            dicomImage.style.imageRendering = '-webkit-optimize-contrast';
+                            dicomImage.style.imageRendering = 'crisp-edges';
+                            dicomImage.style.imageRendering = 'pixelated';
+                            dicomImage.style.maxWidth = '100%';
+                            dicomImage.style.maxHeight = '100%';
+                            dicomImage.style.filter = 'contrast(1.15) brightness(1.05)';
+                        };
+                        dicomImage.onerror = function() {
+                            hideLoading();
+                            showToast('Failed to load image', 'error');
+                        };
+                    } else {
+                        hideLoading();
+                        if (data.warnings?.pixel_decode_error) {
+                            showToast('Image format not supported: ' + data.warnings.pixel_decode_error, 'warning');
+                        } else {
+                            showToast(data.error || 'Failed to load image data', 'error');
+                        }
                     }
                 }
                 
             } catch (error) {
                 hideLoading();
                 console.error('Error updating image display:', error);
-                showToast('Error loading image', 'error');
+                showToast('Error loading image - Check connection', 'error');
             }
         }
 

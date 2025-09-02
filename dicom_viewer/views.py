@@ -111,90 +111,151 @@ def _load_dicom_optimized(file_path):
         return None
 
 def _apply_windowing_fast(image, window_width, window_level, invert=False):
-    """Professional windowing algorithm with enhanced quality for medical imaging"""
+    """Professional windowing algorithm optimized for medical imaging with immediate visibility"""
     try:
         # Convert to float for high-precision calculations
         image_data = image.astype(np.float64)
         
         # Handle edge cases that can cause white images
         if np.all(image_data == 0):
-            logger.warning("All pixels are zero - creating test pattern")
-            # Create a test pattern instead of blank image
+            logger.warning("All pixels are zero - creating visible test pattern")
             height, width = image_data.shape
-            test_pattern = np.zeros_like(image_data)
-            for i in range(0, height, 50):
-                test_pattern[i:i+2, :] = 128
-            for j in range(0, width, 50):
-                test_pattern[:, j:j+2] = 128
-            image_data = test_pattern
+            # Create a medical-style test pattern
+            test_pattern = np.full_like(image_data, 64)  # Dark gray background
+            # Add grid pattern
+            for i in range(0, height, 32):
+                test_pattern[i:i+2, :] = 192
+            for j in range(0, width, 32):
+                test_pattern[:, j:j+2] = 192
+            # Add center crosshair
+            test_pattern[height//2-1:height//2+1, :] = 255
+            test_pattern[:, width//2-1:width//2+1] = 255
+            return test_pattern.astype(np.uint8)
         
-        # Auto-adjust window/level if they seem inappropriate
+        # Get data statistics for intelligent windowing
         data_min, data_max = image_data.min(), image_data.max()
         data_range = data_max - data_min
+        data_mean = image_data.mean()
+        data_std = image_data.std()
+        
+        logger.info(f"Image statistics: min={data_min:.1f}, max={data_max:.1f}, mean={data_mean:.1f}, std={data_std:.1f}")
         
         if data_range == 0:
-            # All pixels have same value - create gradient
-            image_data = np.full_like(image_data, 128)
-        else:
-            # Check if window settings are reasonable
-            min_val = window_level - window_width / 2
-            max_val = window_level + window_width / 2
+            # All pixels have same value - create visible gradient
+            logger.warning("Zero data range - creating gradient pattern")
+            height, width = image_data.shape
+            gradient = np.zeros_like(image_data)
+            for i in range(height):
+                gradient[i, :] = (i / height) * 255
+            return gradient.astype(np.uint8)
+        
+        # Calculate window bounds
+        min_val = window_level - window_width / 2
+        max_val = window_level + window_width / 2
+        
+        # CRITICAL FIX: Auto-adjust window/level if they produce all-white or invisible images
+        if max_val < data_min or min_val > data_max or (max_val - min_val) <= 0:
+            logger.warning(f"Window/Level outside data range or invalid. Data: {data_min:.1f}-{data_max:.1f}, Window: {min_val:.1f}-{max_val:.1f}")
             
-            # If window is completely outside data range, auto-adjust
-            if max_val < data_min or min_val > data_max:
-                logger.warning(f"Window/Level outside data range. Data: {data_min}-{data_max}, Window: {min_val}-{max_val}")
-                # Use data-driven windowing
-                window_level = (data_min + data_max) / 2
-                window_width = data_range * 1.2  # Slightly wider than data range
+            # Use percentile-based windowing for optimal visibility
+            p1, p99 = np.percentile(image_data, [1, 99])
+            if p99 > p1:
+                window_level = (p1 + p99) / 2
+                window_width = (p99 - p1) * 1.2  # 20% wider than data range
                 min_val = window_level - window_width / 2
                 max_val = window_level + window_width / 2
-            
-            # Apply windowing with enhanced precision
-            image_data = np.clip(image_data, min_val, max_val)
-            
-            if max_val > min_val:
-                # Use high-precision normalization
-                normalized = (image_data - min_val) / (max_val - min_val)
-                
-                # Apply gamma correction for better contrast in medical images
-                gamma = 0.9  # Slightly enhance contrast for medical viewing
-                normalized = np.power(normalized, gamma)
-                
-                # Scale to full dynamic range
-                image_data = normalized * 255.0
+                logger.info(f"Auto-adjusted windowing: WW={window_width:.1f}, WL={window_level:.1f}")
             else:
-                image_data = np.full_like(image_data, 128)  # Mid-gray instead of black
+                # Fallback to full range
+                min_val = data_min
+                max_val = data_max
+                window_width = data_range
+                window_level = data_mean
         
+        # Apply windowing with professional quality
+        windowed = np.clip(image_data, min_val, max_val)
+        
+        if max_val > min_val:
+            # High-precision normalization to 0-255 range
+            normalized = (windowed - min_val) / (max_val - min_val)
+            
+            # Apply professional gamma correction for medical imaging
+            # Different gamma for different data characteristics
+            if data_std > data_mean * 0.5:  # High variation - use standard gamma
+                gamma = 0.8  # Enhance contrast for high-variation images
+            else:  # Low variation - use gentler gamma
+                gamma = 0.9  # Preserve subtle details
+            
+            normalized = np.power(normalized, gamma)
+            
+            # Scale to 8-bit range with dithering to prevent banding
+            scaled = normalized * 255.0
+            
+            # Add subtle dithering for smooth gradients
+            noise = np.random.normal(0, 0.3, scaled.shape)
+            scaled = scaled + noise
+            
+        else:
+            # Fallback for edge case
+            scaled = np.full_like(windowed, 128)
+        
+        # Apply inversion if requested
         if invert:
-            image_data = 255.0 - image_data
+            scaled = 255.0 - scaled
         
-        # Apply noise reduction while preserving edges
+        # Apply medical-grade noise reduction while preserving edges
         try:
             from scipy import ndimage
-            # Light Gaussian smoothing to reduce noise without losing detail
-            image_data = ndimage.gaussian_filter(image_data, sigma=0.3)
+            # Multi-scale edge-preserving smoothing
+            sigma_small = 0.3  # Fine detail preservation
+            sigma_large = 1.0   # Noise reduction
+            
+            smooth_fine = ndimage.gaussian_filter(scaled, sigma=sigma_small)
+            smooth_coarse = ndimage.gaussian_filter(scaled, sigma=sigma_large)
+            
+            # Edge detection for adaptive smoothing
+            edge_strength = np.abs(smooth_fine - smooth_coarse)
+            edge_mask = edge_strength / (edge_strength.max() + 1e-8)
+            
+            # Apply adaptive smoothing: preserve edges, smooth flat areas
+            scaled = scaled * edge_mask + smooth_fine * (1 - edge_mask)
+            
         except ImportError:
-            # Fallback if scipy not available
+            # Fallback: basic smoothing
+            logger.warning("SciPy not available - using basic processing")
             pass
         
-        result = np.clip(image_data, 0, 255).astype(np.uint8)
+        # Final conversion to 8-bit with range validation
+        result = np.clip(scaled, 0, 255).astype(np.uint8)
         
-        # Final check - if result is all white or all black, create a visible pattern
-        if np.all(result >= 250) or np.all(result <= 5):
-            logger.warning("Result image is all white/black - creating visible pattern")
-            result = np.full_like(result, 128)  # Mid-gray
-            # Add some pattern for visibility
-            height, width = result.shape
-            result[height//2-2:height//2+2, :] = 200  # Horizontal line
-            result[:, width//2-2:width//2+2] = 200    # Vertical line
+        # CRITICAL CHECK: Ensure result is visible and not all white/black
+        result_min, result_max = result.min(), result.max()
+        result_range = result_max - result_min
         
+        if result_range < 10:  # Very low contrast
+            logger.warning(f"Low contrast result (range: {result_range}), enhancing visibility")
+            # Stretch contrast to full range
+            if result_range > 0:
+                result = ((result - result_min) * 255 / result_range).astype(np.uint8)
+            else:
+                # Create visible pattern if all same value
+                height, width = result.shape
+                result = np.full_like(result, 128)
+                # Add crosshair pattern for visibility
+                result[height//2-2:height//2+2, :] = 255
+                result[:, width//2-2:width//2+2] = 255
+        
+        logger.info(f"Final result: min={result.min()}, max={result.max()}, range={result.max()-result.min()}")
         return result
         
     except Exception as e:
         logger.error(f"Error in windowing algorithm: {e}")
-        # Return a safe fallback pattern
+        # Return a safe, visible fallback pattern
         height, width = image.shape if hasattr(image, 'shape') else (512, 512)
         fallback = np.full((height, width), 128, dtype=np.uint8)
+        # Add crosshair for visibility
+        fallback[height//2-1:height//2+1, :] = 255
+        fallback[:, width//2-1:width//2+1] = 255
         return fallback
 
 def _apply_windowing_enhanced(image, window_width, window_level, invert=False, modality=''):
@@ -213,31 +274,54 @@ def _apply_windowing_enhanced(image, window_width, window_level, invert=False, m
         # High-precision normalization
         normalized = (image_data - min_val) / (max_val - min_val)
         
-        # Apply modality-specific enhancements
-        if modality in ['DX', 'CR', 'MG']:  # Digital Radiography, Computed Radiography, Mammography
-            # Enhanced contrast for radiographic images with professional quality
-            gamma = 0.75  # More aggressive contrast enhancement for radiographs
+        # Apply modality-specific enhancements for professional X-ray quality
+        if modality in ['DX', 'CR', 'MG', 'XR']:  # Digital Radiography, Computed Radiography, Mammography, X-Ray
+            # CRITICAL FIX: Professional X-ray windowing for optimal visibility
+            logger.info(f"Applying X-ray specific processing for modality: {modality}")
+            
+            # Use adaptive gamma based on image content
+            mean_intensity = np.mean(normalized)
+            if mean_intensity < 0.3:  # Dark image - likely needs more contrast
+                gamma = 0.6  # Strong contrast enhancement
+            elif mean_intensity > 0.7:  # Bright image - gentle enhancement
+                gamma = 0.85
+            else:  # Normal range
+                gamma = 0.75
+            
             normalized = np.power(normalized, gamma)
             
-            # Apply advanced edge enhancement for better bone/tissue definition
+            # Apply professional edge enhancement for X-ray detail visibility
             try:
                 from scipy import ndimage
-                # Multi-scale edge enhancement for radiographic detail
-                laplacian = ndimage.laplace(normalized)
-                edge_enhanced = laplacian * 0.15  # Stronger edge enhancement
+                
+                # Multi-scale edge enhancement specifically tuned for X-rays
+                # Fine detail enhancement
+                fine_edges = ndimage.gaussian_laplace(normalized, sigma=0.5)
+                # Medium detail enhancement  
+                medium_edges = ndimage.gaussian_laplace(normalized, sigma=1.0)
+                # Coarse structure enhancement
+                coarse_edges = ndimage.gaussian_laplace(normalized, sigma=2.0)
+                
+                # Combine multi-scale enhancements
+                edge_enhanced = (fine_edges * 0.4 + medium_edges * 0.4 + coarse_edges * 0.2) * 0.2
                 normalized = np.clip(normalized + edge_enhanced, 0, 1)
                 
-                # Apply subtle sharpening for fine detail
-                gaussian_blur = ndimage.gaussian_filter(normalized, sigma=0.5)
-                sharpened = normalized + (normalized - gaussian_blur) * 0.3
-                normalized = np.clip(sharpened, 0, 1)
+                # Apply unsharp masking for X-ray sharpness
+                blur_radius = 1.0
+                blurred = ndimage.gaussian_filter(normalized, sigma=blur_radius)
+                unsharp_mask = normalized - blurred
+                sharpening_strength = 0.4  # Moderate sharpening for medical images
+                normalized = np.clip(normalized + unsharp_mask * sharpening_strength, 0, 1)
+                
+                logger.info("Applied advanced X-ray enhancement")
                 
             except ImportError:
-                # Fallback enhancement without scipy
-                # Simple contrast stretching
-                p2, p98 = np.percentile(normalized, (2, 98))
-                if p98 > p2:
-                    normalized = np.clip((normalized - p2) / (p98 - p2), 0, 1)
+                logger.warning("SciPy not available - using fallback X-ray enhancement")
+                # Fallback enhancement without scipy - contrast stretching
+                p1, p99 = np.percentile(normalized, (1, 99))
+                if p99 > p1:
+                    normalized = np.clip((normalized - p1) / (p99 - p1), 0, 1)
+                    logger.info("Applied fallback contrast stretching")
         elif modality in ['CT']:  # Computed Tomography
             # Standard gamma for CT with slight enhancement
             gamma = 0.9
@@ -371,8 +455,8 @@ def create_working_medical_image(image, window_width, window_level, inverted):
             'error': str(e)
         })
 
-def _array_to_base64_image(array, window_width=None, window_level=None, inverted=False):
-    """Convert numpy array to base64 encoded image with professional windowing"""
+def _array_to_base64_image(array, window_width=None, window_level=None, inverted=False, quality='high'):
+    """Convert numpy array to base64 encoded image with professional windowing and fast loading"""
     try:
         if array is None or array.size == 0:
             logger.warning("Array is None or empty")
@@ -420,33 +504,48 @@ def _array_to_base64_image(array, window_width=None, window_level=None, inverted
                 image_data[height//2-1:height//2+1, :] = 200
                 image_data[:, width//2-1:width//2+1] = 200
         
-        # Convert to PIL Image with high-quality resampling
+        # Convert to PIL Image with optimized settings for speed vs quality
         img = Image.fromarray(image_data, mode='L')
         
-        # Apply high-quality upsampling for better display quality (conservative approach)
-        original_size = img.size
-        # Only upscale very small images to avoid artifacts
-        scale_factor = 1.5 if min(original_size) < 256 else 1.0
-        
-        if scale_factor > 1.0:
-            new_size = (int(original_size[0] * scale_factor), int(original_size[1] * scale_factor))
-            img = img.resize(new_size, Image.Resampling.LANCZOS)
-        
-        # Apply very subtle sharpening only for medical images to avoid artifacts
-        try:
-            from PIL import ImageFilter
-            # Reduced sharpening to maintain clean appearance
-            img = img.filter(ImageFilter.UnsharpMask(radius=0.5, percent=120, threshold=3))
-        except Exception:
-            # Skip sharpening if it causes issues
-            pass
-        
-        # Save to buffer with high-quality settings
-        buffer = BytesIO()
-        img.save(buffer, format='PNG', optimize=False, compress_level=0, quality=100)
+        # SPEED OPTIMIZATION: Conditional processing based on quality setting
+        if quality == 'fast':
+            # Fast loading mode - minimal processing
+            buffer = BytesIO()
+            img.save(buffer, format='JPEG', quality=85, optimize=True)
+        else:
+            # High quality mode - full processing
+            # Apply high-quality upsampling for better display quality (conservative approach)
+            original_size = img.size
+            # Only upscale very small images to avoid artifacts
+            scale_factor = 1.2 if min(original_size) < 256 else 1.0
+            
+            if scale_factor > 1.0:
+                new_size = (int(original_size[0] * scale_factor), int(original_size[1] * scale_factor))
+                img = img.resize(new_size, Image.Resampling.LANCZOS)
+            
+            # Apply medical-grade sharpening for professional X-ray quality
+            try:
+                from PIL import ImageFilter, ImageEnhance
+                
+                # Professional medical image enhancement
+                # Subtle sharpening for fine detail
+                img = img.filter(ImageFilter.UnsharpMask(radius=0.8, percent=130, threshold=2))
+                
+                # Enhance contrast slightly for better visibility
+                enhancer = ImageEnhance.Contrast(img)
+                img = enhancer.enhance(1.1)  # 10% contrast boost
+                
+            except Exception as e:
+                logger.warning(f"Image enhancement failed: {e}")
+                pass
+            
+            # Save with high quality settings
+            buffer = BytesIO()
+            img.save(buffer, format='PNG', optimize=False, compress_level=1)
         
         img_str = base64.b64encode(buffer.getvalue()).decode('ascii')
-        return f"data:image/png;base64,{img_str}"
+        format_type = 'jpeg' if quality == 'fast' else 'png'
+        return f"data:image/{format_type};base64,{img_str}"
         
     except Exception as e:
         logger.error(f"Error converting array to base64: {e}")
@@ -472,58 +571,106 @@ def viewer(request):
     return render(request, 'dicom_viewer/viewer_complete.html', context)
 
 def api_test_image(request):
-    """Test endpoint to verify image processing pipeline"""
+    """Test endpoint to verify enhanced image processing pipeline"""
     try:
-        # Create a test image pattern
+        # Create a comprehensive test image pattern
         test_array = np.zeros((512, 512), dtype=np.float32)
         
-        # Create a gradient pattern
+        # Create realistic medical image pattern with various intensities
+        # Background tissue
+        test_array.fill(100)
+        
+        # Add gradient for testing windowing
         for i in range(512):
             for j in range(512):
-                test_array[i, j] = (i + j) / 2.0
+                test_array[i, j] += (i + j) / 8.0
         
-        # Add some medical-style features
-        # Center circle
+        # Add medical-style anatomical features
         center_x, center_y = 256, 256
+        
+        # Simulate bone structures (high intensity)
         for i in range(512):
             for j in range(512):
                 dist = np.sqrt((i - center_x)**2 + (j - center_y)**2)
-                if 100 < dist < 120:
-                    test_array[i, j] = 1000
-                elif 150 < dist < 170:
-                    test_array[i, j] = 2000
+                # Outer bone ring
+                if 180 < dist < 200:
+                    test_array[i, j] = 2500  # Bone intensity
+                # Inner bone structure
+                elif 100 < dist < 120:
+                    test_array[i, j] = 1800
+                # Soft tissue variation
+                elif 50 < dist < 80:
+                    test_array[i, j] = 400
+                # Air/lung simulation (low intensity)
+                elif 220 < dist < 240:
+                    test_array[i, j] = -800
         
-        # Apply windowing
+        # Add fine detail structures
+        # Simulate trabecular pattern
+        for i in range(0, 512, 20):
+            for j in range(0, 512, 20):
+                if 150 < np.sqrt((i - center_x)**2 + (j - center_y)**2) < 180:
+                    test_array[i:i+2, j:j+2] = 1200
+        
+        # Add noise to simulate realistic medical image
+        noise = np.random.normal(0, 20, test_array.shape)
+        test_array += noise
+        
+        # Get parameters
         window_width = float(request.GET.get('ww', 2000))
         window_level = float(request.GET.get('wl', 1000))
         inverted = request.GET.get('invert', 'false').lower() == 'true'
+        quality = request.GET.get('quality', 'high')
+        modality = request.GET.get('modality', 'XR')  # Test X-ray processing
         
-        windowed_image = _apply_windowing_fast(test_array, window_width, window_level, inverted)
-        image_data_url = _array_to_base64_image(windowed_image)
+        # Apply enhanced windowing
+        if modality in ['XR', 'DX', 'CR']:
+            windowed_image = _apply_windowing_enhanced(test_array, window_width, window_level, inverted, modality)
+        else:
+            windowed_image = _apply_windowing_fast(test_array, window_width, window_level, inverted)
+            
+        image_data_url = _array_to_base64_image(windowed_image, quality=quality)
+        
+        # Calculate statistics for verification
+        stats = {
+            'original_min': float(test_array.min()),
+            'original_max': float(test_array.max()),
+            'original_mean': float(test_array.mean()),
+            'windowed_min': int(windowed_image.min()),
+            'windowed_max': int(windowed_image.max()),
+            'windowed_mean': float(windowed_image.mean())
+        }
         
         return JsonResponse({
+            'success': True,
             'image_data': image_data_url,
             'image_info': {
                 'id': 'test',
                 'dimensions': [512, 512],
                 'pixel_spacing': [1.0, 1.0],
                 'slice_thickness': 1.0,
-                'modality': 'TEST',
-                'patient_name': 'Test Pattern',
+                'modality': modality,
+                'patient_name': 'Test Pattern - Enhanced Processing',
                 'study_date': '20240101',
-                'institution': 'Noctis Pro Test'
+                'institution': 'Noctis Pro Enhanced Test'
             },
             'windowing': {
                 'window_width': window_width,
                 'window_level': window_level,
                 'inverted': inverted
             },
+            'processing': {
+                'quality': quality,
+                'modality': modality,
+                'enhancement': 'professional_medical'
+            },
+            'statistics': stats,
             'test': True
         })
         
     except Exception as e:
-        logger.error(f"Error in test image: {e}")
-        return JsonResponse({'error': str(e)}, status=500)
+        logger.error(f"Error in enhanced test image: {e}")
+        return JsonResponse({'error': str(e), 'success': False}, status=500)
 
 @csrf_exempt
 def api_studies_list(request):
@@ -715,44 +862,79 @@ def api_image_display(request, image_id):
             modality = getattr(ds, 'Modality', '').upper()
             photometric = getattr(ds, 'PhotometricInterpretation', '').upper()
             
-            # Enhanced modality handling with robust error handling
+            # ENHANCED modality handling with professional X-ray optimization
             try:
-                if modality in ['DX', 'CR', 'XA', 'RF', 'MG']:
+                if modality in ['DX', 'CR', 'XA', 'RF', 'MG', 'XR']:
+                    logger.info(f"Processing {modality} image with professional windowing")
+                    
                     # Auto-detect optimal window/level for radiographic images
                     if request.GET.get('ww') is None or request.GET.get('wl') is None:
                         try:
-                            # Calculate optimal windowing from pixel data statistics
+                            # CRITICAL: Use robust statistics for X-ray windowing
                             pixel_min, pixel_max = float(pixel_array.min()), float(pixel_array.max())
                             pixel_range = pixel_max - pixel_min
+                            pixel_mean = float(pixel_array.mean())
+                            pixel_std = float(pixel_array.std())
+                            
+                            # Use percentile-based windowing for better X-ray visibility
+                            p1, p99 = np.percentile(pixel_array, [1, 99])
+                            p5, p95 = np.percentile(pixel_array, [5, 95])
                             
                             if pixel_range > 0 and not (np.isnan(pixel_min) or np.isnan(pixel_max)):
-                                # Use data-driven windowing for optimal contrast
                                 if request.GET.get('ww') is None:
-                                    window_width = max(100.0, pixel_range * 0.8)  # Ensure minimum width
+                                    # Use percentile range for optimal X-ray contrast
+                                    window_width = max(200.0, (p99 - p1) * 1.1)  # 10% wider than 99th percentile range
+                                    logger.info(f"Calculated X-ray window width: {window_width}")
+                                    
                                 if request.GET.get('wl') is None:
-                                    window_level = pixel_min + (pixel_range * 0.5)  # Center of data range
+                                    # Center on the main tissue range, not extreme values
+                                    window_level = (p5 + p95) / 2  # Center between 5th and 95th percentiles
+                                    logger.info(f"Calculated X-ray window level: {window_level}")
                                 
-                                logger.info(f"Auto-calculated {modality} windowing: WW={window_width}, WL={window_level} from data range {pixel_min}-{pixel_max}")
+                                logger.info(f"Professional {modality} windowing: WW={window_width:.1f}, WL={window_level:.1f}")
+                                logger.info(f"Data statistics: min={pixel_min:.1f}, max={pixel_max:.1f}, mean={pixel_mean:.1f}, std={pixel_std:.1f}")
+                                
                             else:
                                 raise ValueError("Invalid pixel range for auto-windowing")
                                 
                         except Exception as e:
-                            logger.warning(f"Auto-windowing failed for {modality}: {e}, using defaults")
-                            # Fallback to standard radiographic settings
+                            logger.warning(f"Auto-windowing failed for {modality}: {e}, using professional defaults")
+                            # Professional X-ray defaults for optimal visibility
                             if request.GET.get('ww') is None:
-                                window_width = 4000.0
+                                window_width = 3000.0  # Wide window for X-ray detail
                             if request.GET.get('wl') is None:
-                                window_level = 2000.0
+                                window_level = 1500.0  # Center for typical X-ray range
                     
-                    # Auto-invert MONOCHROME1 images (common in radiography) with error handling
+                    # CRITICAL: Auto-invert MONOCHROME1 images for proper X-ray display
                     if request.GET.get('invert') is None:
                         try:
-                            inverted = (photometric == 'MONOCHROME1')
-                            if inverted:
-                                logger.info(f"Auto-inverting MONOCHROME1 {modality} image")
+                            should_invert = (photometric == 'MONOCHROME1')
+                            if should_invert:
+                                inverted = True
+                                logger.info(f"Auto-inverting MONOCHROME1 {modality} image for proper display")
+                            else:
+                                # For X-rays, check if we need to invert based on intensity distribution
+                                mean_intensity = pixel_array.mean()
+                                max_intensity = pixel_array.max()
+                                
+                                # If most of the image is bright (typical for non-inverted X-rays that should be inverted)
+                                if mean_intensity > (max_intensity * 0.7):
+                                    inverted = True
+                                    logger.info(f"Auto-inverting bright {modality} image for better visibility")
+                                    
                         except Exception as e:
-                            logger.warning(f"Could not determine photometric interpretation: {e}")
+                            logger.warning(f"Could not determine inversion for {modality}: {e}")
                             inverted = False
+                
+                elif modality in ['CT']:
+                    # CT-specific windowing with HU-based defaults
+                    if request.GET.get('ww') is None or request.GET.get('wl') is None:
+                        # Use soft tissue window as default for CT
+                        if request.GET.get('ww') is None:
+                            window_width = 400.0
+                        if request.GET.get('wl') is None:
+                            window_level = 40.0
+                        logger.info(f"Using CT soft tissue windowing: WW={window_width}, WL={window_level}")
                             
             except Exception as e:
                 logger.warning(f"Error in modality-specific processing: {e}, continuing with standard processing")
@@ -764,8 +946,9 @@ def api_image_display(request, image_id):
             if windowed_image is not None:
                 logger.info(f"Windowed image: shape={windowed_image.shape}, dtype={windowed_image.dtype}, min={windowed_image.min()}, max={windowed_image.max()}")
             
-            # Convert to base64
-            image_data_url = _array_to_base64_image(windowed_image)
+            # Convert to base64 with quality optimization
+            quality_mode = request.GET.get('quality', 'high')  # 'fast' or 'high'
+            image_data_url = _array_to_base64_image(windowed_image, quality=quality_mode)
             
             if not image_data_url:
                 logger.error("Failed to generate image data URL")
@@ -3355,49 +3538,133 @@ def create_dicom_image_from_dicom_metadata(metadata, series, uploaded_files):
     return dicom_image
 
 def create_placeholder_mpr_views():
-    """Create placeholder MPR views when DICOM loading fails"""
+    """Create professional placeholder MPR views with enhanced medical styling"""
     try:
-        # Create three different placeholder images for MPR views
         views = {}
         
         for plane in ['axial', 'sagittal', 'coronal']:
-            img = Image.new('L', (512, 512), color=64)
+            # Create high-quality placeholder with medical styling
+            img = Image.new('L', (512, 512), color=32)  # Dark medical background
             draw = ImageDraw.Draw(img)
             
-            # Draw plane-specific pattern
+            # Add professional medical grid
+            grid_spacing = 64
+            for i in range(0, 512, grid_spacing):
+                draw.line([(i, 0), (i, 512)], fill=80, width=1)
+                draw.line([(0, i), (512, i)], fill=80, width=1)
+            
+            # Add center crosshair (medical standard)
+            center = 256
+            crosshair_color = 200
+            draw.line([(center, 0), (center, 512)], fill=crosshair_color, width=2)
+            draw.line([(0, center), (512, center)], fill=crosshair_color, width=2)
+            
+            # Draw plane-specific anatomical patterns
             if plane == 'axial':
-                # Axial view - circular pattern
-                draw.ellipse([100, 100, 412, 412], outline=200, width=3)
-                draw.ellipse([200, 200, 312, 312], outline=150, width=2)
+                # Axial view - simulate cross-sectional anatomy
+                # Outer boundary (body outline)
+                draw.ellipse([80, 80, 432, 432], outline=180, width=3)
+                # Inner structures (organs)
+                draw.ellipse([180, 180, 332, 332], outline=150, width=2)
+                draw.ellipse([220, 220, 292, 292], outline=120, width=2)
+                # Spine simulation
+                draw.rectangle([240, 240, 272, 272], outline=200, width=2)
+                
             elif plane == 'sagittal':
-                # Sagittal view - vertical pattern
-                for i in range(5):
-                    x = 100 + i * 80
-                    draw.line([(x, 50), (x, 462)], fill=180, width=2)
+                # Sagittal view - simulate side view anatomy
+                # Spine curve
+                spine_points = []
+                for i in range(50, 462, 20):
+                    x_offset = int(20 * np.sin(i / 50))  # Curved spine
+                    spine_points.extend([(200 + x_offset, i), (220 + x_offset, i)])
+                for i in range(0, len(spine_points) - 2, 2):
+                    draw.line([spine_points[i], spine_points[i + 2]], fill=180, width=3)
+                
+                # Head outline
+                draw.ellipse([150, 50, 300, 150], outline=160, width=2)
+                # Torso outline
+                draw.line([(180, 150), (180, 400)], fill=140, width=2)
+                draw.line([(280, 150), (280, 400)], fill=140, width=2)
+                
             else:  # coronal
-                # Coronal view - horizontal pattern
-                for i in range(5):
-                    y = 100 + i * 80
-                    draw.line([(50, y), (462, y)], fill=180, width=2)
+                # Coronal view - simulate front view anatomy
+                # Rib cage simulation
+                for i, y in enumerate(range(120, 350, 30)):
+                    curve_factor = 30 - abs(i - 4) * 5  # Curved ribs
+                    draw.arc([150 - curve_factor, y - 10, 362 + curve_factor, y + 10], 
+                            start=0, end=180, fill=160, width=2)
+                
+                # Spine (vertical)
+                draw.line([(256, 100), (256, 400)], fill=200, width=4)
+                
+                # Shoulder outline
+                draw.arc([100, 80, 412, 180], start=0, end=180, fill=140, width=3)
             
-            # Add plane label
-            draw.text((256, 50), plane.upper(), fill=255, anchor="mm")
+            # Add professional plane label with better positioning
+            try:
+                # Try to use anchor parameter (newer Pillow versions)
+                draw.text((256, 30), plane.upper(), fill=255, anchor="mm")
+            except TypeError:
+                # Fallback for older Pillow versions
+                text_bbox = draw.textbbox((0, 0), plane.upper())
+                text_width = text_bbox[2] - text_bbox[0]
+                draw.text((256 - text_width // 2, 30), plane.upper(), fill=255)
             
-            # Convert to base64
+            # Add orientation markers in corners
+            corner_size = 8
+            corners = [(40, 40), (472, 40), (40, 472), (472, 472)]
+            for x, y in corners:
+                draw.ellipse([x - corner_size, y - corner_size, 
+                             x + corner_size, y + corner_size], fill=180)
+            
+            # Add measurement scale reference
+            scale_y = 490
+            for i in range(50, 462, 40):
+                tick_height = 8 if i % 120 == 50 else 4
+                draw.line([(i, scale_y), (i, scale_y + tick_height)], fill=200, width=1)
+            
+            # Enhance image quality
+            try:
+                from PIL import ImageEnhance
+                enhancer = ImageEnhance.Contrast(img)
+                img = enhancer.enhance(1.3)  # Increase contrast for better visibility
+            except:
+                pass
+            
+            # Convert to base64 with optimal settings
             buffer = BytesIO()
-            img.save(buffer, format='PNG')
+            img.save(buffer, format='PNG', optimize=True)
             img_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
             views[plane] = f'data:image/png;base64,{img_data}'
         
         return views
         
     except Exception as e:
-        logger.error(f"Error creating placeholder MPR views: {e}")
-        return {
-            'axial': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAGA',
-            'sagittal': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAGA',
-            'coronal': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAGA'
-        }
+        logger.error(f"Error creating professional placeholder MPR views: {e}")
+        # Enhanced fallback placeholders
+        try:
+            fallback_views = {}
+            for plane in ['axial', 'sagittal', 'coronal']:
+                # Create minimal but visible fallback
+                img = Image.new('L', (256, 256), color=64)
+                draw = ImageDraw.Draw(img)
+                draw.line([(128, 0), (128, 256)], fill=200, width=2)
+                draw.line([(0, 128), (256, 128)], fill=200, width=2)
+                draw.text((128, 20), plane[0].upper(), fill=255)
+                
+                buffer = BytesIO()
+                img.save(buffer, format='PNG')
+                img_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                fallback_views[plane] = f'data:image/png;base64,{img_data}'
+            
+            return fallback_views
+        except:
+            # Ultimate fallback
+            return {
+                'axial': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAGA',
+                'sagittal': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAGA',
+                'coronal': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAGA'
+            }
 
 @csrf_exempt
 def api_upload_progress(request, upload_id):
