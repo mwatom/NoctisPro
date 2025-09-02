@@ -31,7 +31,7 @@ import scipy.ndimage as ndimage
 import logging
 
 from .models import ViewerSession, Measurement, Annotation, ReconstructionJob
-from .dicom_utils import DicomProcessor
+from .dicom_utils import DicomProcessor, safe_dicom_str
 from .reconstruction import MPRProcessor, MIPProcessor, Bone3DProcessor, MRI3DProcessor
 from .models import WindowLevelPreset, HangingProtocol
 
@@ -1455,7 +1455,7 @@ def upload_dicom(request):
                 series_number = getattr(ds0, 'SeriesNumber', 1) or 1
                 series_desc = getattr(ds0, 'SeriesDescription', f'Series {series_number}')
                 slice_thickness = getattr(ds0, 'SliceThickness', None)
-                pixel_spacing = str(getattr(ds0, 'PixelSpacing', ''))
+                pixel_spacing = safe_dicom_str(getattr(ds0, 'PixelSpacing', ''))
                 image_orientation = str(getattr(ds0, 'ImageOrientationPatient', ''))
 
                 series_obj, _ = Series.objects.get_or_create(
