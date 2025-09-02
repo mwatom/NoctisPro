@@ -1,23 +1,28 @@
 #!/bin/bash
-echo "🛑 Stopping NoctisPro..."
-cd /workspace
 
-if [ -f django.pid ]; then
-    DJANGO_PID=$(cat django.pid)
-    echo "Stopping Django (PID: $DJANGO_PID)..."
-    kill $DJANGO_PID 2>/dev/null || true
-    rm -f django.pid
+# 🛑 NoctisPro Stop Script
+# Stops all NoctisPro processes
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+echo -e "${YELLOW}🛑 Stopping NoctisPro services...${NC}"
+
+# Stop Django
+if pkill -f "manage.py runserver"; then
+    echo -e "${GREEN}✅ Django server stopped${NC}"
+else
+    echo -e "${YELLOW}⚠️  No Django server running${NC}"
 fi
 
-if [ -f ngrok.pid ]; then
-    NGROK_PID=$(cat ngrok.pid)
-    echo "Stopping Ngrok (PID: $NGROK_PID)..."
-    kill $NGROK_PID 2>/dev/null || true
-    rm -f ngrok.pid
+# Stop Ngrok
+if pkill -f "ngrok"; then
+    echo -e "${GREEN}✅ Ngrok tunnel stopped${NC}"
+else
+    echo -e "${YELLOW}⚠️  No ngrok tunnel running${NC}"
 fi
 
-# Kill any remaining processes
-pkill -f "manage.py runserver" || true
-pkill -f "ngrok http" || true
-
-echo "✅ NoctisPro stopped"
+echo -e "${GREEN}🏁 All NoctisPro services stopped${NC}"
