@@ -1037,6 +1037,10 @@
             transform: translateZ(0);
             -webkit-transform: translateZ(0);
             will-change: transform;
+            /* Ensure clean display */
+            border: none;
+            outline: none;
+            box-shadow: none;
         }
 
         .dicom-image {
@@ -1301,6 +1305,9 @@
                 </button>
                 <button class="tool" data-tool="crosshair" onclick="toggleCrosshair()" title="Crosshair">
                     <i class="fas fa-crosshairs"></i>
+                </button>
+                <button class="tool" data-tool="clean" onclick="toggleCleanView()" title="Clean View (Hide Overlays)">
+                    <i class="fas fa-eye"></i>
                 </button>
             </div>
             
@@ -1622,6 +1629,7 @@
                 <span>Tool: <strong id="activeTool">Window</strong></span>
                 <span>HU: <strong id="huValue">-</strong></span>
                 <span>Position: <strong id="mousePosition">-</strong></span>
+                <span style="color: var(--text-muted); font-size: 10px;">Press H for clean view</span>
             </div>
         </div>
     </div>
@@ -2104,6 +2112,10 @@
                     case 'R':
                         resetView();
                         break;
+                    case 'h':
+                    case 'H':
+                        toggleCleanView();
+                        break;
                     case 'ArrowUp':
                         e.preventDefault();
                         changeSlice(-1);
@@ -2419,17 +2431,25 @@
                             dicomImage.style.imageRendering = 'crisp-edges';
                         }
                         
-                        // Remove any problematic filters
+                        // Remove any problematic filters and ensure clean display
                         dicomImage.style.filter = 'none';
                         dicomImage.style.webkitFilter = 'none';
+                        dicomImage.style.border = 'none';
+                        dicomImage.style.outline = 'none';
+                        dicomImage.style.boxShadow = 'none';
+                        dicomImage.style.margin = '0';
+                        dicomImage.style.padding = '0';
                         
-                        // Ensure container is properly styled
+                        // Ensure container is properly styled for clean display
                         const imageContainer = document.getElementById('imageContainer');
                         if (imageContainer) {
                             imageContainer.style.background = '#000000';
                             imageContainer.style.display = 'flex';
                             imageContainer.style.alignItems = 'center';
                             imageContainer.style.justifyContent = 'center';
+                            imageContainer.style.border = 'none';
+                            imageContainer.style.outline = 'none';
+                            imageContainer.style.boxShadow = 'none';
                         }
                         
                         // Apply zoom and pan transformations
@@ -3075,6 +3095,62 @@
             } catch (error) {
                 console.error('Error updating zoom range:', error);
                 // Continue gracefully without zoom range update
+            }
+        }
+
+        // Clean View Toggle - Hide all overlays for pure image viewing
+        let cleanViewMode = false;
+        
+        function toggleCleanView() {
+            cleanViewMode = !cleanViewMode;
+            
+            const overlayElements = [
+                'overlayInfo',
+                'zoomInfo', 
+                'crosshairOverlay',
+                'measurementOverlay'
+            ];
+            
+            const tool = document.querySelector('[data-tool="clean"]');
+            
+            if (cleanViewMode) {
+                // Hide all overlays for clean image viewing
+                overlayElements.forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.style.display = 'none';
+                    }
+                });
+                
+                // Update tool state
+                if (tool) {
+                    tool.classList.add('active');
+                    tool.querySelector('i').className = 'fas fa-eye-slash';
+                }
+                
+                console.log('Clean view mode enabled - all overlays hidden');
+            } else {
+                // Show overlays
+                overlayElements.forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.style.display = '';
+                    }
+                });
+                
+                // Update crosshair visibility based on its state
+                const crosshairOverlay = document.getElementById('crosshairOverlay');
+                if (crosshairOverlay) {
+                    crosshairOverlay.style.display = showCrosshair ? 'block' : 'none';
+                }
+                
+                // Update tool state
+                if (tool) {
+                    tool.classList.remove('active');
+                    tool.querySelector('i').className = 'fas fa-eye';
+                }
+                
+                console.log('Clean view mode disabled - overlays restored');
             }
         }
 

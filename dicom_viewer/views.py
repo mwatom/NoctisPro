@@ -423,17 +423,23 @@ def _array_to_base64_image(array, window_width=None, window_level=None, inverted
         # Convert to PIL Image with high-quality resampling
         img = Image.fromarray(image_data, mode='L')
         
-        # Apply high-quality upsampling for better display quality
+        # Apply high-quality upsampling for better display quality (conservative approach)
         original_size = img.size
-        scale_factor = 2.0 if min(original_size) < 512 else 1.5 if min(original_size) < 1024 else 1.0
+        # Only upscale very small images to avoid artifacts
+        scale_factor = 1.5 if min(original_size) < 256 else 1.0
         
         if scale_factor > 1.0:
             new_size = (int(original_size[0] * scale_factor), int(original_size[1] * scale_factor))
             img = img.resize(new_size, Image.Resampling.LANCZOS)
         
-        # Apply sharpening filter for medical images
-        from PIL import ImageFilter
-        img = img.filter(ImageFilter.UnsharpMask(radius=1.0, percent=150, threshold=2))
+        # Apply very subtle sharpening only for medical images to avoid artifacts
+        try:
+            from PIL import ImageFilter
+            # Reduced sharpening to maintain clean appearance
+            img = img.filter(ImageFilter.UnsharpMask(radius=0.5, percent=120, threshold=3))
+        except Exception:
+            # Skip sharpening if it causes issues
+            pass
         
         # Save to buffer with high-quality settings
         buffer = BytesIO()
