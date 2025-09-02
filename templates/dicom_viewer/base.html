@@ -231,8 +231,9 @@
             /* Enhanced medical image display */
             cursor: crosshair;
             transition: transform 0.1s ease;
-            filter: contrast(1.15) brightness(1.08) saturate(1.05);
-            -webkit-filter: contrast(1.15) brightness(1.08) saturate(1.05);
+            /* Filters disabled to prevent white image issue */
+            filter: none;
+            -webkit-filter: none;
             /* Hardware acceleration for smooth rendering */
             transform: translateZ(0);
             -webkit-transform: translateZ(0);
@@ -1015,8 +1016,9 @@
             cursor: crosshair;
             user-select: none;
             transition: none;
-            filter: contrast(1.15) brightness(1.08) saturate(1.05);
-            -webkit-filter: contrast(1.15) brightness(1.08) saturate(1.05);
+            /* Filters disabled to prevent white image issue */
+            filter: none;
+            -webkit-filter: none;
             /* Hardware acceleration for smooth rendering */
             transform: translateZ(0);
             -webkit-transform: translateZ(0);

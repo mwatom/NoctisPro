@@ -98,10 +98,8 @@ class HighQualityImageRenderer {
             this.ctx.restore();
         }
         
-        // Apply post-processing effects
-        if (mergedOptions.contrastEnhancement || mergedOptions.sharpening) {
-            this.applyPostProcessing(modality, mergedOptions);
-        }
+        // Skip post-processing to prevent white image issue
+        // Post-processing disabled to maintain medical image integrity
         
         return true;
     }
@@ -296,8 +294,8 @@ window.renderImageToCanvas = function(imgElement, canvas, modality = '') {
     
     return window.HighQualityRenderer.renderMedicalImage(imgElement, modality, {
         antialiasing: true,
-        sharpening: true,
-        contrastEnhancement: true,
+        sharpening: false, // Disabled to prevent white image issue
+        contrastEnhancement: false, // Disabled to prevent white image issue
         noiseReduction: false // Keep false to preserve medical data integrity
     });
 };
