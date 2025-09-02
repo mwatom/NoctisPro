@@ -1939,30 +1939,67 @@
             let lastMousePos = { x: 0, y: 0 };
             
             imageContainer.addEventListener('mousedown', function(e) {
-                mouseDown = true;
-                isDragging = false;
-                lastMousePos = { x: e.clientX, y: e.clientY };
-                dragStart = { x: e.clientX, y: e.clientY };
-                
-                // Right-click OR Shift+Left-click for window/level adjustment
-                if (e.button === 2 || (e.button === 0 && e.shiftKey)) {
+                // Right-click handling for measurement tool
+                if (e.button === 2) {
                     e.preventDefault();
+                    if (activeTool === 'measure' && currentMeasurement) {
+                        // Right-click finishes measurement
+                        finishMeasurement(e);
+                        return;
+                    }
+                    // Right-click OR Shift+Left-click for window/level adjustment
                     activeTool = 'window-level-drag';
                     imageContainer.style.cursor = 'crosshair';
                     imageContainer.style.outline = '2px solid var(--accent-color)';
                     showWindowLevelIndicator(true);
+                    mouseDown = true;
+                    isDragging = false;
+                    lastMousePos = { x: e.clientX, y: e.clientY };
                     return;
                 }
                 
-                if (activeTool === 'measure') {
-                    startMeasurement(e);
-                } else if (activeTool === 'annotate') {
-                    addAnnotation(e);
+                // Left-click handling
+                if (e.button === 0) {
+                    mouseDown = true;
+                    isDragging = false;
+                    lastMousePos = { x: e.clientX, y: e.clientY };
+                    dragStart = { x: e.clientX, y: e.clientY };
+                    
+                    // Shift+Left-click for window/level adjustment
+                    if (e.shiftKey) {
+                        e.preventDefault();
+                        activeTool = 'window-level-drag';
+                        imageContainer.style.cursor = 'crosshair';
+                        imageContainer.style.outline = '2px solid var(--accent-color)';
+                        showWindowLevelIndicator(true);
+                        return;
+                    }
+                    
+                    if (activeTool === 'measure') {
+                        if (!currentMeasurement) {
+                            // Start new measurement
+                            startMeasurement(e);
+                        } else {
+                            // Finish current measurement
+                            finishMeasurement(e);
+                        }
+                    } else if (activeTool === 'annotate') {
+                        addAnnotation(e);
+                    }
                 }
             });
             
             imageContainer.addEventListener('mousemove', function(e) {
-                if (mouseDown) {
+                // Skip if dragging annotation
+                if (isDraggingAnnotation) return;
+                
+                // Only update measurement if actively dragging in measure mode
+                if (activeTool === 'measure' && currentMeasurement && mouseDown) {
+                    updateMeasurement(e);
+                }
+                
+                // Handle other tools only when mouse is down
+                if (mouseDown && !isDraggingAnnotation) {
                     isDragging = true;
                     const deltaX = e.clientX - lastMousePos.x;
                     const deltaY = e.clientY - lastMousePos.y;
@@ -1973,8 +2010,6 @@
                         handleZooming(deltaY);
                     } else if (activeTool === 'pan') {
                         handlePanning(deltaX, deltaY);
-                    } else if (activeTool === 'measure' && currentMeasurement) {
-                        updateMeasurement(e);
                     }
                     
                     lastMousePos = { x: e.clientX, y: e.clientY };
@@ -1985,8 +2020,14 @@
             });
             
             imageContainer.addEventListener('mouseup', function(e) {
-                if (mouseDown && activeTool === 'measure' && currentMeasurement) {
-                    finishMeasurement(e);
+                // Don't auto-finish measurement on mouseup - let user control it
+                if (activeTool === 'measure' && currentMeasurement && e.button === 0) {
+                    // Only finish if we've dragged a meaningful distance
+                    const distance = calculateDistance(currentMeasurement.start, currentMeasurement.end);
+                    if (distance.pixels > 10) {
+                        // Don't auto-finish - wait for next click or right-click
+                        console.log('Measurement in progress, click again to finish or right-click to cancel');
+                    }
                 }
                 
                 // Reset window/level drag mode
@@ -1997,9 +2038,13 @@
                     showWindowLevelIndicator(false);
                 }
                 
-                mouseDown = false;
-                isDragging = false;
-                currentMeasurement = null;
+                // Only reset mouse state for non-measurement tools
+                if (activeTool !== 'measure') {
+                    mouseDown = false;
+                    isDragging = false;
+                } else {
+                    mouseDown = false; // Allow mouse up but keep measurement active
+                }
             });
             
             // Disable context menu on right-click
@@ -2072,6 +2117,12 @@
                             close3DModal();
                         } else if (mprMode) {
                             exitMPRFullscreen();
+                        } else if (currentMeasurement) {
+                            // Cancel active measurement
+                            currentMeasurement = null;
+                            updateMeasurementOverlay();
+                            updateMeasurementInstructions();
+                            console.log('Measurement cancelled');
                         }
                         break;
                 }
@@ -2091,6 +2142,13 @@
         // Professional Tool Management with Enhanced Feedback
         function setTool(tool) {
             const previousTool = activeTool;
+            
+            // Clear any active measurement when switching tools
+            if (previousTool === 'measure' && currentMeasurement) {
+                currentMeasurement = null;
+                updateMeasurementOverlay();
+            }
+            
             activeTool = tool;
             
             // Update toolbar visual state with animation
@@ -2124,6 +2182,8 @@
                 case 'measure':
                     imageContainer.style.cursor = 'crosshair';
                     if (canvas) canvas.style.cursor = 'crosshair';
+                    // Add measurement instructions to overlay
+                    updateMeasurementInstructions();
                     break;
                 case 'annotate':
                     imageContainer.style.cursor = 'text';
@@ -2143,6 +2203,24 @@
 
             
 
+        }
+
+        function updateMeasurementInstructions() {
+            // Update footer to show measurement instructions
+            const activeTool = document.getElementById('activeTool');
+            const mousePosition = document.getElementById('mousePosition');
+            
+            if (activeTool && activeTool.textContent === 'Measure' && mousePosition) {
+                if (currentMeasurement && currentMeasurement.isActive) {
+                    mousePosition.textContent = 'Measuring... Click to finish, right-click to cancel, ESC to abort';
+                    mousePosition.style.color = 'var(--warning-color)';
+                    mousePosition.style.fontWeight = 'bold';
+                } else {
+                    mousePosition.textContent = 'Click to start measurement';
+                    mousePosition.style.color = 'var(--text-muted)';
+                    mousePosition.style.fontWeight = 'normal';
+                }
+            }
         }
 
         // Window/Level Management - Professional grade from PyQt
@@ -3711,27 +3789,33 @@
         }
 
         // Measurement System - Professional grade from PyQt
+        // Improved measurement system with proper start/finish behavior
         function startMeasurement(event) {
             const rect = event.target.getBoundingClientRect();
             const x = event.clientX - rect.left;
             const y = event.clientY - rect.top;
             
+            // Create new measurement
             currentMeasurement = {
                 start: { x, y },
                 end: { x, y },
-                imageId: images[currentImageIndex]?.id
+                imageId: images[currentImageIndex]?.id,
+                isActive: true
             };
             
+            console.log('Started measurement at:', currentMeasurement.start);
             updateMeasurementOverlay();
+            updateMeasurementInstructions();
         }
 
         function updateMeasurement(event) {
-            if (!currentMeasurement) return;
+            if (!currentMeasurement || !currentMeasurement.isActive) return;
             
             const rect = event.target.getBoundingClientRect();
             const x = event.clientX - rect.left;
             const y = event.clientY - rect.top;
             
+            // Only update end point while actively measuring
             currentMeasurement.end = { x, y };
             updateMeasurementOverlay();
         }
@@ -3739,17 +3823,33 @@
         function finishMeasurement(event) {
             if (!currentMeasurement) return;
             
+            // Mark measurement as finished
+            currentMeasurement.isActive = false;
+            
+            const rect = event.target.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            
+            // Set final end point
+            currentMeasurement.end = { x, y };
+            
             const distance = calculateDistance(currentMeasurement.start, currentMeasurement.end);
             
-            measurements.push({
-                ...currentMeasurement,
-                distance: distance,
-                timestamp: new Date().toISOString()
-            });
+            // Only save measurement if it has meaningful distance
+            if (distance.pixels > 5) {
+                measurements.push({
+                    ...currentMeasurement,
+                    distance: distance,
+                    timestamp: new Date().toISOString()
+                });
+                
+                updateMeasurementsList();
+                console.log('Finished measurement:', distance);
+            }
             
-            updateMeasurementsList();
             updateMeasurementOverlay();
             currentMeasurement = null;
+            updateMeasurementInstructions();
         }
 
         function calculateDistance(start, end) {
@@ -3806,6 +3906,10 @@
             const length = Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2));
             const angle = Math.atan2(end.y - start.y, end.x - start.x) * 180 / Math.PI;
             
+            // Determine if this is an active measurement
+            const isActive = measurement.isActive || isTemp;
+            const color = isActive ? '#00ff00' : '#ff0000'; // Green for active, red for finished
+            
             // Create professional measurement line
             const line = document.createElement('div');
             line.className = 'measurement-line';
@@ -3814,13 +3918,14 @@
                 left: ${start.x}px;
                 top: ${start.y}px;
                 width: ${length}px;
-                height: 2px;
+                height: ${isActive ? 3 : 2}px;
                 transform-origin: 0 0;
                 transform: rotate(${angle}deg);
-                background: ${isTemp ? 'linear-gradient(90deg, #ffff00, #ffaa00)' : 'linear-gradient(90deg, #00ff88, #00d4ff)'};
-                opacity: ${isTemp ? 0.8 : 1.0};
-                box-shadow: 0 0 4px ${isTemp ? 'rgba(255, 255, 0, 0.5)' : 'rgba(0, 255, 136, 0.5)'};
+                background: ${color};
+                opacity: ${isActive ? 0.8 : 1.0};
+                box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
                 pointer-events: none;
+                z-index: 25;
             `;
             overlay.appendChild(line);
             
@@ -3833,11 +3938,12 @@
                     top: ${point.y - 4}px;
                     width: 8px;
                     height: 8px;
-                    background: ${isTemp ? '#ffff00' : '#00ff88'};
+                    background: ${color};
                     border: 2px solid #ffffff;
                     border-radius: 50%;
-                    box-shadow: 0 0 6px ${isTemp ? 'rgba(255, 255, 0, 0.7)' : 'rgba(0, 255, 136, 0.7)'};
+                    box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
                     pointer-events: none;
+                    z-index: 26;
                 `;
                 overlay.appendChild(endpoint);
             });
@@ -3859,7 +3965,7 @@
                 top: ${midY - 30}px;
                 transform: translate(-50%, 0);
                 background: linear-gradient(135deg, rgba(0, 0, 0, 0.95), rgba(0, 20, 40, 0.95));
-                color: ${isTemp ? '#ffff00' : '#00ff88'};
+                color: ${color};
                 padding: 6px 10px;
                 border-radius: 6px;
                 font-size: 11px;
@@ -4007,23 +4113,149 @@
 
         }
 
-        // Annotation System
+        // Enhanced Annotation System with editing capabilities
+        let selectedAnnotation = null;
+        let isDraggingAnnotation = false;
+        
         function addAnnotation(event) {
-            const text = `Annotation ${annotations.length + 1}`;  // Auto-generate annotation text
-            
             const rect = event.target.getBoundingClientRect();
             const x = event.clientX - rect.left;
             const y = event.clientY - rect.top;
             
-            annotations.push({
+            const annotation = {
+                id: Date.now(), // Unique ID for editing
                 x: x,
                 y: y,
-                text: text,
+                text: `Note ${annotations.length + 1}`,
                 imageId: images[currentImageIndex]?.id,
-                timestamp: new Date().toISOString()
-            });
+                timestamp: new Date().toISOString(),
+                fontSize: 12,
+                color: '#ffff00'
+            };
             
+            annotations.push(annotation);
             updateAnnotationOverlay();
+            
+            // Auto-select new annotation for editing
+            setTimeout(() => editAnnotation(annotation.id), 100);
+        }
+        
+        function editAnnotation(annotationId) {
+            const annotation = annotations.find(a => a.id === annotationId);
+            if (!annotation) return;
+            
+            // Create inline editor
+            const editor = document.createElement('div');
+            editor.style.cssText = `
+                position: absolute;
+                left: ${annotation.x}px;
+                top: ${annotation.y - 30}px;
+                background: rgba(0, 0, 0, 0.9);
+                border: 2px solid var(--accent-color);
+                border-radius: 4px;
+                padding: 8px;
+                z-index: 1000;
+            `;
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = annotation.text;
+            input.style.cssText = `
+                background: var(--card-bg);
+                border: 1px solid var(--border-color);
+                color: var(--text-primary);
+                padding: 4px;
+                border-radius: 2px;
+                font-size: 12px;
+                width: 150px;
+            `;
+            
+            const buttonContainer = document.createElement('div');
+            buttonContainer.style.cssText = 'display: flex; gap: 4px; margin-top: 4px;';
+            
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = '✓';
+            saveBtn.style.cssText = `
+                background: var(--success-color);
+                border: none;
+                color: var(--primary-bg);
+                padding: 4px 8px;
+                border-radius: 2px;
+                cursor: pointer;
+                font-size: 11px;
+                font-weight: bold;
+            `;
+            
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = '✗';
+            cancelBtn.style.cssText = `
+                background: var(--danger-color);
+                border: none;
+                color: white;
+                padding: 4px 8px;
+                border-radius: 2px;
+                cursor: pointer;
+                font-size: 11px;
+                font-weight: bold;
+            `;
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = '🗑';
+            deleteBtn.style.cssText = `
+                background: var(--warning-color);
+                border: none;
+                color: var(--primary-bg);
+                padding: 4px 8px;
+                border-radius: 2px;
+                cursor: pointer;
+                font-size: 11px;
+            `;
+            
+            buttonContainer.appendChild(saveBtn);
+            buttonContainer.appendChild(cancelBtn);
+            buttonContainer.appendChild(deleteBtn);
+            
+            editor.appendChild(input);
+            editor.appendChild(buttonContainer);
+            
+            const imageContainer = document.getElementById('imageContainer');
+            imageContainer.appendChild(editor);
+            
+            input.focus();
+            input.select();
+            
+            const saveAnnotation = () => {
+                annotation.text = input.value || annotation.text;
+                editor.remove();
+                updateAnnotationOverlay();
+            };
+            
+            const cancelEdit = () => {
+                editor.remove();
+            };
+            
+            const deleteAnnotation = () => {
+                const index = annotations.findIndex(a => a.id === annotation.id);
+                if (index > -1) {
+                    annotations.splice(index, 1);
+                    updateAnnotationOverlay();
+                }
+                editor.remove();
+            };
+            
+            saveBtn.onclick = saveAnnotation;
+            cancelBtn.onclick = cancelEdit;
+            deleteBtn.onclick = deleteAnnotation;
+            
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') saveAnnotation();
+                if (e.key === 'Escape') cancelEdit();
+            };
+            
+            // Auto-save after 3 seconds of inactivity
+            setTimeout(() => {
+                if (editor.parentNode) saveAnnotation();
+            }, 3000);
         }
 
         function updateAnnotationOverlay() {
@@ -4032,17 +4264,99 @@
             // Remove existing annotations
             overlay.querySelectorAll('.annotation-marker').forEach(el => el.remove());
             
-            // Add current annotations
+            // Add current annotations with enhanced interactivity
             annotations.forEach((annotation, index) => {
                 if (annotation.imageId === images[currentImageIndex]?.id) {
                     const marker = document.createElement('div');
                     marker.className = 'annotation-marker';
-                    marker.style.left = annotation.x + 'px';
-                    marker.style.top = annotation.y + 'px';
+                    marker.dataset.annotationId = annotation.id || index;
+                    marker.style.cssText = `
+                        position: absolute;
+                        left: ${annotation.x}px;
+                        top: ${annotation.y}px;
+                        background: rgba(0, 0, 0, 0.8);
+                        color: ${annotation.color || '#ffff00'};
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                        font-size: ${annotation.fontSize || 12}px;
+                        font-weight: bold;
+                        cursor: move;
+                        user-select: none;
+                        border: 1px solid ${annotation.color || '#ffff00'};
+                        transform: translate(-50%, -100%);
+                        z-index: 30;
+                        min-width: 40px;
+                        text-align: center;
+                    `;
                     marker.textContent = annotation.text;
+                    
+                    // Make annotation draggable
+                    marker.addEventListener('mousedown', function(e) {
+                        if (e.button === 0) { // Left click
+                            e.preventDefault();
+                            e.stopPropagation();
+                            selectedAnnotation = annotation;
+                            isDraggingAnnotation = true;
+                            
+                            const startX = e.clientX - annotation.x;
+                            const startY = e.clientY - annotation.y;
+                            
+                            const mouseMoveHandler = (moveEvent) => {
+                                if (isDraggingAnnotation && selectedAnnotation) {
+                                    selectedAnnotation.x = moveEvent.clientX - startX;
+                                    selectedAnnotation.y = moveEvent.clientY - startY;
+                                    updateAnnotationOverlay();
+                                }
+                            };
+                            
+                            const mouseUpHandler = () => {
+                                isDraggingAnnotation = false;
+                                selectedAnnotation = null;
+                                document.removeEventListener('mousemove', mouseMoveHandler);
+                                document.removeEventListener('mouseup', mouseUpHandler);
+                            };
+                            
+                            document.addEventListener('mousemove', mouseMoveHandler);
+                            document.addEventListener('mouseup', mouseUpHandler);
+                        }
+                    });
+                    
+                    // Double-click to edit
+                    marker.addEventListener('dblclick', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        editAnnotation(annotation.id || index);
+                    });
+                    
+                    // Scroll wheel to resize annotation
+                    marker.addEventListener('wheel', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const sizeChange = e.deltaY > 0 ? -1 : 1;
+                        annotation.fontSize = Math.max(8, Math.min(24, (annotation.fontSize || 12) + sizeChange));
+                        updateAnnotationOverlay();
+                    });
+                    
+                    // Right-click to delete
+                    marker.addEventListener('contextmenu', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        deleteAnnotation(annotation.id || index);
+                    });
+                    
                     overlay.appendChild(marker);
                 }
             });
+        }
+        
+        function deleteAnnotation(annotationId) {
+            const index = annotations.findIndex(a => (a.id || annotations.indexOf(a)) === annotationId);
+            if (index > -1) {
+                annotations.splice(index, 1);
+                updateAnnotationOverlay();
+                console.log('Deleted annotation:', annotationId);
+            }
         }
 
         // Mouse Info and HU Values
