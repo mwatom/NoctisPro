@@ -817,11 +817,8 @@
                 <select class="select" id="studySelect">
                     <option value="">Select Study from System</option>
                 </select>
-                <button class="btn btn-primary" onclick="loadFromLocalFiles()" title="Load DICOM from Local Files">
-                    <i class="fas fa-folder-open"></i> Load Local
-                </button>
-                <button class="btn" onclick="loadFromExternalMedia()" title="Load DICOM from USB/DVD">
-                    <i class="fas fa-compact-disc"></i> Load USB/DVD
+                <button class="btn btn-primary" onclick="loadFromExternalMedia()" title="Load DICOM from USB/DVD">
+                    <i class="fas fa-compact-disc"></i> Load from USB/DVD
                 </button>
                 <button class="btn" onclick="saveMeasurements()" title="Save Measurements">
                     <i class="fas fa-save"></i> Save
@@ -928,11 +925,7 @@
                     Complete PyQt-level functionality with all essential tools.
                 </p>
                 <div class="welcome-actions">
-                    <button class="welcome-btn primary" onclick="loadFromLocalFiles()">
-                        <i class="fas fa-folder-open"></i>
-                        Load Local DICOM Files
-                    </button>
-                    <button class="welcome-btn" onclick="loadFromExternalMedia()">
+                    <button class="welcome-btn primary" onclick="loadFromExternalMedia()">
                         <i class="fas fa-compact-disc"></i>
                         Load from USB/DVD
                     </button>
@@ -953,15 +946,7 @@
                     </div>
                     <div class="measurement-overlay" id="measurementOverlay"></div>
                 </div>
-                <div class="overlay-info" id="overlayInfo">
-                    WW: 400<br>
-                    WL: 40<br>
-                    Slice: 1/1<br>
-                    HU: -
-                </div>
-                <div class="zoom-info" id="zoomInfo">
-                    Zoom: 100%
-                </div>
+
             </div>
 
             <!-- Professional 2x2 Orthogonal View Grid -->
@@ -1822,48 +1807,13 @@
         }
 
         // File Loading Functions
-        function loadFromLocalFiles() {
+        function loadFromExternalMedia() {
             const fileInput = document.getElementById('fileInput');
             fileInput.removeAttribute('webkitdirectory');
             fileInput.setAttribute('accept', '.dcm,.dicom,*');
             fileInput.multiple = true;
             fileInput.click();
-        }
-
-        function loadFromExternalMedia() {
-            // Create modal for external media selection
-            const modal = document.createElement('div');
-            modal.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0,0,0,0.8);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 2000;
-            `;
-            
-            modal.innerHTML = `
-                <div style="background: var(--card-bg); padding: 20px; border-radius: 8px; max-width: 400px; width: 90%;">
-                    <h3 style="color: var(--accent-color); margin-bottom: 20px; text-align: center;">Load from External Media</h3>
-                    <div style="display: flex; flex-direction: column; gap: 10px;">
-                        <button onclick="selectUSBDrive(); document.body.removeChild(this.closest('div').parentElement)" style="padding: 12px; background: var(--accent-color); color: var(--primary-bg); border: none; border-radius: 4px; cursor: pointer;">
-                            <i class="fas fa-usb"></i> USB Drive
-                        </button>
-                        <button onclick="selectDVD(); document.body.removeChild(this.closest('div').parentElement)" style="padding: 12px; background: var(--accent-color); color: var(--primary-bg); border: none; border-radius: 4px; cursor: pointer;">
-                            <i class="fas fa-compact-disc"></i> DVD/CD
-                        </button>
-                        <button onclick="closeExternalMediaModal(this)" style="padding: 12px; background: var(--border-color); color: var(--text-primary); border: none; border-radius: 4px; cursor: pointer;">
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-            `;
-            
-            document.body.appendChild(modal);
+            showToast('Please select DICOM files from USB/DVD or local storage', 'info');
         }
 
         function selectUSBDrive() {
