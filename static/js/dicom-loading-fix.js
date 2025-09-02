@@ -12,12 +12,12 @@
             // Clear previous error states
             clearErrorMessages();
             
-            // Make request with proper headers
-            const response = await fetch(`/dicom-viewer/api/image/${imageId}/`, {
+            // Make request with proper headers and optimization
+            const response = await fetch(`/dicom-viewer/api/image/${imageId}/display/?quality=fast`, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
-                    'Cache-Control': 'no-cache'
+                    'Cache-Control': 'max-age=300'
                 },
                 credentials: 'same-origin'
             });

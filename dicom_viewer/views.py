@@ -56,10 +56,15 @@ from .reconstruction import (MPRProcessor, MIPProcessor, Bone3DProcessor,
 
 logger = logging.getLogger(__name__)
 
-# Professional caching system for DICOM data
+# Professional caching system for DICOM data - enhanced
 _DICOM_CACHE = {}
 _DICOM_CACHE_LOCK = threading.Lock()
 _MAX_CACHE_SIZE = 100
+
+# Image data cache for faster serving
+_IMAGE_CACHE = {}
+_IMAGE_CACHE_LOCK = threading.Lock()
+_MAX_IMAGE_CACHE_SIZE = 50
 
 # Volume cache for 3D operations
 _VOLUME_CACHE = {}
@@ -80,15 +85,34 @@ def _get_cached_dicom(file_path):
     with _DICOM_CACHE_LOCK:
         return _DICOM_CACHE.get(file_path)
 
+def _cache_image_data(cache_key, image_data):
+    """Cache processed image data"""
+    with _IMAGE_CACHE_LOCK:
+        if len(_IMAGE_CACHE) >= _MAX_IMAGE_CACHE_SIZE:
+            # Remove oldest entry
+            oldest_key = next(iter(_IMAGE_CACHE))
+            del _IMAGE_CACHE[oldest_key]
+        _IMAGE_CACHE[cache_key] = image_data
+
+def _get_cached_image_data(cache_key):
+    """Get cached image data"""
+    with _IMAGE_CACHE_LOCK:
+        return _IMAGE_CACHE.get(cache_key)
+
 def _load_dicom_optimized(file_path):
-    """Load DICOM with caching and error handling"""
+    """Load DICOM with caching and error handling - optimized for speed"""
     cached = _get_cached_dicom(file_path)
     if cached is not None:
         return cached
     
     try:
-        dataset = pydicom.dcmread(file_path, force=True)
-        dataset.decompress()
+        # Use faster loading options
+        dataset = pydicom.dcmread(file_path, force=True, stop_before_pixels=False)
+        
+        # Only decompress if needed and if compressed
+        if hasattr(dataset, 'decompress') and hasattr(dataset, 'is_compressed') and dataset.is_compressed:
+            dataset.decompress()
+        
         _cache_dicom_data(file_path, dataset)
         return dataset
     except Exception as e:
@@ -117,7 +141,7 @@ def _apply_windowing_fast(image, window_width, window_level, invert=False):
     
     return image_data.astype(np.uint8)
 
-def _array_to_base64_image(array, window_width=None, window_level=None, inverted=False):
+def _array_to_base64_image(array, window_width=None, window_level=None, inverted=False, quality='normal'):
     """Convert numpy array to base64 encoded image with professional windowing"""
     try:
         if array is None or array.size == 0:
@@ -158,12 +182,18 @@ def _array_to_base64_image(array, window_width=None, window_level=None, inverted
         # Convert to PIL Image
         img = Image.fromarray(image_data, mode='L')
         
-        # Save to buffer with optimized settings
+        # Save to buffer with optimized settings for fast loading
         buffer = BytesIO()
-        img.save(buffer, format='PNG', optimize=False, compress_level=1)
         
-        img_str = base64.b64encode(buffer.getvalue()).decode('ascii')
-        return f"data:image/png;base64,{img_str}"
+        # Use different compression based on quality setting
+        if quality == 'fast':
+            img.save(buffer, format='JPEG', quality=85, optimize=True)
+            img_str = base64.b64encode(buffer.getvalue()).decode('ascii')
+            return f"data:image/jpeg;base64,{img_str}"
+        else:
+            img.save(buffer, format='PNG', optimize=True, compress_level=1)
+            img_str = base64.b64encode(buffer.getvalue()).decode('ascii')
+            return f"data:image/png;base64,{img_str}"
         
     except Exception as e:
         logger.error(f"Error converting array to base64: {e}")
@@ -172,7 +202,12 @@ def _array_to_base64_image(array, window_width=None, window_level=None, inverted
 def viewer(request):
     """Main DICOM viewer entry point with improved error handling"""
     study_id = request.GET.get('study')
-    context = {'study_id': study_id} if study_id else {}
+    context = {
+        'study_id': study_id,
+        'debug_mode': settings.DEBUG,
+        'static_url': settings.STATIC_URL,
+        'media_url': settings.MEDIA_URL
+    }
     
     # Mark study as in progress if user can edit reports
     if study_id:
@@ -296,7 +331,7 @@ def api_study_data(request, study_id):
 
 @csrf_exempt
 def api_image_display(request, image_id):
-    """Professional image display API with PyQt-level quality"""
+    """Professional image display API with PyQt-level quality and performance optimization"""
     try:
         image = get_object_or_404(DicomImage, id=image_id)
         user = request.user
@@ -305,10 +340,27 @@ def api_image_display(request, image_id):
         if user.is_authenticated and hasattr(user, 'is_facility_user') and user.is_facility_user() and getattr(user, 'facility', None) and image.series.study.facility != user.facility:
             return JsonResponse({'error': 'Permission denied'}, status=403)
         
+        # Check for conditional request (ETag support)
+        etag_value = f'"{image_id}_{request.GET.get("ww", 400)}_{request.GET.get("wl", 40)}_{request.GET.get("invert", "false")}"'
+        if request.META.get('HTTP_IF_NONE_MATCH') == etag_value:
+            response = HttpResponse(status=304)
+            response['ETag'] = etag_value
+            return response
+        
         # Get windowing parameters
         window_width = float(request.GET.get('ww', 400))
         window_level = float(request.GET.get('wl', 40))
         inverted = request.GET.get('invert', 'false').lower() == 'true'
+        quality = request.GET.get('quality', 'normal')  # 'fast' or 'normal'
+        
+        # Check image cache first
+        cache_key = f"{image_id}_{window_width}_{window_level}_{inverted}_{quality}"
+        cached_result = _get_cached_image_data(cache_key)
+        if cached_result:
+            response = JsonResponse(cached_result)
+            response['Cache-Control'] = 'max-age=300, public'
+            response['ETag'] = etag_value
+            return response
         
         # Load DICOM file
         try:
@@ -333,13 +385,18 @@ def api_image_display(request, image_id):
             if ds is None:
                 raise ValueError("Failed to load DICOM dataset")
             
-            # Get pixel data with proper calibration
-            pixel_array = ds.pixel_array.astype(np.float32)
+            # Get pixel data with proper calibration - optimized
+            pixel_array = ds.pixel_array
             
-            # Apply rescaling for HU values
+            # Only convert to float32 if rescaling is needed
             slope = getattr(ds, 'RescaleSlope', 1.0)
             intercept = getattr(ds, 'RescaleIntercept', 0.0)
-            pixel_array = pixel_array * float(slope) + float(intercept)
+            
+            if slope != 1.0 or intercept != 0.0:
+                pixel_array = pixel_array.astype(np.float32)
+                pixel_array = pixel_array * float(slope) + float(intercept)
+            elif pixel_array.dtype != np.float32:
+                pixel_array = pixel_array.astype(np.float32)
             
             # Get default window/level from DICOM if not specified in request
             if request.GET.get('ww') is None or request.GET.get('wl') is None:
@@ -371,8 +428,8 @@ def api_image_display(request, image_id):
             # Apply windowing
             windowed_image = _apply_windowing_fast(pixel_array, window_width, window_level, inverted)
             
-            # Convert to base64
-            image_data_url = _array_to_base64_image(windowed_image)
+            # Convert to base64 with quality setting
+            image_data_url = _array_to_base64_image(windowed_image, window_width, window_level, inverted, quality)
             
             if not image_data_url:
                 raise ValueError("Failed to generate image data")
@@ -396,7 +453,7 @@ def api_image_display(request, image_id):
                 'photometric_interpretation': photometric,
             }
             
-            return JsonResponse({
+            result_data = {
                 'image_data': image_data_url,
                 'image_info': image_info,
                 'windowing': {
@@ -404,7 +461,17 @@ def api_image_display(request, image_id):
                     'window_level': window_level,
                     'inverted': inverted
                 }
-            })
+            }
+            
+            # Cache the result for faster subsequent requests
+            _cache_image_data(cache_key, result_data)
+            
+            response = JsonResponse(result_data)
+            
+            # Add caching headers for better performance
+            response['Cache-Control'] = 'max-age=300, public'  # Cache for 5 minutes
+            response['ETag'] = etag_value
+            return response
             
         except Exception as e:
             logger.error(f"Error loading DICOM image: {e}")
