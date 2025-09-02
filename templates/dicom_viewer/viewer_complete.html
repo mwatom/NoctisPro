@@ -1865,8 +1865,30 @@
         // Advanced Features
         function toggleCrosshair() {
             showCrosshair = !showCrosshair;
+            
+            // Toggle single view crosshair
             const crosshairOverlay = document.getElementById('crosshairOverlay');
-            crosshairOverlay.style.display = showCrosshair ? 'block' : 'none';
+            if (crosshairOverlay) {
+                crosshairOverlay.style.display = showCrosshair ? 'block' : 'none';
+            }
+            
+            // Toggle MPR crosshairs if in MPR mode
+            const mprView = document.getElementById('mprView');
+            if (mprView && mprView.style.display !== 'none') {
+                const crosshairs = ['crosshairAxial', 'crosshairSagittal', 'crosshairCoronal'];
+                crosshairs.forEach(id => {
+                    const crosshair = document.getElementById(id);
+                    if (crosshair) {
+                        if (showCrosshair) {
+                            crosshair.classList.add('active');
+                            crosshair.style.display = 'block';
+                        } else {
+                            crosshair.classList.remove('active');
+                            crosshair.style.display = 'none';
+                        }
+                    }
+                });
+            }
             
             // Update tool visual state
             const tool = document.querySelector('[data-tool="crosshair"]');
@@ -1875,14 +1897,18 @@
             
             if (showCrosshair) {
                 tool?.classList.add('active');
-                statusSpan.textContent = 'On';
-                toggleButton.style.background = 'var(--accent-color)';
-                toggleButton.style.color = 'var(--primary-bg)';
+                if (statusSpan) statusSpan.textContent = 'On';
+                if (toggleButton) {
+                    toggleButton.style.background = 'var(--accent-color)';
+                    toggleButton.style.color = 'var(--primary-bg)';
+                }
             } else {
                 tool?.classList.remove('active');
-                statusSpan.textContent = 'Off';
-                toggleButton.style.background = 'var(--card-bg)';
-                toggleButton.style.color = 'var(--text-primary)';
+                if (statusSpan) statusSpan.textContent = 'Off';
+                if (toggleButton) {
+                    toggleButton.style.background = 'var(--card-bg)';
+                    toggleButton.style.color = 'var(--text-primary)';
+                }
             }
         }
 
@@ -2225,6 +2251,9 @@
                     document.getElementById('mprSagittal').src = data.views.sagittal;
                     document.getElementById('mprCoronal').src = data.views.coronal;
                     
+                    // Enable crosshairs for MPR views
+                    enableMPRCrosshairs();
+                    
                     hideLoading();
                     showToast('MPR views generated successfully', 'success');
                 } else {
@@ -2533,7 +2562,16 @@
             document.querySelectorAll('.mpr-viewport').forEach(vp => {
                 vp.classList.remove('active');
             });
-            document.querySelector(`[data-plane="${plane}"]`)?.classList.add('active');
+            const activeViewport = document.querySelector(`[data-plane="${plane}"]`);
+            if (activeViewport) {
+                activeViewport.classList.add('active');
+            }
+            
+            // Update plane selection dropdown if exists
+            const planeSelect = document.getElementById('planeSelect');
+            if (planeSelect) {
+                planeSelect.value = plane;
+            }
             
             showToast(`Switched to ${plane} plane`, 'info');
         }
@@ -2675,6 +2713,91 @@
 
         function exportCurrentImage() {
             exportImage();
+        }
+
+        // MPR Crosshair functionality
+        function enableMPRCrosshairs() {
+            const crosshairs = ['crosshairAxial', 'crosshairSagittal', 'crosshairCoronal'];
+            crosshairs.forEach(id => {
+                const crosshair = document.getElementById(id);
+                if (crosshair) {
+                    crosshair.classList.add('active');
+                    crosshair.style.display = 'block';
+                }
+            });
+            
+            // Set up MPR viewport interactions
+            setupMPRViewportInteractions();
+        }
+
+        function setupMPRViewportInteractions() {
+            const viewports = document.querySelectorAll('.mpr-viewport');
+            
+            viewports.forEach(viewport => {
+                const plane = viewport.getAttribute('data-plane');
+                if (plane === '3d') return;
+                
+                viewport.addEventListener('mousemove', function(e) {
+                    updateMPRCrosshairPosition(e, plane);
+                });
+                
+                viewport.addEventListener('click', function(e) {
+                    setActivePlane(plane);
+                    updateMPRCrosshairPosition(e, plane, true);
+                });
+            });
+        }
+
+        function updateMPRCrosshairPosition(event, plane, lock = false) {
+            const rect = event.target.getBoundingClientRect();
+            const x = ((event.clientX - rect.left) / rect.width) * 100;
+            const y = ((event.clientY - rect.top) / rect.height) * 100;
+            
+            // Update crosshair position
+            const crosshairId = `crosshair${plane.charAt(0).toUpperCase() + plane.slice(1)}`;
+            const crosshair = document.getElementById(crosshairId);
+            
+            if (crosshair) {
+                const hLine = crosshair.querySelector('.crosshair-line-h-mpr');
+                const vLine = crosshair.querySelector('.crosshair-line-v-mpr');
+                
+                if (hLine) hLine.style.top = `${y}%`;
+                if (vLine) vLine.style.left = `${x}%`;
+            }
+            
+            if (lock) {
+                // Update all other crosshairs for orthogonal sync
+                syncOrthogonalCrosshairs(plane, x, y);
+            }
+        }
+
+        function syncOrthogonalCrosshairs(activePlane, x, y) {
+            const planes = ['axial', 'sagittal', 'coronal'];
+            
+            planes.forEach(plane => {
+                if (plane === activePlane) return;
+                
+                const crosshairId = `crosshair${plane.charAt(0).toUpperCase() + plane.slice(1)}`;
+                const crosshair = document.getElementById(crosshairId);
+                
+                if (crosshair) {
+                    const hLine = crosshair.querySelector('.crosshair-line-h-mpr');
+                    const vLine = crosshair.querySelector('.crosshair-line-v-mpr');
+                    
+                    // Sync crosshair positions based on orthogonal relationships
+                    if (hLine && vLine) {
+                        if (plane === 'axial' && activePlane === 'sagittal') {
+                            hLine.style.top = `${y}%`;
+                        } else if (plane === 'axial' && activePlane === 'coronal') {
+                            vLine.style.left = `${x}%`;
+                        } else if (plane === 'sagittal' && activePlane === 'axial') {
+                            hLine.style.top = `${y}%`;
+                        } else if (plane === 'coronal' && activePlane === 'axial') {
+                            vLine.style.left = `${x}%`;
+                        }
+                    }
+                }
+            });
         }
 
         // Critical missing functions for button functionality

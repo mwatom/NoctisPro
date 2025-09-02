@@ -1174,3 +1174,7 @@ Watching for file changes with StatReloader
 [32mHTTP GET /worklist/ 302 [0.00, 127.0.0.1:36470][0m
 [mHTTP HEAD /dicom-viewer/ 200 [0.00, 127.0.0.1:52130][0m
 [mHTTP GET /dicom-viewer/api/image/6/display/?ww=400&wl=40 200 [0.01, 127.0.0.1:59036][0m
+Watching for file changes with StatReloader
+[mHTTP GET /login/ 200 [0.01, 127.0.0.1:56756][0m
+[mHTTP GET /dicom-viewer/ 200 [0.01, 127.0.0.1:56766][0m
+[32mHTTP GET /admin-panel/ 302 [0.01, 127.0.0.1:56776][0m

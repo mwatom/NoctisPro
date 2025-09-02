@@ -499,7 +499,6 @@ def web_series_images(request, series_id):
         logger.error(f"Error in web_series_images: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@login_required
 @csrf_exempt
 def api_mpr_reconstruction(request, series_id):
     """Professional MPR reconstruction with enhanced 3D capabilities"""
@@ -623,7 +622,6 @@ def api_mpr_reconstruction(request, series_id):
         logger.error(f"Error in MPR reconstruction: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@login_required
 @csrf_exempt
 def api_mpr_update(request, series_id):
     """Update MPR views based on crosshair position for real-time image transformation"""
@@ -723,7 +721,6 @@ def api_mpr_update(request, series_id):
         logger.error(f"Error updating MPR views: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@login_required
 @csrf_exempt
 def api_mip_reconstruction(request, series_id):
     """Professional MIP reconstruction"""
@@ -793,7 +790,6 @@ def api_mip_reconstruction(request, series_id):
         logger.error(f"Error in MIP reconstruction: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@login_required
 @csrf_exempt
 def api_bone_reconstruction(request, series_id):
     """Professional bone 3D reconstruction"""
@@ -899,7 +895,6 @@ def api_bone_reconstruction(request, series_id):
         logger.error(f"Error in bone reconstruction: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@login_required
 @csrf_exempt
 def api_volume_reconstruction(request, series_id):
     """Professional volume rendering reconstruction"""
@@ -1558,7 +1553,6 @@ def api_calculate_distance(request):
         logger.error(f"Error calculating distance: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@login_required
 @csrf_exempt
 def api_mri_reconstruction(request, series_id):
     """Professional MRI reconstruction with tissue-specific analysis"""
@@ -1652,7 +1646,6 @@ def api_mri_reconstruction(request, series_id):
         logger.error(f"Error in MRI reconstruction: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@login_required
 @csrf_exempt
 def api_pet_reconstruction(request, series_id):
     """Professional PET reconstruction with SUV analysis"""
@@ -1755,7 +1748,6 @@ def api_pet_reconstruction(request, series_id):
         logger.error(f"Error in PET reconstruction: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@login_required
 @csrf_exempt
 def api_spect_reconstruction(request, series_id):
     """Professional SPECT reconstruction with perfusion analysis"""
@@ -1861,7 +1853,6 @@ def api_spect_reconstruction(request, series_id):
         logger.error(f"Error in SPECT reconstruction: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@login_required
 @csrf_exempt
 def api_nuclear_reconstruction(request, series_id):
     """Professional Nuclear Medicine reconstruction for various isotopes"""
@@ -1958,7 +1949,6 @@ def api_nuclear_reconstruction(request, series_id):
         logger.error(f"Error in nuclear medicine reconstruction: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@login_required
 @csrf_exempt
 def api_modality_reconstruction_options(request, series_id):
     """Get available reconstruction options for a specific modality"""
