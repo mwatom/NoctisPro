@@ -1092,12 +1092,41 @@
                     <button class="btn" onclick="generateMIP()" style="width: 100%; margin-bottom: 6px;">
                         <i class="fas fa-layer-group"></i> MIP Views
                     </button>
-                    <button class="btn" onclick="generateBone3D()" style="width: 100%; margin-bottom: 6px;">
-                        <i class="fas fa-bone"></i> Bone 3D
-                    </button>
-                    <button class="btn" onclick="generateVolumeRender()" style="width: 100%; margin-bottom: 6px;">
-                        <i class="fas fa-cubes"></i> Volume Render
-                    </button>
+                    
+                    <!-- 3D Reconstruction with dropdown -->
+                    <div style="position: relative; margin-bottom: 6px;">
+                        <select class="select" id="bone3DSelect" onchange="generateBone3DType(this.value)" style="width: 100%;">
+                            <option value="">Select Bone 3D Type</option>
+                            <option value="standard">Standard Bone 3D</option>
+                            <option value="high_res">High Resolution</option>
+                            <option value="low_threshold">Low Threshold</option>
+                            <option value="custom">Custom Threshold</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Volume Rendering with dropdown -->
+                    <div style="position: relative; margin-bottom: 6px;">
+                        <select class="select" id="volumeRenderSelect" onchange="generateVolumeRenderType(this.value)" style="width: 100%;">
+                            <option value="">Select Volume Render Type</option>
+                            <option value="mip">Maximum Intensity Projection</option>
+                            <option value="minip">Minimum Intensity Projection</option>
+                            <option value="average">Average Intensity</option>
+                            <option value="surface">Surface Rendering</option>
+                            <option value="transparency">Transparency Mode</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Advanced 3D Options -->
+                    <div style="position: relative; margin-bottom: 6px;">
+                        <select class="select" id="advanced3DSelect" onchange="generateAdvanced3D(this.value)" style="width: 100%;">
+                            <option value="">Select Advanced 3D</option>
+                            <option value="cinematic">Cinematic Rendering</option>
+                            <option value="vr_angio">VR Angiography</option>
+                            <option value="vr_cardiac">VR Cardiac</option>
+                            <option value="vr_neuro">VR Neurological</option>
+                            <option value="vr_orthopedic">VR Orthopedic</option>
+                        </select>
+                    </div>
                     
                     <!-- Modality-specific reconstruction (populated dynamically) -->
                     <div id="modalitySpecificButtons" style="margin-top: 8px;">
@@ -2526,45 +2555,61 @@
                     
                     if (modality === 'CT') {
                         modalityButtons.innerHTML = `
-                            <button class="btn" onclick="generateBone3D()" style="width: 100%; margin-bottom: 6px;">
-                                <i class="fas fa-bone"></i> Bone 3D
-                            </button>
-                            <button class="btn" onclick="generateVolumeRender()" style="width: 100%; margin-bottom: 6px;">
-                                <i class="fas fa-cubes"></i> Volume Render
-                            </button>
+                            <div style="margin-bottom: 6px;">
+                                <select class="select" id="ctReconSelect" onchange="generateCTRecon(this.value)" style="width: 100%;">
+                                    <option value="">Select CT Reconstruction</option>
+                                    <option value="bone_standard">Bone 3D Standard</option>
+                                    <option value="bone_high_res">Bone 3D High-Res</option>
+                                    <option value="vascular">Vascular 3D</option>
+                                    <option value="cardiac">Cardiac 3D</option>
+                                    <option value="lung">Lung Analysis</option>
+                                    <option value="abdominal">Abdominal 3D</option>
+                                </select>
+                            </div>
                         `;
                     } else if (modality === 'MR' || modality === 'MRI') {
                         modalityButtons.innerHTML = `
-                            <button class="btn" onclick="generateMRI('brain')" style="width: 100%; margin-bottom: 6px;">
-                                <i class="fas fa-brain"></i> MRI Brain
-                            </button>
-                            <button class="btn" onclick="generateMRI('spine')" style="width: 100%; margin-bottom: 6px;">
-                                <i class="fas fa-spine"></i> MRI Spine
-                            </button>
-                            <button class="btn" onclick="generateMRI('cardiac')" style="width: 100%; margin-bottom: 6px;">
-                                <i class="fas fa-heart"></i> MRI Cardiac
-                            </button>
+                            <div style="margin-bottom: 6px;">
+                                <select class="select" id="mriReconSelect" onchange="generateMRIRecon(this.value)" style="width: 100%;">
+                                    <option value="">Select MRI Reconstruction</option>
+                                    <option value="brain_t1">Brain T1</option>
+                                    <option value="brain_t2">Brain T2</option>
+                                    <option value="brain_flair">Brain FLAIR</option>
+                                    <option value="spine_t1">Spine T1</option>
+                                    <option value="spine_t2">Spine T2</option>
+                                    <option value="cardiac_cine">Cardiac Cine</option>
+                                    <option value="cardiac_perfusion">Cardiac Perfusion</option>
+                                    <option value="dti">DTI Tractography</option>
+                                </select>
+                            </div>
                         `;
                     } else if (modality === 'PT' || modality === 'PET') {
                         modalityButtons.innerHTML = `
-                            <button class="btn" onclick="generatePET()" style="width: 100%; margin-bottom: 6px;">
-                                <i class="fas fa-radiation"></i> PET SUV
-                            </button>
-                            <button class="btn" onclick="generatePETHotspots()" style="width: 100%; margin-bottom: 6px;">
-                                <i class="fas fa-fire"></i> PET Hotspots
-                            </button>
+                            <div style="margin-bottom: 6px;">
+                                <select class="select" id="petReconSelect" onchange="generatePETRecon(this.value)" style="width: 100%;">
+                                    <option value="">Select PET Analysis</option>
+                                    <option value="suv_standard">SUV Standard</option>
+                                    <option value="suv_lean">SUV Lean Body Mass</option>
+                                    <option value="hotspots">Hotspot Detection</option>
+                                    <option value="tumor_analysis">Tumor Analysis</option>
+                                    <option value="cardiac_viability">Cardiac Viability</option>
+                                    <option value="brain_metabolism">Brain Metabolism</option>
+                                </select>
+                            </div>
                         `;
                     } else if (modality === 'NM' || modality === 'SPECT') {
                         modalityButtons.innerHTML = `
-                            <button class="btn" onclick="generateSPECT('tc99m')" style="width: 100%; margin-bottom: 6px;">
-                                <i class="fas fa-heart-pulse"></i> SPECT Cardiac
-                            </button>
-                            <button class="btn" onclick="generateSPECT('tl201')" style="width: 100%; margin-bottom: 6px;">
-                                <i class="fas fa-lungs"></i> SPECT Perfusion
-                            </button>
-                            <button class="btn" onclick="generateNuclear('tc99m')" style="width: 100%; margin-bottom: 6px;">
-                                <i class="fas fa-atom"></i> Nuclear Med
-                            </button>
+                            <div style="margin-bottom: 6px;">
+                                <select class="select" id="spectReconSelect" onchange="generateSPECTRecon(this.value)" style="width: 100%;">
+                                    <option value="">Select SPECT Analysis</option>
+                                    <option value="cardiac_tc99m">Cardiac Tc-99m</option>
+                                    <option value="cardiac_tl201">Cardiac Tl-201</option>
+                                    <option value="bone_tc99m">Bone Tc-99m</option>
+                                    <option value="renal_tc99m">Renal Tc-99m</option>
+                                    <option value="perfusion">Perfusion Study</option>
+                                    <option value="ventilation">Ventilation Study</option>
+                                </select>
+                            </div>
                         `;
                     }
                 }
@@ -2753,6 +2798,98 @@
 
         function exportCurrentImage() {
             exportImage(); // Use existing export function
+        }
+
+        // 3D Reconstruction dropdown functions
+        async function generateBone3DType(type) {
+            if (!type) return;
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            const thresholds = {
+                'standard': 200,
+                'high_res': 150,
+                'low_threshold': 100,
+                'custom': parseInt(prompt('Enter custom threshold (50-1000):') || '200')
+            };
+            
+            try {
+                showLoading(`Generating ${type} bone 3D reconstruction...`);
+                const response = await fetch(`/dicom-viewer/api/bone/${currentSeries.id}/?threshold=${thresholds[type]}&type=${type}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    hideLoading();
+                    showToast(`${type} bone 3D reconstruction completed`, 'success');
+                } else {
+                    hideLoading();
+                    showToast(`${type} bone 3D reconstruction failed`, 'error');
+                }
+            } catch (error) {
+                hideLoading();
+                showToast(`${type} bone 3D reconstruction error`, 'error');
+            }
+            
+            // Reset dropdown
+            document.getElementById('bone3DSelect').value = '';
+        }
+
+        async function generateVolumeRenderType(type) {
+            if (!type) return;
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading(`Generating ${type} volume rendering...`);
+                const response = await fetch(`/dicom-viewer/api/volume/${currentSeries.id}/?type=${type}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    hideLoading();
+                    showToast(`${type} volume rendering completed`, 'success');
+                } else {
+                    hideLoading();
+                    showToast(`${type} volume rendering failed`, 'error');
+                }
+            } catch (error) {
+                hideLoading();
+                showToast(`${type} volume rendering error`, 'error');
+            }
+            
+            // Reset dropdown
+            document.getElementById('volumeRenderSelect').value = '';
+        }
+
+        async function generateAdvanced3D(type) {
+            if (!type) return;
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading(`Generating ${type} reconstruction...`);
+                const response = await fetch(`/dicom-viewer/api/advanced3d/${currentSeries.id}/?type=${type}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    hideLoading();
+                    showToast(`${type} reconstruction completed`, 'success');
+                } else {
+                    hideLoading();
+                    showToast(`${type} reconstruction failed`, 'error');
+                }
+            } catch (error) {
+                hideLoading();
+                showToast(`${type} reconstruction error`, 'error');
+            }
+            
+            // Reset dropdown
+            document.getElementById('advanced3DSelect').value = '';
         }
 
         // Ensure all dropdowns work properly
