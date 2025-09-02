@@ -1160,3 +1160,5 @@ Internal Server Error: /worklist/api/study/2/delete/
 Method Not Allowed: /dicom-viewer/upload/
 Bad Request: /dicom-viewer/upload/
 Watching for file changes with StatReloader
+[mHTTP GET /dicom-viewer/ 200 [0.01, 127.0.0.1:57712][0m
+[mHTTP GET /dicom-viewer/api/image/6/display/?window_width=400&window_level=40 200 [0.02, 127.0.0.1:38814][0m
