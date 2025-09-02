@@ -216,8 +216,10 @@
             max-height: 100%;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
+            image-rendering: -webkit-optimize-contrast;
             cursor: crosshair;
             transition: transform 0.1s ease;
+            filter: contrast(1.1) brightness(1.05) saturate(1.1);
         }
 
         .image-container {
@@ -1019,7 +1021,7 @@
                     <button class="preset-btn" onclick="applyPreset('bone')">Bone</button>
                     <button class="preset-btn" onclick="applyPreset('soft')">Soft</button>
                     <button class="preset-btn" onclick="applyPreset('brain')">Brain</button>
-                    <button class="preset-btn" onclick="applyPreset('sine')">Sine</button>
+                    <button class="preset-btn" onclick="applyPreset('cine')">Cine</button>
                     <button class="preset-btn" onclick="applyPreset('liver')">Liver</button>
                 </div>
             </div>
@@ -1228,7 +1230,7 @@
             'brain': { ww: 100, wl: 50 },
             'liver': { ww: 160, wl: 60 },
             'mediastinum': { ww: 350, wl: 50 },
-            'sine': { ww: 800, wl: 200 }
+            'cine': { ww: 800, wl: 200 }
         };
         
         // Professional caching for performance (PyQt-inspired)
@@ -1259,7 +1261,7 @@
             updateOverlayInfo();
             updateZoomInfo();
             
-            showToast('Professional DICOM Viewer initialized', 'success');
+            showToast('DICOM Viewer initialized and ready', 'success');
         }
 
         function setupMouseEvents() {
@@ -2258,20 +2260,49 @@
             generateMPR();
         }
 
-        function show3DReconstruction() {
+        async function show3DReconstruction() {
             if (!currentSeries) {
                 showToast('Please load a series first', 'warning');
                 return;
             }
-            showToast('3D Reconstruction feature available', 'info');
+            
+            try {
+                showLoading('Generating 3D reconstruction...');
+                
+                const response = await fetch(`/dicom-viewer/api/3d/${currentSeries.id}/`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    hideLoading();
+                    showToast('3D reconstruction completed', 'success');
+                } else {
+                    hideLoading();
+                    showToast('3D reconstruction failed', 'error');
+                }
+            } catch (error) {
+                hideLoading();
+                console.error('3D reconstruction error:', error);
+                showToast('3D reconstruction error', 'error');
+            }
         }
 
         function toggleAIPanel() {
-            showToast('AI Analysis panel functionality implemented', 'info');
+            const aiPanel = document.querySelector('.panel h3').textContent === 'AI Analysis' ? 
+                document.querySelector('.panel h3').parentElement : null;
+            
+            if (aiPanel) {
+                const isVisible = aiPanel.style.display !== 'none';
+                aiPanel.style.display = isVisible ? 'none' : 'block';
+                showToast(`AI panel ${isVisible ? 'hidden' : 'shown'}`, 'info');
+            }
         }
 
         function showPrintDialog() {
-            showToast('Print dialog functionality implemented', 'info');
+            if (!images[currentImageIndex]) {
+                showToast('No image to print', 'warning');
+                return;
+            }
+            printCurrentImage();
         }
 
         // Export Functions
@@ -2478,29 +2509,7 @@
         }
 
 
-        
-        // Crosshair control functions
-        function toggleOrthogonalSync() {
-            orthogonalSync = document.getElementById('orthogonalSync').checked;
-            
-            if (orthogonalSync) {
-                ReconstructionSuite.updateAllCrosshairs();
-                showToast('Orthogonal sync enabled', 'success');
-            } else {
-                hideAllCrosshairs();
-                showToast('Orthogonal sync disabled', 'info');
-            }
-        }
-        
-        function hideAllCrosshairs() {
-            const planes = ['axial', 'sagittal', 'coronal'];
-            planes.forEach(plane => {
-                const crosshair = document.getElementById(`crosshair${plane.charAt(0).toUpperCase() + plane.slice(1)}`);
-                if (crosshair) {
-                    crosshair.classList.remove('active');
-                }
-            });
-        }
+
         
         // Load modality-specific reconstruction options
         async function loadModalityReconstructionOptions(seriesId) {
@@ -2596,6 +2605,188 @@
         function generatePETHotspots() {
             generatePET(); // Same as PET SUV for now
         }
+
+        // Missing modality-specific functions
+        async function generateBone3D() {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading('Generating bone 3D reconstruction...');
+                const response = await fetch(`/dicom-viewer/api/bone/${currentSeries.id}/`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    hideLoading();
+                    showToast('Bone 3D reconstruction completed', 'success');
+                } else {
+                    hideLoading();
+                    showToast('Bone 3D reconstruction failed', 'error');
+                }
+            } catch (error) {
+                hideLoading();
+                showToast('Bone 3D reconstruction error', 'error');
+            }
+        }
+
+        async function generateVolumeRender() {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading('Generating volume rendering...');
+                const response = await fetch(`/dicom-viewer/api/volume/${currentSeries.id}/`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    hideLoading();
+                    showToast('Volume rendering completed', 'success');
+                } else {
+                    hideLoading();
+                    showToast('Volume rendering failed', 'error');
+                }
+            } catch (error) {
+                hideLoading();
+                showToast('Volume rendering error', 'error');
+            }
+        }
+
+        async function generateMRI(type) {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading(`Generating MRI ${type} reconstruction...`);
+                const response = await fetch(`/dicom-viewer/api/mri/${currentSeries.id}/${type}/`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    hideLoading();
+                    showToast(`MRI ${type} reconstruction completed`, 'success');
+                } else {
+                    hideLoading();
+                    showToast(`MRI ${type} reconstruction failed`, 'error');
+                }
+            } catch (error) {
+                hideLoading();
+                showToast(`MRI ${type} reconstruction error`, 'error');
+            }
+        }
+
+        async function generatePET() {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading('Generating PET SUV analysis...');
+                const response = await fetch(`/dicom-viewer/api/pet/${currentSeries.id}/`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    hideLoading();
+                    showToast('PET SUV analysis completed', 'success');
+                } else {
+                    hideLoading();
+                    showToast('PET SUV analysis failed', 'error');
+                }
+            } catch (error) {
+                hideLoading();
+                showToast('PET SUV analysis error', 'error');
+            }
+        }
+
+        async function generateSPECT(tracer) {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading(`Generating SPECT ${tracer} reconstruction...`);
+                const response = await fetch(`/dicom-viewer/api/spect/${currentSeries.id}/${tracer}/`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    hideLoading();
+                    showToast(`SPECT ${tracer} reconstruction completed`, 'success');
+                } else {
+                    hideLoading();
+                    showToast(`SPECT ${tracer} reconstruction failed`, 'error');
+                }
+            } catch (error) {
+                hideLoading();
+                showToast(`SPECT ${tracer} reconstruction error`, 'error');
+            }
+        }
+
+        async function generateNuclear(tracer) {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading(`Generating nuclear medicine ${tracer} analysis...`);
+                const response = await fetch(`/dicom-viewer/api/nuclear/${currentSeries.id}/${tracer}/`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    hideLoading();
+                    showToast(`Nuclear medicine ${tracer} analysis completed`, 'success');
+                } else {
+                    hideLoading();
+                    showToast(`Nuclear medicine ${tracer} analysis failed`, 'error');
+                }
+            } catch (error) {
+                hideLoading();
+                showToast(`Nuclear medicine ${tracer} analysis error`, 'error');
+            }
+        }
+
+        function exportCurrentImage() {
+            exportImage(); // Use existing export function
+        }
+
+        // Ensure all dropdowns work properly
+        function initializeDropdowns() {
+            // Study dropdown
+            const studySelect = document.getElementById('studySelect');
+            if (studySelect && !studySelect.hasAttribute('data-initialized')) {
+                studySelect.setAttribute('data-initialized', 'true');
+                studySelect.addEventListener('change', function() {
+                    if (this.value) {
+                        loadStudy(this.value);
+                    }
+                });
+            }
+            
+            // Series dropdown
+            const seriesSelect = document.getElementById('seriesSelect');
+            if (seriesSelect && !seriesSelect.hasAttribute('data-initialized')) {
+                seriesSelect.setAttribute('data-initialized', 'true');
+                // Event already handled by onchange attribute
+            }
+            
+            // Plane dropdown
+            const planeSelect = document.getElementById('planeSelect');
+            if (planeSelect && !planeSelect.hasAttribute('data-initialized')) {
+                planeSelect.setAttribute('data-initialized', 'true');
+                // Event already handled by onchange attribute
+            }
+        }
+
+        // Initialize all dropdowns when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(initializeDropdowns, 100);
+        });
     </script>
 </body>
 </html>
