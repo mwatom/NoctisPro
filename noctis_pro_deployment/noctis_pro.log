@@ -89,3 +89,13 @@ Not Found: /static/js/main.js
 "GET /login/?next=/dicom-viewer/api/hu/%3Fmode%3Dseries%26image_id%3D9%26x%3D128%26y%3D128 HTTP/1.1" 200 7929
 Watching for file changes with StatReloader
 Watching for file changes with StatReloader
+WARNING 2025-09-02 21:27:24,066 misc 2398 140496770937088 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+WARNING 2025-09-02 21:27:24,067 misc 2398 140496770937088 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+INFO 2025-09-02 21:28:02,420 autoreload 2789 140630505832704 Watching for file changes with StatReloader
+WARNING 2025-09-02 21:28:02,512 misc 2789 140630505832704 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+INFO 2025-09-02 21:43:07,551 autoreload 6431 140562282066176 Watching for file changes with StatReloader
+WARNING 2025-09-02 21:43:07,645 misc 6431 140562241963712 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+INFO 2025-09-02 21:43:23,429 autoreload 6519 140350812287232 Watching for file changes with StatReloader
+WARNING 2025-09-02 21:43:23,517 misc 6519 140350812287232 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+INFO 2025-09-02 21:43:28,713 basehttp 6519 140350228264640 "HEAD / HTTP/1.1" 302 0
+INFO 2025-09-02 21:43:44,579 basehttp 6519 140350228264640 "GET / HTTP/1.1" 302 0
