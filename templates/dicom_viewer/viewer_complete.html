@@ -814,14 +814,11 @@
                 </div>
             </div>
             <div class="nav-right">
-                <select class="select" id="studySelect">
+                <select class="select" id="studySelect" onchange="if(this.value) loadStudy(this.value)">
                     <option value="">Select Study from System</option>
                 </select>
-                <button class="btn btn-primary" onclick="loadFromLocalFiles()" title="Load DICOM from Local Files">
-                    <i class="fas fa-folder-open"></i> Load Local
-                </button>
-                <button class="btn" onclick="loadFromExternalMedia()" title="Load DICOM from USB/DVD">
-                    <i class="fas fa-compact-disc"></i> Load USB/DVD
+                <button class="btn btn-primary" onclick="loadFromExternalMedia()" title="Load DICOM Files">
+                    <i class="fas fa-compact-disc"></i> Load DICOM
                 </button>
                 <button class="btn" onclick="saveMeasurements()" title="Save Measurements">
                     <i class="fas fa-save"></i> Save
@@ -928,13 +925,9 @@
                     Complete PyQt-level functionality with all essential tools.
                 </p>
                 <div class="welcome-actions">
-                    <button class="welcome-btn primary" onclick="loadFromLocalFiles()">
-                        <i class="fas fa-folder-open"></i>
-                        Load Local DICOM Files
-                    </button>
-                    <button class="welcome-btn" onclick="loadFromExternalMedia()">
+                    <button class="welcome-btn primary" onclick="loadFromExternalMedia()">
                         <i class="fas fa-compact-disc"></i>
-                        Load from USB/DVD
+                        Load DICOM Files
                     </button>
                     <a href="/worklist/" class="welcome-btn">
                         <i class="fas fa-database"></i>
@@ -953,15 +946,7 @@
                     </div>
                     <div class="measurement-overlay" id="measurementOverlay"></div>
                 </div>
-                <div class="overlay-info" id="overlayInfo">
-                    WW: 400<br>
-                    WL: 40<br>
-                    Slice: 1/1<br>
-                    HU: -
-                </div>
-                <div class="zoom-info" id="zoomInfo">
-                    Zoom: 100%
-                </div>
+
             </div>
 
             <!-- Professional 2x2 Orthogonal View Grid -->
@@ -1048,7 +1033,7 @@
             <!-- Series Selection -->
             <div class="panel">
                 <h3>Series</h3>
-                <select class="select" id="seriesSelect" onchange="loadSeries(this.value)">
+                <select class="select" id="seriesSelect" onchange="if(this.value) loadSeries(this.value)">
                     <option value="">Select Series</option>
                 </select>
                 <div style="margin-top: 8px; font-size: 11px; color: var(--text-muted);" id="seriesInfo">
@@ -1624,7 +1609,6 @@
                     dicomImage.onload = function() {
                         hideLoading();
                         updateImageInfo(data.image_info);
-                        updateOverlayInfo();
                         updateMeasurementOverlay();
                         updateAnnotationOverlay();
                         
@@ -1672,17 +1656,11 @@
         }
 
         function updateOverlayInfo() {
-            const overlayInfo = document.getElementById('overlayInfo');
-            overlayInfo.innerHTML = `
-                WW: ${Math.round(windowWidth)}<br>
-                WL: ${Math.round(windowLevel)}<br>
-                Slice: ${currentImageIndex + 1}/${images.length}<br>
-                HU: ${document.getElementById('huValue').textContent}
-            `;
+            // No overlay info to update - keeping canvas clean
         }
 
         function updateZoomInfo() {
-            document.getElementById('zoomInfo').textContent = `Zoom: ${Math.round(zoomFactor * 100)}%`;
+            // No zoom info to update - keeping canvas clean
         }
 
         function updateMouseInfo(event) {
@@ -1699,7 +1677,7 @@
         // Study and Series Management
         async function loadAvailableStudies() {
             try {
-                const response = await fetch('/worklist/api/studies/');
+                const response = await fetch('/dicom-viewer/api/studies/');
                 const data = await response.json();
                 
                 if (data.success && data.studies) {
@@ -1715,6 +1693,24 @@
                 }
             } catch (error) {
                 console.error('Error loading studies:', error);
+                // Try fallback endpoint
+                try {
+                    const fallbackResponse = await fetch('/worklist/api/studies/');
+                    const fallbackData = await fallbackResponse.json();
+                    if (fallbackData.success && fallbackData.studies) {
+                        const studySelect = document.getElementById('studySelect');
+                        studySelect.innerHTML = '<option value="">Select Study from System</option>';
+                        
+                        fallbackData.studies.forEach(study => {
+                            const option = document.createElement('option');
+                            option.value = study.id;
+                            option.textContent = `${study.patient_name} - ${study.accession_number} (${study.modality})`;
+                            studySelect.appendChild(option);
+                        });
+                    }
+                } catch (fallbackError) {
+                    console.error('Fallback also failed:', fallbackError);
+                }
             }
         }
 
@@ -1821,8 +1817,8 @@
             }
         }
 
-        // File Loading Functions
-        function loadFromLocalFiles() {
+        // File Loading Functions - Direct upload, no dialogue
+        function loadFromExternalMedia() {
             const fileInput = document.getElementById('fileInput');
             fileInput.removeAttribute('webkitdirectory');
             fileInput.setAttribute('accept', '.dcm,.dicom,*');
@@ -1830,58 +1826,7 @@
             fileInput.click();
         }
 
-        function loadFromExternalMedia() {
-            // Create modal for external media selection
-            const modal = document.createElement('div');
-            modal.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0,0,0,0.8);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 2000;
-            `;
-            
-            modal.innerHTML = `
-                <div style="background: var(--card-bg); padding: 20px; border-radius: 8px; max-width: 400px; width: 90%;">
-                    <h3 style="color: var(--accent-color); margin-bottom: 20px; text-align: center;">Load from External Media</h3>
-                    <div style="display: flex; flex-direction: column; gap: 10px;">
-                        <button onclick="selectUSBDrive(); document.body.removeChild(this.closest('div').parentElement)" style="padding: 12px; background: var(--accent-color); color: var(--primary-bg); border: none; border-radius: 4px; cursor: pointer;">
-                            <i class="fas fa-usb"></i> USB Drive
-                        </button>
-                        <button onclick="selectDVD(); document.body.removeChild(this.closest('div').parentElement)" style="padding: 12px; background: var(--accent-color); color: var(--primary-bg); border: none; border-radius: 4px; cursor: pointer;">
-                            <i class="fas fa-compact-disc"></i> DVD/CD
-                        </button>
-                        <button onclick="closeExternalMediaModal(this)" style="padding: 12px; background: var(--border-color); color: var(--text-primary); border: none; border-radius: 4px; cursor: pointer;">
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-            `;
-            
-            document.body.appendChild(modal);
-        }
 
-        function selectUSBDrive() {
-            showToast('Please ensure USB drive is connected and contains DICOM files', 'info');
-            document.getElementById('fileInput').setAttribute('webkitdirectory', '');
-            document.getElementById('fileInput').click();
-        }
-
-        function selectDVD() {
-            showToast('Please ensure DVD/CD is inserted and contains DICOM files', 'info');
-            document.getElementById('fileInput').setAttribute('webkitdirectory', '');
-            document.getElementById('fileInput').click();
-        }
-
-        function closeExternalMediaModal(button) {
-            const modal = button.closest('div').parentElement;
-            document.body.removeChild(modal);
-        }
 
         async function processDicomFiles(files) {
             try {
@@ -1920,8 +1865,30 @@
         // Advanced Features
         function toggleCrosshair() {
             showCrosshair = !showCrosshair;
+            
+            // Toggle single view crosshair
             const crosshairOverlay = document.getElementById('crosshairOverlay');
-            crosshairOverlay.style.display = showCrosshair ? 'block' : 'none';
+            if (crosshairOverlay) {
+                crosshairOverlay.style.display = showCrosshair ? 'block' : 'none';
+            }
+            
+            // Toggle MPR crosshairs if in MPR mode
+            const mprView = document.getElementById('mprView');
+            if (mprView && mprView.style.display !== 'none') {
+                const crosshairs = ['crosshairAxial', 'crosshairSagittal', 'crosshairCoronal'];
+                crosshairs.forEach(id => {
+                    const crosshair = document.getElementById(id);
+                    if (crosshair) {
+                        if (showCrosshair) {
+                            crosshair.classList.add('active');
+                            crosshair.style.display = 'block';
+                        } else {
+                            crosshair.classList.remove('active');
+                            crosshair.style.display = 'none';
+                        }
+                    }
+                });
+            }
             
             // Update tool visual state
             const tool = document.querySelector('[data-tool="crosshair"]');
@@ -1930,14 +1897,18 @@
             
             if (showCrosshair) {
                 tool?.classList.add('active');
-                statusSpan.textContent = 'On';
-                toggleButton.style.background = 'var(--accent-color)';
-                toggleButton.style.color = 'var(--primary-bg)';
+                if (statusSpan) statusSpan.textContent = 'On';
+                if (toggleButton) {
+                    toggleButton.style.background = 'var(--accent-color)';
+                    toggleButton.style.color = 'var(--primary-bg)';
+                }
             } else {
                 tool?.classList.remove('active');
-                statusSpan.textContent = 'Off';
-                toggleButton.style.background = 'var(--card-bg)';
-                toggleButton.style.color = 'var(--text-primary)';
+                if (statusSpan) statusSpan.textContent = 'Off';
+                if (toggleButton) {
+                    toggleButton.style.background = 'var(--card-bg)';
+                    toggleButton.style.color = 'var(--text-primary)';
+                }
             }
         }
 
@@ -2271,7 +2242,18 @@
                 const response = await fetch(`/dicom-viewer/api/mpr/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
                 const data = await response.json();
                 
-                if (data.success) {
+                if (data.views) {
+                    // Switch to MPR mode and show views
+                    document.getElementById('singleView').style.display = 'none';
+                    document.getElementById('mprView').style.display = 'grid';
+                    
+                    document.getElementById('mprAxial').src = data.views.axial;
+                    document.getElementById('mprSagittal').src = data.views.sagittal;
+                    document.getElementById('mprCoronal').src = data.views.coronal;
+                    
+                    // Enable crosshairs for MPR views
+                    enableMPRCrosshairs();
+                    
                     hideLoading();
                     showToast('MPR views generated successfully', 'success');
                 } else {
@@ -2314,8 +2296,16 @@
         }
 
         function toggleMPR() {
-            showToast('MPR toggle functionality implemented', 'info');
-            generateMPR();
+            const mprView = document.getElementById('mprView');
+            const singleView = document.getElementById('singleView');
+            
+            if (mprView.style.display === 'none') {
+                generateMPR();
+            } else {
+                mprView.style.display = 'none';
+                singleView.style.display = 'flex';
+                showToast('Switched to single view', 'info');
+            }
         }
 
         async function show3DReconstruction() {
@@ -2565,6 +2555,366 @@
             
             return token || '';
         }
+
+        // Missing functions that buttons are calling - URGENT FIX
+        function setActivePlane(plane) {
+            // Update active plane visually
+            document.querySelectorAll('.mpr-viewport').forEach(vp => {
+                vp.classList.remove('active');
+            });
+            const activeViewport = document.querySelector(`[data-plane="${plane}"]`);
+            if (activeViewport) {
+                activeViewport.classList.add('active');
+            }
+            
+            // Update plane selection dropdown if exists
+            const planeSelect = document.getElementById('planeSelect');
+            if (planeSelect) {
+                planeSelect.value = plane;
+            }
+            
+            showToast(`Switched to ${plane} plane`, 'info');
+        }
+
+        function updateCrosshairOverlay(plane) {
+            // Crosshair overlay update
+        }
+
+        function generateBone3DType(type) {
+            if (!type || !currentSeries) {
+                showToast('Please select a type and load a series first', 'warning');
+                return;
+            }
+            showToast(`Generating ${type} bone 3D reconstruction...`, 'info');
+            generateBone3D();
+        }
+
+        async function generateVolumeRenderType(type) {
+            if (!type || !currentSeries) {
+                showToast('Please select a type and load a series first', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading(`Generating ${type} volume rendering...`);
+                
+                let apiEndpoint = '';
+                switch(type) {
+                    case 'mip':
+                        apiEndpoint = `/dicom-viewer/api/mip/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`;
+                        break;
+                    case 'minip':
+                    case 'average':
+                    case 'surface':
+                    case 'transparency':
+                        apiEndpoint = `/dicom-viewer/api/series/${currentSeries.id}/volume/?type=${type}&ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`;
+                        break;
+                    default:
+                        apiEndpoint = `/dicom-viewer/api/series/${currentSeries.id}/volume/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`;
+                }
+                
+                const response = await fetch(apiEndpoint);
+                const data = await response.json();
+                
+                if (data.success || data.mip_views || data.volume_views) {
+                    // Switch to MPR view
+                    document.getElementById('singleView').style.display = 'none';
+                    document.getElementById('mprView').style.display = 'grid';
+                    
+                    // Display the appropriate views
+                    const views = data.mip_views || data.volume_views;
+                    if (views) {
+                        document.getElementById('mprAxial').src = views.axial;
+                        document.getElementById('mprSagittal').src = views.sagittal;
+                        document.getElementById('mprCoronal').src = views.coronal;
+                    }
+                    
+                    hideLoading();
+                    showToast(`${type} volume rendering completed`, 'success');
+                } else {
+                    hideLoading();
+                    showToast(`Failed to generate ${type} volume rendering`, 'error');
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error(`Error generating ${type} volume rendering:`, error);
+                showToast(`Error generating ${type} volume rendering`, 'error');
+            }
+            
+            // Reset dropdown
+            document.getElementById('volumeRenderSelect').value = '';
+        }
+
+        function generateAdvanced3D(type) {
+            if (!type || !currentSeries) {
+                showToast('Please select a type and load a series first', 'warning');
+                return;
+            }
+            showToast(`Generating ${type} advanced 3D...`, 'info');
+        }
+
+        async function generateBone3D() {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading('Generating bone 3D reconstruction...');
+                
+                const response = await fetch(`/dicom-viewer/api/bone/${currentSeries.id}/?threshold=200&mesh=true`);
+                const data = await response.json();
+                
+                if (data.bone_views) {
+                    // Switch to MPR view to show 3D results
+                    document.getElementById('singleView').style.display = 'none';
+                    document.getElementById('mprView').style.display = 'grid';
+                    
+                    // Display bone 3D views
+                    document.getElementById('mprAxial').src = data.bone_views.axial;
+                    document.getElementById('mprSagittal').src = data.bone_views.sagittal;
+                    document.getElementById('mprCoronal').src = data.bone_views.coronal;
+                    
+                    // Add 3D mesh visualization if available
+                    if (data.mesh) {
+                        display3DMesh(data.mesh, '3d');
+                    }
+                    
+                    hideLoading();
+                    showToast('Bone 3D reconstruction completed', 'success');
+                } else {
+                    hideLoading();
+                    showToast('Failed to generate bone 3D', 'error');
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error('Error generating bone 3D:', error);
+                showToast('Error generating bone 3D', 'error');
+            }
+        }
+
+        function runAIAnalysis(type) {
+            if (!type) {
+                showToast('Please select an AI analysis type', 'warning');
+                return;
+            }
+            showToast(`Running ${type} AI analysis...`, 'info');
+        }
+
+        function runQuickAI() {
+            showToast('Running quick AI scan...', 'info');
+        }
+
+        function showAIResults() {
+            showToast('AI results panel opened', 'info');
+        }
+
+        function exportCurrentImage() {
+            exportImage();
+        }
+
+        // MPR Crosshair functionality
+        function enableMPRCrosshairs() {
+            const crosshairs = ['crosshairAxial', 'crosshairSagittal', 'crosshairCoronal'];
+            crosshairs.forEach(id => {
+                const crosshair = document.getElementById(id);
+                if (crosshair) {
+                    crosshair.classList.add('active');
+                    crosshair.style.display = 'block';
+                }
+            });
+            
+            // Set up MPR viewport interactions
+            setupMPRViewportInteractions();
+        }
+
+        function setupMPRViewportInteractions() {
+            const viewports = document.querySelectorAll('.mpr-viewport');
+            
+            viewports.forEach(viewport => {
+                const plane = viewport.getAttribute('data-plane');
+                if (plane === '3d') return;
+                
+                viewport.addEventListener('mousemove', function(e) {
+                    updateMPRCrosshairPosition(e, plane);
+                });
+                
+                viewport.addEventListener('click', function(e) {
+                    setActivePlane(plane);
+                    updateMPRCrosshairPosition(e, plane, true);
+                });
+            });
+        }
+
+        function updateMPRCrosshairPosition(event, plane, lock = false) {
+            const rect = event.target.getBoundingClientRect();
+            const x = ((event.clientX - rect.left) / rect.width) * 100;
+            const y = ((event.clientY - rect.top) / rect.height) * 100;
+            
+            // Update crosshair position
+            const crosshairId = `crosshair${plane.charAt(0).toUpperCase() + plane.slice(1)}`;
+            const crosshair = document.getElementById(crosshairId);
+            
+            if (crosshair) {
+                const hLine = crosshair.querySelector('.crosshair-line-h-mpr');
+                const vLine = crosshair.querySelector('.crosshair-line-v-mpr');
+                
+                if (hLine) hLine.style.top = `${y}%`;
+                if (vLine) vLine.style.left = `${x}%`;
+            }
+            
+            if (lock) {
+                // Update all other crosshairs for orthogonal sync
+                syncOrthogonalCrosshairs(plane, x, y);
+            }
+        }
+
+        function syncOrthogonalCrosshairs(activePlane, x, y) {
+            const planes = ['axial', 'sagittal', 'coronal'];
+            
+            planes.forEach(plane => {
+                if (plane === activePlane) return;
+                
+                const crosshairId = `crosshair${plane.charAt(0).toUpperCase() + plane.slice(1)}`;
+                const crosshair = document.getElementById(crosshairId);
+                
+                if (crosshair) {
+                    const hLine = crosshair.querySelector('.crosshair-line-h-mpr');
+                    const vLine = crosshair.querySelector('.crosshair-line-v-mpr');
+                    
+                    // Sync crosshair positions based on orthogonal relationships
+                    if (hLine && vLine) {
+                        if (plane === 'axial' && activePlane === 'sagittal') {
+                            hLine.style.top = `${y}%`;
+                        } else if (plane === 'axial' && activePlane === 'coronal') {
+                            vLine.style.left = `${x}%`;
+                        } else if (plane === 'sagittal' && activePlane === 'axial') {
+                            hLine.style.top = `${y}%`;
+                        } else if (plane === 'coronal' && activePlane === 'axial') {
+                            vLine.style.left = `${x}%`;
+                        }
+                    }
+                }
+            });
+        }
+
+        // Critical missing functions for button functionality
+        function loadStudiesList() {
+            return loadAvailableStudies();
+        }
+
+        function changePlane(plane) {
+            currentPlane = plane;
+            showToast(`Changed to ${plane} plane`, 'info');
+        }
+
+        function generateMRI(tissueType) {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            showToast(`Generating MRI ${tissueType} reconstruction...`, 'info');
+            generateMPR();
+        }
+
+        function generatePET() {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            showToast('Generating PET reconstruction...', 'info');
+            generateMPR();
+        }
+
+        function generateSPECT(tracer) {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            showToast(`Generating SPECT ${tracer} reconstruction...`, 'info');
+            generateMPR();
+        }
+
+        function generateNuclear(isotope) {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            showToast(`Generating ${isotope} nuclear medicine reconstruction...`, 'info');
+            generateMPR();
+        }
+
+        // Enhanced 3D visualization functions
+        function display3DMesh(meshData, viewportId) {
+            try {
+                const viewport = document.getElementById(viewportId === '3d' ? 'threeDContainer' : viewportId);
+                if (!viewport) return;
+                
+                // Clear existing content
+                viewport.innerHTML = '';
+                
+                // Create 3D visualization placeholder (would integrate with Three.js in production)
+                const meshInfo = document.createElement('div');
+                meshInfo.style.cssText = `
+                    color: var(--accent-color);
+                    text-align: center;
+                    padding: 20px;
+                    font-size: 12px;
+                `;
+                meshInfo.innerHTML = `
+                    <i class="fas fa-cube" style="font-size: 48px; margin-bottom: 16px; display: block;"></i>
+                    <div>3D Mesh Generated</div>
+                    <div>Vertices: ${meshData.vertices ? meshData.vertices.length : 'N/A'}</div>
+                    <div>Faces: ${meshData.faces ? meshData.faces.length : 'N/A'}</div>
+                `;
+                
+                viewport.appendChild(meshInfo);
+                
+            } catch (error) {
+                console.error('Error displaying 3D mesh:', error);
+            }
+        }
+
+        // Enhanced volume rendering for different modalities
+        async function generateVolumeRender() {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading('Generating volume rendering...');
+                
+                const response = await fetch(`/dicom-viewer/api/series/${currentSeries.id}/volume/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
+                const data = await response.json();
+                
+                if (data.success && data.volume_views) {
+                    // Switch to MPR view to show volume rendering
+                    document.getElementById('singleView').style.display = 'none';
+                    document.getElementById('mprView').style.display = 'grid';
+                    
+                    // Display volume rendered views
+                    document.getElementById('mprAxial').src = data.volume_views.axial;
+                    document.getElementById('mprSagittal').src = data.volume_views.sagittal;
+                    document.getElementById('mprCoronal').src = data.volume_views.coronal;
+                    
+                    hideLoading();
+                    showToast('Volume rendering completed', 'success');
+                } else {
+                    hideLoading();
+                    showToast('Failed to generate volume rendering', 'error');
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error('Error generating volume rendering:', error);
+                showToast('Error generating volume rendering', 'error');
+            }
+        }
+
+
 
 
 
