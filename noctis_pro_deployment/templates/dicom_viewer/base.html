@@ -1388,11 +1388,42 @@
                                 </div>
                                 <input type="range" class="slider" id="wlSlider" min="-1000" max="1000" value="40" oninput="updateWindowLevel(this.value)">
                             </div>
-                            <div class="preset-grid">
-                                <button class="preset-btn" onclick="applyPreset('lung')">Lung</button>
-                                <button class="preset-btn" onclick="applyPreset('bone')">Bone</button>
-                                <button class="preset-btn" onclick="applyPreset('soft')">Soft</button>
-                                <button class="preset-btn" onclick="applyPreset('brain')">Brain</button>
+                            <div class="preset-grid" style="grid-template-columns: 1fr 1fr; gap: 4px;">
+                                <!-- Primary presets -->
+                                <button class="preset-btn" onclick="applyPreset('lung')" title="Lung parenchyma (WW:1600, WL:-600)">Lung</button>
+                                <button class="preset-btn" onclick="applyPreset('bone')" title="Bone structures (WW:2000, WL:300)">Bone</button>
+                                <button class="preset-btn" onclick="applyPreset('soft')" title="Soft tissue (WW:350, WL:40)">Soft</button>
+                                <button class="preset-btn" onclick="applyPreset('brain')" title="Brain tissue (WW:80, WL:40)">Brain</button>
+                                <button class="preset-btn" onclick="applyPreset('abdomen')" title="Abdominal organs (WW:350, WL:50)">Abdomen</button>
+                                <button class="preset-btn" onclick="applyPreset('liver')" title="Hepatic tissue (WW:160, WL:60)">Liver</button>
+                                <button class="preset-btn" onclick="applyPreset('chest')" title="Chest soft tissue (WW:400, WL:40)">Chest</button>
+                                <button class="preset-btn" onclick="applyPreset('spine')" title="Spinal structures (WW:400, WL:50)">Spine</button>
+                            </div>
+                            
+                            <div style="margin: 8px 0 4px; font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Advanced</div>
+                            <div class="preset-grid" style="grid-template-columns: 1fr 1fr; gap: 4px;">
+                                <button class="preset-btn" onclick="applyPreset('vessels')" title="Vascular structures (WW:600, WL:100)">Vessels</button>
+                                <button class="preset-btn" onclick="applyPreset('muscle')" title="Muscle contrast (WW:400, WL:50)">Muscle</button>
+                                <button class="preset-btn" onclick="applyPreset('fat')" title="Adipose tissue (WW:200, WL:-100)">Fat</button>
+                                <button class="preset-btn" onclick="applyPreset('kidney')" title="Renal parenchyma (WW:400, WL:30)">Kidney</button>
+                            </div>
+                            
+                            <div style="margin: 8px 0 4px; font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Clinical</div>
+                            <div class="preset-grid" style="grid-template-columns: 1fr 1fr; gap: 4px;">
+                                <button class="preset-btn" onclick="applyPreset('pe_study')" title="Pulmonary embolism (WW:700, WL:100)">PE</button>
+                                <button class="preset-btn" onclick="applyPreset('angio')" title="CT angiography (WW:600, WL:150)">Angio</button>
+                                <button class="preset-btn" onclick="applyPreset('stroke')" title="Acute stroke (WW:40, WL:40)">Stroke</button>
+                                <button class="preset-btn" onclick="applyPreset('trauma')" title="Trauma assessment (WW:400, WL:40)">Trauma</button>
+                            </div>
+                            
+                            <div style="margin: 8px 0 4px; font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Auto</div>
+                            <div style="display: flex; gap: 4px;">
+                                <button class="preset-btn" onclick="autoWindow()" title="Automatically optimize window/level" style="flex: 1; background: var(--success-color); color: var(--primary-bg);">
+                                    <i class="fas fa-magic"></i> Auto
+                                </button>
+                                <button class="preset-btn" onclick="resetToDefaults()" title="Reset to DICOM defaults" style="flex: 1;">
+                                    <i class="fas fa-undo"></i> Reset
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -1700,14 +1731,36 @@
         let annotations = [];
         let currentMeasurement = null;
         
-        // Window presets - Professional medical presets
+        // Professional medical imaging window presets - ACR recommended
         const windowPresets = {
-            'lung': { ww: 1500, wl: -600 },
-            'bone': { ww: 2000, wl: 300 },
-            'soft': { ww: 400, wl: 40 },
-            'brain': { ww: 100, wl: 50 },
-            'liver': { ww: 160, wl: 60 },
-            'mediastinum': { ww: 350, wl: 50 }
+            // Primary CT presets
+            'lung': { ww: 1600, wl: -600, desc: 'Lung parenchyma' },
+            'bone': { ww: 2000, wl: 300, desc: 'Bone structures' },
+            'soft': { ww: 350, wl: 40, desc: 'Soft tissue' },
+            'brain': { ww: 80, wl: 40, desc: 'Brain tissue' },
+            'abdomen': { ww: 350, wl: 50, desc: 'Abdominal organs' },
+            'liver': { ww: 160, wl: 60, desc: 'Hepatic tissue' },
+            'mediastinum': { ww: 350, wl: 50, desc: 'Mediastinal structures' },
+            'spine': { ww: 400, wl: 50, desc: 'Spinal structures' },
+            'pelvis': { ww: 400, wl: 40, desc: 'Pelvic anatomy' },
+            'chest': { ww: 400, wl: 40, desc: 'Chest soft tissue' },
+            
+            // Enhanced tissue-specific presets
+            'muscle': { ww: 400, wl: 50, desc: 'Muscle contrast' },
+            'fat': { ww: 200, wl: -100, desc: 'Adipose tissue' },
+            'vessels': { ww: 600, wl: 100, desc: 'Vascular structures' },
+            'kidney': { ww: 400, wl: 30, desc: 'Renal parenchyma' },
+            'pancreas': { ww: 200, wl: 30, desc: 'Pancreatic tissue' },
+            
+            // Clinical presets
+            'pe_study': { ww: 700, wl: 100, desc: 'Pulmonary embolism' },
+            'angio': { ww: 600, wl: 150, desc: 'CT angiography' },
+            'stroke': { ww: 40, wl: 40, desc: 'Acute stroke' },
+            'trauma': { ww: 400, wl: 40, desc: 'Trauma assessment' },
+            
+            // X-ray presets
+            'xray_chest': { ww: 2000, wl: 500, desc: 'Chest X-ray' },
+            'xray_bone': { ww: 4000, wl: 2000, desc: 'Bone X-ray' }
         };
         
         // MPR and 3D state - Enhanced for fast orthogonal transforms
@@ -2103,7 +2156,10 @@
                 if (wlValue) wlValue.textContent = windowLevel;
                 
                 updateImageDisplay();
-                showToast(`Applied ${preset.toUpperCase()} preset (WW:${windowWidth}, WL:${windowLevel})`, 'success');
+                
+                // Show enhanced notification with description
+                const desc = windowPresets[preset].desc || preset;
+                showToast(`Applied ${preset.toUpperCase()} preset: ${desc} (WW:${windowWidth}, WL:${windowLevel})`, 'success', 3000);
                 
                 // Briefly highlight the active preset
                 if (button) {
@@ -2116,6 +2172,73 @@
                     }, 1000);
                 }
             }
+        }
+
+        // Auto-optimize window/level based on image content
+        async function autoWindow() {
+            if (!images.length || currentImageIndex < 0 || currentImageIndex >= images.length) {
+                showToast('No image loaded for auto-windowing', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading('Analyzing image for optimal contrast...');
+                
+                const currentImage = images[currentImageIndex];
+                const response = await fetch(`/dicom-viewer/api/auto-window/${currentImage.id}/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    windowWidth = Math.round(data.window_width);
+                    windowLevel = Math.round(data.window_level);
+                    
+                    // Update UI
+                    updateWindowSliders();
+                    updateImageDisplay();
+                    
+                    hideLoading();
+                    showToast(`Auto-optimized: WW:${windowWidth}, WL:${windowLevel}${data.suggested_preset ? ` (${data.suggested_preset})` : ''}`, 'success');
+                } else {
+                    hideLoading();
+                    showToast('Auto-windowing failed: ' + (data.error || 'Unknown error'), 'error');
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error('Auto-windowing error:', error);
+                showToast('Error during auto-windowing', 'error');
+            }
+        }
+
+        // Reset to original DICOM window/level values
+        function resetToDefaults() {
+            windowWidth = defaultWindowWidth;
+            windowLevel = defaultWindowLevel;
+            
+            updateWindowSliders();
+            updateImageDisplay();
+            
+            showToast(`Reset to DICOM defaults: WW:${windowWidth}, WL:${windowLevel}`, 'info');
+        }
+
+        // Helper function to update window sliders
+        function updateWindowSliders() {
+            const wwSlider = document.getElementById('wwSlider');
+            const wlSlider = document.getElementById('wlSlider');
+            const wwValue = document.getElementById('wwValue');
+            const wlValue = document.getElementById('wlValue');
+            
+            if (wwSlider) wwSlider.value = windowWidth;
+            if (wlSlider) wlSlider.value = windowLevel;
+            if (wwValue) wwValue.textContent = windowWidth;
+            if (wlValue) wlValue.textContent = windowLevel;
         }
 
         function handleWindowing(deltaX, deltaY) {

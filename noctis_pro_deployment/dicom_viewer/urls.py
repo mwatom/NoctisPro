@@ -24,6 +24,7 @@ urlpatterns = [
     path('api/series/<int:series_id>/bone/', views.api_bone_reconstruction, name='api_bone_reconstruction'),
     path('api/hu/', views.api_hu_value, name='api_hu_value'),
     path('api/hounsfield-units/', views.api_hounsfield_units, name='api_hounsfield_units'),
+    path('api/auto-window/<int:image_id>/', views.api_auto_window, name='api_auto_window'),
     
     # Hounsfield Unit Calibration
     path('hu-calibration/', views.hu_calibration_dashboard, name='hu_calibration_dashboard'),

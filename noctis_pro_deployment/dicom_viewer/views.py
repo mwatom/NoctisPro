@@ -833,19 +833,29 @@ def api_dicom_image_display(request, image_id):
             except Exception:
                 pass
         
-        # Derive sensible defaults
+        # Enhanced window derivation with medical imaging optimization
         def derive_window(arr, fallback=(400.0, 40.0)):
             if arr is None:
                 return fallback
-            flat = arr.flatten()
             try:
-                p1 = float(np.percentile(flat, 1))
-                p99 = float(np.percentile(flat, 99))
+                processor = DicomProcessor()
+                ww, wl = processor.auto_window_from_data(arr, percentile_range=(2, 98))
+                
+                # Apply modality-specific adjustments
+                modality = str(getattr(ds, 'Modality', '')).upper() if ds is not None else ''
+                if modality == 'CT':
+                    # For CT, suggest optimal preset based on HU range
+                    suggested_preset = processor.get_optimal_preset_for_hu_range(
+                        arr.min(), arr.max(), modality
+                    )
+                    if suggested_preset in processor.window_presets:
+                        preset = processor.window_presets[suggested_preset]
+                        ww = preset['ww']
+                        wl = preset['wl']
+                
+                return ww, wl
             except Exception:
                 return fallback
-            ww = max(1.0, p99 - p1)
-            wl = (p99 + p1) / 2.0
-            return ww, wl
         
         default_window_width = None
         default_window_level = None
@@ -1118,6 +1128,89 @@ def api_hounsfield_units(request):
             return JsonResponse({'error': f'Invalid data: {str(e)}'}, status=400)
     
     return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@login_required
+@csrf_exempt
+def api_auto_window(request, image_id):
+    """API endpoint for automatic window/level optimization"""
+    if request.method == 'POST':
+        try:
+            image = get_object_or_404(DicomImage, id=image_id)
+            user = request.user
+            
+            # Check permissions
+            if user.is_facility_user() and getattr(user, 'facility', None) and image.series.study.facility != user.facility:
+                return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+            
+            # Load DICOM file and analyze
+            dicom_path = os.path.join(settings.MEDIA_ROOT, str(image.file_path))
+            ds = pydicom.dcmread(dicom_path)
+            
+            # Get pixel data and convert to HU
+            try:
+                pixel_array = ds.pixel_array
+                try:
+                    modality = str(getattr(ds, 'Modality', '')).upper()
+                    if modality in ['DX','CR','XA','RF','MG']:
+                        pixel_array = apply_voi_lut(pixel_array, ds)
+                except Exception:
+                    pass
+                pixel_array = pixel_array.astype(np.float32)
+            except Exception:
+                try:
+                    import SimpleITK as sitk
+                    sitk_image = sitk.ReadImage(dicom_path)
+                    px = sitk.GetArrayFromImage(sitk_image)
+                    if px.ndim == 3 and px.shape[0] == 1:
+                        px = px[0]
+                    pixel_array = px.astype(np.float32)
+                except Exception:
+                    return JsonResponse({'success': False, 'error': 'Could not read pixel data'}, status=500)
+            
+            # Apply rescale slope/intercept
+            if hasattr(ds, 'RescaleSlope') and hasattr(ds, 'RescaleIntercept'):
+                try:
+                    pixel_array = pixel_array * float(ds.RescaleSlope) + float(ds.RescaleIntercept)
+                except Exception:
+                    pass
+            
+            # Use enhanced windowing algorithm
+            processor = DicomProcessor()
+            auto_ww, auto_wl = processor.auto_window_from_data(pixel_array, percentile_range=(2, 98))
+            
+            # Get modality and suggest optimal preset
+            modality = str(getattr(ds, 'Modality', '')).upper()
+            suggested_preset = None
+            
+            if modality == 'CT':
+                suggested_preset = processor.get_optimal_preset_for_hu_range(
+                    pixel_array.min(), pixel_array.max(), modality
+                )
+                if suggested_preset in processor.window_presets:
+                    preset = processor.window_presets[suggested_preset]
+                    auto_ww = preset['ww']
+                    auto_wl = preset['wl']
+            
+            result = {
+                'success': True,
+                'window_width': float(auto_ww),
+                'window_level': float(auto_wl),
+                'suggested_preset': suggested_preset,
+                'modality': modality,
+                'hu_range': {
+                    'min': float(pixel_array.min()),
+                    'max': float(pixel_array.max()),
+                    'mean': float(np.mean(pixel_array))
+                }
+            }
+            
+            return JsonResponse(result)
+            
+        except Exception as e:
+            logger.error(f"Error in auto-windowing for image {image_id}: {str(e)}")
+            return JsonResponse({'success': False, 'error': f'Auto-windowing failed: {str(e)}'}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
 
 @login_required
 @csrf_exempt
@@ -1885,7 +1978,8 @@ def web_dicom_image(request, image_id):
         if inv_param is None and photo == 'MONOCHROME1':
             invert = True
         processor = DicomProcessor()
-        windowed = processor.apply_windowing(pixel_array, window_width, window_level, invert)
+        # Use enhanced windowing for better tissue contrast
+        windowed = processor.apply_windowing(pixel_array, window_width, window_level, invert, enhanced_contrast=True)
         pil_image = Image.fromarray(windowed)
         buffer = BytesIO()
         pil_image.save(buffer, format='PNG')
