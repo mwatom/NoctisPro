@@ -220,16 +220,22 @@
         .dicom-canvas {
             max-width: 100%;
             max-height: 100%;
-            /* Progressive enhancement for different browsers */
+            /* Enhanced rendering for medical images */
             image-rendering: -webkit-optimize-contrast;
             image-rendering: -moz-crisp-edges;
             image-rendering: crisp-edges;
             image-rendering: high-quality;
             image-rendering: optimizeQuality;
+            /* Prevent any smoothing that could degrade medical image quality */
+            -webkit-backface-visibility: hidden;
+            -webkit-transform: translateZ(0);
+            transform: translateZ(0);
             /* Enhanced medical image display */
             cursor: crosshair;
             transition: transform 0.1s ease;
-            /* Filters disabled to prevent white image issue */
+            /* Ensure pixel-perfect rendering */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
             filter: none;
             -webkit-filter: none;
             /* Hardware acceleration for smooth rendering */
@@ -289,6 +295,28 @@
         }
 
         /* Overlay Information */
+        /* X-ray specific optimizations */
+        .dicom-canvas[data-modality="DX"],
+        .dicom-canvas[data-modality="CR"],
+        .dicom-canvas[data-modality="DR"] {
+            /* Disable smoothing for X-ray images to preserve sharp details */
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+            /* Enhanced contrast for X-ray visualization */
+            filter: contrast(1.05) brightness(1.02) !important;
+        }
+
+        .dicom-image[data-modality="DX"],
+        .dicom-image[data-modality="CR"],
+        .dicom-image[data-modality="DR"] {
+            /* X-ray image optimizations */
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+            filter: contrast(1.05) brightness(1.02) !important;
+        }
+
         .overlay-info {
             position: absolute;
             top: 12px;
@@ -1293,6 +1321,15 @@
                 <button class="tool" data-tool="invert" onclick="toggleInvert()" title="Invert">
                     <i class="fas fa-adjust"></i>
                 </button>
+                <button class="tool" data-tool="flip-h" onclick="flipHorizontal()" title="Flip Horizontal">
+                    <i class="fas fa-arrows-alt-h"></i>
+                </button>
+                <button class="tool" data-tool="flip-v" onclick="flipVertical()" title="Flip Vertical">
+                    <i class="fas fa-arrows-alt-v"></i>
+                </button>
+                <button class="tool" data-tool="rotate" onclick="rotateImage()" title="Rotate 90° CW">
+                    <i class="fas fa-redo"></i>
+                </button>
                 <button class="tool" data-tool="mpr" onclick="toggleMPR()" title="MPR Views">
                     <i class="fas fa-cube"></i>
                 </button>
@@ -1437,6 +1474,16 @@
                                 <button class="preset-btn" onclick="applyPreset('muscle')" title="Muscle contrast (WW:400, WL:50)">Muscle</button>
                                 <button class="preset-btn" onclick="applyPreset('fat')" title="Adipose tissue (WW:200, WL:-100)">Fat</button>
                                 <button class="preset-btn" onclick="applyPreset('kidney')" title="Renal parenchyma (WW:400, WL:30)">Kidney</button>
+                            </div>
+                            
+                            <div style="margin: 8px 0 4px; font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">X-Ray Optimized</div>
+                            <div class="preset-grid" style="grid-template-columns: 1fr 1fr; gap: 4px;">
+                                <button class="preset-btn" onclick="applyPreset('xray_chest')" title="Chest X-ray - lungs and mediastinum (WW:2000, WL:0)">Chest XR</button>
+                                <button class="preset-btn" onclick="applyPreset('xray_bone')" title="X-ray bone structures (WW:3000, WL:500)">Bone XR</button>
+                                <button class="preset-btn" onclick="applyPreset('xray_soft')" title="X-ray soft tissue detail (WW:400, WL:50)">Soft XR</button>
+                                <button class="preset-btn" onclick="applyPreset('xray_extremity')" title="Extremity X-rays (WW:2500, WL:300)">Extremity</button>
+                                <button class="preset-btn" onclick="applyPreset('xray_spine')" title="Spine X-ray imaging (WW:2000, WL:200)">Spine XR</button>
+                                <button class="preset-btn" onclick="applyPreset('xray_abdomen')" title="Abdominal X-ray (WW:1000, WL:50)">Abd XR</button>
                             </div>
                             
                             <div style="margin: 8px 0 4px; font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Clinical</div>
@@ -1767,7 +1814,7 @@
         let annotations = [];
         let currentMeasurement = null;
         
-        // Professional medical imaging window presets - ACR recommended
+        // Professional medical imaging window presets - ACR recommended with X-ray optimizations
         const windowPresets = {
             // Primary CT presets
             'lung': { ww: 1600, wl: -600, desc: 'Lung parenchyma' },
@@ -1779,6 +1826,15 @@
             'mediastinum': { ww: 350, wl: 50, desc: 'Mediastinal structures' },
             'spine': { ww: 400, wl: 50, desc: 'Spinal structures' },
             'pelvis': { ww: 400, wl: 40, desc: 'Pelvic anatomy' },
+            
+            // Enhanced X-ray specific presets for optimal visualization
+            'xray_chest': { ww: 2000, wl: 0, desc: 'Chest X-ray - lungs and mediastinum' },
+            'xray_bone': { ww: 3000, wl: 500, desc: 'X-ray bone structures' },
+            'xray_soft': { ww: 400, wl: 50, desc: 'X-ray soft tissue detail' },
+            'xray_pediatric': { ww: 1500, wl: 0, desc: 'Pediatric X-ray imaging' },
+            'xray_extremity': { ww: 2500, wl: 300, desc: 'Extremity X-rays' },
+            'xray_spine': { ww: 2000, wl: 200, desc: 'Spine X-ray imaging' },
+            'xray_abdomen': { ww: 1000, wl: 50, desc: 'Abdominal X-ray' },
             'chest': { ww: 400, wl: 40, desc: 'Chest soft tissue' },
             
             // Enhanced tissue-specific presets
@@ -1835,8 +1891,8 @@
         let lastCrosshairUpdate = 0;
         const CROSSHAIR_UPDATE_DELAY = 50; // 50ms = 20 FPS for smooth updates
         
-        // High-Quality Canvas Rendering Function
-        function renderImageToCanvas(imgElement, canvas) {
+        // Enhanced High-Quality Canvas Rendering Function for Medical Images
+        function renderImageToCanvas(imgElement, canvas, modality) {
             if (!imgElement || !canvas || !imgElement.complete) return;
             
             const ctx = canvas.getContext('2d');
@@ -1849,20 +1905,37 @@
             const displayWidth = rect.width;
             const displayHeight = rect.height;
             
-            // Set actual canvas size to device pixel ratio
-            canvas.width = displayWidth * dpr;
-            canvas.height = displayHeight * dpr;
+            // Modality-specific resolution enhancement
+            let resolutionMultiplier = 1.5; // Default for CT/MR
+            if (modality && ['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality.toUpperCase())) {
+                resolutionMultiplier = 2.0; // Higher resolution for X-ray images
+            }
+            
+            // Set actual canvas size to device pixel ratio with enhanced resolution
+            canvas.width = displayWidth * dpr * resolutionMultiplier;
+            canvas.height = displayHeight * dpr * resolutionMultiplier;
             
             // Scale canvas back down using CSS
             canvas.style.width = displayWidth + 'px';
             canvas.style.height = displayHeight + 'px';
             
-            // Scale the drawing context to match device pixel ratio
-            ctx.scale(dpr, dpr);
+            // Scale the drawing context to match enhanced pixel ratio
+            ctx.scale(dpr * resolutionMultiplier, dpr * resolutionMultiplier);
             
-            // Enable high-quality rendering
+            // Enable highest quality rendering for medical images
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = 'high';
+            
+            // Modality-specific rendering optimizations
+            if (modality && ['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality.toUpperCase())) {
+                // For X-ray images, disable smoothing to preserve sharp edges
+                ctx.imageSmoothingEnabled = false;
+                ctx.filter = 'contrast(1.1) brightness(1.05)'; // Slight enhancement for X-rays
+            } else {
+                // Additional quality settings for CT/MR imaging
+                ctx.textRenderingOptimization = 'optimizeQuality';
+                ctx.filter = 'none'; // Disable any default filters that might degrade image quality
+            }
             
             // Calculate aspect-preserving dimensions
             const imgAspect = imgElement.naturalWidth / imgElement.naturalHeight;
@@ -1908,6 +1981,11 @@
             setTimeout(() => {
                 showToast('💡 Tip: Right-click or Shift+click and drag on image to adjust brightness/contrast', 'info', 6000);
             }, 2000);
+            
+            // Show keyboard shortcuts help
+            setTimeout(() => {
+                showToast('⌨️ Keyboard shortcuts: H=Flip horizontal, V=Flip vertical, T=Rotate, Ctrl+R=Reset transforms', 'info', 8000);
+            }, 10000);
             loadAvailableStudies();
             
             // Check for study ID in URL
@@ -2086,7 +2164,32 @@
                         break;
                     case 'r':
                     case 'R':
-                        resetView();
+                        if (e.ctrlKey || e.metaKey) {
+                            // Ctrl+R: Reset transformations only
+                            resetImageTransformations();
+                            e.preventDefault();
+                        } else {
+                            // R: Reset entire view
+                            resetView();
+                        }
+                        break;
+                    case 'h':
+                    case 'H':
+                        // H: Flip horizontal
+                        flipHorizontal();
+                        e.preventDefault();
+                        break;
+                    case 'v':
+                    case 'V':
+                        // V: Flip vertical
+                        flipVertical();
+                        e.preventDefault();
+                        break;
+                    case 't':
+                    case 'T':
+                        // T: Rotate (Turn)
+                        rotateImage();
+                        e.preventDefault();
                         break;
                     case 'ArrowUp':
                         e.preventDefault();
@@ -2379,6 +2482,11 @@
                         
                         // Render to high-quality canvas with modality-specific optimization
                         renderImageToCanvas(dicomImage, dicomCanvas, modality);
+                        
+                        // Reapply any active transformations
+                        if (flipHorizontalState || flipVerticalState || rotationAngle !== 0) {
+                            applyImageTransformations();
+                        }
                         
                         hideLoading();
                         updateImageInfo(data.image_info);
@@ -2805,6 +2913,160 @@
             }
         }
 
+        // Image transformation variables
+        let flipHorizontalState = false;
+        let flipVerticalState = false;
+        let rotationAngle = 0; // In degrees, increments of 90
+
+        function flipHorizontal() {
+            flipHorizontalState = !flipHorizontalState;
+            applyImageTransformations();
+            
+            // Update tool visual state
+            const tool = document.querySelector('[data-tool="flip-h"]');
+            if (flipHorizontalState) {
+                tool.classList.add('active');
+                showToast('Flipped horizontally', 'success', 1500);
+            } else {
+                tool.classList.remove('active');
+                showToast('Horizontal flip removed', 'info', 1500);
+            }
+        }
+
+        function flipVertical() {
+            flipVerticalState = !flipVerticalState;
+            applyImageTransformations();
+            
+            // Update tool visual state
+            const tool = document.querySelector('[data-tool="flip-v"]');
+            if (flipVerticalState) {
+                tool.classList.add('active');
+                showToast('Flipped vertically', 'success', 1500);
+            } else {
+                tool.classList.remove('active');
+                showToast('Vertical flip removed', 'info', 1500);
+            }
+        }
+
+        function rotateImage() {
+            rotationAngle = (rotationAngle + 90) % 360;
+            applyImageTransformations();
+            
+            // Update tool visual state and tooltip
+            const tool = document.querySelector('[data-tool="rotate"]');
+            if (rotationAngle !== 0) {
+                tool.classList.add('active');
+                tool.title = `Rotate 90° CW (Currently ${rotationAngle}°)`;
+                showToast(`Rotated to ${rotationAngle}°`, 'success', 1500);
+            } else {
+                tool.classList.remove('active');
+                tool.title = 'Rotate 90° CW';
+                showToast('Rotation reset', 'info', 1500);
+            }
+        }
+
+        function applyImageTransformations() {
+            const canvas = document.getElementById('dicomCanvas');
+            const img = document.getElementById('dicomImage');
+            
+            if (!canvas || !img || !img.complete) {
+                return;
+            }
+
+            // Build CSS transform string
+            let transforms = [];
+            
+            if (flipHorizontalState) {
+                transforms.push('scaleX(-1)');
+            }
+            
+            if (flipVerticalState) {
+                transforms.push('scaleY(-1)');
+            }
+            
+            if (rotationAngle !== 0) {
+                transforms.push(`rotate(${rotationAngle}deg)`);
+            }
+            
+            // Apply transforms to both canvas and image
+            const transformString = transforms.length > 0 ? transforms.join(' ') : 'none';
+            canvas.style.transform = transformString;
+            img.style.transform = transformString;
+            
+            // For canvas, we need to redraw with transformations
+            redrawCanvasWithTransformations();
+        }
+
+        function redrawCanvasWithTransformations() {
+            const canvas = document.getElementById('dicomCanvas');
+            const img = document.getElementById('dicomImage');
+            
+            if (!canvas || !img || !img.complete) {
+                return;
+            }
+
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.getBoundingClientRect();
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Save current context
+            ctx.save();
+            
+            // Move to center for transformations
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            
+            // Apply transformations
+            if (flipHorizontalState) {
+                ctx.scale(-1, 1);
+            }
+            
+            if (flipVerticalState) {
+                ctx.scale(1, -1);
+            }
+            
+            if (rotationAngle !== 0) {
+                ctx.rotate((rotationAngle * Math.PI) / 180);
+            }
+            
+            // Draw image centered
+            const drawWidth = img.naturalWidth * (canvas.height / img.naturalHeight);
+            const drawHeight = canvas.height;
+            ctx.drawImage(img, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+            
+            // Restore context
+            ctx.restore();
+        }
+
+        function resetImageTransformations() {
+            flipHorizontalState = false;
+            flipVerticalState = false;
+            rotationAngle = 0;
+            
+            // Reset tool visual states
+            document.querySelector('[data-tool="flip-h"]')?.classList.remove('active');
+            document.querySelector('[data-tool="flip-v"]')?.classList.remove('active');
+            const rotateTool = document.querySelector('[data-tool="rotate"]');
+            if (rotateTool) {
+                rotateTool.classList.remove('active');
+                rotateTool.title = 'Rotate 90° CW';
+            }
+            
+            // Reset canvas and image transforms
+            const canvas = document.getElementById('dicomCanvas');
+            const img = document.getElementById('dicomImage');
+            if (canvas) canvas.style.transform = 'none';
+            if (img) img.style.transform = 'none';
+            
+            // Redraw canvas normally
+            if (canvas && img && img.complete) {
+                renderImageToCanvas(img, canvas);
+            }
+            
+            showToast('All transformations reset', 'info', 2000);
+        }
+
         function resetView() {
             if (mprMode) {
                 // Reset all MPR viewports
@@ -2818,9 +3080,12 @@
                 document.getElementById('zoomSlider').value = 100;
                 document.getElementById('zoomValue').textContent = '100%';
                 
+                // Reset image transformations
+                resetImageTransformations();
+                
                 applyTransform();
                 updateZoomInfo();
-                showToast('View reset', 'success');
+                showToast('View and transformations reset', 'success');
             }
         }
 
