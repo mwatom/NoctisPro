@@ -1178,3 +1178,8 @@ Watching for file changes with StatReloader
 [mHTTP GET /login/ 200 [0.01, 127.0.0.1:56756][0m
 [mHTTP GET /dicom-viewer/ 200 [0.01, 127.0.0.1:56766][0m
 [32mHTTP GET /admin-panel/ 302 [0.01, 127.0.0.1:56776][0m
+[mHTTP GET /dicom-viewer/api/image/6/display/?ww=400&wl=40 200 [0.02, 127.0.0.1:55494][0m
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/dicom_viewer/views.py changed, reloading.
+Watching for file changes with StatReloader
