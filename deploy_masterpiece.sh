@@ -7,6 +7,7 @@
 set -euo pipefail
 
 # Professional color palette
+declare -r RED='\033[0;31m'
 declare -r GREEN='\033[0;32m'
 declare -r CYAN='\033[0;36m'
 declare -r WHITE='\033[1;37m'
