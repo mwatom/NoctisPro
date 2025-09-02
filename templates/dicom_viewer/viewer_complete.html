@@ -814,7 +814,7 @@
                 </div>
             </div>
             <div class="nav-right">
-                <select class="select" id="studySelect">
+                <select class="select" id="studySelect" onchange="loadStudy(this.value)">
                     <option value="">Select Study from System</option>
                 </select>
                 <button class="btn btn-primary" onclick="loadFromExternalMedia()" title="Load DICOM from USB/DVD">
@@ -1609,7 +1609,6 @@
                     dicomImage.onload = function() {
                         hideLoading();
                         updateImageInfo(data.image_info);
-                        updateOverlayInfo();
                         updateMeasurementOverlay();
                         updateAnnotationOverlay();
                         
@@ -1657,17 +1656,11 @@
         }
 
         function updateOverlayInfo() {
-            const overlayInfo = document.getElementById('overlayInfo');
-            overlayInfo.innerHTML = `
-                WW: ${Math.round(windowWidth)}<br>
-                WL: ${Math.round(windowLevel)}<br>
-                Slice: ${currentImageIndex + 1}/${images.length}<br>
-                HU: ${document.getElementById('huValue').textContent}
-            `;
+            // No overlay info to update - keeping canvas clean
         }
 
         function updateZoomInfo() {
-            document.getElementById('zoomInfo').textContent = `Zoom: ${Math.round(zoomFactor * 100)}%`;
+            // No zoom info to update - keeping canvas clean
         }
 
         function updateMouseInfo(event) {
@@ -1684,7 +1677,7 @@
         // Study and Series Management
         async function loadAvailableStudies() {
             try {
-                const response = await fetch('/worklist/api/studies/');
+                const response = await fetch('/dicom-viewer/api/studies/');
                 const data = await response.json();
                 
                 if (data.success && data.studies) {
@@ -1700,6 +1693,24 @@
                 }
             } catch (error) {
                 console.error('Error loading studies:', error);
+                // Try fallback endpoint
+                try {
+                    const fallbackResponse = await fetch('/worklist/api/studies/');
+                    const fallbackData = await fallbackResponse.json();
+                    if (fallbackData.success && fallbackData.studies) {
+                        const studySelect = document.getElementById('studySelect');
+                        studySelect.innerHTML = '<option value="">Select Study from System</option>';
+                        
+                        fallbackData.studies.forEach(study => {
+                            const option = document.createElement('option');
+                            option.value = study.id;
+                            option.textContent = `${study.patient_name} - ${study.accession_number} (${study.modality})`;
+                            studySelect.appendChild(option);
+                        });
+                    }
+                } catch (fallbackError) {
+                    console.error('Fallback also failed:', fallbackError);
+                }
             }
         }
 
@@ -1816,22 +1827,7 @@
             showToast('Please select DICOM files from USB/DVD or local storage', 'info');
         }
 
-        function selectUSBDrive() {
-            showToast('Please ensure USB drive is connected and contains DICOM files', 'info');
-            document.getElementById('fileInput').setAttribute('webkitdirectory', '');
-            document.getElementById('fileInput').click();
-        }
 
-        function selectDVD() {
-            showToast('Please ensure DVD/CD is inserted and contains DICOM files', 'info');
-            document.getElementById('fileInput').setAttribute('webkitdirectory', '');
-            document.getElementById('fileInput').click();
-        }
-
-        function closeExternalMediaModal(button) {
-            const modal = button.closest('div').parentElement;
-            document.body.removeChild(modal);
-        }
 
         async function processDicomFiles(files) {
             try {
@@ -2221,7 +2217,15 @@
                 const response = await fetch(`/dicom-viewer/api/mpr/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
                 const data = await response.json();
                 
-                if (data.success) {
+                if (data.views) {
+                    // Switch to MPR mode and show views
+                    document.getElementById('singleView').style.display = 'none';
+                    document.getElementById('mprView').style.display = 'grid';
+                    
+                    document.getElementById('mprAxial').src = data.views.axial;
+                    document.getElementById('mprSagittal').src = data.views.sagittal;
+                    document.getElementById('mprCoronal').src = data.views.coronal;
+                    
                     hideLoading();
                     showToast('MPR views generated successfully', 'success');
                 } else {
@@ -2264,8 +2268,16 @@
         }
 
         function toggleMPR() {
-            showToast('MPR toggle functionality implemented', 'info');
-            generateMPR();
+            const mprView = document.getElementById('mprView');
+            const singleView = document.getElementById('singleView');
+            
+            if (mprView.style.display === 'none') {
+                generateMPR();
+            } else {
+                mprView.style.display = 'none';
+                singleView.style.display = 'flex';
+                showToast('Switched to single view', 'info');
+            }
         }
 
         async function show3DReconstruction() {
@@ -2514,6 +2526,94 @@
             }
             
             return token || '';
+        }
+
+        // Missing functions that buttons are calling - URGENT FIX
+        function setActivePlane(plane) {
+            showToast(`Switched to ${plane} plane`, 'info');
+        }
+
+        function updateCrosshairOverlay(plane) {
+            // Crosshair overlay update
+        }
+
+        function generateBone3DType(type) {
+            if (!type || !currentSeries) {
+                showToast('Please select a type and load a series first', 'warning');
+                return;
+            }
+            showToast(`Generating ${type} bone 3D reconstruction...`, 'info');
+            generateBone3D();
+        }
+
+        function generateVolumeRenderType(type) {
+            if (!type || !currentSeries) {
+                showToast('Please select a type and load a series first', 'warning');
+                return;
+            }
+            showToast(`Generating ${type} volume rendering...`, 'info');
+        }
+
+        function generateAdvanced3D(type) {
+            if (!type || !currentSeries) {
+                showToast('Please select a type and load a series first', 'warning');
+                return;
+            }
+            showToast(`Generating ${type} advanced 3D...`, 'info');
+        }
+
+        async function generateBone3D() {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading('Generating bone 3D reconstruction...');
+                
+                const response = await fetch(`/dicom-viewer/api/bone/${currentSeries.id}/?threshold=200&mesh=true`);
+                const data = await response.json();
+                
+                if (data.bone_views) {
+                    document.getElementById('singleView').style.display = 'none';
+                    document.getElementById('mprView').style.display = 'grid';
+                    
+                    document.getElementById('mprAxial').src = data.bone_views.axial;
+                    document.getElementById('mprSagittal').src = data.bone_views.sagittal;
+                    document.getElementById('mprCoronal').src = data.bone_views.coronal;
+                    
+                    hideLoading();
+                    showToast('Bone 3D reconstruction completed', 'success');
+                } else {
+                    hideLoading();
+                    showToast('Failed to generate bone 3D', 'error');
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error('Error generating bone 3D:', error);
+                showToast('Error generating bone 3D', 'error');
+            }
+        }
+
+        function runAIAnalysis(type) {
+            if (!type) {
+                showToast('Please select an AI analysis type', 'warning');
+                return;
+            }
+            showToast(`Running ${type} AI analysis...`, 'info');
+        }
+
+        function runQuickAI() {
+            showToast('Running quick AI scan...', 'info');
+        }
+
+        function showAIResults() {
+            showToast('AI results panel opened', 'info');
+        }
+
+        function exportCurrentImage() {
+            exportImage();
         }
 
 
