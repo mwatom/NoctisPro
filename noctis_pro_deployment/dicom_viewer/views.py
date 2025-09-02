@@ -1735,7 +1735,7 @@ def web_index(request):
 
 @login_required
 def web_viewer(request):
-    """Render the web viewer page. Expects ?study_id in query."""
+    """Render the simple web viewer page. Expects ?study_id in query."""
     # If an admin/radiologist opens a specific study, mark it in_progress
     try:
         study_id_param = request.GET.get('study_id')
@@ -1750,7 +1750,12 @@ def web_viewer(request):
                 pass
     except Exception:
         pass
-    return render(request, 'dicom_viewer/base.html')
+    return render(request, 'dicom_viewer/simple_viewer.html')
+
+@login_required
+def simple_viewer(request):
+    """Simple DICOM viewer with minimal UI - just displays images"""
+    return render(request, 'dicom_viewer/simple_viewer.html')
 
 
 @login_required

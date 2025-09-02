@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple DICOM Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .viewer-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .top-bar {
+            background: #222;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #444;
+        }
+
+        .title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .btn {
+            background: #333;
+            border: 1px solid #555;
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .btn:hover {
+            background: #00d4ff;
+            color: #000;
+        }
+
+        .select {
+            background: #333;
+            border: 1px solid #555;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .image-area {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            position: relative;
+        }
+
+        .dicom-image {
+            max-width: 100%;
+            max-height: 100%;
+            image-rendering: pixelated;
+        }
+
+        .info-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .bottom-bar {
+            background: #222;
+            padding: 8px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #444;
+            font-size: 12px;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .slider {
+            width: 200px;
+            height: 4px;
+            background: #444;
+            border-radius: 2px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #00d4ff;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #00d4ff;
+        }
+
+        .spinner {
+            border: 3px solid #333;
+            border-top: 3px solid #00d4ff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="viewer-container">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="title">Simple DICOM Viewer</div>
+            <div class="controls">
+                <select class="select" id="studySelect">
+                    <option value="">Select Study</option>
+                </select>
+                <select class="select" id="seriesSelect">
+                    <option value="">Select Series</option>
+                </select>
+                <button class="btn" onclick="loadFiles()">Load Files</button>
+                <button class="btn" onclick="resetView()">Reset</button>
+                <a href="/worklist/" class="btn">Back</a>
+            </div>
+        </div>
+
+        <!-- Image Display Area -->
+        <div class="image-area">
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <div>Loading...</div>
+            </div>
+            
+            <img class="dicom-image hidden" id="dicomImage" alt="DICOM Image">
+            
+            <div class="info-overlay" id="infoOverlay">
+                Patient: -<br>
+                Study: -<br>
+                Series: -<br>
+                Image: 1/1<br>
+                WW: 400 | WL: 40
+            </div>
+        </div>
+
+        <!-- Bottom Controls -->
+        <div class="bottom-bar">
+            <div class="slider-container">
+                <span>Slice:</span>
+                <input type="range" class="slider" id="sliceSlider" min="0" max="0" value="0" onchange="changeSlice(this.value)">
+                <span id="sliceInfo">1/1</span>
+            </div>
+            
+            <div class="slider-container">
+                <span>Window:</span>
+                <input type="range" class="slider" id="windowSlider" min="1" max="4000" value="400" onchange="updateWindow(this.value)">
+                <span id="windowInfo">400</span>
+            </div>
+            
+            <div class="slider-container">
+                <span>Level:</span>
+                <input type="range" class="slider" id="levelSlider" min="-1000" max="1000" value="40" onchange="updateLevel(this.value)">
+                <span id="levelInfo">40</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden file input -->
+    <input type="file" id="fileInput" accept=".dcm,.dicom" multiple style="display: none;">
+
+    <script>
+        // Simple global variables
+        let currentStudy = null;
+        let currentSeries = null;
+        let images = [];
+        let currentImageIndex = 0;
+        let windowWidth = 400;
+        let windowLevel = 40;
+
+        // Initialize viewer
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAvailableStudies();
+            
+            // Check for study ID in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const studyId = urlParams.get('study') || urlParams.get('study_id');
+            if (studyId) {
+                loadStudy(studyId);
+            } else {
+                hideLoading();
+            }
+        });
+
+        // Load available studies
+        async function loadAvailableStudies() {
+            try {
+                const response = await fetch('/worklist/api/studies/');
+                const data = await response.json();
+                
+                if (data.success && data.studies) {
+                    const studySelect = document.getElementById('studySelect');
+                    studySelect.innerHTML = '<option value="">Select Study</option>';
+                    
+                    data.studies.forEach(study => {
+                        const option = document.createElement('option');
+                        option.value = study.id;
+                        option.textContent = `${study.patient_name} - ${study.accession_number}`;
+                        studySelect.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading studies:', error);
+            }
+        }
+
+        // Load study
+        async function loadStudy(studyId) {
+            if (!studyId) return;
+            
+            try {
+                showLoading('Loading study...');
+                
+                const response = await fetch(`/dicom-viewer/api/study/${studyId}/data/`);
+                const data = await response.json();
+                
+                if (data.study && data.series) {
+                    currentStudy = data.study;
+                    
+                    // Update series dropdown
+                    const seriesSelect = document.getElementById('seriesSelect');
+                    seriesSelect.innerHTML = '<option value="">Select Series</option>';
+                    
+                    data.series.forEach(series => {
+                        const option = document.createElement('option');
+                        option.value = series.id;
+                        option.textContent = `Series ${series.series_number}: ${series.description}`;
+                        seriesSelect.appendChild(option);
+                    });
+                    
+                    // Auto-load first series
+                    if (data.series.length > 0) {
+                        await loadSeries(data.series[0].id);
+                    }
+                    
+                    hideLoading();
+                } else {
+                    hideLoading();
+                    alert('Failed to load study');
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error('Error loading study:', error);
+                alert('Error loading study');
+            }
+        }
+
+        // Load series
+        async function loadSeries(seriesId) {
+            if (!seriesId) return;
+            
+            try {
+                showLoading('Loading images...');
+                
+                const response = await fetch(`/dicom-viewer/series/${seriesId}/images/`);
+                const data = await response.json();
+                
+                if (data.series && data.images) {
+                    currentSeries = data.series;
+                    images = data.images;
+                    currentImageIndex = 0;
+                    
+                    // Update slice slider
+                    const sliceSlider = document.getElementById('sliceSlider');
+                    sliceSlider.max = Math.max(0, images.length - 1);
+                    sliceSlider.value = 0;
+                    
+                    // Load first image
+                    await loadImage(0);
+                    
+                    hideLoading();
+                } else {
+                    hideLoading();
+                    alert('Failed to load series');
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error('Error loading series:', error);
+                alert('Error loading series');
+            }
+        }
+
+        // Load and display image
+        async function loadImage(index) {
+            if (!images.length || index < 0 || index >= images.length) return;
+            
+            const image = images[index];
+            currentImageIndex = index;
+            
+            try {
+                const url = `/dicom-viewer/api/image/${image.id}/display/?window_width=${windowWidth}&window_level=${windowLevel}`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.image_data) {
+                    const dicomImage = document.getElementById('dicomImage');
+                    dicomImage.src = data.image_data;
+                    dicomImage.classList.remove('hidden');
+                    
+                    // Update info overlay
+                    updateInfoOverlay(data.image_info);
+                    
+                    // Update slice info
+                    document.getElementById('sliceInfo').textContent = `${index + 1}/${images.length}`;
+                } else {
+                    alert('Failed to load image');
+                }
+                
+            } catch (error) {
+                console.error('Error loading image:', error);
+                alert('Error loading image');
+            }
+        }
+
+        // Update info overlay
+        function updateInfoOverlay(info) {
+            if (!info) return;
+            
+            const overlay = document.getElementById('infoOverlay');
+            overlay.innerHTML = `
+                Patient: ${info.patient_name || '-'}<br>
+                Study: ${info.study_date || '-'}<br>
+                Series: ${info.series_description || '-'}<br>
+                Image: ${currentImageIndex + 1}/${images.length}<br>
+                WW: ${Math.round(windowWidth)} | WL: ${Math.round(windowLevel)}
+            `;
+        }
+
+        // Change slice
+        function changeSlice(value) {
+            const index = parseInt(value);
+            if (index !== currentImageIndex) {
+                loadImage(index);
+            }
+        }
+
+        // Update window width
+        function updateWindow(value) {
+            windowWidth = parseInt(value);
+            document.getElementById('windowInfo').textContent = windowWidth;
+            if (images.length > 0) {
+                loadImage(currentImageIndex);
+            }
+        }
+
+        // Update window level
+        function updateLevel(value) {
+            windowLevel = parseInt(value);
+            document.getElementById('levelInfo').textContent = windowLevel;
+            if (images.length > 0) {
+                loadImage(currentImageIndex);
+            }
+        }
+
+        // Reset view
+        function resetView() {
+            windowWidth = 400;
+            windowLevel = 40;
+            document.getElementById('windowSlider').value = 400;
+            document.getElementById('levelSlider').value = 40;
+            document.getElementById('windowInfo').textContent = '400';
+            document.getElementById('levelInfo').textContent = '40';
+            
+            if (images.length > 0) {
+                loadImage(currentImageIndex);
+            }
+        }
+
+        // Load files
+        function loadFiles() {
+            document.getElementById('fileInput').click();
+        }
+
+        // Show/hide loading
+        function showLoading(message = 'Loading...') {
+            const loading = document.getElementById('loading');
+            loading.querySelector('div:last-child').textContent = message;
+            loading.classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.add('hidden');
+        }
+
+        // Handle study selection
+        document.getElementById('studySelect').addEventListener('change', function() {
+            if (this.value) {
+                loadStudy(this.value);
+            }
+        });
+
+        // Handle series selection
+        document.getElementById('seriesSelect').addEventListener('change', function() {
+            if (this.value) {
+                loadSeries(this.value);
+            }
+        });
+
+        // Handle file input
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const files = Array.from(e.target.files);
+            if (files.length > 0) {
+                uploadFiles(files);
+            }
+        });
+
+        // Upload files
+        async function uploadFiles(files) {
+            try {
+                showLoading('Uploading files...');
+                
+                const formData = new FormData();
+                files.forEach(file => {
+                    formData.append('dicom_files', file);
+                });
+                
+                const response = await fetch('/dicom-viewer/upload/', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': getCSRFToken()
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.study_id) {
+                    await loadStudy(data.study_id);
+                } else {
+                    hideLoading();
+                    alert(data.error || 'Upload failed');
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error('Error uploading files:', error);
+                alert('Error uploading files');
+            }
+        }
+
+        // Get CSRF token
+        function getCSRFToken() {
+            const cookie = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
+            return cookie ? cookie.split('=')[1] : '';
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            switch(e.key) {
+                case 'ArrowUp':
+                    e.preventDefault();
+                    if (currentImageIndex > 0) {
+                        changeSlice(currentImageIndex - 1);
+                        document.getElementById('sliceSlider').value = currentImageIndex;
+                    }
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    if (currentImageIndex < images.length - 1) {
+                        changeSlice(currentImageIndex + 1);
+                        document.getElementById('sliceSlider').value = currentImageIndex;
+                    }
+                    break;
+                case 'r':
+                case 'R':
+                    resetView();
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>

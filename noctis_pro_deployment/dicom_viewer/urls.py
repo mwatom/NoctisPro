@@ -65,6 +65,7 @@ urlpatterns += [
     # Web viewer pages
     path('web/', views.web_index, name='index'),
     path('web/viewer/', views.web_viewer, name='web_viewer'),
+    path('simple/', views.simple_viewer, name='simple_viewer'),
 
     # Web viewer JSON APIs
     path('study/<int:study_id>/', views.web_study_detail, name='web_study_detail'),
