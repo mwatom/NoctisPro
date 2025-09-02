@@ -230,23 +230,30 @@
             cursor: crosshair;
             transition: transform 0.1s ease;
             /* Filters disabled to prevent white image issue */
-            filter: none;
-            -webkit-filter: none;
+            filter: none !important;
+            -webkit-filter: none !important;
             /* Hardware acceleration for smooth rendering */
             transform: translateZ(0);
             -webkit-transform: translateZ(0);
             will-change: transform;
+            /* Ensure proper canvas display */
+            background: transparent;
         }
 
-        /* MPR Grid Layout */
+        /* MPR Grid Layout - Full screen resolution optimized */
         .mpr-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             grid-template-rows: 1fr 1fr;
             gap: 2px;
-            width: 100%;
-            height: 100%;
-            background: var(--border-color);
+            width: 100vw;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background: var(--primary-bg);
+            z-index: 1000;
+            padding: 2px;
         }
 
         .mpr-viewport {
@@ -255,37 +262,64 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            border: 1px solid var(--border-color);
+            border: 2px solid var(--border-color);
+            border-radius: 2px;
+            overflow: hidden;
+            cursor: crosshair;
+            /* Use full available space */
+            width: 100%;
+            height: 100%;
+            /* High-DPI optimization */
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: pixelated;
+        }
+
+        .mpr-viewport:hover {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
+            transform: scale(1.02);
+            transition: all 0.2s ease;
         }
 
         .mpr-viewport.active {
             border-color: var(--accent-color);
-            box-shadow: inset 0 0 0 2px var(--accent-color);
+            box-shadow: inset 0 0 0 3px var(--accent-color), 0 0 15px rgba(0, 212, 255, 0.5);
+            transform: scale(1.05);
         }
 
         .mpr-viewport img {
             max-width: 100%;
             max-height: 100%;
+            width: 100%;
+            height: 100%;
             image-rendering: -webkit-optimize-contrast;
             image-rendering: -moz-crisp-edges;
             image-rendering: crisp-edges;
             image-rendering: high-quality;
             cursor: crosshair;
-            filter: contrast(1.15) brightness(1.08) sharpen(0.3);
-            -webkit-filter: contrast(1.15) brightness(1.08);
+            /* Remove problematic filters that could cause white images */
+            filter: none !important;
+            -webkit-filter: none !important;
+            object-fit: contain;
+            background: transparent;
+            display: block;
         }
 
         .mpr-label {
             position: absolute;
-            top: 8px;
-            left: 8px;
-            background: rgba(0, 0, 0, 0.8);
+            top: 12px;
+            left: 12px;
+            background: rgba(0, 0, 0, 0.9);
             color: var(--accent-color);
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 11px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
             font-weight: bold;
             text-transform: uppercase;
+            border: 1px solid var(--accent-color);
+            z-index: 20;
+            pointer-events: none;
+            letter-spacing: 1px;
         }
 
         /* Overlay Information */
@@ -362,26 +396,30 @@
 
         .crosshair-line-h-mpr {
             position: absolute;
-            height: 2px;
+            height: 3px;
             background: #00ffff;
             width: 100%;
             top: 50%;
             left: 0;
             opacity: 0.9;
-            box-shadow: 0 0 4px rgba(0, 255, 255, 0.6);
+            box-shadow: 0 0 6px rgba(0, 255, 255, 0.8), 0 0 2px rgba(0, 0, 0, 0.8);
             transform: translateY(-1px);
+            z-index: 10;
+            pointer-events: none;
         }
 
         .crosshair-line-v-mpr {
             position: absolute;
-            width: 2px;
+            width: 3px;
             background: #00ffff;
             height: 100%;
             left: 50%;
             top: 0;
             opacity: 0.9;
-            box-shadow: 0 0 4px rgba(0, 255, 255, 0.6);
+            box-shadow: 0 0 6px rgba(0, 255, 255, 0.8), 0 0 2px rgba(0, 0, 0, 0.8);
             transform: translateX(-1px);
+            z-index: 10;
+            pointer-events: none;
         }
 
         /* Enhanced MPR viewport interactions */
@@ -999,6 +1037,10 @@
             transform: translateZ(0);
             -webkit-transform: translateZ(0);
             will-change: transform;
+            /* Ensure clean display */
+            border: none;
+            outline: none;
+            box-shadow: none;
         }
 
         .dicom-image {
@@ -1014,13 +1056,38 @@
             cursor: crosshair;
             user-select: none;
             transition: none;
-            /* Filters disabled to prevent white image issue */
-            filter: none;
-            -webkit-filter: none;
+            /* Ensure no filters that could cause white images */
+            filter: none !important;
+            -webkit-filter: none !important;
             /* Hardware acceleration for smooth rendering */
             transform: translateZ(0);
             -webkit-transform: translateZ(0);
             will-change: transform;
+            /* Ensure proper display */
+            object-fit: contain;
+            background: transparent;
+        }
+
+        /* Modality-specific image enhancements */
+        .dicom-image[data-modality="DX"],
+        .dicom-image[data-modality="CR"],
+        .dicom-image[data-modality="MG"] {
+            /* Enhanced rendering for radiographic images */
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: high-quality;
+            /* Better contrast for bone/tissue visualization */
+            image-rendering: optimizeQuality;
+        }
+
+        .dicom-image[data-modality="CT"] {
+            /* Optimized for CT images */
+            image-rendering: crisp-edges;
+        }
+
+        .dicom-image[data-modality="MR"],
+        .dicom-image[data-modality="MRI"] {
+            /* Optimized for MR images */
+            image-rendering: high-quality;
         }
 
         /* Measurement Overlays */
@@ -1133,40 +1200,7 @@
             box-shadow: 0 0 0 1px var(--accent-color);
         }
 
-        /* Toast Notifications */
-        .toast {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-left: 4px solid var(--accent-color);
-            color: var(--text-primary);
-            padding: 12px 16px;
-            border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            z-index: 2000;
-            font-size: 12px;
-            max-width: 300px;
-            transform: translateX(100%);
-            transition: transform 0.3s ease;
-        }
-
-        .toast.show {
-            transform: translateX(0);
-        }
-
-        .toast.error {
-            border-left-color: var(--danger-color);
-        }
-
-        .toast.success {
-            border-left-color: var(--success-color);
-        }
-
-        .toast.warning {
-            border-left-color: var(--warning-color);
-        }
+        /* Toast Notifications - Disabled */
 
         /* Responsive Design */
         @media (max-width: 1200px) {
@@ -1228,6 +1262,7 @@
                 <button class="btn-dicom-viewer" onclick="loadFromExternalMedia()" title="Load DICOM from USB/DVD">
                     <i class="fas fa-compact-disc"></i>
                 </button>
+
                 <button class="btn-dicom-viewer btn-secondary" onclick="saveMeasurements()" title="Save Measurements">
                     <i class="fas fa-save"></i>
                 </button>
@@ -1271,6 +1306,9 @@
                 <button class="tool" data-tool="crosshair" onclick="toggleCrosshair()" title="Crosshair">
                     <i class="fas fa-crosshairs"></i>
                 </button>
+                <button class="tool" data-tool="clean" onclick="toggleCleanView()" title="Clean View (Hide Overlays)">
+                    <i class="fas fa-eye"></i>
+                </button>
             </div>
             
             <div class="tool-separator"></div>
@@ -1310,8 +1348,8 @@
             <!-- Single Image View -->
             <div class="viewport-content" id="singleView">
                 <div class="image-container" id="imageContainer">
-                    <img class="dicom-image medical-image" id="dicomImage" alt="DICOM Image" style="display: none;">
-                    <canvas class="dicom-canvas medical-image" id="dicomCanvas"></canvas>
+                    <img class="dicom-image medical-image" id="dicomImage" alt="DICOM Image" style="display: block; max-width: 100%; max-height: 100%;">
+                    <canvas class="dicom-canvas medical-image" id="dicomCanvas" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
                     <div class="crosshair-overlay" id="crosshairOverlay" style="display: none;">
                         <div class="crosshair-line-h"></div>
                         <div class="crosshair-line-v"></div>
@@ -1329,35 +1367,53 @@
                 </div>
             </div>
 
-            <!-- Professional 2x2 Orthogonal View Grid -->
+            <!-- Professional 2x2 Orthogonal View Grid - Full Screen -->
             <div class="mpr-grid" id="mprView" style="display: none;">
-                <div class="mpr-viewport" data-plane="axial" onclick="setActivePlane('axial')">
+                <!-- MPR Controls Bar -->
+                <div style="position: absolute; top: 10px; left: 10px; right: 10px; z-index: 1001; display: flex; justify-content: space-between; align-items: center; background: rgba(0, 0, 0, 0.8); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color);">
+                    <div style="color: var(--accent-color); font-weight: bold; font-size: 16px;">
+                        <i class="fas fa-cube"></i> MPR Fullscreen Mode
+                    </div>
+                    <div style="color: var(--text-secondary); font-size: 12px;" id="mprResolutionInfo">
+                        Resolution: Loading...
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button style="background: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px;" onclick="resetCrosshair()">
+                            <i class="fas fa-crosshairs"></i> Center
+                        </button>
+                        <button style="background: var(--danger-color); border: none; color: white; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 14px;" onclick="exitMPRFullscreen()">
+                            <i class="fas fa-times"></i> Exit
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="mpr-viewport" data-plane="axial">
                     <div class="mpr-label">Axial (Z)</div>
-                    <img id="mprAxial" alt="Axial View" onload="updateCrosshairOverlay('axial')">
+                    <img id="mprAxial" alt="Axial View" style="width: 100%; height: 100%; object-fit: contain;">
                     <div class="crosshair-overlay-mpr" id="crosshairAxial">
                         <div class="crosshair-line-h-mpr"></div>
                         <div class="crosshair-line-v-mpr"></div>
                     </div>
                 </div>
-                <div class="mpr-viewport" data-plane="sagittal" onclick="setActivePlane('sagittal')">
+                <div class="mpr-viewport" data-plane="sagittal">
                     <div class="mpr-label">Sagittal (X)</div>
-                    <img id="mprSagittal" alt="Sagittal View" onload="updateCrosshairOverlay('sagittal')">
+                    <img id="mprSagittal" alt="Sagittal View" style="width: 100%; height: 100%; object-fit: contain;">
                     <div class="crosshair-overlay-mpr" id="crosshairSagittal">
                         <div class="crosshair-line-h-mpr"></div>
                         <div class="crosshair-line-v-mpr"></div>
                     </div>
                 </div>
-                <div class="mpr-viewport" data-plane="coronal" onclick="setActivePlane('coronal')">
+                <div class="mpr-viewport" data-plane="coronal">
                     <div class="mpr-label">Coronal (Y)</div>
-                    <img id="mprCoronal" alt="Coronal View" onload="updateCrosshairOverlay('coronal')">
+                    <img id="mprCoronal" alt="Coronal View" style="width: 100%; height: 100%; object-fit: contain;">
                     <div class="crosshair-overlay-mpr" id="crosshairCoronal">
                         <div class="crosshair-line-h-mpr"></div>
                         <div class="crosshair-line-v-mpr"></div>
                     </div>
                 </div>
-                <div class="mpr-viewport" data-plane="3d" onclick="setActivePlane('3d')">
+                <div class="mpr-viewport" data-plane="3d">
                     <div class="mpr-label">3D Volume</div>
-                    <div id="threeDContainer" class="three-container"></div>
+                    <div id="threeDContainer" class="three-container" style="width: 100%; height: 100%;"></div>
                 </div>
             </div>
         </div>
@@ -1421,7 +1477,7 @@
                                     <span>Zoom</span>
                                     <span id="zoomValue">100%</span>
                                 </div>
-                                <input type="range" class="slider" id="zoomSlider" min="25" max="500" value="100" oninput="updateZoom(this.value)">
+                                <input type="range" class="slider" id="zoomSlider" min="25" max="1000" value="100" oninput="updateZoom(this.value)">
                             </div>
                         </div>
                     </div>
@@ -1573,6 +1629,7 @@
                 <span>Tool: <strong id="activeTool">Window</strong></span>
                 <span>HU: <strong id="huValue">-</strong></span>
                 <span>Position: <strong id="mousePosition">-</strong></span>
+                <span style="color: var(--text-muted); font-size: 10px;">Press H for clean view</span>
             </div>
         </div>
     </div>
@@ -1700,14 +1757,25 @@
         let annotations = [];
         let currentMeasurement = null;
         
-        // Window presets - Professional medical presets
+        // Window presets - Professional medical presets including DX/CR
         const windowPresets = {
             'lung': { ww: 1500, wl: -600 },
             'bone': { ww: 2000, wl: 300 },
             'soft': { ww: 400, wl: 40 },
             'brain': { ww: 100, wl: 50 },
             'liver': { ww: 160, wl: 60 },
-            'mediastinum': { ww: 350, wl: 50 }
+            'mediastinum': { ww: 350, wl: 50 },
+            // DX/CR specific presets
+            'chest_dx': { ww: 2000, wl: 1000 },
+            'abdomen_dx': { ww: 3000, wl: 1500 },
+            'extremity_dx': { ww: 2500, wl: 1200 },
+            'spine_dx': { ww: 2200, wl: 1100 },
+            'pelvis_dx': { ww: 2800, wl: 1400 },
+            'skull_dx': { ww: 2000, wl: 1000 },
+            // CR specific presets
+            'chest_cr': { ww: 1800, wl: 900 },
+            'abdomen_cr': { ww: 2500, wl: 1250 },
+            'extremity_cr': { ww: 2000, wl: 1000 }
         };
         
         // MPR and 3D state - Enhanced for fast orthogonal transforms
@@ -1794,14 +1862,39 @@
             ctx.restore();
         }
 
+        // Debug function to help troubleshoot image display issues
+        function debugImageDisplay() {
+            const dicomImage = document.getElementById('dicomImage');
+            const dicomCanvas = document.getElementById('dicomCanvas');
+            const imageContainer = document.getElementById('imageContainer');
+            
+            console.log('Debug Image Display:', {
+                imageElement: !!dicomImage,
+                canvasElement: !!dicomCanvas,
+                containerElement: !!imageContainer,
+                imageSrc: dicomImage?.src ? dicomImage.src.substring(0, 50) + '...' : 'null',
+                imageDisplay: dicomImage?.style.display,
+                imageVisibility: dicomImage?.style.visibility,
+                imageOpacity: dicomImage?.style.opacity,
+                canvasDisplay: dicomCanvas?.style.display,
+                containerBackground: imageContainer?.style.background,
+                naturalDimensions: dicomImage ? `${dicomImage.naturalWidth}x${dicomImage.naturalHeight}` : 'null',
+                computedStyle: dicomImage ? window.getComputedStyle(dicomImage).filter : 'null'
+            });
+        }
+
         // Professional initialization
         document.addEventListener('DOMContentLoaded', function() {
             initializeViewer();
             
-            // Show help tooltip for window/level control
-            setTimeout(() => {
-                showToast('💡 Tip: Right-click or Shift+click and drag on image to adjust brightness/contrast', 'info', 6000);
-            }, 2000);
+            // Add debug shortcut
+            document.addEventListener('keydown', function(e) {
+                if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+                    debugImageDisplay();
+                }
+            });
+            
+
             loadAvailableStudies();
             
             // Check for study ID in URL
@@ -1827,7 +1920,7 @@
             // Initialize crosshair system
             mprCrosshair = { x: 50, y: 50, z: 50 }; // Center position
             
-            showToast('Professional DICOM Viewer initialized', 'success');
+
         }
         
         function setupCanvasResizeHandler() {
@@ -1854,30 +1947,67 @@
             let lastMousePos = { x: 0, y: 0 };
             
             imageContainer.addEventListener('mousedown', function(e) {
-                mouseDown = true;
-                isDragging = false;
-                lastMousePos = { x: e.clientX, y: e.clientY };
-                dragStart = { x: e.clientX, y: e.clientY };
-                
-                // Right-click OR Shift+Left-click for window/level adjustment
-                if (e.button === 2 || (e.button === 0 && e.shiftKey)) {
+                // Right-click handling for measurement tool
+                if (e.button === 2) {
                     e.preventDefault();
+                    if (activeTool === 'measure' && currentMeasurement) {
+                        // Right-click finishes measurement
+                        finishMeasurement(e);
+                        return;
+                    }
+                    // Right-click OR Shift+Left-click for window/level adjustment
                     activeTool = 'window-level-drag';
                     imageContainer.style.cursor = 'crosshair';
                     imageContainer.style.outline = '2px solid var(--accent-color)';
                     showWindowLevelIndicator(true);
+                    mouseDown = true;
+                    isDragging = false;
+                    lastMousePos = { x: e.clientX, y: e.clientY };
                     return;
                 }
                 
-                if (activeTool === 'measure') {
-                    startMeasurement(e);
-                } else if (activeTool === 'annotate') {
-                    addAnnotation(e);
+                // Left-click handling
+                if (e.button === 0) {
+                    mouseDown = true;
+                    isDragging = false;
+                    lastMousePos = { x: e.clientX, y: e.clientY };
+                    dragStart = { x: e.clientX, y: e.clientY };
+                    
+                    // Shift+Left-click for window/level adjustment
+                    if (e.shiftKey) {
+                        e.preventDefault();
+                        activeTool = 'window-level-drag';
+                        imageContainer.style.cursor = 'crosshair';
+                        imageContainer.style.outline = '2px solid var(--accent-color)';
+                        showWindowLevelIndicator(true);
+                        return;
+                    }
+                    
+                    if (activeTool === 'measure') {
+                        if (!currentMeasurement) {
+                            // Start new measurement
+                            startMeasurement(e);
+                        } else {
+                            // Finish current measurement
+                            finishMeasurement(e);
+                        }
+                    } else if (activeTool === 'annotate') {
+                        addAnnotation(e);
+                    }
                 }
             });
             
             imageContainer.addEventListener('mousemove', function(e) {
-                if (mouseDown) {
+                // Skip if dragging annotation
+                if (isDraggingAnnotation) return;
+                
+                // Only update measurement if actively dragging in measure mode
+                if (activeTool === 'measure' && currentMeasurement && mouseDown) {
+                    updateMeasurement(e);
+                }
+                
+                // Handle other tools only when mouse is down
+                if (mouseDown && !isDraggingAnnotation) {
                     isDragging = true;
                     const deltaX = e.clientX - lastMousePos.x;
                     const deltaY = e.clientY - lastMousePos.y;
@@ -1888,8 +2018,6 @@
                         handleZooming(deltaY);
                     } else if (activeTool === 'pan') {
                         handlePanning(deltaX, deltaY);
-                    } else if (activeTool === 'measure' && currentMeasurement) {
-                        updateMeasurement(e);
                     }
                     
                     lastMousePos = { x: e.clientX, y: e.clientY };
@@ -1900,8 +2028,14 @@
             });
             
             imageContainer.addEventListener('mouseup', function(e) {
-                if (mouseDown && activeTool === 'measure' && currentMeasurement) {
-                    finishMeasurement(e);
+                // Don't auto-finish measurement on mouseup - let user control it
+                if (activeTool === 'measure' && currentMeasurement && e.button === 0) {
+                    // Only finish if we've dragged a meaningful distance
+                    const distance = calculateDistance(currentMeasurement.start, currentMeasurement.end);
+                    if (distance.pixels > 10) {
+                        // Don't auto-finish - wait for next click or right-click
+                        console.log('Measurement in progress, click again to finish or right-click to cancel');
+                    }
                 }
                 
                 // Reset window/level drag mode
@@ -1912,9 +2046,13 @@
                     showWindowLevelIndicator(false);
                 }
                 
-                mouseDown = false;
-                isDragging = false;
-                currentMeasurement = null;
+                // Only reset mouse state for non-measurement tools
+                if (activeTool !== 'measure') {
+                    mouseDown = false;
+                    isDragging = false;
+                } else {
+                    mouseDown = false; // Allow mouse up but keep measurement active
+                }
             });
             
             // Disable context menu on right-click
@@ -1974,6 +2112,10 @@
                     case 'R':
                         resetView();
                         break;
+                    case 'h':
+                    case 'H':
+                        toggleCleanView();
+                        break;
                     case 'ArrowUp':
                         e.preventDefault();
                         changeSlice(-1);
@@ -1985,6 +2127,14 @@
                     case 'Escape':
                         if (document.getElementById('threeDModal').classList.contains('active')) {
                             close3DModal();
+                        } else if (mprMode) {
+                            exitMPRFullscreen();
+                        } else if (currentMeasurement) {
+                            // Cancel active measurement
+                            currentMeasurement = null;
+                            updateMeasurementOverlay();
+                            updateMeasurementInstructions();
+                            console.log('Measurement cancelled');
                         }
                         break;
                 }
@@ -2004,6 +2154,13 @@
         // Professional Tool Management with Enhanced Feedback
         function setTool(tool) {
             const previousTool = activeTool;
+            
+            // Clear any active measurement when switching tools
+            if (previousTool === 'measure' && currentMeasurement) {
+                currentMeasurement = null;
+                updateMeasurementOverlay();
+            }
+            
             activeTool = tool;
             
             // Update toolbar visual state with animation
@@ -2037,6 +2194,8 @@
                 case 'measure':
                     imageContainer.style.cursor = 'crosshair';
                     if (canvas) canvas.style.cursor = 'crosshair';
+                    // Add measurement instructions to overlay
+                    updateMeasurementInstructions();
                     break;
                 case 'annotate':
                     imageContainer.style.cursor = 'text';
@@ -2053,16 +2212,26 @@
                 activeToolElement.textContent = tool.charAt(0).toUpperCase() + tool.slice(1);
             }
             
-            // Show tool change notification
-            if (previousTool !== tool) {
-                showToast(`${tool.charAt(0).toUpperCase() + tool.slice(1)} tool activated`, 'info', 1500);
-            }
+
             
-            // Tool-specific initialization
-            if (tool === 'measure') {
-                showToast('Click and drag to measure distances', 'info', 2000);
-            } else if (tool === 'annotate') {
-                showToast('Click to add annotations', 'info', 2000);
+
+        }
+
+        function updateMeasurementInstructions() {
+            // Update footer to show measurement instructions
+            const activeTool = document.getElementById('activeTool');
+            const mousePosition = document.getElementById('mousePosition');
+            
+            if (activeTool && activeTool.textContent === 'Measure' && mousePosition) {
+                if (currentMeasurement && currentMeasurement.isActive) {
+                    mousePosition.textContent = 'Measuring... Click to finish, right-click to cancel, ESC to abort';
+                    mousePosition.style.color = 'var(--warning-color)';
+                    mousePosition.style.fontWeight = 'bold';
+                } else {
+                    mousePosition.textContent = 'Click to start measurement';
+                    mousePosition.style.color = 'var(--text-muted)';
+                    mousePosition.style.fontWeight = 'normal';
+                }
             }
         }
 
@@ -2103,7 +2272,6 @@
                 if (wlValue) wlValue.textContent = windowLevel;
                 
                 updateImageDisplay();
-                showToast(`Applied ${preset.toUpperCase()} preset (WW:${windowWidth}, WL:${windowLevel})`, 'success');
                 
                 // Briefly highlight the active preset
                 if (button) {
@@ -2140,10 +2308,14 @@
         }
 
         function setZoom(factor) {
-            zoomFactor = Math.max(0.1, Math.min(5.0, factor));
+            // Allow higher zoom for DX/CR images for detail examination
+            const currentModality = document.getElementById('dicomImage')?.getAttribute('data-modality');
+            const maxZoom = (currentModality === 'DX' || currentModality === 'CR') ? 10.0 : 5.0;
+            
+            zoomFactor = Math.max(0.1, Math.min(maxZoom, factor));
             const zoomPercent = Math.round(zoomFactor * 100);
             
-            document.getElementById('zoomSlider').value = zoomPercent;
+            document.getElementById('zoomSlider').value = Math.min(zoomPercent, 500); // UI slider max
             document.getElementById('zoomValue').textContent = zoomPercent + '%';
             document.getElementById('zoomInfo').textContent = `Zoom: ${zoomPercent}%`;
             
@@ -2166,12 +2338,17 @@
             const dicomImage = document.getElementById('dicomImage');
             const dicomCanvas = document.getElementById('dicomCanvas');
             
-            if (dicomCanvas && dicomImage && dicomImage.complete) {
-                // Re-render to canvas with new transform
-                renderImageToCanvas(dicomImage, dicomCanvas);
-            } else if (dicomImage) {
-                // Fallback to image transform
-                dicomImage.style.transform = `scale(${zoomFactor}) translate(${panX/zoomFactor}px, ${panY/zoomFactor}px)`;
+            // Always use image element for better compatibility and quality
+            if (dicomImage) {
+                const transform = `scale(${zoomFactor}) translate(${panX/zoomFactor}px, ${panY/zoomFactor}px)`;
+                dicomImage.style.transform = transform;
+                dicomImage.style.transformOrigin = 'center center';
+                
+                // Ensure image is visible
+                dicomImage.style.display = 'block';
+                if (dicomCanvas) {
+                    dicomCanvas.style.display = 'none';
+                }
             }
         }
 
@@ -2211,12 +2388,25 @@
                 const response = await fetch(url);
                 const data = await response.json();
                 
+                console.log('API Response:', {
+                    hasImageData: !!data.image_data,
+                    imageDataStart: data.image_data ? data.image_data.substring(0, 50) + '...' : 'null',
+                    imageInfo: data.image_info,
+                    error: data.error
+                });
+                
                 if (data.image_data) {
                     const dicomImage = document.getElementById('dicomImage');
                     const dicomCanvas = document.getElementById('dicomCanvas');
                     
+                    // Show the image element directly for better compatibility
+                    dicomImage.style.display = 'block';
+                    dicomCanvas.style.display = 'none';
+                    
                     dicomImage.src = data.image_data;
                     dicomImage.onload = function() {
+                        console.log('Image onload triggered');
+                        
                         // Set modality attribute for CSS targeting
                         const modality = data.image_info?.modality || '';
                         if (modality) {
@@ -2224,24 +2414,85 @@
                             dicomCanvas.setAttribute('data-modality', modality);
                         }
                         
-                        // Render to high-quality canvas with modality-specific optimization
-                        renderImageToCanvas(dicomImage, dicomCanvas, modality);
+                        // Apply proper styling for medical image display
+                        dicomImage.style.maxWidth = '100%';
+                        dicomImage.style.maxHeight = '100%';
+                        dicomImage.style.objectFit = 'contain';
+                        dicomImage.style.display = 'block';
+                        dicomImage.style.visibility = 'visible';
+                        dicomImage.style.opacity = '1';
+                        
+                        // Apply modality-specific image rendering
+                        if (modality === 'DX' || modality === 'CR' || modality === 'MG') {
+                            // High-quality rendering for radiographic images
+                            dicomImage.style.imageRendering = 'high-quality';
+                            dicomImage.style.imageRendering = '-webkit-optimize-contrast';
+                        } else {
+                            dicomImage.style.imageRendering = 'crisp-edges';
+                        }
+                        
+                        // Remove any problematic filters and ensure clean display
+                        dicomImage.style.filter = 'none';
+                        dicomImage.style.webkitFilter = 'none';
+                        dicomImage.style.border = 'none';
+                        dicomImage.style.outline = 'none';
+                        dicomImage.style.boxShadow = 'none';
+                        dicomImage.style.margin = '0';
+                        dicomImage.style.padding = '0';
+                        
+                        // Ensure container is properly styled for clean display
+                        const imageContainer = document.getElementById('imageContainer');
+                        if (imageContainer) {
+                            imageContainer.style.background = '#000000';
+                            imageContainer.style.display = 'flex';
+                            imageContainer.style.alignItems = 'center';
+                            imageContainer.style.justifyContent = 'center';
+                            imageContainer.style.border = 'none';
+                            imageContainer.style.outline = 'none';
+                            imageContainer.style.boxShadow = 'none';
+                        }
+                        
+                        // Apply zoom and pan transformations
+                        applyTransform();
                         
                         hideLoading();
                         updateImageInfo(data.image_info);
                         updateOverlayInfo();
                         updateMeasurementOverlay();
                         updateAnnotationOverlay();
+                        
+                        console.log('Image loaded successfully:', {
+                            naturalWidth: dicomImage.naturalWidth,
+                            naturalHeight: dicomImage.naturalHeight,
+                            src: data.image_data.substring(0, 50) + '...',
+                            modality: modality,
+                            photometric: data.image_info?.photometric_interpretation
+                        });
+                        
+                        // Auto-optimize for DX/CR images
+                        if (modality === 'DX' || modality === 'CR') {
+                            optimizeForRadiography(data.image_info);
+                            // Update zoom slider range for detailed examination
+                            updateZoomRangeForModality(modality);
+                        }
+                        
+
+                    };
+                    
+                    dicomImage.onerror = function() {
+                        console.error('Failed to load image:', data.image_data.substring(0, 100));
+                        hideLoading();
                     };
                 } else {
                     hideLoading();
-                    showToast('Failed to load image data', 'error');
+                    console.error('No image data in response:', data);
+                    
+
                 }
                 
             } catch (error) {
                 hideLoading();
                 console.error('Error updating image display:', error);
-                showToast('Error loading image', 'error');
             }
         }
 
@@ -2249,17 +2500,148 @@
             if (!info) return;
             
             const imageInfoDiv = document.getElementById('imageInfo');
-            imageInfoDiv.innerHTML = `
+            
+            let infoHTML = `
                 <div>Dimensions: ${info.dimensions[1]}×${info.dimensions[0]}</div>
                 <div>Pixel Spacing: ${Array.isArray(info.pixel_spacing) ? info.pixel_spacing.join('×') : info.pixel_spacing}</div>
-                <div>Slice Thickness: ${info.slice_thickness || 'N/A'}</div>
                 <div>Modality: ${info.modality}</div>
-                <div>Institution: ${info.institution || 'N/A'}</div>
+                <div>Photometric: ${info.photometric_interpretation || 'N/A'}</div>
             `;
+            
+            // Add DX/CR specific information
+            if (info.modality === 'DX' || info.modality === 'CR') {
+                infoHTML += `
+                    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-color); color: var(--accent-color); font-weight: bold;">
+                        Radiographic Info:
+                    </div>
+                `;
+                
+                if (info.body_part_examined) {
+                    infoHTML += `<div>Body Part: ${info.body_part_examined}</div>`;
+                }
+                if (info.view_position) {
+                    infoHTML += `<div>View: ${info.view_position}</div>`;
+                }
+                if (info.kvp) {
+                    infoHTML += `<div>kVp: ${info.kvp}</div>`;
+                }
+                if (info.exposure_time) {
+                    infoHTML += `<div>Exposure: ${info.exposure_time}ms</div>`;
+                }
+                if (info.detector_type) {
+                    infoHTML += `<div>Detector: ${info.detector_type}</div>`;
+                }
+            } else {
+                if (info.slice_thickness) {
+                    infoHTML += `<div>Slice Thickness: ${info.slice_thickness}</div>`;
+                }
+            }
+            
+            if (info.institution) {
+                infoHTML += `<div>Institution: ${info.institution}</div>`;
+            }
+            
+            imageInfoDiv.innerHTML = infoHTML;
             
             // Update patient info
             document.getElementById('patientInfo').textContent = 
                 `Patient: ${info.patient_name} | Study Date: ${info.study_date} | Modality: ${info.modality}`;
+            
+            // Update presets based on modality
+            updatePresetsForModality(info.modality);
+        }
+
+        function updatePresetsForModality(modality) {
+            try {
+                const presetContainer = document.querySelector('.preset-grid');
+                if (!presetContainer) {
+                    console.warn('Preset container not found, skipping preset update');
+                    return;
+                }
+                
+                // Clear existing presets
+                presetContainer.innerHTML = '';
+                
+                let presets = [];
+                
+                // Robust modality detection with fallbacks
+                const modalityUpper = (modality || '').toUpperCase();
+                
+                if (modalityUpper === 'DX') {
+                    presets = [
+                        { key: 'chest_dx', label: 'Chest' },
+                        { key: 'abdomen_dx', label: 'Abdomen' },
+                        { key: 'extremity_dx', label: 'Extremity' },
+                        { key: 'spine_dx', label: 'Spine' },
+                        { key: 'pelvis_dx', label: 'Pelvis' },
+                        { key: 'skull_dx', label: 'Skull' }
+                    ];
+                } else if (modalityUpper === 'CR') {
+                    presets = [
+                        { key: 'chest_cr', label: 'Chest' },
+                        { key: 'abdomen_cr', label: 'Abdomen' },
+                        { key: 'extremity_cr', label: 'Extremity' },
+                        { key: 'bone', label: 'Bone' }
+                    ];
+                } else if (modalityUpper === 'CT') {
+                    presets = [
+                        { key: 'lung', label: 'Lung' },
+                        { key: 'bone', label: 'Bone' },
+                        { key: 'soft', label: 'Soft' },
+                        { key: 'brain', label: 'Brain' }
+                    ];
+                } else if (modalityUpper === 'MR' || modalityUpper === 'MRI') {
+                    presets = [
+                        { key: 'brain', label: 'Brain' },
+                        { key: 'soft', label: 'Soft' },
+                        { key: 'bone', label: 'Bone' }
+                    ];
+                } else {
+                    // Default presets for unknown/other modalities
+                    presets = [
+                        { key: 'soft', label: 'Soft' },
+                        { key: 'bone', label: 'Bone' },
+                        { key: 'lung', label: 'Lung' },
+                        { key: 'brain', label: 'Brain' }
+                    ];
+                }
+                
+                // Create preset buttons with error handling
+                presets.forEach(preset => {
+                    try {
+                        const button = document.createElement('button');
+                        button.className = 'preset-btn';
+                        button.textContent = preset.label;
+                        button.onclick = () => {
+                            try {
+                                applyPreset(preset.key);
+                            } catch (e) {
+                                console.error('Error applying preset:', e);
+                            }
+                        };
+                        presetContainer.appendChild(button);
+                    } catch (e) {
+                        console.error('Error creating preset button:', e);
+                    }
+                });
+                
+                console.log(`Updated presets for modality: ${modalityUpper}, ${presets.length} presets available`);
+                
+            } catch (error) {
+                console.error('Error updating presets for modality:', error);
+                // Ensure we have at least basic presets
+                try {
+                    const presetContainer = document.querySelector('.preset-grid');
+                    if (presetContainer) {
+                        presetContainer.innerHTML = `
+                            <button class="preset-btn" onclick="applyPreset('soft')">Soft</button>
+                            <button class="preset-btn" onclick="applyPreset('bone')">Bone</button>
+                        `;
+                    }
+                } catch (e) {
+                    console.error('Failed to create fallback presets:', e);
+                }
+            }
         }
 
         function updateOverlayInfo() {
@@ -2331,16 +2713,13 @@
                     }
                     
                     hideLoading();
-                    showToast('Study loaded successfully', 'success');
                 } else {
                     hideLoading();
-                    showToast('Failed to load study data', 'error');
                 }
                 
             } catch (error) {
                 hideLoading();
                 console.error('Error loading study:', error);
-                showToast('Error loading study', 'error');
             }
         }
 
@@ -2382,16 +2761,13 @@
                     await updateImageDisplay();
                     
                     hideLoading();
-                    showToast(`Loaded ${images.length} images`, 'success');
                 } else {
                     hideLoading();
-                    showToast('Failed to load series images', 'error');
                 }
                 
             } catch (error) {
                 hideLoading();
                 console.error('Error loading series:', error);
-                showToast('Error loading series', 'error');
             }
         }
 
@@ -2456,79 +2832,17 @@
             }
         }
 
-        // Professional External Media Loading (USB/DVD)
+        // Simple External Media Loading (no annoying dialog)
         function loadFromExternalMedia() {
-            // Show professional media selection dialog
-            showMediaSelectionDialog();
-        }
-
-        function showMediaSelectionDialog() {
-            const dialog = document.createElement('div');
-            dialog.className = 'modal-overlay';
-            dialog.innerHTML = `
-                <div class="modal-content" style="width: 500px; height: auto;">
-                    <div class="modal-header">
-                        <div class="modal-title">
-                            <i class="fas fa-compact-disc"></i> Load DICOM from External Media
-                        </div>
-                        <button class="close-btn" onclick="this.closest('.modal-overlay').remove()">
-                            <i class="fas fa-times"></i> Close
-                        </button>
-                    </div>
-                    <div style="padding: 20px;">
-                        <div style="text-align: center; margin-bottom: 20px;">
-                            <div style="font-size: 48px; color: var(--accent-color); margin-bottom: 16px;">
-                                <i class="fas fa-compact-disc"></i>
-                            </div>
-                            <h3 style="color: var(--text-primary); margin-bottom: 8px;">Select DICOM Source</h3>
-                            <p style="color: var(--text-secondary); font-size: 12px;">Choose DICOM files from USB drive, DVD, or local storage</p>
-                        </div>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
-                            <button class="btn-dicom-viewer btn-lg" onclick="selectUSBDrive()" style="padding: 16px; flex-direction: column; gap: 8px;">
-                                <i class="fas fa-usb" style="font-size: 24px;"></i>
-                                <span>USB Drive</span>
-                            </button>
-                            <button class="btn-dicom-viewer btn-lg" onclick="selectDVD()" style="padding: 16px; flex-direction: column; gap: 8px;">
-                                <i class="fas fa-compact-disc" style="font-size: 24px;"></i>
-                                <span>DVD/CD</span>
-                            </button>
-                        </div>
-                        
-                        <div style="text-align: center;">
-                            <button class="btn-dicom-viewer btn-secondary" onclick="selectLocalFiles()" style="width: 100%;">
-                                <i class="fas fa-folder-open"></i> Browse Local Files
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            dialog.classList.add('active');
-            document.body.appendChild(dialog);
-        }
-
-        function selectUSBDrive() {
-            showToast('Please ensure USB drive is connected and contains DICOM files', 'info');
-            document.getElementById('fileInput').setAttribute('webkitdirectory', '');
-            document.getElementById('fileInput').click();
-            document.querySelector('.modal-overlay').remove();
-        }
-
-        function selectDVD() {
-            showToast('Please ensure DVD/CD is inserted and contains DICOM files', 'info');
-            document.getElementById('fileInput').setAttribute('webkitdirectory', '');
-            document.getElementById('fileInput').click();
-            document.querySelector('.modal-overlay').remove();
-        }
-
-        function selectLocalFiles() {
+            // Directly open file browser
             const fileInput = document.getElementById('fileInput');
             fileInput.removeAttribute('webkitdirectory');
             fileInput.setAttribute('accept', '.dcm,.dicom,*');
+            fileInput.multiple = true;
             fileInput.click();
-            document.querySelector('.modal-overlay').remove();
         }
+
+
 
         async function processDicomFiles(files) {
             try {
@@ -2553,7 +2867,7 @@
                                 // Reload study list to show new uploads
                                 await loadStudiesList();
                                 
-                                showToast(`Upload completed: ${progressData.current} files processed`, 'success');
+
                                 
                                 // Auto-load the first study if available
                                 if (window.lastUploadedStudyId) {
@@ -2562,7 +2876,7 @@
                             } else if (progressData.status === 'failed') {
                                 clearInterval(progressInterval);
                                 hideLoading();
-                                showToast('Upload failed: ' + (progressData.errors?.[0] || 'Unknown error'), 'error');
+
                             }
                         } catch (e) {
                             console.error('Progress check error:', e);
@@ -2573,7 +2887,6 @@
             } catch (error) {
                 hideLoading();
                 console.error('Error processing files:', error);
-                showToast('Error processing DICOM files', 'error');
             }
         }
 
@@ -2606,7 +2919,6 @@
                 
             } catch (error) {
                 console.error('Upload start error:', error);
-                showToast('Failed to start upload: ' + error.message, 'error');
                 return null;
             }
         }
@@ -2621,6 +2933,224 @@
                     </div>
                     <div style="margin-top: 5px; font-size: 12px; color: var(--text-secondary);">${percentage}% complete</div>
                 `;
+            }
+        }
+
+        // Test function to verify image processing pipeline
+        async function loadTestImage() {
+            try {
+                showLoading('Loading test image...');
+                
+                const url = `/dicom-viewer/api/test-image/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                console.log('Test Image Response:', data);
+                
+                if (data.image_data) {
+                    const dicomImage = document.getElementById('dicomImage');
+                    const dicomCanvas = document.getElementById('dicomCanvas');
+                    
+                    // Show the image element directly
+                    dicomImage.style.display = 'block';
+                    dicomCanvas.style.display = 'none';
+                    
+                    dicomImage.src = data.image_data;
+                    dicomImage.onload = function() {
+                        console.log('Test image loaded successfully');
+                        
+                        // Apply proper styling
+                        dicomImage.style.maxWidth = '100%';
+                        dicomImage.style.maxHeight = '100%';
+                        dicomImage.style.objectFit = 'contain';
+                        dicomImage.style.filter = 'none';
+                        dicomImage.style.webkitFilter = 'none';
+                        
+                        hideLoading();
+                        updateImageInfo(data.image_info);
+                    };
+                    
+                    dicomImage.onerror = function() {
+                        console.error('Test image failed to load');
+                        hideLoading();
+                    };
+                } else {
+                    hideLoading();
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error('Error loading test image:', error);
+            }
+        }
+
+        // DX/CR Optimization Function - Robust with error handling
+        function optimizeForRadiography(imageInfo) {
+            try {
+                console.log('Optimizing display for radiographic image:', imageInfo);
+                
+                const modality = (imageInfo?.modality || '').toUpperCase();
+                const photometric = (imageInfo?.photometric_interpretation || '').toUpperCase();
+                
+                // Only proceed if we have a radiographic modality
+                if (!['DX', 'CR', 'XA', 'RF', 'MG'].includes(modality)) {
+                    console.log('Not a radiographic modality, skipping optimization');
+                    return;
+                }
+                
+                let suggestedPreset = '';
+                
+                try {
+                    // First, try to use DICOM body part information with safe string handling
+                    const bodyPart = (imageInfo?.body_part_examined || '').toLowerCase();
+                    const viewPosition = (imageInfo?.view_position || '').toLowerCase();
+                    const seriesDesc = (imageInfo?.series_description || '').toLowerCase();
+                
+                if (bodyPart.includes('chest') || seriesDesc.includes('chest') || viewPosition.includes('pa') || viewPosition.includes('ap')) {
+                    suggestedPreset = modality === 'DX' ? 'chest_dx' : 'chest_cr';
+                } else if (bodyPart.includes('abdomen') || seriesDesc.includes('abdomen') || seriesDesc.includes('kub')) {
+                    suggestedPreset = modality === 'DX' ? 'abdomen_dx' : 'abdomen_cr';
+                } else if (bodyPart.includes('spine') || seriesDesc.includes('spine') || seriesDesc.includes('cervical') || seriesDesc.includes('lumbar')) {
+                    suggestedPreset = modality === 'DX' ? 'spine_dx' : 'extremity_cr';
+                } else if (bodyPart.includes('pelvis') || seriesDesc.includes('pelvis') || seriesDesc.includes('hip')) {
+                    suggestedPreset = modality === 'DX' ? 'pelvis_dx' : 'abdomen_cr';
+                } else if (bodyPart.includes('skull') || bodyPart.includes('head') || seriesDesc.includes('skull') || seriesDesc.includes('head')) {
+                    suggestedPreset = modality === 'DX' ? 'skull_dx' : 'extremity_cr';
+                } else if (bodyPart.includes('hand') || bodyPart.includes('foot') || bodyPart.includes('arm') || bodyPart.includes('leg') || seriesDesc.includes('extremity')) {
+                    suggestedPreset = modality === 'DX' ? 'extremity_dx' : 'extremity_cr';
+                } else {
+                    // Fallback to image dimensions analysis
+                    const width = imageInfo?.dimensions?.[1] || 0;
+                    const height = imageInfo?.dimensions?.[0] || 0;
+                    const aspectRatio = width / height;
+                    
+                    if (aspectRatio > 1.2) {
+                        // Wide image - likely chest
+                        suggestedPreset = modality === 'DX' ? 'chest_dx' : 'chest_cr';
+                    } else if (aspectRatio < 0.8) {
+                        // Tall image - likely spine or extremity
+                        suggestedPreset = modality === 'DX' ? 'spine_dx' : 'extremity_cr';
+                    } else {
+                        // Square-ish - likely abdomen or pelvis
+                        suggestedPreset = modality === 'DX' ? 'abdomen_dx' : 'abdomen_cr';
+                    }
+                }
+                
+                // Show optimization suggestion and auto-apply if appropriate
+                if (suggestedPreset && windowPresets[suggestedPreset]) {
+                    const preset = windowPresets[suggestedPreset];
+                    
+                    // Auto-apply if using default windowing values
+                    if (windowWidth === 400 && windowLevel === 40) {
+                        setTimeout(() => {
+                            try {
+                                applyPreset(suggestedPreset);
+                            } catch (e) {
+                                console.error('Error auto-applying preset:', e);
+                            }
+                        }, 1000);
+                    }
+                }
+                
+                } catch (presetError) {
+                    console.warn('Error in preset suggestion logic:', presetError);
+                    // Continue without preset suggestion
+                }
+                
+                // Handle MONOCHROME1 images silently
+                try {
+                    if (photometric === 'MONOCHROME1') {
+                        console.log('MONOCHROME1 image - automatically inverted for proper display');
+                    }
+                } catch (e) {
+                    console.warn('Error checking photometric interpretation:', e);
+                }
+                
+            } catch (error) {
+                console.error('Error in radiographic optimization:', error);
+                // Continue gracefully without optimization
+            }
+        }
+
+        function updateZoomRangeForModality(modality) {
+            try {
+                const zoomSlider = document.getElementById('zoomSlider');
+                if (!zoomSlider) {
+                    console.warn('Zoom slider not found, skipping zoom range update');
+                    return;
+                }
+                
+                const modalityUpper = (modality || '').toUpperCase();
+                
+                if (['DX', 'CR', 'MG'].includes(modalityUpper)) {
+                    // Higher zoom range for radiographic detail examination
+                    zoomSlider.max = '1000';  // 10x zoom
+                } else {
+                    // Standard zoom range for other modalities
+                    zoomSlider.max = '500';   // 5x zoom
+                }
+                
+                console.log(`Updated zoom range for ${modalityUpper}: max=${zoomSlider.max}%`);
+                
+            } catch (error) {
+                console.error('Error updating zoom range:', error);
+                // Continue gracefully without zoom range update
+            }
+        }
+
+        // Clean View Toggle - Hide all overlays for pure image viewing
+        let cleanViewMode = false;
+        
+        function toggleCleanView() {
+            cleanViewMode = !cleanViewMode;
+            
+            const overlayElements = [
+                'overlayInfo',
+                'zoomInfo', 
+                'crosshairOverlay',
+                'measurementOverlay'
+            ];
+            
+            const tool = document.querySelector('[data-tool="clean"]');
+            
+            if (cleanViewMode) {
+                // Hide all overlays for clean image viewing
+                overlayElements.forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.style.display = 'none';
+                    }
+                });
+                
+                // Update tool state
+                if (tool) {
+                    tool.classList.add('active');
+                    tool.querySelector('i').className = 'fas fa-eye-slash';
+                }
+                
+                console.log('Clean view mode enabled - all overlays hidden');
+            } else {
+                // Show overlays
+                overlayElements.forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.style.display = '';
+                    }
+                });
+                
+                // Update crosshair visibility based on its state
+                const crosshairOverlay = document.getElementById('crosshairOverlay');
+                if (crosshairOverlay) {
+                    crosshairOverlay.style.display = showCrosshair ? 'block' : 'none';
+                }
+                
+                // Update tool state
+                if (tool) {
+                    tool.classList.remove('active');
+                    tool.querySelector('i').className = 'fas fa-eye';
+                }
+                
+                console.log('Clean view mode disabled - overlays restored');
             }
         }
 
@@ -2662,13 +3192,11 @@
             
             applyTransform();
             updateZoomInfo();
-            showToast('View reset', 'success');
         }
 
         // MPR Implementation
         async function toggleMPR() {
             if (!currentSeries) {
-                showToast('Please load a series first', 'warning');
                 return;
             }
             
@@ -2679,15 +3207,99 @@
                 document.getElementById('singleView').style.display = 'none';
                 document.getElementById('mprView').style.display = 'grid';
                 
-                // Update tool state
-                document.querySelector('[data-tool="mpr"]').classList.add('active');
-            } else {
-                document.getElementById('singleView').style.display = 'flex';
-                document.getElementById('mprView').style.display = 'none';
+                // Disable body scrolling for fullscreen MPR
+                document.body.style.overflow = 'hidden';
                 
                 // Update tool state
-                document.querySelector('[data-tool="mpr"]').classList.remove('active');
+                document.querySelector('[data-tool="mpr"]').classList.add('active');
+                
+                // Initialize crosshair position to center
+                mprCrosshair = { x: 50, y: 50, z: 50 };
+                updateCrosshairDisplay();
+                
+                // Optimize for current screen resolution
+                optimizeMPRForResolution();
+                
+
+            } else {
+                exitMPRFullscreen();
             }
+        }
+
+        function optimizeMPRForResolution() {
+            const mprView = document.getElementById('mprView');
+            if (!mprView) return;
+            
+            // Get actual screen dimensions
+            const screenWidth = screen.width;
+            const screenHeight = screen.height;
+            const pixelRatio = window.devicePixelRatio || 1;
+            
+            console.log(`Optimizing MPR for resolution: ${screenWidth}x${screenHeight}, DPR: ${pixelRatio}`);
+            
+            // Adjust grid gap based on resolution
+            const gap = screenWidth > 1920 ? '3px' : screenWidth > 1280 ? '2px' : '1px';
+            mprView.style.gap = gap;
+            
+            // Adjust viewport borders based on resolution
+            const viewports = mprView.querySelectorAll('.mpr-viewport');
+            viewports.forEach(viewport => {
+                const borderWidth = screenWidth > 1920 ? '3px' : '2px';
+                viewport.style.borderWidth = borderWidth;
+                
+                // Optimize image quality for high-DPI displays
+                const img = viewport.querySelector('img');
+                if (img && pixelRatio > 1) {
+                    img.style.imageRendering = 'crisp-edges';
+                    img.style.transform = `scale(${1/pixelRatio})`;
+                    img.style.transformOrigin = 'top left';
+                }
+            });
+            
+            // Adjust crosshair thickness for better visibility on high-res displays
+            const crosshairLines = mprView.querySelectorAll('.crosshair-line-h-mpr, .crosshair-line-v-mpr');
+            crosshairLines.forEach(line => {
+                const thickness = screenWidth > 1920 ? '4px' : '3px';
+                if (line.classList.contains('crosshair-line-h-mpr')) {
+                    line.style.height = thickness;
+                } else {
+                    line.style.width = thickness;
+                }
+            });
+            
+            // Update resolution info display
+            const resolutionInfo = document.getElementById('mprResolutionInfo');
+            if (resolutionInfo) {
+                resolutionInfo.textContent = `${screenWidth}×${screenHeight} (${pixelRatio}x DPR)`;
+            }
+        }
+
+        function exitMPRFullscreen() {
+            const mprView = document.getElementById('mprView');
+            const singleView = document.getElementById('singleView');
+            
+            // Hide MPR fullscreen view
+            mprView.style.display = 'none';
+            singleView.style.display = 'flex';
+            
+            // Re-enable body scrolling
+            document.body.style.overflow = '';
+            
+            mprMode = false;
+            
+            // Update tool state
+            const mprTool = document.querySelector('[data-tool="mpr"]');
+            if (mprTool) {
+                mprTool.classList.remove('active');
+            }
+            
+
+        }
+
+        function resetCrosshair() {
+            // Reset crosshair to center position
+            mprCrosshair = { x: 50, y: 50, z: 50 };
+            updateCrosshairDisplay();
         }
 
         async function generateMPR() {
@@ -2711,36 +3323,73 @@
 
         async function generateMPRViews() {
             try {
-                showLoading('Generating MPR views...');
+                showLoading('Generating high-resolution MPR views...');
                 
-                const response = await fetch(`/dicom_viewer/api/mpr/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
+                // Get screen resolution for optimal image size
+                const screenWidth = screen.width;
+                const screenHeight = screen.height;
+                const pixelRatio = window.devicePixelRatio || 1;
+                
+                // Calculate optimal image dimensions for each viewport (half screen size)
+                const viewportWidth = Math.floor((screenWidth / 2) * pixelRatio);
+                const viewportHeight = Math.floor((screenHeight / 2) * pixelRatio);
+                
+                const url = `/dicom_viewer/api/mpr/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}&width=${viewportWidth}&height=${viewportHeight}`;
+                const response = await fetch(url);
                 const data = await response.json();
                 
                 if (data.views) {
-                    document.getElementById('mprAxial').src = data.views.axial;
-                    document.getElementById('mprSagittal').src = data.views.sagittal;
-                    document.getElementById('mprCoronal').src = data.views.coronal;
+                    // Load images with proper error handling
+                    const axialImg = document.getElementById('mprAxial');
+                    const sagittalImg = document.getElementById('mprSagittal');
+                    const coronalImg = document.getElementById('mprCoronal');
+                    
+                    let loadedCount = 0;
+                    const totalImages = 3;
+                    
+                    const imageLoadHandler = () => {
+                        loadedCount++;
+                        if (loadedCount === totalImages) {
+                            hideLoading();
+                            updateCrosshairDisplay();
+                        }
+                    };
+                    
+                    const imageErrorHandler = (plane) => {
+                        console.error(`Failed to load ${plane} MPR view`);
+                        loadedCount++;
+                        if (loadedCount === totalImages) {
+                            hideLoading();
+                        }
+                    };
+                    
+                    axialImg.onload = imageLoadHandler;
+                    axialImg.onerror = () => imageErrorHandler('axial');
+                    axialImg.src = data.views.axial;
+                    
+                    sagittalImg.onload = imageLoadHandler;
+                    sagittalImg.onerror = () => imageErrorHandler('sagittal');
+                    sagittalImg.src = data.views.sagittal;
+                    
+                    coronalImg.onload = imageLoadHandler;
+                    coronalImg.onerror = () => imageErrorHandler('coronal');
+                    coronalImg.src = data.views.coronal;
                     
                     mprImages = data.views;
                     volumeMetadata = data.metadata;
                     
-                    hideLoading();
-                    showToast('MPR views generated', 'success');
                 } else {
                     hideLoading();
-                    showToast('Failed to generate MPR views', 'error');
                 }
                 
             } catch (error) {
                 hideLoading();
                 console.error('Error generating MPR:', error);
-                showToast('Error generating MPR views', 'error');
             }
         }
 
         async function generateMIP() {
             if (!currentSeries) {
-                showToast('Please load a series first', 'warning');
                 return;
             }
             
@@ -2782,16 +3431,14 @@
                     mprMode = true;
                     
                     hideLoading();
-                    showToast('MIP views generated', 'success');
+
                 } else {
                     hideLoading();
-                    showToast('Failed to generate MIP views', 'error');
                 }
                 
             } catch (error) {
                 hideLoading();
                 console.error('Error generating MIP:', error);
-                showToast('Error generating MIP views', 'error');
             }
         }
 
@@ -3101,33 +3748,44 @@
                 const plane = viewport.getAttribute('data-plane');
                 if (plane === '3d') return; // Skip 3D viewport
                 
-                viewport.addEventListener('mousemove', function(e) {
-                    if (orthogonalSync && mprMode) {
-                        const rect = viewport.getBoundingClientRect();
-                        const x = ((e.clientX - rect.left) / rect.width) * 100;
-                        const y = ((e.clientY - rect.top) / rect.height) * 100;
-                        
-                        // Update crosshair position based on plane
-                        updateCrosshairPosition(plane, x, y);
+                // Remove mousemove listener - crosshair should only move on click
+                viewport.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    setActivePlane(plane);
+                    
+                    // Always update crosshair position on click
+                    const rect = viewport.getBoundingClientRect();
+                    const x = ((e.clientX - rect.left) / rect.width) * 100;
+                    const y = ((e.clientY - rect.top) / rect.height) * 100;
+                    
+                    // Update crosshair position and lock it there
+                    updateCrosshairPosition(plane, x, y, true);
+                });
+                
+                // Add hover effect without moving crosshair
+                viewport.addEventListener('mouseenter', function() {
+                    if (!viewport.classList.contains('active')) {
+                        viewport.style.borderColor = 'var(--accent-color)';
+                        viewport.style.opacity = '0.9';
                     }
                 });
                 
-                viewport.addEventListener('click', function(e) {
-                    setActivePlane(plane);
-                    
-                    if (orthogonalSync) {
-                        const rect = viewport.getBoundingClientRect();
-                        const x = ((e.clientX - rect.left) / rect.width) * 100;
-                        const y = ((e.clientY - rect.top) / rect.height) * 100;
-                        
-                        // Lock crosshair position
-                        updateCrosshairPosition(plane, x, y, true);
+                viewport.addEventListener('mouseleave', function() {
+                    if (!viewport.classList.contains('active')) {
+                        viewport.style.borderColor = 'var(--border-color)';
+                        viewport.style.opacity = '1';
                     }
                 });
             });
         }
 
         function updateCrosshairPosition(plane, x, y, lock = false) {
+            // Clamp coordinates to valid range
+            x = Math.max(0, Math.min(100, x));
+            y = Math.max(0, Math.min(100, y));
+            
             // Update crosshair coordinates based on plane
             if (plane === 'axial') {
                 mprCrosshair.x = x;
@@ -3140,14 +3798,17 @@
                 mprCrosshair.z = y;
             }
             
-            // Update crosshair display on all planes
-            if (lock) {
-                updateCrosshairDisplay();
-            }
+            // Always update crosshair display when position changes
+            updateCrosshairDisplay();
             
             // Update position display
-            document.getElementById('crosshairPosition').textContent = 
-                `X:${Math.round(mprCrosshair.x)} Y:${Math.round(mprCrosshair.y)} Z:${Math.round(mprCrosshair.z)}`;
+            const positionElement = document.getElementById('crosshairPosition');
+            if (positionElement) {
+                positionElement.textContent = 
+                    `X:${Math.round(mprCrosshair.x)} Y:${Math.round(mprCrosshair.y)} Z:${Math.round(mprCrosshair.z)}`;
+            }
+            
+            console.log(`Crosshair updated - Plane: ${plane}, Position: (${Math.round(x)}, ${Math.round(y)})`);
         }
 
         function updateCrosshairDisplay() {
@@ -3157,18 +3818,34 @@
                 const crosshair = document.getElementById(`crosshair${plane.charAt(0).toUpperCase() + plane.slice(1)}`);
                 if (!crosshair) return;
                 
+                // Show crosshair if it's enabled
+                if (showCrosshair || mprMode) {
+                    crosshair.style.display = 'block';
+                    crosshair.classList.add('active');
+                } else {
+                    crosshair.style.display = 'none';
+                    crosshair.classList.remove('active');
+                    return;
+                }
+                
                 const hLine = crosshair.querySelector('.crosshair-line-h-mpr');
                 const vLine = crosshair.querySelector('.crosshair-line-v-mpr');
                 
-                if (plane === 'axial') {
-                    if (hLine) hLine.style.top = `${mprCrosshair.y}%`;
-                    if (vLine) vLine.style.left = `${mprCrosshair.x}%`;
-                } else if (plane === 'sagittal') {
-                    if (hLine) hLine.style.top = `${mprCrosshair.y}%`;
-                    if (vLine) vLine.style.left = `${mprCrosshair.z}%`;
-                } else if (plane === 'coronal') {
-                    if (hLine) hLine.style.top = `${mprCrosshair.z}%`;
-                    if (vLine) vLine.style.left = `${mprCrosshair.x}%`;
+                if (hLine && vLine) {
+                    if (plane === 'axial') {
+                        hLine.style.top = `${mprCrosshair.y}%`;
+                        vLine.style.left = `${mprCrosshair.x}%`;
+                    } else if (plane === 'sagittal') {
+                        hLine.style.top = `${mprCrosshair.y}%`;
+                        vLine.style.left = `${mprCrosshair.z}%`;
+                    } else if (plane === 'coronal') {
+                        hLine.style.top = `${mprCrosshair.z}%`;
+                        vLine.style.left = `${mprCrosshair.x}%`;
+                    }
+                    
+                    // Ensure crosshair lines are visible
+                    hLine.style.display = 'block';
+                    vLine.style.display = 'block';
                 }
             });
         }
@@ -3188,27 +3865,33 @@
         }
 
         // Measurement System - Professional grade from PyQt
+        // Improved measurement system with proper start/finish behavior
         function startMeasurement(event) {
             const rect = event.target.getBoundingClientRect();
             const x = event.clientX - rect.left;
             const y = event.clientY - rect.top;
             
+            // Create new measurement
             currentMeasurement = {
                 start: { x, y },
                 end: { x, y },
-                imageId: images[currentImageIndex]?.id
+                imageId: images[currentImageIndex]?.id,
+                isActive: true
             };
             
+            console.log('Started measurement at:', currentMeasurement.start);
             updateMeasurementOverlay();
+            updateMeasurementInstructions();
         }
 
         function updateMeasurement(event) {
-            if (!currentMeasurement) return;
+            if (!currentMeasurement || !currentMeasurement.isActive) return;
             
             const rect = event.target.getBoundingClientRect();
             const x = event.clientX - rect.left;
             const y = event.clientY - rect.top;
             
+            // Only update end point while actively measuring
             currentMeasurement.end = { x, y };
             updateMeasurementOverlay();
         }
@@ -3216,17 +3899,33 @@
         function finishMeasurement(event) {
             if (!currentMeasurement) return;
             
+            // Mark measurement as finished
+            currentMeasurement.isActive = false;
+            
+            const rect = event.target.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            
+            // Set final end point
+            currentMeasurement.end = { x, y };
+            
             const distance = calculateDistance(currentMeasurement.start, currentMeasurement.end);
             
-            measurements.push({
-                ...currentMeasurement,
-                distance: distance,
-                timestamp: new Date().toISOString()
-            });
+            // Only save measurement if it has meaningful distance
+            if (distance.pixels > 5) {
+                measurements.push({
+                    ...currentMeasurement,
+                    distance: distance,
+                    timestamp: new Date().toISOString()
+                });
+                
+                updateMeasurementsList();
+                console.log('Finished measurement:', distance);
+            }
             
-            updateMeasurementsList();
             updateMeasurementOverlay();
             currentMeasurement = null;
+            updateMeasurementInstructions();
         }
 
         function calculateDistance(start, end) {
@@ -3283,6 +3982,10 @@
             const length = Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2));
             const angle = Math.atan2(end.y - start.y, end.x - start.x) * 180 / Math.PI;
             
+            // Determine if this is an active measurement
+            const isActive = measurement.isActive || isTemp;
+            const color = isActive ? '#00ff00' : '#ff0000'; // Green for active, red for finished
+            
             // Create professional measurement line
             const line = document.createElement('div');
             line.className = 'measurement-line';
@@ -3291,13 +3994,14 @@
                 left: ${start.x}px;
                 top: ${start.y}px;
                 width: ${length}px;
-                height: 2px;
+                height: ${isActive ? 3 : 2}px;
                 transform-origin: 0 0;
                 transform: rotate(${angle}deg);
-                background: ${isTemp ? 'linear-gradient(90deg, #ffff00, #ffaa00)' : 'linear-gradient(90deg, #00ff88, #00d4ff)'};
-                opacity: ${isTemp ? 0.8 : 1.0};
-                box-shadow: 0 0 4px ${isTemp ? 'rgba(255, 255, 0, 0.5)' : 'rgba(0, 255, 136, 0.5)'};
+                background: ${color};
+                opacity: ${isActive ? 0.8 : 1.0};
+                box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
                 pointer-events: none;
+                z-index: 25;
             `;
             overlay.appendChild(line);
             
@@ -3310,11 +4014,12 @@
                     top: ${point.y - 4}px;
                     width: 8px;
                     height: 8px;
-                    background: ${isTemp ? '#ffff00' : '#00ff88'};
+                    background: ${color};
                     border: 2px solid #ffffff;
                     border-radius: 50%;
-                    box-shadow: 0 0 6px ${isTemp ? 'rgba(255, 255, 0, 0.7)' : 'rgba(0, 255, 136, 0.7)'};
+                    box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
                     pointer-events: none;
+                    z-index: 26;
                 `;
                 overlay.appendChild(endpoint);
             });
@@ -3336,7 +4041,7 @@
                 top: ${midY - 30}px;
                 transform: translate(-50%, 0);
                 background: linear-gradient(135deg, rgba(0, 0, 0, 0.95), rgba(0, 20, 40, 0.95));
-                color: ${isTemp ? '#ffff00' : '#00ff88'};
+                color: ${color};
                 padding: 6px 10px;
                 border-radius: 6px;
                 font-size: 11px;
@@ -3481,27 +4186,152 @@
             updateMeasurementOverlay();
             updateAnnotationOverlay();
             
-            showToast(`Cleared ${measurementCount} measurement${measurementCount > 1 ? 's' : ''}`, 'success');
+
         }
 
-        // Annotation System
+        // Enhanced Annotation System with editing capabilities
+        let selectedAnnotation = null;
+        let isDraggingAnnotation = false;
+        
         function addAnnotation(event) {
-            const text = prompt('Enter annotation text:');
-            if (!text) return;
-            
             const rect = event.target.getBoundingClientRect();
             const x = event.clientX - rect.left;
             const y = event.clientY - rect.top;
             
-            annotations.push({
+            const annotation = {
+                id: Date.now(), // Unique ID for editing
                 x: x,
                 y: y,
-                text: text,
+                text: `Note ${annotations.length + 1}`,
                 imageId: images[currentImageIndex]?.id,
-                timestamp: new Date().toISOString()
-            });
+                timestamp: new Date().toISOString(),
+                fontSize: 12,
+                color: '#ffff00'
+            };
             
+            annotations.push(annotation);
             updateAnnotationOverlay();
+            
+            // Auto-select new annotation for editing
+            setTimeout(() => editAnnotation(annotation.id), 100);
+        }
+        
+        function editAnnotation(annotationId) {
+            const annotation = annotations.find(a => a.id === annotationId);
+            if (!annotation) return;
+            
+            // Create inline editor
+            const editor = document.createElement('div');
+            editor.style.cssText = `
+                position: absolute;
+                left: ${annotation.x}px;
+                top: ${annotation.y - 30}px;
+                background: rgba(0, 0, 0, 0.9);
+                border: 2px solid var(--accent-color);
+                border-radius: 4px;
+                padding: 8px;
+                z-index: 1000;
+            `;
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = annotation.text;
+            input.style.cssText = `
+                background: var(--card-bg);
+                border: 1px solid var(--border-color);
+                color: var(--text-primary);
+                padding: 4px;
+                border-radius: 2px;
+                font-size: 12px;
+                width: 150px;
+            `;
+            
+            const buttonContainer = document.createElement('div');
+            buttonContainer.style.cssText = 'display: flex; gap: 4px; margin-top: 4px;';
+            
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = '✓';
+            saveBtn.style.cssText = `
+                background: var(--success-color);
+                border: none;
+                color: var(--primary-bg);
+                padding: 4px 8px;
+                border-radius: 2px;
+                cursor: pointer;
+                font-size: 11px;
+                font-weight: bold;
+            `;
+            
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = '✗';
+            cancelBtn.style.cssText = `
+                background: var(--danger-color);
+                border: none;
+                color: white;
+                padding: 4px 8px;
+                border-radius: 2px;
+                cursor: pointer;
+                font-size: 11px;
+                font-weight: bold;
+            `;
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = '🗑';
+            deleteBtn.style.cssText = `
+                background: var(--warning-color);
+                border: none;
+                color: var(--primary-bg);
+                padding: 4px 8px;
+                border-radius: 2px;
+                cursor: pointer;
+                font-size: 11px;
+            `;
+            
+            buttonContainer.appendChild(saveBtn);
+            buttonContainer.appendChild(cancelBtn);
+            buttonContainer.appendChild(deleteBtn);
+            
+            editor.appendChild(input);
+            editor.appendChild(buttonContainer);
+            
+            const imageContainer = document.getElementById('imageContainer');
+            imageContainer.appendChild(editor);
+            
+            input.focus();
+            input.select();
+            
+            const saveAnnotation = () => {
+                annotation.text = input.value || annotation.text;
+                editor.remove();
+                updateAnnotationOverlay();
+            };
+            
+            const cancelEdit = () => {
+                editor.remove();
+            };
+            
+            const deleteAnnotation = () => {
+                const index = annotations.findIndex(a => a.id === annotation.id);
+                if (index > -1) {
+                    annotations.splice(index, 1);
+                    updateAnnotationOverlay();
+                }
+                editor.remove();
+            };
+            
+            saveBtn.onclick = saveAnnotation;
+            cancelBtn.onclick = cancelEdit;
+            deleteBtn.onclick = deleteAnnotation;
+            
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') saveAnnotation();
+                if (e.key === 'Escape') cancelEdit();
+            };
+            
+            // Auto-save after 3 seconds of inactivity
+            setTimeout(() => {
+                if (editor.parentNode) saveAnnotation();
+            }, 3000);
         }
 
         function updateAnnotationOverlay() {
@@ -3510,17 +4340,99 @@
             // Remove existing annotations
             overlay.querySelectorAll('.annotation-marker').forEach(el => el.remove());
             
-            // Add current annotations
+            // Add current annotations with enhanced interactivity
             annotations.forEach((annotation, index) => {
                 if (annotation.imageId === images[currentImageIndex]?.id) {
                     const marker = document.createElement('div');
                     marker.className = 'annotation-marker';
-                    marker.style.left = annotation.x + 'px';
-                    marker.style.top = annotation.y + 'px';
+                    marker.dataset.annotationId = annotation.id || index;
+                    marker.style.cssText = `
+                        position: absolute;
+                        left: ${annotation.x}px;
+                        top: ${annotation.y}px;
+                        background: rgba(0, 0, 0, 0.8);
+                        color: ${annotation.color || '#ffff00'};
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                        font-size: ${annotation.fontSize || 12}px;
+                        font-weight: bold;
+                        cursor: move;
+                        user-select: none;
+                        border: 1px solid ${annotation.color || '#ffff00'};
+                        transform: translate(-50%, -100%);
+                        z-index: 30;
+                        min-width: 40px;
+                        text-align: center;
+                    `;
                     marker.textContent = annotation.text;
+                    
+                    // Make annotation draggable
+                    marker.addEventListener('mousedown', function(e) {
+                        if (e.button === 0) { // Left click
+                            e.preventDefault();
+                            e.stopPropagation();
+                            selectedAnnotation = annotation;
+                            isDraggingAnnotation = true;
+                            
+                            const startX = e.clientX - annotation.x;
+                            const startY = e.clientY - annotation.y;
+                            
+                            const mouseMoveHandler = (moveEvent) => {
+                                if (isDraggingAnnotation && selectedAnnotation) {
+                                    selectedAnnotation.x = moveEvent.clientX - startX;
+                                    selectedAnnotation.y = moveEvent.clientY - startY;
+                                    updateAnnotationOverlay();
+                                }
+                            };
+                            
+                            const mouseUpHandler = () => {
+                                isDraggingAnnotation = false;
+                                selectedAnnotation = null;
+                                document.removeEventListener('mousemove', mouseMoveHandler);
+                                document.removeEventListener('mouseup', mouseUpHandler);
+                            };
+                            
+                            document.addEventListener('mousemove', mouseMoveHandler);
+                            document.addEventListener('mouseup', mouseUpHandler);
+                        }
+                    });
+                    
+                    // Double-click to edit
+                    marker.addEventListener('dblclick', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        editAnnotation(annotation.id || index);
+                    });
+                    
+                    // Scroll wheel to resize annotation
+                    marker.addEventListener('wheel', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const sizeChange = e.deltaY > 0 ? -1 : 1;
+                        annotation.fontSize = Math.max(8, Math.min(24, (annotation.fontSize || 12) + sizeChange));
+                        updateAnnotationOverlay();
+                    });
+                    
+                    // Right-click to delete
+                    marker.addEventListener('contextmenu', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        deleteAnnotation(annotation.id || index);
+                    });
+                    
                     overlay.appendChild(marker);
                 }
             });
+        }
+        
+        function deleteAnnotation(annotationId) {
+            const index = annotations.findIndex(a => (a.id || annotations.indexOf(a)) === annotationId);
+            if (index > -1) {
+                annotations.splice(index, 1);
+                updateAnnotationOverlay();
+                console.log('Deleted annotation:', annotationId);
+            }
         }
 
         // Mouse Info and HU Values
@@ -3658,7 +4570,7 @@
         function showLoading(message = 'Loading...') {
             const overlay = document.getElementById('loadingOverlay');
             const messageEl = document.getElementById('loadingMessage');
-            messageEl.textContent = message;
+            messageEl.textContent = 'Loading...';  // Keep simple, no custom messages
             overlay.classList.add('active');
         }
 
@@ -3668,23 +4580,8 @@
         }
 
         function showToast(message, type = 'info', duration = 3000) {
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'exclamation-triangle' : 'info-circle'}"></i>
-                    <span>${message}</span>
-                </div>
-            `;
-            
-            document.body.appendChild(toast);
-            
-            setTimeout(() => toast.classList.add('show'), 10);
-            
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => toast.remove(), 300);
-            }, duration);
+            // Disabled - no more annoying popups
+            console.log(`[${type.toUpperCase()}] ${message}`);
         }
 
         function getCSRFToken() {

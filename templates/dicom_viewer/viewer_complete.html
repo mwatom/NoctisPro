@@ -244,8 +244,12 @@
             cursor: crosshair;
             user-select: none;
             transition: none;
-            filter: contrast(1.15) brightness(1.08) sharpen(0.3);
-            -webkit-filter: contrast(1.15) brightness(1.08);
+            /* Remove filters that could cause white images */
+            filter: none !important;
+            -webkit-filter: none !important;
+            /* Ensure proper display */
+            object-fit: contain;
+            background: transparent;
         }
 
         /* Overlay Information */
@@ -304,15 +308,20 @@
             box-shadow: 0 0 2px rgba(0, 255, 255, 0.5);
         }
 
-        /* MPR Grid Layout */
+        /* MPR Grid Layout - Full screen resolution optimized */
         .mpr-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             grid-template-rows: 1fr 1fr;
             gap: 2px;
-            width: 100%;
-            height: 100%;
-            background: var(--border-color);
+            width: 100vw;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background: var(--primary-bg);
+            z-index: 1000;
+            padding: 2px;
         }
 
         .mpr-viewport {
@@ -321,9 +330,16 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            border: 1px solid var(--border-color);
+            border: 2px solid var(--border-color);
+            border-radius: 2px;
+            overflow: hidden;
             cursor: crosshair;
-            transition: all 0.1s ease;
+            /* Use full available space */
+            width: 100%;
+            height: 100%;
+            /* High-DPI optimization */
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: pixelated;
         }
 
         .mpr-viewport:hover {
@@ -339,8 +355,17 @@
         .mpr-viewport img {
             max-width: 100%;
             max-height: 100%;
+            width: 100%;
+            height: 100%;
+            image-rendering: -webkit-optimize-contrast;
             image-rendering: pixelated;
             cursor: crosshair;
+            object-fit: contain;
+            background: transparent;
+            display: block;
+            /* Remove problematic filters */
+            filter: none !important;
+            -webkit-filter: none !important;
         }
 
         .mpr-label {
@@ -679,40 +704,7 @@
             box-shadow: 0 0 0 1px var(--accent-color);
         }
 
-        /* Toast Notifications */
-        .toast {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-left: 4px solid var(--accent-color);
-            color: var(--text-primary);
-            padding: 12px 16px;
-            border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            z-index: 2000;
-            font-size: 12px;
-            max-width: 300px;
-            transform: translateX(100%);
-            transition: transform 0.3s ease;
-        }
-
-        .toast.show {
-            transform: translateX(0);
-        }
-
-        .toast.error {
-            border-left-color: var(--danger-color);
-        }
-
-        .toast.success {
-            border-left-color: var(--success-color);
-        }
-
-        .toast.warning {
-            border-left-color: var(--warning-color);
-        }
+        /* Toast Notifications - Disabled */
 
         /* Footer Status */
         .footer-status {
@@ -950,14 +942,14 @@
             <!-- Single Image View -->
             <div class="viewport-content" id="singleView">
                 <div class="image-container" id="imageContainer">
-                    <img class="dicom-image" id="dicomImage" alt="DICOM Image">
+                    <img class="dicom-image" id="dicomImage" alt="DICOM Image" style="display: block; max-width: 100%; max-height: 100%; object-fit: contain;">
+                    <canvas class="dicom-canvas" id="dicomCanvas" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
                     <div class="crosshair-overlay" id="crosshairOverlay" style="display: none;">
                         <div class="crosshair-line-h"></div>
                         <div class="crosshair-line-v"></div>
                     </div>
                     <div class="measurement-overlay" id="measurementOverlay"></div>
                 </div>
-
             </div>
 
             <!-- Professional 2x2 Orthogonal View Grid -->
@@ -1037,7 +1029,7 @@
                         <span>Zoom</span>
                         <span id="zoomValue">100%</span>
                     </div>
-                    <input type="range" class="slider" id="zoomSlider" min="25" max="500" value="100" oninput="updateZoom(this.value)">
+                    <input type="range" class="slider" id="zoomSlider" min="25" max="1000" value="100" oninput="updateZoom(this.value)">
                 </div>
             </div>
 
@@ -1288,7 +1280,7 @@
         let annotations = [];
         let currentMeasurement = null;
         
-        // Window presets - Professional medical presets from PyQt
+        // Window presets - Professional medical presets including DX/CR
         const windowPresets = {
             'lung': { ww: 1500, wl: -600 },
             'bone': { ww: 2000, wl: 300 },
@@ -1296,7 +1288,18 @@
             'brain': { ww: 100, wl: 50 },
             'liver': { ww: 160, wl: 60 },
             'mediastinum': { ww: 350, wl: 50 },
-            'cine': { ww: 800, wl: 200 }
+            'cine': { ww: 800, wl: 200 },
+            // DX/CR specific presets
+            'chest_dx': { ww: 2000, wl: 1000 },
+            'abdomen_dx': { ww: 3000, wl: 1500 },
+            'extremity_dx': { ww: 2500, wl: 1200 },
+            'spine_dx': { ww: 2200, wl: 1100 },
+            'pelvis_dx': { ww: 2800, wl: 1400 },
+            'skull_dx': { ww: 2000, wl: 1000 },
+            // CR specific presets
+            'chest_cr': { ww: 1800, wl: 900 },
+            'abdomen_cr': { ww: 2500, wl: 1250 },
+            'extremity_cr': { ww: 2000, wl: 1000 }
         };
         
         // Professional caching for performance (PyQt-inspired)
@@ -1327,7 +1330,7 @@
             updateOverlayInfo();
             updateZoomInfo();
             
-            showToast('DICOM Viewer initialized and ready', 'success');
+
         }
 
         function setupMouseEvents() {
@@ -1565,8 +1568,23 @@
 
         function applyTransform() {
             const dicomImage = document.getElementById('dicomImage');
+            const dicomCanvas = document.getElementById('dicomCanvas');
+            
+            // Always use image element for better compatibility and quality
             if (dicomImage) {
-                dicomImage.style.transform = `scale(${zoomFactor}) translate(${panX/zoomFactor}px, ${panY/zoomFactor}px)`;
+                const transform = `scale(${zoomFactor}) translate(${panX/zoomFactor}px, ${panY/zoomFactor}px)`;
+                dicomImage.style.transform = transform;
+                dicomImage.style.transformOrigin = 'center center';
+                
+                // Ensure image is visible and properly styled
+                dicomImage.style.display = 'block';
+                dicomImage.style.maxWidth = '100%';
+                dicomImage.style.maxHeight = '100%';
+                dicomImage.style.objectFit = 'contain';
+                
+                if (dicomCanvas) {
+                    dicomCanvas.style.display = 'none';
+                }
             }
         }
 
@@ -2547,7 +2565,7 @@
         function showLoading(message = 'Loading...') {
             const overlay = document.getElementById('loadingOverlay');
             const messageEl = document.getElementById('loadingMessage');
-            messageEl.textContent = message;
+            messageEl.textContent = 'Loading...';  // Keep simple, no custom messages
             overlay.classList.add('active');
         }
 
@@ -2557,25 +2575,8 @@
         }
 
         function showToast(message, type = 'info', duration = 3000) {
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-triangle' : 'info-circle'}"></i>
-                    <span>${message}</span>
-                </div>
-            `;
-            
-            document.body.appendChild(toast);
-            
-            // Show toast
-            setTimeout(() => toast.classList.add('show'), 100);
-            
-            // Hide toast
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => toast.remove(), 300);
-            }, duration);
+            // Disabled - no more annoying popups
+            console.log(`[${type.toUpperCase()}] ${message}`);
         }
 
         function getCSRFToken() {
