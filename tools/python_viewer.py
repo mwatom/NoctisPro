@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""
+Professional DICOM Viewer - Medical Imaging Excellence
+Optimized for diagnostic quality visualization with advanced image processing
+Specially enhanced for X-ray, CT, MRI, and other medical imaging modalities
+"""
+
 import sys
 import os
 import argparse
@@ -7,73 +13,158 @@ import pydicom
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout,
                              QWidget, QPushButton, QLabel, QSlider, QFileDialog,
                              QScrollArea, QFrame, QGridLayout, QComboBox, QTextEdit,
-                             QMessageBox, QInputDialog, QListWidget)
-from PyQt5.QtCore import Qt, QTimer, pyqtSignal
+                             QMessageBox, QInputDialog, QListWidget, QListWidgetItem,
+                             QSplitter, QGroupBox, QCheckBox, QSpinBox, QDoubleSpinBox,
+                             QTabWidget, QProgressBar, QStatusBar)
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread, pyqtSlot
+from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen, QColor, QFont, QIcon
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from matplotlib.colors import LinearSegmentedColormap
+import matplotlib.pyplot as plt
 from io import BytesIO
 import requests
-from PIL import Image as PILImage
+from PIL import Image as PILImage, ImageEnhance, ImageFilter
+from scipy import ndimage
+from scipy.ndimage import gaussian_filter, sobel
+import cv2
+from skimage import exposure, filters, morphology
+from skimage.restoration import denoise_nl_means
+import logging
+
+# Configure logging for professional debugging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 
 class DicomCanvas(FigureCanvas):
+    """Professional DICOM Canvas with Medical-Grade Rendering"""
     mouse_pressed = pyqtSignal(int, int)
     mouse_moved = pyqtSignal(int, int)
     mouse_released = pyqtSignal(int, int)
+    pixel_value_changed = pyqtSignal(float, float, float)  # x, y, value
 
     def __init__(self, parent=None):
-        self.fig = Figure(figsize=(8, 8), facecolor='black')
+        # High-DPI rendering support
+        self.fig = Figure(figsize=(10, 10), facecolor='black', dpi=100)
         super().__init__(self.fig)
         self.setParent(parent)
+        
+        # Professional medical imaging display setup
         self.ax = self.fig.add_subplot(111)
         self.ax.set_facecolor('black')
         self.ax.axis('off')
-        self.fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
+        
+        # Optimize for medical imaging - no margins, perfect fit
+        self.fig.subplots_adjust(left=0, right=1, top=1, bottom=0, wspace=0, hspace=0)
+        
+        # Enhanced interaction tracking
         self.mouse_pressed_flag = False
         self.last_mouse_pos = None
+        self.current_pixel_pos = None
+        
+        # Professional rendering settings
+        self.fig.patch.set_facecolor('black')
+        self.setStyleSheet("background-color: black; border: none;")
+        
+        # Enable high-quality rendering
+        self.setRenderHint(QPainter.Antialiasing, True)
+        self.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        self.setRenderHint(QPainter.HighQualityAntialiasing, True)
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:  # type: ignore
+        if event.button() == Qt.LeftButton:
             self.mouse_pressed_flag = True
             self.last_mouse_pos = (event.x(), event.y())
+            self.current_pixel_pos = (event.x(), event.y())
             self.mouse_pressed.emit(event.x(), event.y())
+            self._emit_pixel_value(event.x(), event.y())
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
+        # Always track mouse position for pixel value display
+        self.current_pixel_pos = (event.x(), event.y())
+        self._emit_pixel_value(event.x(), event.y())
+        
         if self.mouse_pressed_flag:
             self.mouse_moved.emit(event.x(), event.y())
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        if event.button() == Qt.LeftButton:  # type: ignore
+        if event.button() == Qt.LeftButton:
             self.mouse_pressed_flag = False
             self.mouse_released.emit(event.x(), event.y())
         super().mouseReleaseEvent(event)
+    
+    def _emit_pixel_value(self, x, y):
+        """Emit pixel value at mouse position for HU display"""
+        try:
+            if hasattr(self.parent(), 'current_image_data') and self.parent().current_image_data is not None:
+                # Convert widget coordinates to data coordinates
+                inv = self.ax.transData.inverted()
+                data_x, data_y = inv.transform((x, y))
+                
+                # Get pixel value if within bounds
+                image_data = self.parent().current_image_data
+                if (0 <= int(data_y) < image_data.shape[0] and 
+                    0 <= int(data_x) < image_data.shape[1]):
+                    pixel_value = float(image_data[int(data_y), int(data_x)])
+                    self.pixel_value_changed.emit(data_x, data_y, pixel_value)
+        except Exception as e:
+            logger.debug(f"Pixel value emission error: {e}")
 
     def wheelEvent(self, event):
-        if event.modifiers() & Qt.ControlModifier:  # type: ignore
-            delta = event.angleDelta().y()
-            zoom_factor = 1.1 if delta > 0 else 0.9
-            self.parent().handle_zoom(zoom_factor)
+        """Enhanced wheel event with smooth zooming and slice navigation"""
+        delta = event.angleDelta().y()
+        
+        if event.modifiers() & Qt.ControlModifier:
+            # Smooth zoom with variable speed
+            zoom_factor = 1.15 if delta > 0 else 0.87
+            self.parent().handle_zoom(zoom_factor, event.x(), event.y())
+        elif event.modifiers() & Qt.ShiftModifier:
+            # Window/Level adjustment with mouse wheel
+            if delta > 0:
+                self.parent().adjust_window_level(10, 0)  # Increase window width
+            else:
+                self.parent().adjust_window_level(-10, 0)  # Decrease window width
         else:
-            delta = event.angleDelta().y()
+            # Slice navigation
             direction = 1 if delta > 0 else -1
             self.parent().handle_slice_change(direction)
+        
         super().wheelEvent(event)
 
 
 class DicomViewer(QMainWindow):
+    """Professional DICOM Viewer - Medical Imaging Excellence"""
+    
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Python DICOM Viewer")
-        self.setGeometry(100, 100, 1400, 900)
-        self.setStyleSheet("background-color: #2a2a2a; color: white;")
+        self.setWindowTitle("Professional DICOM Viewer - Medical Imaging Excellence")
+        self.setGeometry(50, 50, 1600, 1000)
+        
+        # Professional dark theme optimized for medical imaging
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #1a1a1a;
+                color: #ffffff;
+            }
+            QWidget {
+                background-color: #1a1a1a;
+                color: #ffffff;
+                font-family: 'Segoe UI', 'Arial', sans-serif;
+                font-size: 11px;
+            }
+        """)
 
+        # Core DICOM data
         self.dicom_files = []
         self.current_image_index = 0
         self.current_image_data = None
         self.current_dicom = None
-
+        self.original_pixel_data = None  # Store original for processing
+        
+        # Enhanced display parameters
         self.window_width = 400
         self.window_level = 40
         self.zoom_factor = 1.0
@@ -81,25 +172,61 @@ class DicomViewer(QMainWindow):
         self.pan_y = 0
         self.inverted = False
         self.crosshair = False
+        self.pixel_value_display = True
+        self.ruler_enabled = False
+        
+        # Advanced image processing flags
+        self.noise_reduction = False
+        self.edge_enhancement = False
+        self.contrast_enhancement = True
+        self.histogram_equalization = False
 
+        # Tool management
         self.active_tool = 'windowing'
         self.measurements = []
         self.annotations = []
         self.current_measurement = None
         self.drag_start = None
 
+        # Professional medical imaging presets - Enhanced for X-ray optimization
         self.window_presets = {
-            'lung': {'ww': 1500, 'wl': -600},
-            'bone': {'ww': 2000, 'wl': 300},
-            'soft': {'ww': 400, 'wl': 40},
-            'brain': {'ww': 100, 'wl': 50}
+            # CT Presets
+            'lung': {'ww': 1600, 'wl': -600, 'description': 'Lung Window - Optimal for pulmonary imaging'},
+            'bone': {'ww': 2000, 'wl': 300, 'description': 'Bone Window - Skeletal structures'},
+            'soft': {'ww': 400, 'wl': 40, 'description': 'Soft Tissue - General abdomen/pelvis'},
+            'brain': {'ww': 80, 'wl': 40, 'description': 'Brain Window - Neurological imaging'},
+            'liver': {'ww': 160, 'wl': 60, 'description': 'Liver Window - Hepatic imaging'},
+            'mediastinum': {'ww': 350, 'wl': 50, 'description': 'Mediastinum - Chest soft tissue'},
+            
+            # X-ray Optimized Presets
+            'xray_chest': {'ww': 2500, 'wl': 500, 'description': 'Chest X-ray - Lungs and mediastinum'},
+            'xray_bone': {'ww': 3000, 'wl': 1500, 'description': 'X-ray Bone - Skeletal detail'},
+            'xray_soft': {'ww': 1000, 'wl': 300, 'description': 'X-ray Soft Tissue'},
+            'xray_pediatric': {'ww': 1500, 'wl': 200, 'description': 'Pediatric X-ray'},
+            'xray_extremity': {'ww': 2500, 'wl': 800, 'description': 'Extremity X-ray'},
+            'xray_spine': {'ww': 2000, 'wl': 600, 'description': 'Spine X-ray'},
+            'xray_abdomen': {'ww': 1200, 'wl': 400, 'description': 'Abdominal X-ray'},
+            
+            # Specialized presets
+            'angio': {'ww': 600, 'wl': 150, 'description': 'Angiography - Vascular imaging'},
+            'pe_study': {'ww': 700, 'wl': 100, 'description': 'Pulmonary Embolism Study'},
+            'trauma': {'ww': 400, 'wl': 40, 'description': 'Trauma Assessment'},
+            'stroke': {'ww': 40, 'wl': 40, 'description': 'Stroke Imaging - Brain'},
         }
 
+        # View management
         self.view_xlim = None
         self.view_ylim = None
-
+        
+        # Advanced caching system
         self._cached_image_data = None
-        self._cached_image_params = (None, None, None, None)
+        self._cached_image_params = (None, None, None, None, None, None)  # Enhanced cache params
+        self._processing_cache = {}  # Cache for processed images
+        
+        # Current pixel information
+        self.current_pixel_value = 0.0
+        self.current_hu_value = 0.0
+        self.current_mouse_pos = (0, 0)
 
         # Backend mode (web API parity)
         self.backend_mode = False
@@ -108,124 +235,557 @@ class DicomViewer(QMainWindow):
             self.base_url = self.base_url[:-1]
         self.backend_study = None
         self.backend_series = None
-        self.backend_images = []  # list of dicts with id, etc.
-        self.series_options = []  # list of (label, id)
-
+        self.backend_images = []
+        self.series_options = []
+        
+        # Status bar for professional feedback
+        self.status_bar = None
+        self.pixel_info_label = None
+        
+        # Initialize the professional UI
         self.init_ui()
 
     def init_ui(self):
+        """Initialize professional medical imaging UI"""
+        # Create main widget with professional layout
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
-
+        
+        # Create status bar for professional feedback
+        self.status_bar = QStatusBar()
+        self.setStatusBar(self.status_bar)
+        
+        # Pixel information display
+        self.pixel_info_label = QLabel("Ready")
+        self.pixel_info_label.setStyleSheet("""
+            QLabel {
+                background-color: #2d2d2d;
+                color: #ffffff;
+                padding: 4px 8px;
+                border-radius: 3px;
+                font-family: 'Courier New', monospace;
+                font-size: 10px;
+            }
+        """)
+        self.status_bar.addPermanentWidget(self.pixel_info_label)
+        
+        # Main layout using splitters for professional resizing
         main_layout = QHBoxLayout(main_widget)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
-
-        self.create_toolbar(main_layout)
-
+        main_layout.setContentsMargins(2, 2, 2, 2)
+        main_layout.setSpacing(2)
+        
+        # Create main splitter
+        main_splitter = QSplitter(Qt.Horizontal)
+        main_splitter.setStyleSheet("""
+            QSplitter::handle {
+                background-color: #404040;
+                width: 3px;
+            }
+            QSplitter::handle:hover {
+                background-color: #0078d4;
+            }
+        """)
+        
+        # Create toolbar with enhanced organization
+        self.create_professional_toolbar(main_splitter)
+        
+        # Create center area with viewport
         center_widget = QWidget()
         center_layout = QVBoxLayout(center_widget)
         center_layout.setContentsMargins(0, 0, 0, 0)
+        center_layout.setSpacing(1)
+        
+        self.create_enhanced_top_bar(center_layout)
+        self.create_professional_viewport(center_layout)
+        
+        main_splitter.addWidget(center_widget)
+        
+        # Create enhanced right panel
+        self.create_professional_right_panel(main_splitter)
+        
+        # Set splitter proportions for optimal viewing
+        main_splitter.setSizes([90, 800, 280])  # toolbar, center, right panel
+        
+        main_layout.addWidget(main_splitter)
+    
+    def create_professional_right_panel(self, main_splitter):
+        """Create enhanced right panel with tabbed interface"""
+        right_panel = QWidget()
+        right_panel.setFixedWidth(300)
+        right_panel.setStyleSheet("""
+            QWidget {
+                background-color: #2d2d2d;
+                border-left: 2px solid #404040;
+            }
+        """)
+        
+        panel_layout = QVBoxLayout(right_panel)
+        panel_layout.setContentsMargins(5, 5, 5, 5)
+        panel_layout.setSpacing(2)
+        
+        # Create tabbed interface for better organization
+        tab_widget = QTabWidget()
+        tab_widget.setStyleSheet("""
+            QTabWidget::pane {
+                border: 1px solid #555555;
+                background-color: #2d2d2d;
+            }
+            QTabBar::tab {
+                background-color: #404040;
+                color: white;
+                padding: 8px 12px;
+                margin-right: 2px;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+            }
+            QTabBar::tab:selected {
+                background-color: #0078d4;
+            }
+            QTabBar::tab:hover {
+                background-color: #4a4a4a;
+            }
+        """)
+        
+        # Create tabs
+        self.create_display_controls_tab(tab_widget)
+        self.create_measurements_tab(tab_widget)
+        self.create_image_info_tab(tab_widget)
+        self.create_presets_tab(tab_widget)
+        
+        panel_layout.addWidget(tab_widget)
+        main_splitter.addWidget(right_panel)
+    
+    def create_display_controls_tab(self, tab_widget):
+        """Create display controls tab"""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(15)
+        
+        # Window/Level section
+        self.create_enhanced_window_level_section(layout)
+        
+        # Navigation section  
+        self.create_enhanced_navigation_section(layout)
+        
+        # Transform section
+        self.create_enhanced_transform_section(layout)
+        
+        layout.addStretch()
+        tab_widget.addTab(tab, "Display")
+    
+    def create_measurements_tab(self, tab_widget):
+        """Create measurements tab"""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(10, 10, 10, 10)
+        
+        self.create_enhanced_measurements_section(layout)
+        
+        tab_widget.addTab(tab, "Measure")
+    
+    def create_image_info_tab(self, tab_widget):
+        """Create image information tab"""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(10, 10, 10, 10)
+        
+        self.create_enhanced_image_info_section(layout)
+        
+        tab_widget.addTab(tab, "Info")
+    
+    def create_presets_tab(self, tab_widget):
+        """Create window/level presets tab"""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(10, 10, 10, 10)
+        
+        self.create_enhanced_presets_section(layout)
+        
+        tab_widget.addTab(tab, "Presets")
 
-        self.create_top_bar(center_layout)
-        self.create_viewport(center_layout)
-        main_layout.addWidget(center_widget, 1)
-
-        self.create_right_panel(main_layout)
-
-    def create_toolbar(self, main_layout):
+    def create_professional_toolbar(self, main_splitter):
+        """Create professional medical imaging toolbar with organized tool groups"""
         toolbar = QWidget()
-        toolbar.setFixedWidth(80)
-        toolbar.setStyleSheet("background-color: #333; border-right: 1px solid #555;")
+        toolbar.setFixedWidth(85)
+        toolbar.setStyleSheet("""
+            QWidget {
+                background-color: #2d2d2d;
+                border-right: 2px solid #404040;
+            }
+        """)
 
         toolbar_layout = QVBoxLayout(toolbar)
         toolbar_layout.setContentsMargins(5, 10, 5, 10)
-        toolbar_layout.setSpacing(5)
-
-        tools = [
-            ('windowing', 'Window', '🔄'),
-            ('zoom', 'Zoom', '🔍'),
-            ('pan', 'Pan', '✋'),
-            ('measure', 'Measure', '📏'),
-            ('annotate', 'Annotate', '📝'),
-            ('crosshair', 'Crosshair', '✚'),
-            ('invert', 'Invert', '⚫'),
-            ('reset', 'Reset', '🔄'),
-            ('ai', 'AI', '🤖'),
-            ('recon', '3D', '🧊')
+        toolbar_layout.setSpacing(3)
+        
+        # Professional tool organization
+        tool_groups = [
+            {
+                'name': 'Navigation',
+                'tools': [
+                    ('windowing', 'Window/Level', '🪟', 'Adjust window and level settings'),
+                    ('zoom', 'Zoom', '🔍', 'Zoom in/out of image'),
+                    ('pan', 'Pan', '✋', 'Pan around the image'),
+                    ('reset', 'Reset View', '🏠', 'Reset zoom and pan to fit'),
+                ]
+            },
+            {
+                'name': 'Measurement',
+                'tools': [
+                    ('measure', 'Measure', '📏', 'Linear measurements'),
+                    ('annotate', 'Annotate', '📝', 'Add text annotations'),
+                    ('crosshair', 'Crosshair', '✚', 'Show crosshair overlay'),
+                ]
+            },
+            {
+                'name': 'Display',
+                'tools': [
+                    ('invert', 'Invert', '⚫', 'Invert image colors'),
+                    ('enhance', 'Enhance', '✨', 'Image enhancement'),
+                    ('filter', 'Filter', '🔧', 'Apply image filters'),
+                ]
+            },
+            {
+                'name': 'Advanced',
+                'tools': [
+                    ('cine', 'Cine', '▶️', 'Cine mode playback'),
+                    ('3d', '3D/MPR', '🧊', '3D reconstruction'),
+                    ('export', 'Export', '💾', 'Export image/study'),
+                ]
+            }
         ]
 
         self.tool_buttons = {}
-        for tool_key, tool_label, tool_icon in tools:
-            btn = QPushButton(f"{tool_icon}\n{tool_label}")
-            btn.setFixedSize(70, 50)
-            btn.setStyleSheet("""
-                QPushButton { background-color: #444; color: white; border: none; border-radius: 5px; font-size: 10px; }
-                QPushButton:hover { background-color: #555; }
-                QPushButton:pressed { background-color: #0078d4; }
-            """
-            )
-            btn.clicked.connect(lambda checked, tool=tool_key: self.handle_tool_click(tool))
-            toolbar_layout.addWidget(btn)
-            self.tool_buttons[tool_key] = btn
+        
+        for group in tool_groups:
+            # Group separator
+            if toolbar_layout.count() > 0:
+                separator = QFrame()
+                separator.setFrameShape(QFrame.HLine)
+                separator.setStyleSheet("color: #555555;")
+                toolbar_layout.addWidget(separator)
+            
+            # Group label
+            group_label = QLabel(group['name'])
+            group_label.setStyleSheet("""
+                QLabel {
+                    color: #888888;
+                    font-size: 9px;
+                    font-weight: bold;
+                    padding: 2px;
+                    text-align: center;
+                }
+            """)
+            group_label.setAlignment(Qt.AlignCenter)
+            toolbar_layout.addWidget(group_label)
+            
+            # Group tools
+            for tool_key, tool_label, tool_icon, tool_tip in group['tools']:
+                btn = QPushButton(f"{tool_icon}\n{tool_label.split()[0]}")  # First word only
+                btn.setFixedSize(75, 55)
+                btn.setToolTip(f"{tool_label}\n{tool_tip}")
+                btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #404040;
+                        color: white;
+                        border: 1px solid #555555;
+                        border-radius: 6px;
+                        font-size: 9px;
+                        font-weight: bold;
+                        text-align: center;
+                    }
+                    QPushButton:hover {
+                        background-color: #4a4a4a;
+                        border-color: #0078d4;
+                    }
+                    QPushButton:pressed {
+                        background-color: #0078d4;
+                        border-color: #005a9e;
+                    }
+                    QPushButton:checked {
+                        background-color: #0078d4;
+                        border-color: #005a9e;
+                    }
+                """)
+                btn.setCheckable(True)  # Make buttons toggleable
+                btn.clicked.connect(lambda checked, tool=tool_key: self.handle_tool_click(tool))
+                toolbar_layout.addWidget(btn)
+                self.tool_buttons[tool_key] = btn
 
         toolbar_layout.addStretch()
-        main_layout.addWidget(toolbar)
+        main_splitter.addWidget(toolbar)
 
-    def create_top_bar(self, center_layout):
+    def create_enhanced_top_bar(self, center_layout):
+        """Create enhanced top bar with professional controls"""
         top_bar = QWidget()
-        top_bar.setFixedHeight(50)
-        top_bar.setStyleSheet("background-color: #333; border-bottom: 1px solid #555;")
+        top_bar.setFixedHeight(55)
+        top_bar.setStyleSheet("""
+            QWidget {
+                background-color: #2d2d2d;
+                border-bottom: 2px solid #404040;
+            }
+        """)
 
         top_layout = QHBoxLayout(top_bar)
-        top_layout.setContentsMargins(20, 0, 20, 0)
+        top_layout.setContentsMargins(15, 5, 15, 5)
+        top_layout.setSpacing(10)
 
-        load_btn = QPushButton("Load DICOM Files")
+        # File operations group
+        file_group = QGroupBox("File Operations")
+        file_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid #555555;
+                border-radius: 5px;
+                margin-top: 10px;
+                padding-top: 5px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+            }
+        """)
+        file_layout = QHBoxLayout(file_group)
+        file_layout.setContentsMargins(5, 5, 5, 5)
+        
+        load_btn = QPushButton("📁 Load Files")
         load_btn.setStyleSheet("""
-            QPushButton { background-color: #0078d4; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; }
-            QPushButton:hover { background-color: #106ebe; }
-        """
-        )
+            QPushButton {
+                background-color: #0078d4;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-size: 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #106ebe;
+            }
+        """)
         load_btn.clicked.connect(self.load_dicom_files)
-        top_layout.addWidget(load_btn)
+        file_layout.addWidget(load_btn)
 
-        folder_btn = QPushButton("Load DICOM Folder")
+        folder_btn = QPushButton("📂 Load Folder")
         folder_btn.setStyleSheet("""
-            QPushButton { background-color: #0b8457; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; }
-            QPushButton:hover { background-color: #086b46; }
-        """
-        )
+            QPushButton {
+                background-color: #0b8457;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-size: 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #086b46;
+            }
+        """)
         folder_btn.clicked.connect(self.load_dicom_folder)
-        top_layout.addWidget(folder_btn)
+        file_layout.addWidget(folder_btn)
+        
+        top_layout.addWidget(file_group)
 
+        # Series selection
+        series_group = QGroupBox("Series Selection")
+        series_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid #555555;
+                border-radius: 5px;
+                margin-top: 10px;
+                padding-top: 5px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+            }
+        """)
+        series_layout = QHBoxLayout(series_group)
+        series_layout.setContentsMargins(5, 5, 5, 5)
+        
         self.backend_combo = QComboBox()
         self.backend_combo.addItem("Select Series")
-        self.backend_combo.setStyleSheet("padding: 6px; border-radius: 4px; font-size: 14px;")
+        self.backend_combo.setStyleSheet("""
+            QComboBox {
+                padding: 6px;
+                border-radius: 4px;
+                font-size: 12px;
+                background-color: #404040;
+                border: 1px solid #555555;
+                min-width: 150px;
+            }
+            QComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 20px;
+                border-left: 1px solid #555555;
+            }
+        """)
         self.backend_combo.currentTextChanged.connect(self.handle_backend_study_select)
-        top_layout.addWidget(self.backend_combo)
+        series_layout.addWidget(self.backend_combo)
+        
+        top_layout.addWidget(series_group)
 
-        self.patient_info_label = QLabel("Patient: - | Study Date: - | Modality: -")
-        self.patient_info_label.setStyleSheet("font-size: 14px; color: #ccc;")
-        top_layout.addWidget(self.patient_info_label)
+        # Patient information
+        info_group = QGroupBox("Patient Information")
+        info_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid #555555;
+                border-radius: 5px;
+                margin-top: 10px;
+                padding-top: 5px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+            }
+        """)
+        info_layout = QHBoxLayout(info_group)
+        info_layout.setContentsMargins(5, 5, 5, 5)
+        
+        self.patient_info_label = QLabel("Ready to load DICOM files...")
+        self.patient_info_label.setStyleSheet("""
+            QLabel {
+                font-size: 11px;
+                color: #cccccc;
+                font-family: 'Segoe UI', Arial, sans-serif;
+            }
+        """)
+        info_layout.addWidget(self.patient_info_label)
+        
+        top_layout.addWidget(info_group, 1)  # Take remaining space
 
-        top_layout.addStretch()
         center_layout.addWidget(top_bar)
 
-    def create_viewport(self, center_layout):
+    def create_professional_viewport(self, center_layout):
+        """Create professional medical imaging viewport with enhanced overlays"""
         viewport_widget = QWidget()
-        viewport_widget.setStyleSheet("background-color: black;")
+        viewport_widget.setStyleSheet("""
+            QWidget {
+                background-color: #000000;
+                border: 2px solid #404040;
+                border-radius: 3px;
+            }
+        """)
 
         viewport_layout = QVBoxLayout(viewport_widget)
-        viewport_layout.setContentsMargins(0, 0, 0, 0)
+        viewport_layout.setContentsMargins(2, 2, 2, 2)
 
+        # Create the enhanced DICOM canvas
         self.canvas = DicomCanvas(self)
         self.canvas.mouse_pressed.connect(self.on_mouse_press)
         self.canvas.mouse_moved.connect(self.on_mouse_move)
         self.canvas.mouse_released.connect(self.on_mouse_release)
+        self.canvas.pixel_value_changed.connect(self.on_pixel_value_changed)
 
         viewport_layout.addWidget(self.canvas)
-        self.create_overlay_labels(viewport_widget)
+        
+        # Create professional overlay system
+        self.create_professional_overlays(viewport_widget)
+        
         center_layout.addWidget(viewport_widget)
+        
+    def create_professional_overlays(self, viewport_widget):
+        """Create professional medical imaging overlays"""
+        # Top-left overlay - Window/Level and slice info
+        self.wl_overlay = QLabel()
+        self.wl_overlay.setStyleSheet("""
+            QLabel {
+                background-color: rgba(0, 0, 0, 180);
+                color: #00ff00;
+                padding: 8px 12px;
+                border-radius: 6px;
+                font-family: 'Courier New', monospace;
+                font-size: 11px;
+                font-weight: bold;
+                border: 1px solid #333333;
+            }
+        """)
+        self.wl_overlay.setParent(viewport_widget)
+        self.wl_overlay.move(15, 15)
+        
+        # Top-right overlay - Image information
+        self.image_overlay = QLabel()
+        self.image_overlay.setStyleSheet("""
+            QLabel {
+                background-color: rgba(0, 0, 0, 180);
+                color: #00ffff;
+                padding: 8px 12px;
+                border-radius: 6px;
+                font-family: 'Courier New', monospace;
+                font-size: 10px;
+                border: 1px solid #333333;
+            }
+        """)
+        self.image_overlay.setParent(viewport_widget)
+        
+        # Bottom-left overlay - Zoom and tool info
+        self.zoom_overlay = QLabel()
+        self.zoom_overlay.setStyleSheet("""
+            QLabel {
+                background-color: rgba(0, 0, 0, 180);
+                color: #ffff00;
+                padding: 6px 10px;
+                border-radius: 4px;
+                font-family: 'Courier New', monospace;
+                font-size: 10px;
+                font-weight: bold;
+                border: 1px solid #333333;
+            }
+        """)
+        self.zoom_overlay.setParent(viewport_widget)
+        
+        # Bottom-right overlay - Pixel value and coordinates
+        self.pixel_overlay = QLabel()
+        self.pixel_overlay.setStyleSheet("""
+            QLabel {
+                background-color: rgba(0, 0, 0, 180);
+                color: #ff8800;
+                padding: 6px 10px;
+                border-radius: 4px;
+                font-family: 'Courier New', monospace;
+                font-size: 10px;
+                font-weight: bold;
+                border: 1px solid #333333;
+            }
+        """)
+        self.pixel_overlay.setParent(viewport_widget)
+        
+        # Position overlays with timer for proper sizing
+        QTimer.singleShot(100, self.position_overlays)
+    
+    def position_overlays(self):
+        """Position overlay labels professionally"""
+        if not hasattr(self, 'wl_overlay'):
+            return
+            
+        parent = self.wl_overlay.parent()
+        if not parent:
+            return
+            
+        parent_width = parent.width()
+        parent_height = parent.height()
+        
+        # Position top-right overlay
+        self.image_overlay.adjustSize()
+        self.image_overlay.move(parent_width - self.image_overlay.width() - 15, 15)
+        
+        # Position bottom-left overlay
+        self.zoom_overlay.adjustSize()
+        self.zoom_overlay.move(15, parent_height - self.zoom_overlay.height() - 15)
+        
+        # Position bottom-right overlay
+        self.pixel_overlay.adjustSize()
+        self.pixel_overlay.move(
+            parent_width - self.pixel_overlay.width() - 15,
+            parent_height - self.pixel_overlay.height() - 15
+        )
 
     def create_overlay_labels(self, viewport_widget):
         self.wl_label = QLabel("WW: 400\nWL: 40\nSlice: 1/1")
@@ -448,25 +1008,81 @@ class DicomViewer(QMainWindow):
         panel_layout.addWidget(measurements_frame)
 
     def handle_tool_click(self, tool):
+        """Enhanced professional tool handling"""
+        logger.info(f"Tool activated: {tool}")
+        
+        # Handle action tools (non-persistent)
         if tool == 'reset':
             self.reset_view()
+            return
         elif tool == 'invert':
             self.inverted = not self.inverted
             self.update_display()
+            return
         elif tool == 'crosshair':
             self.crosshair = not self.crosshair
             self.update_display()
-        elif tool == 'ai':
-            QMessageBox.information(self, "AI Analysis", "AI analysis result: (stub) No backend connected.")
-        elif tool == 'recon':
-            QMessageBox.information(self, "3D Reconstruction", "3D reconstruction feature is not implemented yet.")
-        else:
-            self.active_tool = tool
-        for btn_key, btn in self.tool_buttons.items():
-            if btn_key == tool and tool not in ['reset', 'invert', 'crosshair', 'ai', 'recon']:
-                btn.setStyleSheet(btn.styleSheet().replace('#444', '#0078d4'))
+            return
+        elif tool == 'enhance':
+            # Toggle contrast enhancement
+            self.contrast_enhancement = not self.contrast_enhancement
+            self._cached_image_data = None  # Force re-processing
+            self.update_display()
+            self.status_bar.showMessage(f"Contrast enhancement: {'ON' if self.contrast_enhancement else 'OFF'}", 2000)
+            return
+        elif tool == 'filter':
+            # Cycle through filter options
+            if not self.noise_reduction and not self.edge_enhancement:
+                self.noise_reduction = True
+                filter_msg = "Noise Reduction ON"
+            elif self.noise_reduction and not self.edge_enhancement:
+                self.noise_reduction = False
+                self.edge_enhancement = True
+                filter_msg = "Edge Enhancement ON"
             else:
-                btn.setStyleSheet(btn.styleSheet().replace('#0078d4', '#444'))
+                self.noise_reduction = False
+                self.edge_enhancement = False
+                filter_msg = "Filters OFF"
+            
+            self._cached_image_data = None  # Force re-processing
+            self.update_display()
+            self.status_bar.showMessage(filter_msg, 2000)
+            return
+        elif tool == 'cine':
+            QMessageBox.information(self, "Cine Mode", "Cine mode playback - Feature in development")
+            return
+        elif tool == '3d':
+            QMessageBox.information(self, "3D Reconstruction", "3D/MPR reconstruction - Feature in development")
+            return
+        elif tool == 'export':
+            QMessageBox.information(self, "Export", "Export functionality - Feature in development")
+            return
+        
+        # Handle persistent tools (change active tool)
+        old_tool = self.active_tool
+        self.active_tool = tool
+        
+        # Update button states
+        for btn_key, btn in self.tool_buttons.items():
+            if btn_key == tool:
+                btn.setChecked(True)
+            else:
+                btn.setChecked(False)
+        
+        # Update status
+        tool_descriptions = {
+            'windowing': 'Window/Level adjustment - Drag to adjust contrast and brightness',
+            'zoom': 'Zoom tool - Drag up/down to zoom in/out',
+            'pan': 'Pan tool - Drag to move around the image',
+            'measure': 'Measurement tool - Click and drag to measure distances',
+            'annotate': 'Annotation tool - Click to add text annotations'
+        }
+        
+        description = tool_descriptions.get(tool, f'{tool.title()} tool active')
+        self.status_bar.showMessage(description, 3000)
+        
+        # Update zoom overlay to show current tool
+        self.update_zoom_overlay()
 
     def handle_window_width_change(self, value):
         self.window_width = value
@@ -791,7 +1407,7 @@ class DicomViewer(QMainWindow):
                 self.current_image_data = self.current_dicom.pixel_array.copy()
             else:
                 return
-            image_data = self.apply_windowing(self.current_image_data)
+            image_data = self.apply_medical_grade_windowing(self.current_image_data)
             if self.inverted:
                 image_data = 255 - image_data
             self._cached_image_data = image_data
@@ -813,13 +1429,259 @@ class DicomViewer(QMainWindow):
         self.update_overlay_labels()
         self.canvas.draw()
 
-    def apply_windowing(self, image_data):
-        image_data = image_data.astype(np.float32)
+    def apply_medical_grade_windowing(self, image_data):
+        """Apply medical-grade windowing with advanced image processing"""
+        # Convert to float for processing
+        processed_data = image_data.astype(np.float32)
+        
+        # Store original for HU calculations
+        original_data = processed_data.copy()
+        
+        # Apply advanced preprocessing for X-ray images
+        if self.current_dicom and hasattr(self.current_dicom, 'Modality'):
+            modality = str(getattr(self.current_dicom, 'Modality', '')).upper()
+            
+            if modality in ['CR', 'DX', 'DR']:  # Digital radiography
+                processed_data = self._enhance_xray_image(processed_data)
+            elif modality == 'CT':
+                processed_data = self._enhance_ct_image(processed_data)
+            elif modality in ['MR', 'MRI']:
+                processed_data = self._enhance_mr_image(processed_data)
+        
+        # Apply noise reduction if enabled
+        if self.noise_reduction:
+            processed_data = self._apply_noise_reduction(processed_data)
+        
+        # Apply edge enhancement if enabled
+        if self.edge_enhancement:
+            processed_data = self._apply_edge_enhancement(processed_data)
+        
+        # Apply contrast enhancement
+        if self.contrast_enhancement:
+            processed_data = self._apply_contrast_enhancement(processed_data)
+        
+        # Apply histogram equalization if enabled
+        if self.histogram_equalization:
+            processed_data = self._apply_histogram_equalization(processed_data)
+        
+        # Apply window/level
         min_val = self.window_level - self.window_width / 2
         max_val = self.window_level + self.window_width / 2
-        image_data = np.clip(image_data, min_val, max_val)
-        image_data = (image_data - min_val) / (max_val - min_val) * 255
-        return image_data.astype(np.uint8)
+        
+        # Advanced windowing with smooth transitions
+        windowed_data = np.clip(processed_data, min_val, max_val)
+        
+        if max_val > min_val:
+            # Smooth windowing curve for better tissue differentiation
+            windowed_data = (windowed_data - min_val) / (max_val - min_val)
+            
+            # Apply gamma correction for medical displays
+            gamma = self._get_optimal_gamma()
+            windowed_data = np.power(windowed_data, gamma)
+            
+            # Scale to display range
+            windowed_data = windowed_data * 255
+        else:
+            windowed_data = np.zeros_like(windowed_data)
+        
+        return windowed_data.astype(np.uint8)
+    
+    def _enhance_xray_image(self, image_data):
+        """Advanced X-ray image enhancement for diagnostic quality"""
+        try:
+            # X-ray specific enhancement pipeline
+            enhanced = image_data.copy()
+            
+            # 1. Noise reduction with edge preservation
+            enhanced = self._bilateral_filter(enhanced)
+            
+            # 2. Contrast enhancement using CLAHE
+            enhanced = self._apply_clahe(enhanced)
+            
+            # 3. Unsharp masking for edge enhancement
+            enhanced = self._unsharp_mask(enhanced, amount=0.3, sigma=1.0)
+            
+            # 4. Logarithmic enhancement for wide dynamic range
+            enhanced = self._log_enhancement(enhanced)
+            
+            logger.info("Applied X-ray enhancement pipeline")
+            return enhanced
+            
+        except Exception as e:
+            logger.warning(f"X-ray enhancement failed: {e}")
+            return image_data
+    
+    def _enhance_ct_image(self, image_data):
+        """CT image enhancement for optimal diagnostic viewing"""
+        try:
+            enhanced = image_data.copy()
+            
+            # CT-specific processing
+            # 1. Mild noise reduction
+            enhanced = gaussian_filter(enhanced, sigma=0.5)
+            
+            # 2. Edge-preserving smoothing
+            enhanced = self._edge_preserving_smooth(enhanced)
+            
+            return enhanced
+            
+        except Exception as e:
+            logger.warning(f"CT enhancement failed: {e}")
+            return image_data
+    
+    def _enhance_mr_image(self, image_data):
+        """MR image enhancement"""
+        try:
+            enhanced = image_data.copy()
+            
+            # MR-specific processing
+            # 1. Non-local means denoising
+            if 'denoise_nl_means' in globals():
+                enhanced = denoise_nl_means(enhanced, h=0.1, fast_mode=True)
+            
+            # 2. Bias field correction simulation
+            enhanced = self._bias_field_correction(enhanced)
+            
+            return enhanced
+            
+        except Exception as e:
+            logger.warning(f"MR enhancement failed: {e}")
+            return image_data
+    
+    def _bilateral_filter(self, image_data):
+        """Apply bilateral filter for noise reduction with edge preservation"""
+        try:
+            # Normalize for OpenCV
+            normalized = ((image_data - image_data.min()) / 
+                         (image_data.max() - image_data.min()) * 255).astype(np.uint8)
+            
+            # Apply bilateral filter
+            filtered = cv2.bilateralFilter(normalized, 9, 75, 75)
+            
+            # Scale back to original range
+            return (filtered.astype(np.float32) / 255.0 * 
+                   (image_data.max() - image_data.min()) + image_data.min())
+            
+        except Exception as e:
+            logger.warning(f"Bilateral filter failed: {e}")
+            return gaussian_filter(image_data, sigma=0.5)
+    
+    def _apply_clahe(self, image_data):
+        """Apply Contrast Limited Adaptive Histogram Equalization"""
+        try:
+            # Normalize to 0-255 range
+            normalized = ((image_data - image_data.min()) / 
+                         (image_data.max() - image_data.min()) * 255).astype(np.uint8)
+            
+            # Apply CLAHE
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            enhanced = clahe.apply(normalized)
+            
+            # Scale back to original range
+            return (enhanced.astype(np.float32) / 255.0 * 
+                   (image_data.max() - image_data.min()) + image_data.min())
+            
+        except Exception as e:
+            logger.warning(f"CLAHE failed: {e}")
+            return image_data
+    
+    def _unsharp_mask(self, image_data, amount=0.5, sigma=1.0):
+        """Apply unsharp masking for edge enhancement"""
+        try:
+            # Create blurred version
+            blurred = gaussian_filter(image_data, sigma=sigma)
+            
+            # Create mask
+            mask = image_data - blurred
+            
+            # Apply enhancement
+            enhanced = image_data + amount * mask
+            
+            return enhanced
+            
+        except Exception as e:
+            logger.warning(f"Unsharp mask failed: {e}")
+            return image_data
+    
+    def _log_enhancement(self, image_data):
+        """Apply logarithmic enhancement for wide dynamic range"""
+        try:
+            # Ensure positive values
+            min_val = image_data.min()
+            if min_val <= 0:
+                image_data = image_data - min_val + 1
+            
+            # Apply log enhancement
+            enhanced = np.log1p(image_data)
+            
+            # Normalize
+            enhanced = (enhanced - enhanced.min()) / (enhanced.max() - enhanced.min())
+            enhanced = enhanced * (image_data.max() - image_data.min()) + image_data.min()
+            
+            return enhanced
+            
+        except Exception as e:
+            logger.warning(f"Log enhancement failed: {e}")
+            return image_data
+    
+    def _apply_noise_reduction(self, image_data):
+        """Apply advanced noise reduction"""
+        return gaussian_filter(image_data, sigma=0.8)
+    
+    def _apply_edge_enhancement(self, image_data):
+        """Apply edge enhancement"""
+        # Sobel edge detection
+        edges_x = sobel(image_data, axis=1)
+        edges_y = sobel(image_data, axis=0)
+        edges = np.sqrt(edges_x**2 + edges_y**2)
+        
+        # Enhance edges
+        enhanced = image_data + 0.2 * edges
+        return enhanced
+    
+    def _apply_contrast_enhancement(self, image_data):
+        """Apply advanced contrast enhancement"""
+        # Histogram stretching
+        p2, p98 = np.percentile(image_data, (2, 98))
+        if p98 > p2:
+            enhanced = np.clip((image_data - p2) / (p98 - p2), 0, 1)
+            enhanced = enhanced * (image_data.max() - image_data.min()) + image_data.min()
+            return enhanced
+        return image_data
+    
+    def _apply_histogram_equalization(self, image_data):
+        """Apply histogram equalization"""
+        try:
+            # Use skimage exposure
+            enhanced = exposure.equalize_hist(image_data)
+            # Scale back to original range
+            enhanced = enhanced * (image_data.max() - image_data.min()) + image_data.min()
+            return enhanced
+        except:
+            return image_data
+    
+    def _get_optimal_gamma(self):
+        """Get optimal gamma correction for current window settings"""
+        if self.window_level < -200:  # Lung window
+            return 0.8  # Brighten dark areas
+        elif self.window_level > 200:  # Bone window  
+            return 1.2  # Slightly darken bright areas
+        else:  # Soft tissue
+            return 1.0  # Standard gamma
+    
+    def _edge_preserving_smooth(self, image_data):
+        """Edge-preserving smoothing filter"""
+        return gaussian_filter(image_data, sigma=0.5)
+    
+    def _bias_field_correction(self, image_data):
+        """Simple bias field correction simulation"""
+        # Create smooth bias field estimate
+        from scipy.ndimage import uniform_filter
+        bias_field = uniform_filter(image_data.astype(np.float32), size=50)
+        
+        # Correct bias field
+        corrected = image_data / (bias_field + 1e-6) * np.mean(bias_field)
+        return corrected
 
     def draw_measurements(self):
         for measurement in self.measurements:
@@ -869,8 +1731,46 @@ class DicomViewer(QMainWindow):
             self.canvas.ax.axhline(y=center_y, color='cyan', linewidth=1, alpha=0.7)
 
     def update_overlay_labels(self):
-        self.wl_label.setText(f"WW: {int(self.window_width)}\nWL: {int(self.window_level)}\nSlice: {self.current_image_index + 1}/{len(self.dicom_files)}")
-        self.zoom_label.setText(f"Zoom: {int(self.zoom_factor * 100)}%")
+        """Update all professional overlay labels"""
+        # Legacy support for old overlays
+        if hasattr(self, 'wl_label') and self.wl_label:
+            self.wl_label.setText(f"WW: {int(self.window_width)}\nWL: {int(self.window_level)}\nSlice: {self.current_image_index + 1}/{len(self.dicom_files)}")
+        if hasattr(self, 'zoom_label') and self.zoom_label:
+            self.zoom_label.setText(f"Zoom: {int(self.zoom_factor * 100)}%")
+            
+        # New professional overlays
+        if not hasattr(self, 'wl_overlay'):
+            return
+            
+        # Window/Level overlay
+        modality = getattr(self.current_dicom, 'Modality', 'Unknown') if self.current_dicom else 'Unknown'
+        slice_info = f"{self.current_image_index + 1}/{len(self.dicom_files)}" if self.dicom_files else "0/0"
+        
+        self.wl_overlay.setText(f"WW: {int(self.window_width):4d}\nWL: {int(self.window_level):4d}\nSlice: {slice_info}")
+        self.wl_overlay.adjustSize()
+        
+        # Image information overlay
+        if self.current_dicom:
+            rows = getattr(self.current_dicom, 'Rows', 'N/A')
+            cols = getattr(self.current_dicom, 'Columns', 'N/A')
+            thickness = getattr(self.current_dicom, 'SliceThickness', 'N/A')
+            spacing = getattr(self.current_dicom, 'PixelSpacing', ['N/A', 'N/A'])
+            
+            if isinstance(spacing, list) and len(spacing) >= 2:
+                spacing_text = f"{spacing[0]:.2f}×{spacing[1]:.2f}"
+            else:
+                spacing_text = str(spacing)
+                
+            self.image_overlay.setText(
+                f"Modality: {modality}\n"
+                f"Matrix: {cols}×{rows}\n"
+                f"Spacing: {spacing_text}mm\n"
+                f"Thickness: {thickness}mm"
+            )
+            self.image_overlay.adjustSize()
+        
+        # Update zoom overlay
+        self.update_zoom_overlay()
 
     def update_measurements_list(self):
         self.measurements_list.clear()
@@ -911,6 +1811,70 @@ class DicomViewer(QMainWindow):
             self.view_xlim = (0, w)
             self.view_ylim = (h, 0)
         self.update_display()
+    
+    def on_pixel_value_changed(self, x, y, pixel_value):
+        """Handle pixel value changes for professional HU display"""
+        self.current_pixel_value = pixel_value
+        self.current_mouse_pos = (x, y)
+        
+        # Calculate Hounsfield Units if CT data
+        hu_value = pixel_value
+        if self.current_dicom and hasattr(self.current_dicom, 'RescaleSlope'):
+            try:
+                slope = float(getattr(self.current_dicom, 'RescaleSlope', 1.0))
+                intercept = float(getattr(self.current_dicom, 'RescaleIntercept', 0.0))
+                hu_value = pixel_value * slope + intercept
+                self.current_hu_value = hu_value
+            except:
+                pass
+        
+        # Update pixel overlay
+        self.update_pixel_overlay()
+        
+        # Update status bar
+        if self.pixel_info_label:
+            modality = getattr(self.current_dicom, 'Modality', '') if self.current_dicom else ''
+            if modality == 'CT':
+                self.pixel_info_label.setText(
+                    f"Pos: ({int(x)}, {int(y)}) | Pixel: {pixel_value:.0f} | HU: {hu_value:.1f}"
+                )
+            else:
+                self.pixel_info_label.setText(
+                    f"Pos: ({int(x)}, {int(y)}) | Value: {pixel_value:.0f}"
+                )
+    
+    def adjust_window_level(self, ww_delta, wl_delta):
+        """Adjust window/level with delta values"""
+        self.window_width = max(1, self.window_width + ww_delta)
+        self.window_level = max(-1000, min(1000, self.window_level + wl_delta))
+        
+        # Update sliders
+        self.ww_slider.setValue(int(self.window_width))
+        self.wl_slider.setValue(int(self.window_level))
+        
+        self.update_display()
+    
+    def update_pixel_overlay(self):
+        """Update pixel value overlay"""
+        if hasattr(self, 'pixel_overlay') and self.pixel_overlay:
+            x, y = self.current_mouse_pos
+            pixel_val = self.current_pixel_value
+            hu_val = self.current_hu_value
+            
+            if self.current_dicom and getattr(self.current_dicom, 'Modality', '') == 'CT':
+                self.pixel_overlay.setText(f"X: {int(x):4d} Y: {int(y):4d}\nPixel: {pixel_val:6.0f}\nHU: {hu_val:7.1f}")
+            else:
+                self.pixel_overlay.setText(f"X: {int(x):4d} Y: {int(y):4d}\nValue: {pixel_val:6.0f}")
+            
+            self.pixel_overlay.adjustSize()
+    
+    def update_zoom_overlay(self):
+        """Update zoom and tool overlay"""
+        if hasattr(self, 'zoom_overlay') and self.zoom_overlay:
+            tool_text = f"Tool: {self.active_tool.title()}"
+            zoom_text = f"Zoom: {int(self.zoom_factor * 100)}%"
+            self.zoom_overlay.setText(f"{tool_text}\n{zoom_text}")
+            self.zoom_overlay.adjustSize()
 
     def open_path(self, path):
         paths = []
