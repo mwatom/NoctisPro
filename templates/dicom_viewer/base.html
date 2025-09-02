@@ -2508,55 +2508,97 @@
         }
 
         function updatePresetsForModality(modality) {
-            const presetContainer = document.querySelector('.preset-grid');
-            if (!presetContainer) return;
-            
-            // Clear existing presets
-            presetContainer.innerHTML = '';
-            
-            let presets = [];
-            
-            if (modality === 'DX') {
-                presets = [
-                    { key: 'chest_dx', label: 'Chest' },
-                    { key: 'abdomen_dx', label: 'Abdomen' },
-                    { key: 'extremity_dx', label: 'Extremity' },
-                    { key: 'spine_dx', label: 'Spine' },
-                    { key: 'pelvis_dx', label: 'Pelvis' },
-                    { key: 'skull_dx', label: 'Skull' }
-                ];
-            } else if (modality === 'CR') {
-                presets = [
-                    { key: 'chest_cr', label: 'Chest' },
-                    { key: 'abdomen_cr', label: 'Abdomen' },
-                    { key: 'extremity_cr', label: 'Extremity' },
-                    { key: 'bone', label: 'Bone' }
-                ];
-            } else if (modality === 'CT') {
-                presets = [
-                    { key: 'lung', label: 'Lung' },
-                    { key: 'bone', label: 'Bone' },
-                    { key: 'soft', label: 'Soft' },
-                    { key: 'brain', label: 'Brain' }
-                ];
-            } else {
-                // Default presets for other modalities
-                presets = [
-                    { key: 'soft', label: 'Soft' },
-                    { key: 'bone', label: 'Bone' },
-                    { key: 'lung', label: 'Lung' },
-                    { key: 'brain', label: 'Brain' }
-                ];
+            try {
+                const presetContainer = document.querySelector('.preset-grid');
+                if (!presetContainer) {
+                    console.warn('Preset container not found, skipping preset update');
+                    return;
+                }
+                
+                // Clear existing presets
+                presetContainer.innerHTML = '';
+                
+                let presets = [];
+                
+                // Robust modality detection with fallbacks
+                const modalityUpper = (modality || '').toUpperCase();
+                
+                if (modalityUpper === 'DX') {
+                    presets = [
+                        { key: 'chest_dx', label: 'Chest' },
+                        { key: 'abdomen_dx', label: 'Abdomen' },
+                        { key: 'extremity_dx', label: 'Extremity' },
+                        { key: 'spine_dx', label: 'Spine' },
+                        { key: 'pelvis_dx', label: 'Pelvis' },
+                        { key: 'skull_dx', label: 'Skull' }
+                    ];
+                } else if (modalityUpper === 'CR') {
+                    presets = [
+                        { key: 'chest_cr', label: 'Chest' },
+                        { key: 'abdomen_cr', label: 'Abdomen' },
+                        { key: 'extremity_cr', label: 'Extremity' },
+                        { key: 'bone', label: 'Bone' }
+                    ];
+                } else if (modalityUpper === 'CT') {
+                    presets = [
+                        { key: 'lung', label: 'Lung' },
+                        { key: 'bone', label: 'Bone' },
+                        { key: 'soft', label: 'Soft' },
+                        { key: 'brain', label: 'Brain' }
+                    ];
+                } else if (modalityUpper === 'MR' || modalityUpper === 'MRI') {
+                    presets = [
+                        { key: 'brain', label: 'Brain' },
+                        { key: 'soft', label: 'Soft' },
+                        { key: 'bone', label: 'Bone' }
+                    ];
+                } else {
+                    // Default presets for unknown/other modalities
+                    presets = [
+                        { key: 'soft', label: 'Soft' },
+                        { key: 'bone', label: 'Bone' },
+                        { key: 'lung', label: 'Lung' },
+                        { key: 'brain', label: 'Brain' }
+                    ];
+                }
+                
+                // Create preset buttons with error handling
+                presets.forEach(preset => {
+                    try {
+                        const button = document.createElement('button');
+                        button.className = 'preset-btn';
+                        button.textContent = preset.label;
+                        button.onclick = () => {
+                            try {
+                                applyPreset(preset.key);
+                            } catch (e) {
+                                console.error('Error applying preset:', e);
+                                showToast('Error applying preset', 'error');
+                            }
+                        };
+                        presetContainer.appendChild(button);
+                    } catch (e) {
+                        console.error('Error creating preset button:', e);
+                    }
+                });
+                
+                console.log(`Updated presets for modality: ${modalityUpper}, ${presets.length} presets available`);
+                
+            } catch (error) {
+                console.error('Error updating presets for modality:', error);
+                // Ensure we have at least basic presets
+                try {
+                    const presetContainer = document.querySelector('.preset-grid');
+                    if (presetContainer) {
+                        presetContainer.innerHTML = `
+                            <button class="preset-btn" onclick="applyPreset('soft')">Soft</button>
+                            <button class="preset-btn" onclick="applyPreset('bone')">Bone</button>
+                        `;
+                    }
+                } catch (e) {
+                    console.error('Failed to create fallback presets:', e);
+                }
             }
-            
-            // Create preset buttons
-            presets.forEach(preset => {
-                const button = document.createElement('button');
-                button.className = 'preset-btn';
-                button.textContent = preset.label;
-                button.onclick = () => applyPreset(preset.key);
-                presetContainer.appendChild(button);
-            });
         }
 
         function updateOverlayInfo() {
@@ -2973,21 +3015,27 @@
             }
         }
 
-        // DX/CR Optimization Function
+        // DX/CR Optimization Function - Robust with error handling
         function optimizeForRadiography(imageInfo) {
-            console.log('Optimizing display for radiographic image:', imageInfo);
-            
-            const modality = imageInfo?.modality;
-            const photometric = imageInfo?.photometric_interpretation;
-            
-            // Auto-suggest appropriate preset based on DICOM metadata and image characteristics
-            if (modality === 'DX' || modality === 'CR') {
+            try {
+                console.log('Optimizing display for radiographic image:', imageInfo);
+                
+                const modality = (imageInfo?.modality || '').toUpperCase();
+                const photometric = (imageInfo?.photometric_interpretation || '').toUpperCase();
+                
+                // Only proceed if we have a radiographic modality
+                if (!['DX', 'CR', 'XA', 'RF', 'MG'].includes(modality)) {
+                    console.log('Not a radiographic modality, skipping optimization');
+                    return;
+                }
+                
                 let suggestedPreset = '';
                 
-                // First, try to use DICOM body part information
-                const bodyPart = imageInfo?.body_part_examined?.toLowerCase() || '';
-                const viewPosition = imageInfo?.view_position?.toLowerCase() || '';
-                const seriesDesc = imageInfo?.series_description?.toLowerCase() || '';
+                try {
+                    // First, try to use DICOM body part information with safe string handling
+                    const bodyPart = (imageInfo?.body_part_examined || '').toLowerCase();
+                    const viewPosition = (imageInfo?.view_position || '').toLowerCase();
+                    const seriesDesc = (imageInfo?.series_description || '').toLowerCase();
                 
                 if (bodyPart.includes('chest') || seriesDesc.includes('chest') || viewPosition.includes('pa') || viewPosition.includes('ap')) {
                     suggestedPreset = modality === 'DX' ? 'chest_dx' : 'chest_cr';
@@ -3026,32 +3074,63 @@
                     // Auto-apply if using default windowing values
                     if (windowWidth === 400 && windowLevel === 40) {
                         setTimeout(() => {
-                            applyPreset(suggestedPreset);
-                            showToast(`✨ Auto-applied ${suggestedPreset.replace('_', ' ').toUpperCase()} preset for optimal ${modality} viewing`, 'success', 4000);
+                            try {
+                                applyPreset(suggestedPreset);
+                                showToast(`✨ Auto-applied ${suggestedPreset.replace('_', ' ').toUpperCase()} preset for optimal ${modality} viewing`, 'success', 4000);
+                            } catch (e) {
+                                console.error('Error auto-applying preset:', e);
+                                showToast('Error applying suggested preset', 'warning');
+                            }
                         }, 1000);
                     } else {
                         showToast(`💡 Suggested preset for ${modality}: ${suggestedPreset.replace('_', ' ').toUpperCase()} (WW:${preset.ww}, WL:${preset.wl})`, 'info', 5000);
                     }
                 }
                 
-                // Show inversion status for MONOCHROME1 images
-                if (photometric === 'MONOCHROME1') {
-                    showToast('📷 MONOCHROME1 image - automatically inverted for proper display', 'info', 3000);
+                } catch (presetError) {
+                    console.warn('Error in preset suggestion logic:', presetError);
+                    // Continue without preset suggestion
                 }
+                
+                // Show inversion status for MONOCHROME1 images with error handling
+                try {
+                    if (photometric === 'MONOCHROME1') {
+                        showToast('📷 MONOCHROME1 image - automatically inverted for proper display', 'info', 3000);
+                    }
+                } catch (e) {
+                    console.warn('Error checking photometric interpretation:', e);
+                }
+                
+            } catch (error) {
+                console.error('Error in radiographic optimization:', error);
+                // Continue gracefully without optimization
             }
         }
 
         function updateZoomRangeForModality(modality) {
-            const zoomSlider = document.getElementById('zoomSlider');
-            if (!zoomSlider) return;
-            
-            if (modality === 'DX' || modality === 'CR') {
-                // Higher zoom range for radiographic detail examination
-                zoomSlider.max = '1000';  // 10x zoom
-                showToast('📷 Radiographic mode: Enhanced zoom range (up to 10x) for detail examination', 'info', 3000);
-            } else {
-                // Standard zoom range for other modalities
-                zoomSlider.max = '500';   // 5x zoom
+            try {
+                const zoomSlider = document.getElementById('zoomSlider');
+                if (!zoomSlider) {
+                    console.warn('Zoom slider not found, skipping zoom range update');
+                    return;
+                }
+                
+                const modalityUpper = (modality || '').toUpperCase();
+                
+                if (['DX', 'CR', 'MG'].includes(modalityUpper)) {
+                    // Higher zoom range for radiographic detail examination
+                    zoomSlider.max = '1000';  // 10x zoom
+                    showToast(`📷 ${modalityUpper} mode: Enhanced zoom range (up to 10x) for detail examination`, 'info', 3000);
+                } else {
+                    // Standard zoom range for other modalities
+                    zoomSlider.max = '500';   // 5x zoom
+                }
+                
+                console.log(`Updated zoom range for ${modalityUpper}: max=${zoomSlider.max}%`);
+                
+            } catch (error) {
+                console.error('Error updating zoom range:', error);
+                // Continue gracefully without zoom range update
             }
         }
 

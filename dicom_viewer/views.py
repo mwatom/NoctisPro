@@ -709,34 +709,47 @@ def api_image_display(request, image_id):
             modality = getattr(ds, 'Modality', '').upper()
             photometric = getattr(ds, 'PhotometricInterpretation', '').upper()
             
-            # Enhanced DX/CR handling with proper windowing
-            if modality in ['DX', 'CR', 'XA', 'RF', 'MG']:
-                # Auto-detect optimal window/level for radiographic images
-                if request.GET.get('ww') is None or request.GET.get('wl') is None:
-                    # Calculate optimal windowing from pixel data statistics
-                    pixel_min, pixel_max = pixel_array.min(), pixel_array.max()
-                    pixel_range = pixel_max - pixel_min
+            # Enhanced modality handling with robust error handling
+            try:
+                if modality in ['DX', 'CR', 'XA', 'RF', 'MG']:
+                    # Auto-detect optimal window/level for radiographic images
+                    if request.GET.get('ww') is None or request.GET.get('wl') is None:
+                        try:
+                            # Calculate optimal windowing from pixel data statistics
+                            pixel_min, pixel_max = float(pixel_array.min()), float(pixel_array.max())
+                            pixel_range = pixel_max - pixel_min
+                            
+                            if pixel_range > 0 and not (np.isnan(pixel_min) or np.isnan(pixel_max)):
+                                # Use data-driven windowing for optimal contrast
+                                if request.GET.get('ww') is None:
+                                    window_width = max(100.0, pixel_range * 0.8)  # Ensure minimum width
+                                if request.GET.get('wl') is None:
+                                    window_level = pixel_min + (pixel_range * 0.5)  # Center of data range
+                                
+                                logger.info(f"Auto-calculated {modality} windowing: WW={window_width}, WL={window_level} from data range {pixel_min}-{pixel_max}")
+                            else:
+                                raise ValueError("Invalid pixel range for auto-windowing")
+                                
+                        except Exception as e:
+                            logger.warning(f"Auto-windowing failed for {modality}: {e}, using defaults")
+                            # Fallback to standard radiographic settings
+                            if request.GET.get('ww') is None:
+                                window_width = 4000.0
+                            if request.GET.get('wl') is None:
+                                window_level = 2000.0
                     
-                    if pixel_range > 0:
-                        # Use data-driven windowing for optimal contrast
-                        if request.GET.get('ww') is None:
-                            window_width = pixel_range * 0.8  # Use 80% of data range
-                        if request.GET.get('wl') is None:
-                            window_level = pixel_min + (pixel_range * 0.5)  # Center of data range
-                        
-                        logger.info(f"Auto-calculated DX/CR windowing: WW={window_width}, WL={window_level} from data range {pixel_min}-{pixel_max}")
-                    else:
-                        # Fallback to standard radiographic settings
-                        if request.GET.get('ww') is None:
-                            window_width = 4000.0
-                        if request.GET.get('wl') is None:
-                            window_level = 2000.0
-                
-                # Auto-invert MONOCHROME1 images (common in radiography)
-                if request.GET.get('invert') is None:
-                    inverted = (photometric == 'MONOCHROME1')
-                    if inverted:
-                        logger.info("Auto-inverting MONOCHROME1 radiographic image")
+                    # Auto-invert MONOCHROME1 images (common in radiography) with error handling
+                    if request.GET.get('invert') is None:
+                        try:
+                            inverted = (photometric == 'MONOCHROME1')
+                            if inverted:
+                                logger.info(f"Auto-inverting MONOCHROME1 {modality} image")
+                        except Exception as e:
+                            logger.warning(f"Could not determine photometric interpretation: {e}")
+                            inverted = False
+                            
+            except Exception as e:
+                logger.warning(f"Error in modality-specific processing: {e}, continuing with standard processing")
             
             # Apply high-quality windowing with modality-specific enhancements
             logger.info(f"Applying windowing: WW={window_width}, WL={window_level}, invert={inverted}, modality={modality}")
@@ -752,35 +765,60 @@ def api_image_display(request, image_id):
                 logger.error("Failed to generate image data URL")
                 raise ValueError("Failed to generate image data")
             
-            # Prepare enhanced image info with DX/CR specific metadata
+            # Prepare enhanced image info with robust metadata extraction
+            def safe_get_attr(dataset, attr, default=None, convert_func=None):
+                """Safely extract DICOM attributes with error handling"""
+                try:
+                    value = getattr(dataset, attr, default)
+                    if value is None:
+                        return default
+                    if convert_func:
+                        return convert_func(value)
+                    return value
+                except Exception as e:
+                    logger.warning(f"Error extracting {attr}: {e}")
+                    return default
+            
             image_info = {
                 'id': image.id,
-                'instance_number': image.instance_number,
-                'slice_location': image.slice_location,
-                'dimensions': [int(getattr(ds, 'Rows', 0)), int(getattr(ds, 'Columns', 0))],
-                'pixel_spacing': getattr(ds, 'PixelSpacing', [1.0, 1.0]),
-                'slice_thickness': getattr(ds, 'SliceThickness', 1.0),
+                'instance_number': safe_get_attr(image, 'instance_number', 0),
+                'slice_location': safe_get_attr(image, 'slice_location', 0.0),
+                'dimensions': [
+                    safe_get_attr(ds, 'Rows', 512, int),
+                    safe_get_attr(ds, 'Columns', 512, int)
+                ],
+                'pixel_spacing': safe_get_attr(ds, 'PixelSpacing', [1.0, 1.0]),
+                'slice_thickness': safe_get_attr(ds, 'SliceThickness', 1.0, float),
                 'default_window_width': float(window_width),
                 'default_window_level': float(window_level),
-                'modality': getattr(ds, 'Modality', ''),
-                'series_description': getattr(ds, 'SeriesDescription', ''),
-                'patient_name': str(getattr(ds, 'PatientName', '')),
-                'study_date': str(getattr(ds, 'StudyDate', '')),
-                'institution': str(getattr(ds, 'InstitutionName', '')),
-                'bits_allocated': getattr(ds, 'BitsAllocated', 16),
+                'modality': safe_get_attr(ds, 'Modality', 'UN', str),  # UN = Unknown
+                'series_description': safe_get_attr(ds, 'SeriesDescription', '', str),
+                'patient_name': safe_get_attr(ds, 'PatientName', 'Unknown', str),
+                'study_date': safe_get_attr(ds, 'StudyDate', '', str),
+                'institution': safe_get_attr(ds, 'InstitutionName', '', str),
+                'bits_allocated': safe_get_attr(ds, 'BitsAllocated', 16, int),
                 'photometric_interpretation': photometric,
-                # DX/CR specific metadata
-                'body_part_examined': str(getattr(ds, 'BodyPartExamined', '')),
-                'view_position': str(getattr(ds, 'ViewPosition', '')),
-                'patient_orientation': getattr(ds, 'PatientOrientation', []),
-                'image_orientation': getattr(ds, 'ImageOrientationPatient', []),
-                'kvp': getattr(ds, 'KVP', None),
-                'exposure_time': getattr(ds, 'ExposureTime', None),
-                'x_ray_tube_current': getattr(ds, 'XRayTubeCurrent', None),
-                'exposure': getattr(ds, 'Exposure', None),
-                'detector_type': str(getattr(ds, 'DetectorType', '')),
-                'grid': str(getattr(ds, 'Grid', '')),
             }
+            
+            # Add modality-specific metadata only if available (robust approach)
+            if modality in ['DX', 'CR', 'XA', 'RF', 'MG']:
+                # DX/CR specific metadata with safe extraction
+                radiographic_info = {
+                    'body_part_examined': safe_get_attr(ds, 'BodyPartExamined', '', str),
+                    'view_position': safe_get_attr(ds, 'ViewPosition', '', str),
+                    'patient_orientation': safe_get_attr(ds, 'PatientOrientation', [], list),
+                    'image_orientation': safe_get_attr(ds, 'ImageOrientationPatient', [], list),
+                    'kvp': safe_get_attr(ds, 'KVP', None, float),
+                    'exposure_time': safe_get_attr(ds, 'ExposureTime', None, float),
+                    'x_ray_tube_current': safe_get_attr(ds, 'XRayTubeCurrent', None, float),
+                    'exposure': safe_get_attr(ds, 'Exposure', None, float),
+                    'detector_type': safe_get_attr(ds, 'DetectorType', '', str),
+                    'grid': safe_get_attr(ds, 'Grid', '', str),
+                }
+                # Only add non-empty values
+                for key, value in radiographic_info.items():
+                    if value not in [None, '', [], 0]:
+                        image_info[key] = value
             
             return JsonResponse({
                 'image_data': image_data_url,
