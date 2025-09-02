@@ -111,26 +111,127 @@ def _load_dicom_optimized(file_path):
         return None
 
 def _apply_windowing_fast(image, window_width, window_level, invert=False):
-    """Professional windowing algorithm from PyQt implementation"""
-    # Convert to float for calculations
-    image_data = image.astype(np.float32)
+    """Professional windowing algorithm with enhanced quality for medical imaging"""
+    # Convert to float for high-precision calculations
+    image_data = image.astype(np.float64)
     
-    # Apply window/level
+    # Apply window/level with improved precision
     min_val = window_level - window_width / 2
     max_val = window_level + window_width / 2
     
-    # Clip and normalize
+    # Enhanced windowing with smooth transitions
     image_data = np.clip(image_data, min_val, max_val)
     
     if max_val > min_val:
-        image_data = (image_data - min_val) / (max_val - min_val) * 255
+        # Use high-precision normalization
+        normalized = (image_data - min_val) / (max_val - min_val)
+        
+        # Apply gamma correction for better contrast in medical images
+        gamma = 0.9  # Slightly enhance contrast for medical viewing
+        normalized = np.power(normalized, gamma)
+        
+        # Scale to full dynamic range
+        image_data = normalized * 255.0
     else:
         image_data = np.zeros_like(image_data)
     
     if invert:
-        image_data = 255 - image_data
+        image_data = 255.0 - image_data
     
-    return image_data.astype(np.uint8)
+    # Apply noise reduction while preserving edges
+    from scipy import ndimage
+    try:
+        # Light Gaussian smoothing to reduce noise without losing detail
+        image_data = ndimage.gaussian_filter(image_data, sigma=0.3)
+    except ImportError:
+        # Fallback if scipy not available
+        pass
+    
+    return np.clip(image_data, 0, 255).astype(np.uint8)
+
+def _apply_windowing_enhanced(image, window_width, window_level, invert=False, modality=''):
+    """Enhanced windowing with modality-specific optimizations for superior image quality"""
+    # Convert to high-precision float for calculations
+    image_data = image.astype(np.float64)
+    
+    # Apply window/level with enhanced precision
+    min_val = window_level - window_width / 2
+    max_val = window_level + window_width / 2
+    
+    # Enhanced windowing with smooth transitions
+    image_data = np.clip(image_data, min_val, max_val)
+    
+    if max_val > min_val:
+        # High-precision normalization
+        normalized = (image_data - min_val) / (max_val - min_val)
+        
+        # Apply modality-specific enhancements
+        if modality in ['DX', 'CR', 'MG']:  # Digital Radiography, Computed Radiography, Mammography
+            # Enhanced contrast for radiographic images
+            gamma = 0.8
+            normalized = np.power(normalized, gamma)
+            # Apply edge enhancement
+            try:
+                from scipy import ndimage
+                edge_enhanced = ndimage.laplace(normalized) * 0.1
+                normalized = np.clip(normalized + edge_enhanced, 0, 1)
+            except ImportError:
+                pass
+        elif modality in ['CT']:  # Computed Tomography
+            # Standard gamma for CT with slight enhancement
+            gamma = 0.9
+            normalized = np.power(normalized, gamma)
+        elif modality in ['MR', 'MRI']:  # Magnetic Resonance
+            # Enhanced contrast for MR images
+            gamma = 0.85
+            normalized = np.power(normalized, gamma)
+        elif modality in ['US']:  # Ultrasound
+            # Special processing for ultrasound
+            gamma = 0.95
+            normalized = np.power(normalized, gamma)
+        else:
+            # Default enhancement for other modalities
+            gamma = 0.9
+            normalized = np.power(normalized, gamma)
+        
+        # Scale to full dynamic range with dithering for smooth gradients
+        image_data = normalized * 255.0
+        
+        # Add subtle dithering to prevent banding
+        noise = np.random.normal(0, 0.5, image_data.shape)
+        image_data = image_data + noise
+    else:
+        image_data = np.zeros_like(image_data)
+    
+    if invert:
+        image_data = 255.0 - image_data
+    
+    # Apply high-quality noise reduction while preserving edges
+    try:
+        from scipy import ndimage
+        # Bilateral filter-like effect using multiple Gaussian filters
+        sigma_small = 0.5
+        sigma_large = 1.5
+        
+        smooth_small = ndimage.gaussian_filter(image_data, sigma=sigma_small)
+        smooth_large = ndimage.gaussian_filter(image_data, sigma=sigma_large)
+        
+        # Edge-preserving combination
+        edge_factor = np.abs(smooth_small - smooth_large) / 255.0
+        edge_factor = np.clip(edge_factor, 0, 1)
+        
+        # Preserve edges, smooth flat areas
+        image_data = image_data * edge_factor + smooth_small * (1 - edge_factor)
+        
+    except ImportError:
+        # Fallback: simple Gaussian smoothing
+        try:
+            from scipy import ndimage
+            image_data = ndimage.gaussian_filter(image_data, sigma=0.3)
+        except ImportError:
+            pass
+    
+    return np.clip(image_data, 0, 255).astype(np.uint8)
 
 def _array_to_base64_image(array, window_width=None, window_level=None, inverted=False):
     """Convert numpy array to base64 encoded image with professional windowing"""
@@ -170,12 +271,24 @@ def _array_to_base64_image(array, window_width=None, window_level=None, inverted
             else:
                 image_data = np.zeros_like(array, dtype=np.uint8)
         
-        # Convert to PIL Image
+        # Convert to PIL Image with high-quality resampling
         img = Image.fromarray(image_data, mode='L')
         
-        # Save to buffer with optimized settings
+        # Apply high-quality upsampling for better display quality
+        original_size = img.size
+        scale_factor = 2.0 if min(original_size) < 512 else 1.5 if min(original_size) < 1024 else 1.0
+        
+        if scale_factor > 1.0:
+            new_size = (int(original_size[0] * scale_factor), int(original_size[1] * scale_factor))
+            img = img.resize(new_size, Image.Resampling.LANCZOS)
+        
+        # Apply sharpening filter for medical images
+        from PIL import ImageFilter
+        img = img.filter(ImageFilter.UnsharpMask(radius=1.0, percent=150, threshold=2))
+        
+        # Save to buffer with high-quality settings
         buffer = BytesIO()
-        img.save(buffer, format='PNG', optimize=False, compress_level=1)
+        img.save(buffer, format='PNG', optimize=False, compress_level=0, quality=100)
         
         img_str = base64.b64encode(buffer.getvalue()).decode('ascii')
         return f"data:image/png;base64,{img_str}"
@@ -374,7 +487,7 @@ def api_image_display(request, image_id):
                 if request.GET.get('wl') is None:
                     window_level = float(default_wl)
             
-            # Handle modality-specific defaults
+            # Handle modality-specific defaults and quality enhancements
             modality = getattr(ds, 'Modality', '').upper()
             photometric = getattr(ds, 'PhotometricInterpretation', '').upper()
             
@@ -386,8 +499,8 @@ def api_image_display(request, image_id):
                 if request.GET.get('invert') is None:
                     inverted = (photometric == 'MONOCHROME1')
             
-            # Apply windowing
-            windowed_image = _apply_windowing_fast(pixel_array, window_width, window_level, inverted)
+            # Apply high-quality windowing with modality-specific enhancements
+            windowed_image = _apply_windowing_enhanced(pixel_array, window_width, window_level, inverted, modality)
             
             # Convert to base64
             image_data_url = _array_to_base64_image(windowed_image)
