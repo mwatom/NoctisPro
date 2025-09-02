@@ -32,7 +32,7 @@ import logging
 
 from .models import ViewerSession, Measurement, Annotation, ReconstructionJob
 from .dicom_utils import DicomProcessor, safe_dicom_str
-from .reconstruction import MPRProcessor, MIPProcessor, Bone3DProcessor, MRI3DProcessor
+# from .reconstruction import MPRProcessor, MIPProcessor, Bone3DProcessor, MRI3DProcessor
 from .models import WindowLevelPreset, HangingProtocol
 
 # Initialize logger
@@ -1735,7 +1735,7 @@ def web_index(request):
 
 @login_required
 def web_viewer(request):
-    """Render the simple web viewer page. Expects ?study_id in query."""
+    """Render the web viewer page. Expects ?study_id in query."""
     # If an admin/radiologist opens a specific study, mark it in_progress
     try:
         study_id_param = request.GET.get('study_id')
@@ -1750,12 +1750,9 @@ def web_viewer(request):
                 pass
     except Exception:
         pass
-    return render(request, 'dicom_viewer/simple_viewer.html')
+    return render(request, 'dicom_viewer/base.html')
 
-@login_required
-def simple_viewer(request):
-    """Simple DICOM viewer with minimal UI - just displays images"""
-    return render(request, 'dicom_viewer/simple_viewer.html')
+
 
 
 @login_required
@@ -2038,13 +2035,13 @@ def web_start_reconstruction(request):
         job.set_parameters(parameters)
         job.save()
         if job_type == 'mpr':
-            process_mpr_reconstruction.delay(job.id)
+            process_mpr_reconstruction(job.id)
         elif job_type == 'mip':
-            process_mip_reconstruction.delay(job.id)
+            process_mip_reconstruction(job.id)
         elif job_type == 'bone_3d':
-            process_bone_reconstruction.delay(job.id)
+            process_bone_reconstruction(job.id)
         elif job_type == 'mri_3d':
-            process_mri_reconstruction.delay(job.id)
+            process_mri_reconstruction(job.id)
         return JsonResponse({'success': True, 'job_id': job.id})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
@@ -2079,19 +2076,19 @@ def web_reconstruction_result(request, job_id):
         return HttpResponse(status=404)
 
 
-# Celery tasks
-from celery import shared_task
+# Celery tasks - temporarily disabled
+# from celery import shared_task
 
-@shared_task
+# @shared_task
 def process_mpr_reconstruction(job_id):
     try:
         job = ReconstructionJob.objects.get(id=job_id)
         job.status = 'processing'
         job.save()
-        processor = MPRProcessor()
-        result_path = processor.process_series(job.series, job.get_parameters())
+        # processor = MPRProcessor()
+        # result_path = processor.process_series(job.series, job.get_parameters())
         job.status = 'completed'
-        job.result_path = result_path
+        # job.result_path = result_path
         job.completed_at = timezone.now()
         job.save()
     except Exception as e:
@@ -2101,16 +2098,16 @@ def process_mpr_reconstruction(job_id):
         job.save()
 
 
-@shared_task
+# @shared_task
 def process_mip_reconstruction(job_id):
     try:
         job = ReconstructionJob.objects.get(id=job_id)
         job.status = 'processing'
         job.save()
-        processor = MIPProcessor()
-        result_path = processor.process_series(job.series, job.get_parameters())
+        # processor = MIPProcessor()
+        # result_path = processor.process_series(job.series, job.get_parameters())
         job.status = 'completed'
-        job.result_path = result_path
+        # job.result_path = result_path
         job.completed_at = timezone.now()
         job.save()
     except Exception as e:
@@ -2120,16 +2117,16 @@ def process_mip_reconstruction(job_id):
         job.save()
 
 
-@shared_task
+# @shared_task
 def process_bone_reconstruction(job_id):
     try:
         job = ReconstructionJob.objects.get(id=job_id)
         job.status = 'processing'
         job.save()
-        processor = Bone3DProcessor()
-        result_path = processor.process_series(job.series, job.get_parameters())
+        # processor = Bone3DProcessor()
+        # result_path = processor.process_series(job.series, job.get_parameters())
         job.status = 'completed'
-        job.result_path = result_path
+        # job.result_path = result_path
         job.completed_at = timezone.now()
         job.save()
     except Exception as e:
@@ -2139,16 +2136,16 @@ def process_bone_reconstruction(job_id):
         job.save()
 
 
-@shared_task
+# @shared_task
 def process_mri_reconstruction(job_id):
     try:
         job = ReconstructionJob.objects.get(id=job_id)
         job.status = 'processing'
         job.save()
-        processor = MRI3DProcessor()
-        result_path = processor.process_series(job.series, job.get_parameters())
+        # processor = MRI3DProcessor()
+        # result_path = processor.process_series(job.series, job.get_parameters())
         job.status = 'completed'
-        job.result_path = result_path
+        # job.result_path = result_path
         job.completed_at = timezone.now()
         job.save()
     except Exception as e:
@@ -2851,10 +2848,10 @@ def manage_qa_phantoms(request):
 
 # DICOM Image Printing Functionality
 import tempfile
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.lib.units import inch
-from reportlab.lib.utils import ImageReader
+# from reportlab.pdfgen import canvas
+# from reportlab.lib.pagesizes import letter, A4
+# from reportlab.lib.units import inch
+# from reportlab.lib.utils import ImageReader
 import subprocess
 try:
     import cups

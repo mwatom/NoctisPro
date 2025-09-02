@@ -23,6 +23,7 @@ urlpatterns = [
     path('api/series/<int:series_id>/mip/', views.api_mip_reconstruction, name='api_mip_reconstruction'),
     path('api/series/<int:series_id>/bone/', views.api_bone_reconstruction, name='api_bone_reconstruction'),
     path('api/hu/', views.api_hu_value, name='api_hu_value'),
+    path('api/hounsfield-units/', views.api_hounsfield_units, name='api_hounsfield_units'),
     
     # Hounsfield Unit Calibration
     path('hu-calibration/', views.hu_calibration_dashboard, name='hu_calibration_dashboard'),
@@ -65,7 +66,7 @@ urlpatterns += [
     # Web viewer pages
     path('web/', views.web_index, name='index'),
     path('web/viewer/', views.web_viewer, name='web_viewer'),
-    path('simple/', views.simple_viewer, name='simple_viewer'),
+
 
     # Web viewer JSON APIs
     path('study/<int:study_id>/', views.web_study_detail, name='web_study_detail'),
