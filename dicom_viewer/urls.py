@@ -42,6 +42,7 @@ urlpatterns = [
     
     # DICOM file upload
     path('upload/', views.upload_dicom, name='upload_dicom'),
+    path('api/upload/progress/<str:upload_id>/', views.api_upload_progress, name='api_upload_progress'),
     
     # HU Calibration (basic)
     path('hu-calibration/', views.hu_calibration_dashboard, name='hu_calibration_dashboard'),

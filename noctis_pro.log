@@ -1157,3 +1157,5 @@ Watching for file changes with StatReloader
 [mHTTP GET /dicom-viewer/ 200 [0.01, 127.0.0.1:43002][0m
 [mHTTP GET /dicom-viewer/api/study/2/ 200 [0.01, 127.0.0.1:41242][0m
 Internal Server Error: /worklist/api/study/2/delete/
+Method Not Allowed: /dicom-viewer/upload/
+Bad Request: /dicom-viewer/upload/
