@@ -9,6 +9,8 @@
     {% load static %}
     <link href="{% static 'css/dicom-viewer-buttons.css' %}" rel="stylesheet">
     <link href="{% static 'css/dicom-viewer-fixes.css' %}" rel="stylesheet">
+    <link href="{% static 'css/high-quality-medical-imaging.css' %}" rel="stylesheet">
+    <script src="{% static 'js/high-quality-image-renderer.js' %}"></script>
     <style>
         :root {
             --primary-bg: #0a0a0a;
@@ -38,6 +40,10 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: var(--primary-bg);
             color: var(--text-primary);
+            /* High-DPI display optimization */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
         }
 
         .viewer-container {
@@ -216,10 +222,21 @@
         .dicom-canvas {
             max-width: 100%;
             max-height: 100%;
-            image-rendering: pixelated;
+            /* Progressive enhancement for different browsers */
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: -moz-crisp-edges;
             image-rendering: crisp-edges;
+            image-rendering: high-quality;
+            image-rendering: optimizeQuality;
+            /* Enhanced medical image display */
             cursor: crosshair;
             transition: transform 0.1s ease;
+            filter: contrast(1.15) brightness(1.08) saturate(1.05);
+            -webkit-filter: contrast(1.15) brightness(1.08) saturate(1.05);
+            /* Hardware acceleration for smooth rendering */
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+            will-change: transform;
         }
 
         /* MPR Grid Layout */
@@ -250,8 +267,13 @@
         .mpr-viewport img {
             max-width: 100%;
             max-height: 100%;
-            image-rendering: pixelated;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+            image-rendering: high-quality;
             cursor: crosshair;
+            filter: contrast(1.15) brightness(1.08) sharpen(0.3);
+            -webkit-filter: contrast(1.15) brightness(1.08);
         }
 
         .mpr-label {
@@ -778,7 +800,7 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Professional Image Display */
+        /* Professional High-Quality Image Display */
         .image-container {
             position: relative;
             width: 100%;
@@ -787,16 +809,31 @@
             align-items: center;
             justify-content: center;
             background: #000000;
+            /* Enable hardware acceleration for smooth rendering */
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+            will-change: transform;
         }
 
         .dicom-image {
             max-width: 100%;
             max-height: 100%;
-            image-rendering: pixelated;
+            /* Progressive enhancement for different browsers */
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: -moz-crisp-edges;
             image-rendering: crisp-edges;
+            image-rendering: high-quality;
+            image-rendering: optimizeQuality;
+            /* Enhanced medical image display */
             cursor: crosshair;
             user-select: none;
             transition: none;
+            filter: contrast(1.15) brightness(1.08) saturate(1.05);
+            -webkit-filter: contrast(1.15) brightness(1.08) saturate(1.05);
+            /* Hardware acceleration for smooth rendering */
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+            will-change: transform;
         }
 
         /* Measurement Overlays */
@@ -1075,7 +1112,8 @@
             <!-- Single Image View -->
             <div class="viewport-content" id="singleView">
                 <div class="image-container" id="imageContainer">
-                    <img class="dicom-image" id="dicomImage" alt="DICOM Image">
+                    <img class="dicom-image medical-image" id="dicomImage" alt="DICOM Image" style="display: none;">
+                    <canvas class="dicom-canvas medical-image" id="dicomCanvas"></canvas>
                     <div class="crosshair-overlay" id="crosshairOverlay" style="display: none;">
                         <div class="crosshair-line-h"></div>
                         <div class="crosshair-line-v"></div>
@@ -1418,6 +1456,71 @@
         let renderingQueue = [];
         let isRendering = false;
         
+        // High-Quality Canvas Rendering Function
+        function renderImageToCanvas(imgElement, canvas) {
+            if (!imgElement || !canvas || !imgElement.complete) return;
+            
+            const ctx = canvas.getContext('2d');
+            
+            // Get device pixel ratio for high-DPI displays
+            const dpr = window.devicePixelRatio || 1;
+            
+            // Get display size
+            const rect = canvas.getBoundingClientRect();
+            const displayWidth = rect.width;
+            const displayHeight = rect.height;
+            
+            // Set actual canvas size to device pixel ratio
+            canvas.width = displayWidth * dpr;
+            canvas.height = displayHeight * dpr;
+            
+            // Scale canvas back down using CSS
+            canvas.style.width = displayWidth + 'px';
+            canvas.style.height = displayHeight + 'px';
+            
+            // Scale the drawing context to match device pixel ratio
+            ctx.scale(dpr, dpr);
+            
+            // Enable high-quality rendering
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            
+            // Calculate aspect-preserving dimensions
+            const imgAspect = imgElement.naturalWidth / imgElement.naturalHeight;
+            const canvasAspect = displayWidth / displayHeight;
+            
+            let drawWidth, drawHeight, drawX, drawY;
+            
+            if (imgAspect > canvasAspect) {
+                // Image is wider than canvas
+                drawWidth = displayWidth;
+                drawHeight = displayWidth / imgAspect;
+                drawX = 0;
+                drawY = (displayHeight - drawHeight) / 2;
+            } else {
+                // Image is taller than canvas
+                drawWidth = displayHeight * imgAspect;
+                drawHeight = displayHeight;
+                drawX = (displayWidth - drawWidth) / 2;
+                drawY = 0;
+            }
+            
+            // Apply current zoom and pan transformations
+            ctx.save();
+            ctx.translate(displayWidth / 2, displayHeight / 2);
+            ctx.scale(zoomFactor, zoomFactor);
+            ctx.translate(-displayWidth / 2 + panX / zoomFactor, -displayHeight / 2 + panY / zoomFactor);
+            
+            // Clear canvas with black background
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(-displayWidth, -displayHeight, displayWidth * 3, displayHeight * 3);
+            
+            // Draw image with high-quality interpolation
+            ctx.drawImage(imgElement, drawX, drawY, drawWidth, drawHeight);
+            
+            ctx.restore();
+        }
+
         // Professional initialization
         document.addEventListener('DOMContentLoaded', function() {
             initializeViewer();
@@ -1437,6 +1540,7 @@
             setupKeyboardShortcuts();
             setupFileInput();
             setupMPRInteractions();
+            setupCanvasResizeHandler();
             
             // Initialize UI state
             updateOverlayInfo();
@@ -1447,10 +1551,26 @@
             
             showToast('Professional DICOM Viewer initialized', 'success');
         }
+        
+        function setupCanvasResizeHandler() {
+            // Handle window resize to maintain high-quality rendering
+            let resizeTimeout;
+            window.addEventListener('resize', function() {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(function() {
+                    const dicomImage = document.getElementById('dicomImage');
+                    const dicomCanvas = document.getElementById('dicomCanvas');
+                    if (dicomImage && dicomCanvas && dicomImage.complete) {
+                        renderImageToCanvas(dicomImage, dicomCanvas);
+                    }
+                }, 100);
+            });
+        }
 
         function setupMouseEvents() {
             const imageContainer = document.getElementById('imageContainer');
             const dicomImage = document.getElementById('dicomImage');
+            const dicomCanvas = document.getElementById('dicomCanvas');
             
             let mouseDown = false;
             let lastMousePos = { x: 0, y: 0 };
@@ -1685,7 +1805,13 @@
 
         function applyTransform() {
             const dicomImage = document.getElementById('dicomImage');
-            if (dicomImage) {
+            const dicomCanvas = document.getElementById('dicomCanvas');
+            
+            if (dicomCanvas && dicomImage && dicomImage.complete) {
+                // Re-render to canvas with new transform
+                renderImageToCanvas(dicomImage, dicomCanvas);
+            } else if (dicomImage) {
+                // Fallback to image transform
                 dicomImage.style.transform = `scale(${zoomFactor}) translate(${panX/zoomFactor}px, ${panY/zoomFactor}px)`;
             }
         }
@@ -1728,8 +1854,20 @@
                 
                 if (data.image_data) {
                     const dicomImage = document.getElementById('dicomImage');
+                    const dicomCanvas = document.getElementById('dicomCanvas');
+                    
                     dicomImage.src = data.image_data;
                     dicomImage.onload = function() {
+                        // Set modality attribute for CSS targeting
+                        const modality = data.image_info?.modality || '';
+                        if (modality) {
+                            dicomImage.setAttribute('data-modality', modality);
+                            dicomCanvas.setAttribute('data-modality', modality);
+                        }
+                        
+                        // Render to high-quality canvas with modality-specific optimization
+                        renderImageToCanvas(dicomImage, dicomCanvas, modality);
+                        
                         hideLoading();
                         updateImageInfo(data.image_info);
                         updateOverlayInfo();
