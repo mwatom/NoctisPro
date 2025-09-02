@@ -395,9 +395,22 @@
             box-shadow: inset 0 0 0 1px var(--accent-color);
         }
 
+        .mpr-viewport:hover .mpr-controls {
+            display: flex !important;
+        }
+
         .mpr-viewport.active {
             border-color: var(--accent-color);
             box-shadow: inset 0 0 0 3px var(--accent-color);
+        }
+
+        .mpr-viewport.active .mpr-controls {
+            display: flex !important;
+        }
+
+        .mpr-controls button:hover {
+            background: var(--accent-color) !important;
+            color: var(--primary-bg) !important;
         }
 
         /* Professional Icon-Based Right Panel */
@@ -1333,6 +1346,12 @@
             <div class="mpr-grid" id="mprView" style="display: none;">
                 <div class="mpr-viewport" data-plane="axial" onclick="setActivePlane('axial')">
                     <div class="mpr-label">Axial (Z)</div>
+                    <div class="mpr-controls" style="position: absolute; top: 8px; right: 8px; display: none; gap: 4px;">
+                        <button onclick="event.stopPropagation(); resetMPRViewport('axial')" title="Reset Axial View" 
+                                style="background: rgba(0,0,0,0.8); border: 1px solid var(--border-color); color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">
+                            <i class="fas fa-undo"></i>
+                        </button>
+                    </div>
                     <img id="mprAxial" alt="Axial View" onload="updateCrosshairOverlay('axial')">
                     <div class="crosshair-overlay-mpr" id="crosshairAxial">
                         <div class="crosshair-line-h-mpr"></div>
@@ -1341,6 +1360,12 @@
                 </div>
                 <div class="mpr-viewport" data-plane="sagittal" onclick="setActivePlane('sagittal')">
                     <div class="mpr-label">Sagittal (X)</div>
+                    <div class="mpr-controls" style="position: absolute; top: 8px; right: 8px; display: none; gap: 4px;">
+                        <button onclick="event.stopPropagation(); resetMPRViewport('sagittal')" title="Reset Sagittal View"
+                                style="background: rgba(0,0,0,0.8); border: 1px solid var(--border-color); color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">
+                            <i class="fas fa-undo"></i>
+                        </button>
+                    </div>
                     <img id="mprSagittal" alt="Sagittal View" onload="updateCrosshairOverlay('sagittal')">
                     <div class="crosshair-overlay-mpr" id="crosshairSagittal">
                         <div class="crosshair-line-h-mpr"></div>
@@ -1349,6 +1374,12 @@
                 </div>
                 <div class="mpr-viewport" data-plane="coronal" onclick="setActivePlane('coronal')">
                     <div class="mpr-label">Coronal (Y)</div>
+                    <div class="mpr-controls" style="position: absolute; top: 8px; right: 8px; display: none; gap: 4px;">
+                        <button onclick="event.stopPropagation(); resetMPRViewport('coronal')" title="Reset Coronal View"
+                                style="background: rgba(0,0,0,0.8); border: 1px solid var(--border-color); color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">
+                            <i class="fas fa-undo"></i>
+                        </button>
+                    </div>
                     <img id="mprCoronal" alt="Coronal View" onload="updateCrosshairOverlay('coronal')">
                     <div class="crosshair-overlay-mpr" id="crosshairCoronal">
                         <div class="crosshair-line-h-mpr"></div>
@@ -1587,6 +1618,11 @@
                                     <span id="crosshairPosition">-</span>
                                 </div>
                             </div>
+                            <div class="control" style="margin-top: 12px;">
+                                <button class="btn-dicom-viewer btn-secondary" onclick="resetAllMPRViewports()" style="width: 100%; font-size: 10px;" title="Reset all MPR viewports">
+                                    <i class="fas fa-refresh"></i> Reset All Views
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1773,6 +1809,13 @@
         let volumeMetadata = null;
         let orthogonalSync = true;
         
+        // Individual MPR viewport zoom/pan states
+        let mprViewportStates = {
+            axial: { zoom: 1.0, panX: 0, panY: 0 },
+            sagittal: { zoom: 1.0, panX: 0, panY: 0 },
+            coronal: { zoom: 1.0, panX: 0, panY: 0 }
+        };
+        
         // Professional caching for performance (PyQt-inspired)
         let imageCache = new Map();
         let mprCache = new Map();
@@ -1881,6 +1924,14 @@
             mprCrosshair = { x: 50, y: 50, z: 50 }; // Center position
             
             showToast('Professional DICOM Viewer initialized', 'success');
+            
+            // Show MPR help after a delay
+            setTimeout(() => {
+                if (!localStorage.getItem('mpr_help_shown')) {
+                    showToast('💡 MPR Tip: Each viewport can be zoomed/panned independently. Use Ctrl+scroll to zoom, drag to pan, scroll to change slices.', 'info', 8000);
+                    localStorage.setItem('mpr_help_shown', 'true');
+                }
+            }, 5000);
         }
         
         function setupCanvasResizeHandler() {
@@ -2776,16 +2827,22 @@
         }
 
         function resetView() {
-            zoomFactor = 1.0;
-            panX = 0;
-            panY = 0;
-            
-            document.getElementById('zoomSlider').value = 100;
-            document.getElementById('zoomValue').textContent = '100%';
-            
-            applyTransform();
-            updateZoomInfo();
-            showToast('View reset', 'success');
+            if (mprMode) {
+                // Reset all MPR viewports
+                resetAllMPRViewports();
+            } else {
+                // Reset single view
+                zoomFactor = 1.0;
+                panX = 0;
+                panY = 0;
+                
+                document.getElementById('zoomSlider').value = 100;
+                document.getElementById('zoomValue').textContent = '100%';
+                
+                applyTransform();
+                updateZoomInfo();
+                showToast('View reset', 'success');
+            }
         }
 
         // MPR Implementation
@@ -3224,8 +3281,25 @@
                 const plane = viewport.getAttribute('data-plane');
                 if (plane === '3d') return; // Skip 3D viewport
                 
+                // Mouse interaction states for this viewport
+                let isDragging = false;
+                let dragStart = { x: 0, y: 0 };
+                let lastMousePos = { x: 0, y: 0 };
+                
                 viewport.addEventListener('mousemove', function(e) {
-                    if (orthogonalSync && mprMode) {
+                    if (isDragging && mprMode) {
+                        const deltaX = e.clientX - lastMousePos.x;
+                        const deltaY = e.clientY - lastMousePos.y;
+                        
+                        if (activeTool === 'pan') {
+                            // Pan this viewport only
+                            mprViewportStates[plane].panX += deltaX;
+                            mprViewportStates[plane].panY += deltaY;
+                            applyMPRViewportTransform(plane);
+                        }
+                        
+                        lastMousePos = { x: e.clientX, y: e.clientY };
+                    } else if (orthogonalSync && mprMode) {
                         const rect = viewport.getBoundingClientRect();
                         const x = ((e.clientX - rect.left) / rect.width) * 100;
                         const y = ((e.clientY - rect.top) / rect.height) * 100;
@@ -3235,17 +3309,63 @@
                     }
                 });
                 
-                viewport.addEventListener('click', function(e) {
-                    setActivePlane(plane);
+                viewport.addEventListener('mousedown', function(e) {
+                    if (mprMode) {
+                        isDragging = true;
+                        lastMousePos = { x: e.clientX, y: e.clientY };
+                        dragStart = { x: e.clientX, y: e.clientY };
+                        setActivePlane(plane);
+                    }
+                });
+                
+                viewport.addEventListener('mouseup', function(e) {
+                    isDragging = false;
                     
-                    if (orthogonalSync) {
+                    if (orthogonalSync && mprMode) {
                         const rect = viewport.getBoundingClientRect();
                         const x = ((e.clientX - rect.left) / rect.width) * 100;
                         const y = ((e.clientY - rect.top) / rect.height) * 100;
                         
-                        // Lock crosshair position
-                        updateCrosshairPosition(plane, x, y, true);
+                        // Lock crosshair position only if not dragging
+                        if (Math.abs(e.clientX - dragStart.x) < 5 && Math.abs(e.clientY - dragStart.y) < 5) {
+                            updateCrosshairPosition(plane, x, y, true);
+                        }
                     }
+                });
+                
+                viewport.addEventListener('click', function(e) {
+                    setActivePlane(plane);
+                });
+                
+                // Wheel event for individual viewport zoom
+                viewport.addEventListener('wheel', function(e) {
+                    if (mprMode) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        if (e.ctrlKey) {
+                            // Zoom this viewport only
+                            const zoomDirection = e.deltaY > 0 ? 0.9 : 1.1;
+                            const newZoom = Math.max(0.1, Math.min(5.0, mprViewportStates[plane].zoom * zoomDirection));
+                            mprViewportStates[plane].zoom = newZoom;
+                            applyMPRViewportTransform(plane);
+                            
+                            // Update zoom info for active plane
+                            if (plane === activePlane) {
+                                document.getElementById('zoomInfo').textContent = `Zoom: ${Math.round(newZoom * 100)}%`;
+                            }
+                        } else {
+                            // Slice navigation for this plane
+                            const direction = e.deltaY > 0 ? 1 : -1;
+                            changeMPRSlice(plane, direction);
+                        }
+                    }
+                });
+                
+                // Disable context menu
+                viewport.addEventListener('contextmenu', function(e) {
+                    e.preventDefault();
+                    return false;
                 });
             });
         }
@@ -3294,6 +3414,74 @@
                     if (vLine) vLine.style.left = `${mprCrosshair.x}%`;
                 }
             });
+        }
+
+        // Apply transform to individual MPR viewport
+        function applyMPRViewportTransform(plane) {
+            const img = document.getElementById(`mpr${plane.charAt(0).toUpperCase() + plane.slice(1)}`);
+            if (!img) return;
+            
+            const state = mprViewportStates[plane];
+            const transform = `scale(${state.zoom}) translate(${state.panX/state.zoom}px, ${state.panY/state.zoom}px)`;
+            img.style.transform = transform;
+            img.style.transformOrigin = 'center center';
+            img.style.transition = 'none'; // Disable transitions during interaction
+        }
+
+        // Change slice for specific MPR plane
+        function changeMPRSlice(plane, direction) {
+            if (!volumeMetadata || !volumeMetadata.counts) return;
+            
+            const maxSlice = volumeMetadata.counts[plane] - 1;
+            const currentSlice = mprIndices[plane];
+            const newSlice = Math.max(0, Math.min(maxSlice, currentSlice + direction));
+            
+            if (newSlice !== currentSlice) {
+                mprIndices[plane] = newSlice;
+                loadMPRSlice(plane, newSlice);
+            }
+        }
+
+        // Load specific slice for MPR plane
+        async function loadMPRSlice(plane, sliceIndex) {
+            try {
+                const response = await fetch(
+                    `/dicom_viewer/api/mpr/${currentSeries.id}/?plane=${plane}&slice=${sliceIndex}&ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`
+                );
+                const data = await response.json();
+                
+                if (data.image) {
+                    const img = document.getElementById(`mpr${plane.charAt(0).toUpperCase() + plane.slice(1)}`);
+                    if (img) {
+                        img.src = data.image;
+                        img.onload = () => applyMPRViewportTransform(plane);
+                    }
+                }
+            } catch (error) {
+                console.error(`Error loading ${plane} slice ${sliceIndex}:`, error);
+            }
+        }
+
+        // Reset MPR viewport to default view
+        function resetMPRViewport(plane) {
+            mprViewportStates[plane] = { zoom: 1.0, panX: 0, panY: 0 };
+            applyMPRViewportTransform(plane);
+            
+            if (plane === activePlane) {
+                document.getElementById('zoomInfo').textContent = 'Zoom: 100%';
+            }
+            
+            showToast(`${plane.charAt(0).toUpperCase() + plane.slice(1)} viewport reset`, 'info');
+        }
+
+        // Reset all MPR viewports
+        function resetAllMPRViewports() {
+            ['axial', 'sagittal', 'coronal'].forEach(plane => {
+                mprViewportStates[plane] = { zoom: 1.0, panX: 0, panY: 0 };
+                applyMPRViewportTransform(plane);
+            });
+            document.getElementById('zoomInfo').textContent = 'Zoom: 100%';
+            showToast('All MPR viewports reset', 'success');
         }
 
         function launch3DViewer() {
