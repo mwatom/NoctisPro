@@ -301,20 +301,23 @@
         }
 
         .data-table th {
-            background: var(--header-bg);
+            background: linear-gradient(135deg, var(--header-bg) 0%, #3a3a3a 50%, var(--header-bg) 100%);
             color: var(--text-primary);
-            padding: 8px 12px;
+            padding: 10px 14px;
             text-align: left;
             font-weight: 600;
             font-size: 10px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            border-bottom: 1px solid var(--border-color);
+            letter-spacing: 0.8px;
+            border-bottom: 2px solid var(--accent-color);
             border-right: 1px solid var(--border-color);
             position: sticky;
             top: 0;
             z-index: 10;
             white-space: nowrap;
+            box-shadow: 
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .data-table th:last-child {
@@ -350,7 +353,14 @@
         }
 
         .data-table tbody tr:hover {
-            background: rgba(0, 212, 255, 0.08);
+            background: linear-gradient(90deg, 
+                rgba(0, 212, 255, 0.08) 0%, 
+                rgba(0, 212, 255, 0.12) 50%, 
+                rgba(0, 212, 255, 0.08) 100%);
+            transform: translateX(2px);
+            box-shadow: 
+                inset 3px 0 0 var(--accent-color),
+                0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .data-table tbody tr:nth-child(even) {
@@ -379,35 +389,50 @@
             font-size: 10px;
         }
 
-        /* Status Badges */
+        /* Status Badges - Enhanced for medical excellence */
         .status-badge {
-            padding: 2px 8px;
-            border-radius: 12px;
+            padding: 4px 10px;
+            border-radius: 8px;
             font-size: 9px;
             font-weight: bold;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.8px;
             display: inline-flex;
             align-items: center;
             gap: 4px;
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(1px);
+            box-shadow: 
+                0 2px 4px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
         }
 
         .status-active {
-            background: rgba(126, 211, 33, 0.2);
+            background: linear-gradient(135deg, rgba(126, 211, 33, 0.25) 0%, rgba(126, 211, 33, 0.15) 100%);
             color: var(--completed-color);
             border: 1px solid var(--completed-color);
+            box-shadow: 
+                0 0 8px rgba(126, 211, 33, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
         }
 
         .status-inactive {
-            background: rgba(208, 2, 27, 0.2);
+            background: linear-gradient(135deg, rgba(208, 2, 27, 0.25) 0%, rgba(208, 2, 27, 0.15) 100%);
             color: var(--cancelled-color);
             border: 1px solid var(--cancelled-color);
+            box-shadow: 
+                0 0 8px rgba(208, 2, 27, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
         }
 
         .status-pending {
-            background: rgba(255, 170, 0, 0.2);
+            background: linear-gradient(135deg, rgba(255, 170, 0, 0.25) 0%, rgba(255, 170, 0, 0.15) 100%);
             color: var(--warning-color);
             border: 1px solid var(--warning-color);
+            box-shadow: 
+                0 0 8px rgba(255, 170, 0, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
         }
 
         /* Role Badges */
@@ -424,21 +449,30 @@
         }
 
         .role-admin {
-            background: rgba(255, 68, 68, 0.2);
+            background: linear-gradient(135deg, rgba(255, 68, 68, 0.25) 0%, rgba(255, 68, 68, 0.15) 100%);
             color: var(--danger-color);
             border: 1px solid var(--danger-color);
+            box-shadow: 
+                0 0 10px rgba(255, 68, 68, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
         }
 
         .role-radiologist {
-            background: rgba(0, 212, 255, 0.2);
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.25) 0%, rgba(0, 212, 255, 0.15) 100%);
             color: var(--accent-color);
             border: 1px solid var(--accent-color);
+            box-shadow: 
+                0 0 10px rgba(0, 212, 255, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
         }
 
         .role-technologist {
-            background: rgba(255, 170, 0, 0.2);
+            background: linear-gradient(135deg, rgba(255, 170, 0, 0.25) 0%, rgba(255, 170, 0, 0.15) 100%);
             color: var(--warning-color);
             border: 1px solid var(--warning-color);
+            box-shadow: 
+                0 0 8px rgba(255, 170, 0, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
         }
 
         /* Action Buttons */
@@ -449,23 +483,47 @@
         }
 
         .btn-action {
-            background: var(--card-bg);
+            background: linear-gradient(135deg, var(--card-bg) 0%, #2a2a2a 100%);
             border: 1px solid var(--border-color);
             color: var(--text-primary);
-            padding: 4px 8px;
-            border-radius: 2px;
+            padding: 6px 10px;
+            border-radius: 6px;
             font-size: 9px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             text-transform: none;
-            letter-spacing: 0;
+            letter-spacing: 0.5px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 
+                0 2px 4px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        .btn-action::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .btn-action:hover::before {
+            left: 100%;
         }
 
         .btn-action:hover {
-            background: var(--accent-color);
+            background: linear-gradient(135deg, var(--accent-color) 0%, #00b8d4 100%);
             color: var(--primary-bg);
             border-color: var(--accent-color);
+            transform: translateY(-1px) scale(1.05);
+            box-shadow: 
+                0 4px 12px rgba(0, 212, 255, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }
 
         .btn-action.edit, .btn-action.delete { background: var(--card-bg); color: var(--text-primary); border-color: var(--border-color); }
