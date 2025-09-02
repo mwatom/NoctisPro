@@ -1190,3 +1190,12 @@ Watching for file changes with StatReloader
 /workspace/dicom_viewer/views.py changed, reloading.
 Watching for file changes with StatReloader
 [mHTTP GET /dicom-viewer/api/image/6/display/?ww=400&wl=40 200 [0.02, 127.0.0.1:50424][0m
+[mHTTP GET /dicom-viewer/api/image/6/display/?ww=400&wl=40 200 [0.01, 127.0.0.1:46612][0m
+[mHTTP GET /dicom-viewer/?study=1 200 [0.01, 127.0.0.1:48946][0m
+[mHTTP GET /dicom-viewer/web/series/2/images/ 200 [0.01, 127.0.0.1:34008][0m
+[mHTTP GET /dicom-viewer/api/mpr/2/?ww=400&wl=40 200 [0.01, 127.0.0.1:41960][0m
+[mHTTP GET /dicom-viewer/ 200 [0.00, 127.0.0.1:58540][0m
+[mHTTP GET /dicom-viewer/api/studies/ 200 [0.01, 127.0.0.1:58548][0m
+[mHTTP GET /dicom-viewer/api/image/6/display/?ww=400&wl=40 200 [0.01, 127.0.0.1:58550][0m
+[mHTTP GET /dicom-viewer/api/mpr/2/?ww=400&wl=40 200 [0.00, 127.0.0.1:58560][0m
+[32mHTTP HEAD /dicom-viewer/upload/ 302 [0.06, 127.0.0.1:58566][0m
