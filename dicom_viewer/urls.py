@@ -14,6 +14,7 @@ urlpatterns = [
     path('api/study/<int:study_id>/', views.api_study_data, name='api_study_data'),
     path('api/study/<int:study_id>/data/', views.api_study_data, name='api_study_data_alt'),
     path('api/image/<int:image_id>/display/', views.api_image_display, name='api_image_display'),
+    path('api/image/<int:image_id>/', views.api_image_display, name='api_image_display_alt'),
     
     # Advanced reconstruction endpoints
     path('api/mpr/<int:series_id>/', views.api_mpr_reconstruction, name='api_mpr_reconstruction'),

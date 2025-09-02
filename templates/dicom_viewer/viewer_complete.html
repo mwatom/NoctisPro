@@ -228,16 +228,23 @@
             align-items: center;
             justify-content: center;
             background: #000000;
+            overflow: hidden;
+            min-height: 400px;
         }
 
         .dicom-image {
             max-width: 100%;
             max-height: 100%;
+            width: auto;
+            height: auto;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
             cursor: crosshair;
             user-select: none;
-            transition: none;
+            transition: opacity 0.2s ease-in-out;
+            display: block;
+            visibility: visible;
+            opacity: 1;
         }
 
         /* Overlay Information */
@@ -1179,6 +1186,9 @@
 
     <!-- Load essential JavaScript files -->
     <script src="{% static 'js/dicom-viewer-utils.js' %}"></script>
+    <script src="{% static 'js/dicom-visibility-fix.js' %}"></script>
+    <script src="{% static 'js/dicom-performance-fix.js' %}"></script>
+    <script src="{% static 'js/dicom-loading-fix.js' %}"></script>
     <script src="{% static 'js/delete-button-fix.js' %}"></script>
     <script src="{% static 'js/mpr-reconstruction-complete.js' %}"></script>
 
@@ -1228,6 +1238,27 @@
         document.addEventListener('DOMContentLoaded', function() {
             initializeViewer();
             loadAvailableStudies();
+            
+            // Force visibility fixes immediately
+            setTimeout(function() {
+                const dicomImage = document.getElementById('dicomImage');
+                const imageContainer = document.getElementById('imageContainer');
+                const singleView = document.getElementById('singleView');
+                
+                if (dicomImage) {
+                    dicomImage.style.display = 'block';
+                    dicomImage.style.visibility = 'visible';
+                    dicomImage.style.opacity = '1';
+                }
+                
+                if (imageContainer) {
+                    imageContainer.style.display = 'flex';
+                }
+                
+                if (singleView) {
+                    singleView.style.display = 'flex';
+                }
+            }, 100);
             
             // Check for study ID in URL
             const urlParams = new URLSearchParams(window.location.search);
@@ -1507,8 +1538,14 @@
             }
         }
 
-        // Image Display Management
+        // Image Display Management - Optimized for fast loading
         async function updateImageDisplay() {
+            // Use the optimized version from dicom-performance-fix.js
+            if (typeof updateImageDisplayOptimized === 'function') {
+                return await updateImageDisplayOptimized();
+            }
+            
+            // Fallback to original implementation
             if (!images.length || currentImageIndex < 0 || currentImageIndex >= images.length) {
                 return;
             }
@@ -1521,21 +1558,32 @@
                 showLoading('Processing image...');
                 
                 // Get processed image with current window/level settings
-                const url = `/dicom-viewer/api/image/${currentImage.id}/display/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`;
+                const url = `/dicom-viewer/api/image/${currentImage.id}/display/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}&quality=fast`;
                 
-                const response = await fetch(url);
+                const response = await fetch(url, {
+                    headers: {
+                        'Cache-Control': 'max-age=300'
+                    }
+                });
                 const data = await response.json();
                 
                 if (data.image_data) {
                     const dicomImage = document.getElementById('dicomImage');
-                    dicomImage.src = data.image_data;
-                    dicomImage.onload = function() {
+                    
+                    // Preload for smooth transition
+                    const img = new Image();
+                    img.onload = function() {
+                        dicomImage.src = data.image_data;
+                        dicomImage.style.opacity = '1';
                         hideLoading();
                         updateImageInfo(data.image_info);
                         updateOverlayInfo();
                         updateMeasurementOverlay();
                         updateAnnotationOverlay();
                     };
+                    
+                    dicomImage.style.opacity = '0.3';
+                    img.src = data.image_data;
                 } else {
                     hideLoading();
                     showToast('Failed to load image data', 'error');
@@ -1626,7 +1674,7 @@
                     
                     // Hide welcome screen and show image view
                     document.getElementById('welcomeScreen').style.display = 'none';
-                    document.getElementById('imageView').style.display = 'flex';
+                    document.getElementById('singleView').style.display = 'flex';
                     
                     // Update study status
                     document.getElementById('studyStatus').textContent = 
@@ -1663,6 +1711,12 @@
         }
 
         async function loadSeries(seriesId) {
+            // Use optimized version if available
+            if (typeof loadSeriesOptimized === 'function') {
+                return await loadSeriesOptimized(seriesId);
+            }
+            
+            // Fallback implementation
             if (!seriesId) return;
             
             try {
@@ -1696,8 +1750,23 @@
                     // Load modality-specific reconstruction options
                     await loadModalityReconstructionOptions(seriesId);
                     
-                    // Load first image
+                    // Load first image with visibility fixes
                     await updateImageDisplay();
+                    
+                    // Ensure image is visible
+                    setTimeout(() => {
+                        const dicomImage = document.getElementById('dicomImage');
+                        const singleView = document.getElementById('singleView');
+                        
+                        if (dicomImage) {
+                            dicomImage.style.display = 'block';
+                            dicomImage.style.visibility = 'visible';
+                        }
+                        
+                        if (singleView) {
+                            singleView.style.display = 'flex';
+                        }
+                    }, 200);
                     
                     hideLoading();
                     showToast(`Loaded ${images.length} images`, 'success');
