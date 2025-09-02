@@ -814,7 +814,7 @@
                 </div>
             </div>
             <div class="nav-right">
-                <select class="select" id="studySelect" onchange="loadStudy(this.value)">
+                <select class="select" id="studySelect" onchange="if(this.value) loadStudy(this.value)">
                     <option value="">Select Study from System</option>
                 </select>
                 <button class="btn btn-primary" onclick="loadFromExternalMedia()" title="Load DICOM from USB/DVD">
@@ -1033,7 +1033,7 @@
             <!-- Series Selection -->
             <div class="panel">
                 <h3>Series</h3>
-                <select class="select" id="seriesSelect" onchange="loadSeries(this.value)">
+                <select class="select" id="seriesSelect" onchange="if(this.value) loadSeries(this.value)">
                     <option value="">Select Series</option>
                 </select>
                 <div style="margin-top: 8px; font-size: 11px; color: var(--text-muted);" id="seriesInfo">
@@ -2530,6 +2530,12 @@
 
         // Missing functions that buttons are calling - URGENT FIX
         function setActivePlane(plane) {
+            // Update active plane visually
+            document.querySelectorAll('.mpr-viewport').forEach(vp => {
+                vp.classList.remove('active');
+            });
+            document.querySelector(`[data-plane="${plane}"]`)?.classList.add('active');
+            
             showToast(`Switched to ${plane} plane`, 'info');
         }
 
@@ -2615,6 +2621,54 @@
         function exportCurrentImage() {
             exportImage();
         }
+
+        // Critical missing functions for button functionality
+        function loadStudiesList() {
+            return loadAvailableStudies();
+        }
+
+        function changePlane(plane) {
+            currentPlane = plane;
+            showToast(`Changed to ${plane} plane`, 'info');
+        }
+
+        function generateMRI(tissueType) {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            showToast(`Generating MRI ${tissueType} reconstruction...`, 'info');
+            generateMPR();
+        }
+
+        function generatePET() {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            showToast('Generating PET reconstruction...', 'info');
+            generateMPR();
+        }
+
+        function generateSPECT(tracer) {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            showToast(`Generating SPECT ${tracer} reconstruction...`, 'info');
+            generateMPR();
+        }
+
+        function generateNuclear(isotope) {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            showToast(`Generating ${isotope} nuclear medicine reconstruction...`, 'info');
+            generateMPR();
+        }
+
+
 
 
 

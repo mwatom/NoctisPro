@@ -456,7 +456,7 @@ def api_image_display(request, image_id):
         logger.error(f"Fatal error in api_image_display: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@login_required
+@csrf_exempt
 def web_series_images(request, series_id):
     """Enhanced series images API"""
     try:
