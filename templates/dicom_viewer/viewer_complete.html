@@ -2552,12 +2552,61 @@
             generateBone3D();
         }
 
-        function generateVolumeRenderType(type) {
+        async function generateVolumeRenderType(type) {
             if (!type || !currentSeries) {
                 showToast('Please select a type and load a series first', 'warning');
                 return;
             }
-            showToast(`Generating ${type} volume rendering...`, 'info');
+            
+            try {
+                showLoading(`Generating ${type} volume rendering...`);
+                
+                let apiEndpoint = '';
+                switch(type) {
+                    case 'mip':
+                        apiEndpoint = `/dicom-viewer/api/mip/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`;
+                        break;
+                    case 'minip':
+                    case 'average':
+                    case 'surface':
+                    case 'transparency':
+                        apiEndpoint = `/dicom-viewer/api/series/${currentSeries.id}/volume/?type=${type}&ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`;
+                        break;
+                    default:
+                        apiEndpoint = `/dicom-viewer/api/series/${currentSeries.id}/volume/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`;
+                }
+                
+                const response = await fetch(apiEndpoint);
+                const data = await response.json();
+                
+                if (data.success || data.mip_views || data.volume_views) {
+                    // Switch to MPR view
+                    document.getElementById('singleView').style.display = 'none';
+                    document.getElementById('mprView').style.display = 'grid';
+                    
+                    // Display the appropriate views
+                    const views = data.mip_views || data.volume_views;
+                    if (views) {
+                        document.getElementById('mprAxial').src = views.axial;
+                        document.getElementById('mprSagittal').src = views.sagittal;
+                        document.getElementById('mprCoronal').src = views.coronal;
+                    }
+                    
+                    hideLoading();
+                    showToast(`${type} volume rendering completed`, 'success');
+                } else {
+                    hideLoading();
+                    showToast(`Failed to generate ${type} volume rendering`, 'error');
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error(`Error generating ${type} volume rendering:`, error);
+                showToast(`Error generating ${type} volume rendering`, 'error');
+            }
+            
+            // Reset dropdown
+            document.getElementById('volumeRenderSelect').value = '';
         }
 
         function generateAdvanced3D(type) {
@@ -2581,12 +2630,19 @@
                 const data = await response.json();
                 
                 if (data.bone_views) {
+                    // Switch to MPR view to show 3D results
                     document.getElementById('singleView').style.display = 'none';
                     document.getElementById('mprView').style.display = 'grid';
                     
+                    // Display bone 3D views
                     document.getElementById('mprAxial').src = data.bone_views.axial;
                     document.getElementById('mprSagittal').src = data.bone_views.sagittal;
                     document.getElementById('mprCoronal').src = data.bone_views.coronal;
+                    
+                    // Add 3D mesh visualization if available
+                    if (data.mesh) {
+                        display3DMesh(data.mesh, '3d');
+                    }
                     
                     hideLoading();
                     showToast('Bone 3D reconstruction completed', 'success');
@@ -2666,6 +2722,74 @@
             }
             showToast(`Generating ${isotope} nuclear medicine reconstruction...`, 'info');
             generateMPR();
+        }
+
+        // Enhanced 3D visualization functions
+        function display3DMesh(meshData, viewportId) {
+            try {
+                const viewport = document.getElementById(viewportId === '3d' ? 'threeDContainer' : viewportId);
+                if (!viewport) return;
+                
+                // Clear existing content
+                viewport.innerHTML = '';
+                
+                // Create 3D visualization placeholder (would integrate with Three.js in production)
+                const meshInfo = document.createElement('div');
+                meshInfo.style.cssText = `
+                    color: var(--accent-color);
+                    text-align: center;
+                    padding: 20px;
+                    font-size: 12px;
+                `;
+                meshInfo.innerHTML = `
+                    <i class="fas fa-cube" style="font-size: 48px; margin-bottom: 16px; display: block;"></i>
+                    <div>3D Mesh Generated</div>
+                    <div>Vertices: ${meshData.vertices ? meshData.vertices.length : 'N/A'}</div>
+                    <div>Faces: ${meshData.faces ? meshData.faces.length : 'N/A'}</div>
+                `;
+                
+                viewport.appendChild(meshInfo);
+                
+            } catch (error) {
+                console.error('Error displaying 3D mesh:', error);
+            }
+        }
+
+        // Enhanced volume rendering for different modalities
+        async function generateVolumeRender() {
+            if (!currentSeries) {
+                showToast('Please load a series first', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading('Generating volume rendering...');
+                
+                const response = await fetch(`/dicom-viewer/api/series/${currentSeries.id}/volume/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
+                const data = await response.json();
+                
+                if (data.success && data.volume_views) {
+                    // Switch to MPR view to show volume rendering
+                    document.getElementById('singleView').style.display = 'none';
+                    document.getElementById('mprView').style.display = 'grid';
+                    
+                    // Display volume rendered views
+                    document.getElementById('mprAxial').src = data.volume_views.axial;
+                    document.getElementById('mprSagittal').src = data.volume_views.sagittal;
+                    document.getElementById('mprCoronal').src = data.volume_views.coronal;
+                    
+                    hideLoading();
+                    showToast('Volume rendering completed', 'success');
+                } else {
+                    hideLoading();
+                    showToast('Failed to generate volume rendering', 'error');
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error('Error generating volume rendering:', error);
+                showToast('Error generating volume rendering', 'error');
+            }
         }
 
 
