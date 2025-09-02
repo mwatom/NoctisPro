@@ -220,16 +220,22 @@
         .dicom-canvas {
             max-width: 100%;
             max-height: 100%;
-            /* Progressive enhancement for different browsers */
+            /* Enhanced rendering for medical images */
             image-rendering: -webkit-optimize-contrast;
             image-rendering: -moz-crisp-edges;
             image-rendering: crisp-edges;
             image-rendering: high-quality;
             image-rendering: optimizeQuality;
+            /* Prevent any smoothing that could degrade medical image quality */
+            -webkit-backface-visibility: hidden;
+            -webkit-transform: translateZ(0);
+            transform: translateZ(0);
             /* Enhanced medical image display */
             cursor: crosshair;
             transition: transform 0.1s ease;
-            /* Filters disabled to prevent white image issue */
+            /* Ensure pixel-perfect rendering */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
             filter: none;
             -webkit-filter: none;
             /* Hardware acceleration for smooth rendering */
@@ -1439,6 +1445,16 @@
                                 <button class="preset-btn" onclick="applyPreset('kidney')" title="Renal parenchyma (WW:400, WL:30)">Kidney</button>
                             </div>
                             
+                            <div style="margin: 8px 0 4px; font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">X-Ray Optimized</div>
+                            <div class="preset-grid" style="grid-template-columns: 1fr 1fr; gap: 4px;">
+                                <button class="preset-btn" onclick="applyPreset('xray_chest')" title="Chest X-ray - lungs and mediastinum (WW:2000, WL:0)">Chest XR</button>
+                                <button class="preset-btn" onclick="applyPreset('xray_bone')" title="X-ray bone structures (WW:3000, WL:500)">Bone XR</button>
+                                <button class="preset-btn" onclick="applyPreset('xray_soft')" title="X-ray soft tissue detail (WW:400, WL:50)">Soft XR</button>
+                                <button class="preset-btn" onclick="applyPreset('xray_extremity')" title="Extremity X-rays (WW:2500, WL:300)">Extremity</button>
+                                <button class="preset-btn" onclick="applyPreset('xray_spine')" title="Spine X-ray imaging (WW:2000, WL:200)">Spine XR</button>
+                                <button class="preset-btn" onclick="applyPreset('xray_abdomen')" title="Abdominal X-ray (WW:1000, WL:50)">Abd XR</button>
+                            </div>
+                            
                             <div style="margin: 8px 0 4px; font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Clinical</div>
                             <div class="preset-grid" style="grid-template-columns: 1fr 1fr; gap: 4px;">
                                 <button class="preset-btn" onclick="applyPreset('pe_study')" title="Pulmonary embolism (WW:700, WL:100)">PE</button>
@@ -1767,7 +1783,7 @@
         let annotations = [];
         let currentMeasurement = null;
         
-        // Professional medical imaging window presets - ACR recommended
+        // Professional medical imaging window presets - ACR recommended with X-ray optimizations
         const windowPresets = {
             // Primary CT presets
             'lung': { ww: 1600, wl: -600, desc: 'Lung parenchyma' },
@@ -1779,6 +1795,15 @@
             'mediastinum': { ww: 350, wl: 50, desc: 'Mediastinal structures' },
             'spine': { ww: 400, wl: 50, desc: 'Spinal structures' },
             'pelvis': { ww: 400, wl: 40, desc: 'Pelvic anatomy' },
+            
+            // Enhanced X-ray specific presets for optimal visualization
+            'xray_chest': { ww: 2000, wl: 0, desc: 'Chest X-ray - lungs and mediastinum' },
+            'xray_bone': { ww: 3000, wl: 500, desc: 'X-ray bone structures' },
+            'xray_soft': { ww: 400, wl: 50, desc: 'X-ray soft tissue detail' },
+            'xray_pediatric': { ww: 1500, wl: 0, desc: 'Pediatric X-ray imaging' },
+            'xray_extremity': { ww: 2500, wl: 300, desc: 'Extremity X-rays' },
+            'xray_spine': { ww: 2000, wl: 200, desc: 'Spine X-ray imaging' },
+            'xray_abdomen': { ww: 1000, wl: 50, desc: 'Abdominal X-ray' },
             'chest': { ww: 400, wl: 40, desc: 'Chest soft tissue' },
             
             // Enhanced tissue-specific presets
@@ -1835,7 +1860,7 @@
         let lastCrosshairUpdate = 0;
         const CROSSHAIR_UPDATE_DELAY = 50; // 50ms = 20 FPS for smooth updates
         
-        // High-Quality Canvas Rendering Function
+        // Enhanced High-Quality Canvas Rendering Function for Medical Images
         function renderImageToCanvas(imgElement, canvas) {
             if (!imgElement || !canvas || !imgElement.complete) return;
             
@@ -1849,20 +1874,24 @@
             const displayWidth = rect.width;
             const displayHeight = rect.height;
             
-            // Set actual canvas size to device pixel ratio
-            canvas.width = displayWidth * dpr;
-            canvas.height = displayHeight * dpr;
+            // Set actual canvas size to device pixel ratio with enhanced resolution
+            canvas.width = displayWidth * dpr * 1.5; // Increased resolution for medical imaging
+            canvas.height = displayHeight * dpr * 1.5;
             
             // Scale canvas back down using CSS
             canvas.style.width = displayWidth + 'px';
             canvas.style.height = displayHeight + 'px';
             
-            // Scale the drawing context to match device pixel ratio
-            ctx.scale(dpr, dpr);
+            // Scale the drawing context to match enhanced pixel ratio
+            ctx.scale(dpr * 1.5, dpr * 1.5);
             
-            // Enable high-quality rendering
+            // Enable highest quality rendering for medical images
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = 'high';
+            
+            // Additional quality settings for medical imaging
+            ctx.textRenderingOptimization = 'optimizeQuality';
+            ctx.filter = 'none'; // Disable any default filters that might degrade image quality
             
             // Calculate aspect-preserving dimensions
             const imgAspect = imgElement.naturalWidth / imgElement.naturalHeight;

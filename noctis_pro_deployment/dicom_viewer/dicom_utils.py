@@ -48,6 +48,15 @@ class DicomProcessor:
             # Enhanced tissue-specific presets
             'muscle': {'ww': 400, 'wl': 50, 'description': 'Muscle tissue contrast'},
             'fat': {'ww': 200, 'wl': -100, 'description': 'Adipose tissue'},
+            
+            # X-ray specific presets for optimal visualization
+            'xray_chest': {'ww': 2000, 'wl': 0, 'description': 'Chest X-ray - lungs and mediastinum'},
+            'xray_bone': {'ww': 3000, 'wl': 500, 'description': 'X-ray bone structures'},
+            'xray_soft': {'ww': 400, 'wl': 50, 'description': 'X-ray soft tissue detail'},
+            'xray_pediatric': {'ww': 1500, 'wl': 0, 'description': 'Pediatric X-ray imaging'},
+            'xray_extremity': {'ww': 2500, 'wl': 300, 'description': 'Extremity X-rays'},
+            'xray_spine': {'ww': 2000, 'wl': 200, 'description': 'Spine X-ray imaging'},
+            'xray_abdomen': {'ww': 1000, 'wl': 50, 'description': 'Abdominal X-ray'},
             'vessels': {'ww': 600, 'wl': 100, 'description': 'Vascular structures'},
             'kidney': {'ww': 400, 'wl': 30, 'description': 'Renal parenchyma'},
             'pancreas': {'ww': 200, 'wl': 30, 'description': 'Pancreatic tissue'},
@@ -102,14 +111,23 @@ class DicomProcessor:
 
         if enhanced_contrast:
             # Enhanced windowing with improved tissue differentiation
-            # Apply sigmoid-based contrast enhancement for better tissue separation
+            # Apply multi-stage enhancement for better X-ray visualization
             
-            # Normalize to window range
+            # Stage 1: Noise reduction with edge preservation
+            image_data = self._apply_edge_preserving_filter(image_data)
+            
+            # Stage 2: Adaptive histogram equalization for local contrast
+            image_data = self._apply_adaptive_histogram_equalization(image_data, min_val, max_val)
+            
+            # Stage 3: Normalize to window range
             normalized = np.clip((image_data - min_val) / max(1.0, max_val - min_val), 0.0, 1.0)
             
-            # Apply contrast enhancement curve
+            # Stage 4: Apply contrast enhancement curve
             # This provides better tissue differentiation by stretching contrast in mid-range
             enhanced = self._apply_contrast_curve(normalized, window_width, window_level)
+            
+            # Stage 5: Apply unsharp masking for edge enhancement
+            enhanced = self._apply_unsharp_masking(enhanced)
             
             # Scale to display range
             image_data = enhanced * 255.0
@@ -168,6 +186,127 @@ class DicomProcessor:
         else:  # Soft tissue
             return 1.0  # Standard gamma
     
+    def _apply_edge_preserving_filter(self, image_data):
+        """Apply edge-preserving noise reduction filter for better image quality"""
+        try:
+            from scipy import ndimage
+            from scipy.ndimage import gaussian_filter
+            
+            # Apply bilateral filter approximation using multiple Gaussian filters
+            # This reduces noise while preserving edges - critical for X-ray images
+            
+            # Calculate noise level
+            noise_level = np.std(image_data) * 0.1
+            
+            # Apply edge-preserving smoothing
+            # Use a small kernel to preserve fine details
+            smoothed = gaussian_filter(image_data, sigma=0.8)
+            
+            # Blend original and smoothed based on local gradient
+            gradient_magnitude = np.sqrt(
+                ndimage.sobel(image_data, axis=0)**2 + 
+                ndimage.sobel(image_data, axis=1)**2
+            )
+            
+            # Normalize gradient
+            gradient_norm = gradient_magnitude / (np.max(gradient_magnitude) + 1e-8)
+            
+            # Preserve edges (high gradient areas), smooth flat areas
+            edge_weight = np.clip(gradient_norm * 2.0, 0, 1)
+            result = edge_weight * image_data + (1 - edge_weight) * smoothed
+            
+            return result.astype(np.float32)
+            
+        except ImportError:
+            # Fallback: simple noise reduction
+            kernel = np.ones((3,3)) / 9
+            return ndimage.convolve(image_data, kernel, mode='reflect')
+    
+    def _apply_adaptive_histogram_equalization(self, image_data, min_val, max_val):
+        """Apply adaptive histogram equalization for improved local contrast"""
+        try:
+            # Clip to window range first
+            windowed_data = np.clip(image_data, min_val, max_val)
+            
+            # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization) approximation
+            # This enhances local contrast while preventing over-amplification
+            
+            # Divide image into tiles
+            tile_size = min(64, min(image_data.shape) // 4)
+            if tile_size < 8:
+                tile_size = 8
+                
+            rows, cols = image_data.shape
+            
+            # Create enhanced image
+            enhanced = np.copy(windowed_data)
+            
+            # Process each tile
+            for i in range(0, rows - tile_size + 1, tile_size // 2):
+                for j in range(0, cols - tile_size + 1, tile_size // 2):
+                    # Extract tile
+                    tile = windowed_data[i:i+tile_size, j:j+tile_size]
+                    
+                    # Apply local histogram equalization
+                    tile_min, tile_max = np.min(tile), np.max(tile)
+                    if tile_max > tile_min:
+                        # Normalize tile
+                        tile_norm = (tile - tile_min) / (tile_max - tile_min)
+                        
+                        # Apply contrast stretching
+                        tile_enhanced = np.power(tile_norm, 0.8)  # Slight gamma correction
+                        
+                        # Scale back to original range
+                        tile_enhanced = tile_enhanced * (tile_max - tile_min) + tile_min
+                        
+                        # Blend with original (prevent over-enhancement)
+                        alpha = 0.6  # Blend factor
+                        tile_final = alpha * tile_enhanced + (1 - alpha) * tile
+                        
+                        # Update enhanced image
+                        enhanced[i:i+tile_size, j:j+tile_size] = tile_final
+            
+            return enhanced
+            
+        except Exception as e:
+            logger.warning(f"Adaptive histogram equalization failed: {e}")
+            return image_data
+    
+    def _apply_unsharp_masking(self, normalized_data):
+        """Apply unsharp masking for edge enhancement"""
+        try:
+            from scipy.ndimage import gaussian_filter
+            
+            # Create blurred version
+            sigma = 1.0  # Blur radius
+            blurred = gaussian_filter(normalized_data, sigma=sigma)
+            
+            # Create unsharp mask
+            mask = normalized_data - blurred
+            
+            # Apply sharpening
+            amount = 0.5  # Sharpening strength
+            threshold = 0.02  # Threshold to prevent noise amplification
+            
+            # Only sharpen where the mask is above threshold
+            mask_strong = np.abs(mask) > threshold
+            sharpened = normalized_data + amount * mask * mask_strong
+            
+            # Ensure values stay in valid range
+            return np.clip(sharpened, 0.0, 1.0)
+            
+        except ImportError:
+            # Fallback: simple edge enhancement
+            kernel = np.array([[-1, -1, -1],
+                              [-1,  9, -1],
+                              [-1, -1, -1]]) / 9
+            try:
+                from scipy import ndimage
+                enhanced = ndimage.convolve(normalized_data, kernel, mode='reflect')
+                return np.clip(enhanced, 0.0, 1.0)
+            except:
+                return normalized_data
+    
     def get_optimal_preset_for_hu_range(self, hu_min, hu_max, modality='CT'):
         """Automatically suggest optimal window preset based on HU range"""
         hu_range = hu_max - hu_min
@@ -191,13 +330,30 @@ class DicomProcessor:
         else:
             return 'soft'  # Default for non-CT
     
-    def auto_window_from_data(self, pixel_array, percentile_range=(1, 99)):
-        """Automatically calculate optimal window/level from image data"""
+    def auto_window_from_data(self, pixel_array, percentile_range=(1, 99), modality='CT'):
+        """Automatically calculate optimal window/level from image data with X-ray optimization"""
         try:
             # Remove extreme outliers
             p_low, p_high = np.percentile(pixel_array.flatten(), percentile_range)
             
-            # Calculate window width and level
+            # Special handling for X-ray images (typically have different characteristics)
+            if modality.upper() in ['CR', 'DX', 'DR']:  # Digital radiography modalities
+                # X-ray images often have inverted intensity values
+                # Use wider percentile range for better contrast
+                percentile_range = (0.5, 99.5)
+                p_low, p_high = np.percentile(pixel_array.flatten(), percentile_range)
+                
+                # Calculate optimal window for X-ray
+                window_width = (p_high - p_low) * 1.5  # Wider window for X-rays
+                window_level = (p_high + p_low) / 2
+                
+                # Ensure minimum window width for X-rays
+                if window_width < 1000:
+                    window_width = 1500
+                    
+                return float(window_width), float(window_level)
+            
+            # Calculate window width and level for CT and other modalities
             window_width = max(50, p_high - p_low)  # Minimum width of 50 HU
             window_level = (p_high + p_low) / 2
             

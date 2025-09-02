@@ -839,7 +839,8 @@ def api_dicom_image_display(request, image_id):
                 return fallback
             try:
                 processor = DicomProcessor()
-                ww, wl = processor.auto_window_from_data(arr, percentile_range=(2, 98))
+                modality = str(getattr(ds, 'Modality', '')).upper() if ds is not None else 'CT'
+                ww, wl = processor.auto_window_from_data(arr, percentile_range=(2, 98), modality=modality)
                 
                 # Apply modality-specific adjustments
                 modality = str(getattr(ds, 'Modality', '')).upper() if ds is not None else ''
@@ -1176,7 +1177,8 @@ def api_auto_window(request, image_id):
             
             # Use enhanced windowing algorithm
             processor = DicomProcessor()
-            auto_ww, auto_wl = processor.auto_window_from_data(pixel_array, percentile_range=(2, 98))
+            modality = str(getattr(ds, 'Modality', '')).upper()
+            auto_ww, auto_wl = processor.auto_window_from_data(pixel_array, percentile_range=(2, 98), modality=modality)
             
             # Get modality and suggest optimal preset
             modality = str(getattr(ds, 'Modality', '')).upper()
