@@ -38,6 +38,22 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydicom")
 logger = logging.getLogger(__name__)
 
 
+def safe_dicom_str(value):
+    """Safely convert DICOM values to string, handling MultiValue objects."""
+    if value is None or value == "":
+        return ""
+    
+    # Handle MultiValue objects (like PixelSpacing, WindowCenter, WindowWidth)
+    if hasattr(value, '__iter__') and not isinstance(value, str):
+        try:
+            # Convert to list and join with backslash (DICOM standard separator)
+            return '\\'.join(map(str, value))
+        except Exception:
+            return str(value)
+    
+    return str(value)
+
+
 class ModalityType(Enum):
     """DICOM modality types with specific processing requirements"""
     # Core modalities

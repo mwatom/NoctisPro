@@ -9,6 +9,7 @@ from django.core.files.storage import default_storage
 from django.utils import timezone
 from django.db import transaction
 from django.conf import settings
+from .dicom_utils import safe_dicom_str
 
 import json
 import base64
@@ -1326,8 +1327,8 @@ def upload_dicom(request):
                         'modality': getattr(ds0, 'Modality', modality_code),
                         'body_part': getattr(ds0, 'BodyPartExamined', ''),
                         'slice_thickness': getattr(ds0, 'SliceThickness', None),
-                        'pixel_spacing': str(getattr(ds0, 'PixelSpacing', '')),
-                        'image_orientation': str(getattr(ds0, 'ImageOrientationPatient', '')),
+                        'pixel_spacing': safe_dicom_str(getattr(ds0, 'PixelSpacing', '')),
+                        'image_orientation': safe_dicom_str(getattr(ds0, 'ImageOrientationPatient', '')),
                     }
                 )
                 
