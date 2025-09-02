@@ -1299,6 +1299,15 @@
                 <button class="tool" data-tool="invert" onclick="toggleInvert()" title="Invert">
                     <i class="fas fa-adjust"></i>
                 </button>
+                <button class="tool" data-tool="flip-h" onclick="flipHorizontal()" title="Flip Horizontal">
+                    <i class="fas fa-arrows-alt-h"></i>
+                </button>
+                <button class="tool" data-tool="flip-v" onclick="flipVertical()" title="Flip Vertical">
+                    <i class="fas fa-arrows-alt-v"></i>
+                </button>
+                <button class="tool" data-tool="rotate" onclick="rotateImage()" title="Rotate 90° CW">
+                    <i class="fas fa-redo"></i>
+                </button>
                 <button class="tool" data-tool="mpr" onclick="toggleMPR()" title="MPR Views">
                     <i class="fas fa-cube"></i>
                 </button>
@@ -2409,6 +2418,11 @@
                         // Render to high-quality canvas with modality-specific optimization
                         renderImageToCanvas(dicomImage, dicomCanvas, modality);
                         
+                        // Reapply any active transformations
+                        if (flipHorizontalState || flipVerticalState || rotationAngle !== 0) {
+                            applyImageTransformations();
+                        }
+                        
                         hideLoading();
                         updateImageInfo(data.image_info);
                         updateOverlayInfo();
@@ -2834,6 +2848,160 @@
             }
         }
 
+        // Image transformation variables
+        let flipHorizontalState = false;
+        let flipVerticalState = false;
+        let rotationAngle = 0; // In degrees, increments of 90
+
+        function flipHorizontal() {
+            flipHorizontalState = !flipHorizontalState;
+            applyImageTransformations();
+            
+            // Update tool visual state
+            const tool = document.querySelector('[data-tool="flip-h"]');
+            if (flipHorizontalState) {
+                tool.classList.add('active');
+                showToast('Flipped horizontally', 'success', 1500);
+            } else {
+                tool.classList.remove('active');
+                showToast('Horizontal flip removed', 'info', 1500);
+            }
+        }
+
+        function flipVertical() {
+            flipVerticalState = !flipVerticalState;
+            applyImageTransformations();
+            
+            // Update tool visual state
+            const tool = document.querySelector('[data-tool="flip-v"]');
+            if (flipVerticalState) {
+                tool.classList.add('active');
+                showToast('Flipped vertically', 'success', 1500);
+            } else {
+                tool.classList.remove('active');
+                showToast('Vertical flip removed', 'info', 1500);
+            }
+        }
+
+        function rotateImage() {
+            rotationAngle = (rotationAngle + 90) % 360;
+            applyImageTransformations();
+            
+            // Update tool visual state and tooltip
+            const tool = document.querySelector('[data-tool="rotate"]');
+            if (rotationAngle !== 0) {
+                tool.classList.add('active');
+                tool.title = `Rotate 90° CW (Currently ${rotationAngle}°)`;
+                showToast(`Rotated to ${rotationAngle}°`, 'success', 1500);
+            } else {
+                tool.classList.remove('active');
+                tool.title = 'Rotate 90° CW';
+                showToast('Rotation reset', 'info', 1500);
+            }
+        }
+
+        function applyImageTransformations() {
+            const canvas = document.getElementById('dicomCanvas');
+            const img = document.getElementById('dicomImage');
+            
+            if (!canvas || !img || !img.complete) {
+                return;
+            }
+
+            // Build CSS transform string
+            let transforms = [];
+            
+            if (flipHorizontalState) {
+                transforms.push('scaleX(-1)');
+            }
+            
+            if (flipVerticalState) {
+                transforms.push('scaleY(-1)');
+            }
+            
+            if (rotationAngle !== 0) {
+                transforms.push(`rotate(${rotationAngle}deg)`);
+            }
+            
+            // Apply transforms to both canvas and image
+            const transformString = transforms.length > 0 ? transforms.join(' ') : 'none';
+            canvas.style.transform = transformString;
+            img.style.transform = transformString;
+            
+            // For canvas, we need to redraw with transformations
+            redrawCanvasWithTransformations();
+        }
+
+        function redrawCanvasWithTransformations() {
+            const canvas = document.getElementById('dicomCanvas');
+            const img = document.getElementById('dicomImage');
+            
+            if (!canvas || !img || !img.complete) {
+                return;
+            }
+
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.getBoundingClientRect();
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Save current context
+            ctx.save();
+            
+            // Move to center for transformations
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            
+            // Apply transformations
+            if (flipHorizontalState) {
+                ctx.scale(-1, 1);
+            }
+            
+            if (flipVerticalState) {
+                ctx.scale(1, -1);
+            }
+            
+            if (rotationAngle !== 0) {
+                ctx.rotate((rotationAngle * Math.PI) / 180);
+            }
+            
+            // Draw image centered
+            const drawWidth = img.naturalWidth * (canvas.height / img.naturalHeight);
+            const drawHeight = canvas.height;
+            ctx.drawImage(img, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+            
+            // Restore context
+            ctx.restore();
+        }
+
+        function resetImageTransformations() {
+            flipHorizontalState = false;
+            flipVerticalState = false;
+            rotationAngle = 0;
+            
+            // Reset tool visual states
+            document.querySelector('[data-tool="flip-h"]')?.classList.remove('active');
+            document.querySelector('[data-tool="flip-v"]')?.classList.remove('active');
+            const rotateTool = document.querySelector('[data-tool="rotate"]');
+            if (rotateTool) {
+                rotateTool.classList.remove('active');
+                rotateTool.title = 'Rotate 90° CW';
+            }
+            
+            // Reset canvas and image transforms
+            const canvas = document.getElementById('dicomCanvas');
+            const img = document.getElementById('dicomImage');
+            if (canvas) canvas.style.transform = 'none';
+            if (img) img.style.transform = 'none';
+            
+            // Redraw canvas normally
+            if (canvas && img && img.complete) {
+                renderImageToCanvas(img, canvas);
+            }
+            
+            showToast('All transformations reset', 'info', 2000);
+        }
+
         function resetView() {
             if (mprMode) {
                 // Reset all MPR viewports
@@ -2847,9 +3015,12 @@
                 document.getElementById('zoomSlider').value = 100;
                 document.getElementById('zoomValue').textContent = '100%';
                 
+                // Reset image transformations
+                resetImageTransformations();
+                
                 applyTransform();
                 updateZoomInfo();
-                showToast('View reset', 'success');
+                showToast('View and transformations reset', 'success');
             }
         }
 
