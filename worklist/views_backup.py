@@ -16,6 +16,7 @@ from pathlib import Path
 import pydicom
 from PIL import Image
 from io import BytesIO
+from dicom_viewer.dicom_utils import safe_dicom_str
 
 logger = logging.getLogger(__name__)
 
@@ -328,8 +329,8 @@ def upload_study(request):
 					series_number = getattr(ds0, 'SeriesNumber', 1) or 1
 					series_desc = getattr(ds0, 'SeriesDescription', f'Series {series_number}')
 					slice_thickness = getattr(ds0, 'SliceThickness', None)
-					pixel_spacing = str(getattr(ds0, 'PixelSpacing', ''))
-					image_orientation = str(getattr(ds0, 'ImageOrientationPatient', ''))
+					pixel_spacing = safe_dicom_str(getattr(ds0, 'PixelSpacing', ''))
+					image_orientation = safe_dicom_str(getattr(ds0, 'ImageOrientationPatient', ''))
 					
 					# Enhanced series metadata for CT/MRI
 					body_part = getattr(ds0, 'BodyPartExamined', '')
