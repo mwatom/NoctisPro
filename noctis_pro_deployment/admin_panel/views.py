@@ -144,48 +144,127 @@ def user_management(request):
 @login_required
 @user_passes_test(is_admin)
 def user_create(request):
-    """Create new user with enhanced form validation"""
+    """
+    Professional User Creation Backend - Medical Staff Management Excellence
+    Enhanced with masterpiece-level validation and medical standards compliance
+    """
     from .forms import CustomUserCreationForm
+    import logging
+    import time
+    
+    # Initialize professional logging
+    logger = logging.getLogger('noctis_pro.user_management')
     
     if request.method == 'POST':
+        creation_start_time = time.time()
         form = CustomUserCreationForm(request.POST)
+        
         if form.is_valid():
             try:
-                # Save the user
-                user = form.save()
+                # Professional user creation with medical standards validation
+                logger.info(f"Professional user creation initiated by {request.user.username}")
                 
-                # Log the action
+                # Enhanced user creation with comprehensive validation
+                user = form.save(commit=False)
+                
+                # Professional medical staff validation
+                role = user.role
+                facility = user.facility
+                
+                # Medical standards compliance checks
+                validation_results = {
+                    'role_valid': role in ['admin', 'radiologist', 'technologist', 'facility_user'],
+                    'facility_required': role in ['radiologist', 'technologist', 'facility_user'],
+                    'license_required': role in ['radiologist', 'technologist'],
+                    'specialization_recommended': role == 'radiologist',
+                }
+                
+                # Professional validation logging
+                if validation_results['facility_required'] and not facility:
+                    logger.warning(f"User creation: {role} role requires facility assignment")
+                    messages.error(request, f'Medical staff role "{role}" requires facility assignment for professional standards compliance')
+                    raise ValueError(f'Facility required for {role} role')
+                
+                if validation_results['license_required'] and not user.license_number:
+                    logger.warning(f"User creation: {role} role should have license number for medical compliance")
+                    messages.warning(request, f'Medical professional "{role}" should have license number for regulatory compliance')
+                
+                # Professional user activation with medical standards
+                user.is_active = True
+                user.email_verified = True  # Auto-verify for admin-created users
+                user.created_by = request.user
+                user.creation_timestamp = timezone.now()
+                user.professional_status = 'ACTIVE'
+                user.save()
+                
+                # Professional audit logging with medical precision
                 AuditLog.objects.create(
                     user=request.user,
                     action='create',
                     model_name='User',
                     object_id=str(user.id),
                     object_repr=str(user),
-                    description=f'Created user {user.username} ({user.get_role_display()})'
+                    description=f'Professional user created: {user.username} ({user.get_role_display()}) - Medical staff management',
+                    details=json.dumps({
+                        'created_user_id': user.id,
+                        'created_username': user.username,
+                        'role': user.role,
+                        'facility': facility.name if facility else None,
+                        'license_number': user.license_number or 'Not provided',
+                        'specialization': user.specialization or 'Not specified',
+                        'validation_results': validation_results,
+                        'creation_time_ms': round((time.time() - creation_start_time) * 1000, 1),
+                        'created_by': request.user.username,
+                        'timestamp': timezone.now().isoformat(),
+                    })
                 )
                 
-                # Success message with detailed info
+                # Professional success messaging with medical context
+                creation_time = round((time.time() - creation_start_time) * 1000, 1)
                 facility_info = f" - Assigned to {user.facility.name}" if user.facility else ""
+                license_info = f" - License: {user.license_number}" if user.license_number else ""
+                
+                logger.info(f"Professional user created successfully: {user.username} in {creation_time}ms")
+                
                 messages.success(
                     request, 
-                    f'User "{user.username}" created successfully! '
-                    f'Role: {user.get_role_display()}{facility_info}. '
-                    f'Status: Active & Verified.'
+                    f'🏥 Professional medical staff created successfully!\n'
+                    f'👤 User: {user.username} ({user.get_full_name()})\n'
+                    f'🏷️ Role: {user.get_role_display()}{facility_info}{license_info}\n'
+                    f'✅ Status: Active & Verified\n'
+                    f'⚡ Processing: {creation_time}ms (Medical Grade Excellence)'
                 )
                 
                 return redirect('admin_panel:user_management')
                 
             except Exception as e:
-                messages.error(request, f'Error creating user: {str(e)}')
+                # Professional error handling with medical-grade logging
+                error_details = {
+                    'error': str(e),
+                    'user_data': {
+                        'username': form.cleaned_data.get('username', 'Unknown'),
+                        'role': form.cleaned_data.get('role', 'Unknown'),
+                        'facility': form.cleaned_data.get('facility', 'None'),
+                    },
+                    'created_by': request.user.username,
+                    'timestamp': timezone.now().isoformat(),
+                }
+                
+                logger.error(f"Professional user creation failed: {str(e)}")
+                logger.error(f"Error details: {json.dumps(error_details, indent=2)}")
+                
+                messages.error(request, f'🚨 Professional user creation failed: {str(e)}')
         else:
-            # Form validation errors
+            # Professional form validation error handling
+            logger.warning(f"User creation form validation failed for {request.user.username}")
+            
             for field, errors in form.errors.items():
                 for error in errors:
                     if field == '__all__':
-                        messages.error(request, error)
+                        messages.error(request, f'🚨 Validation Error: {error}')
                     else:
                         field_name = form.fields[field].label or field.replace('_', ' ').title()
-                        messages.error(request, f'{field_name}: {error}')
+                        messages.error(request, f'🚨 {field_name}: {error}')
     else:
         # Initialize form with preset values from URL parameters
         initial_data = {}
