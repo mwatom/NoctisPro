@@ -295,6 +295,28 @@
         }
 
         /* Overlay Information */
+        /* X-ray specific optimizations */
+        .dicom-canvas[data-modality="DX"],
+        .dicom-canvas[data-modality="CR"],
+        .dicom-canvas[data-modality="DR"] {
+            /* Disable smoothing for X-ray images to preserve sharp details */
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+            /* Enhanced contrast for X-ray visualization */
+            filter: contrast(1.05) brightness(1.02) !important;
+        }
+
+        .dicom-image[data-modality="DX"],
+        .dicom-image[data-modality="CR"],
+        .dicom-image[data-modality="DR"] {
+            /* X-ray image optimizations */
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+            filter: contrast(1.05) brightness(1.02) !important;
+        }
+
         .overlay-info {
             position: absolute;
             top: 12px;
@@ -1870,7 +1892,7 @@
         const CROSSHAIR_UPDATE_DELAY = 50; // 50ms = 20 FPS for smooth updates
         
         // Enhanced High-Quality Canvas Rendering Function for Medical Images
-        function renderImageToCanvas(imgElement, canvas) {
+        function renderImageToCanvas(imgElement, canvas, modality) {
             if (!imgElement || !canvas || !imgElement.complete) return;
             
             const ctx = canvas.getContext('2d');
@@ -1883,24 +1905,37 @@
             const displayWidth = rect.width;
             const displayHeight = rect.height;
             
+            // Modality-specific resolution enhancement
+            let resolutionMultiplier = 1.5; // Default for CT/MR
+            if (modality && ['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality.toUpperCase())) {
+                resolutionMultiplier = 2.0; // Higher resolution for X-ray images
+            }
+            
             // Set actual canvas size to device pixel ratio with enhanced resolution
-            canvas.width = displayWidth * dpr * 1.5; // Increased resolution for medical imaging
-            canvas.height = displayHeight * dpr * 1.5;
+            canvas.width = displayWidth * dpr * resolutionMultiplier;
+            canvas.height = displayHeight * dpr * resolutionMultiplier;
             
             // Scale canvas back down using CSS
             canvas.style.width = displayWidth + 'px';
             canvas.style.height = displayHeight + 'px';
             
             // Scale the drawing context to match enhanced pixel ratio
-            ctx.scale(dpr * 1.5, dpr * 1.5);
+            ctx.scale(dpr * resolutionMultiplier, dpr * resolutionMultiplier);
             
             // Enable highest quality rendering for medical images
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = 'high';
             
-            // Additional quality settings for medical imaging
-            ctx.textRenderingOptimization = 'optimizeQuality';
-            ctx.filter = 'none'; // Disable any default filters that might degrade image quality
+            // Modality-specific rendering optimizations
+            if (modality && ['DX', 'CR', 'DR', 'XA', 'RF'].includes(modality.toUpperCase())) {
+                // For X-ray images, disable smoothing to preserve sharp edges
+                ctx.imageSmoothingEnabled = false;
+                ctx.filter = 'contrast(1.1) brightness(1.05)'; // Slight enhancement for X-rays
+            } else {
+                // Additional quality settings for CT/MR imaging
+                ctx.textRenderingOptimization = 'optimizeQuality';
+                ctx.filter = 'none'; // Disable any default filters that might degrade image quality
+            }
             
             // Calculate aspect-preserving dimensions
             const imgAspect = imgElement.naturalWidth / imgElement.naturalHeight;
@@ -1946,6 +1981,11 @@
             setTimeout(() => {
                 showToast('💡 Tip: Right-click or Shift+click and drag on image to adjust brightness/contrast', 'info', 6000);
             }, 2000);
+            
+            // Show keyboard shortcuts help
+            setTimeout(() => {
+                showToast('⌨️ Keyboard shortcuts: H=Flip horizontal, V=Flip vertical, T=Rotate, Ctrl+R=Reset transforms', 'info', 8000);
+            }, 10000);
             loadAvailableStudies();
             
             // Check for study ID in URL
@@ -2124,7 +2164,32 @@
                         break;
                     case 'r':
                     case 'R':
-                        resetView();
+                        if (e.ctrlKey || e.metaKey) {
+                            // Ctrl+R: Reset transformations only
+                            resetImageTransformations();
+                            e.preventDefault();
+                        } else {
+                            // R: Reset entire view
+                            resetView();
+                        }
+                        break;
+                    case 'h':
+                    case 'H':
+                        // H: Flip horizontal
+                        flipHorizontal();
+                        e.preventDefault();
+                        break;
+                    case 'v':
+                    case 'V':
+                        // V: Flip vertical
+                        flipVertical();
+                        e.preventDefault();
+                        break;
+                    case 't':
+                    case 'T':
+                        // T: Rotate (Turn)
+                        rotateImage();
+                        e.preventDefault();
                         break;
                     case 'ArrowUp':
                         e.preventDefault();

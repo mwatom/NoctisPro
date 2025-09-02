@@ -877,9 +877,35 @@ def api_dicom_image_display(request, image_id):
         photo = str(getattr(ds, 'PhotometricInterpretation', '')).upper() if ds is not None else ''
         default_inverted = False
         if str(modality).upper() in ['DX','CR','XA','RF']:
-            default_window_width = float(default_window_width) if default_window_width is not None else 3000.0
-            default_window_level = float(default_window_level) if default_window_level is not None else 1500.0
+            # Enhanced X-ray windowing for better visibility
+            default_window_width = float(default_window_width) if default_window_width is not None else 2500.0
+            default_window_level = float(default_window_level) if default_window_level is not None else 1200.0
             default_inverted = (photo == 'MONOCHROME1')
+            
+            # Apply additional X-ray specific processing if pixel array is available
+            if pixel_array is not None:
+                try:
+                    # Enhance X-ray contrast using histogram equalization
+                    from scipy import ndimage
+                    
+                    # Apply mild Gaussian smoothing to reduce noise
+                    pixel_array = ndimage.gaussian_filter(pixel_array.astype(np.float32), sigma=0.5)
+                    
+                    # Apply adaptive contrast enhancement
+                    p1, p99 = np.percentile(pixel_array.flatten(), [1, 99])
+                    if p99 > p1:
+                        # Clip extreme values
+                        pixel_array = np.clip(pixel_array, p1, p99)
+                        
+                        # Apply contrast stretching
+                        pixel_array = (pixel_array - p1) / (p99 - p1) * (p99 - p1) + p1
+                        
+                except ImportError:
+                    # Fallback without scipy
+                    pass
+                except Exception as e:
+                    logger.warning(f"X-ray enhancement failed: {e}")
+                    pass
         
         # Overwrite request params only if not provided
         try:
