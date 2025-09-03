@@ -219,17 +219,9 @@
             image-rendering: crisp-edges;
             image-rendering: high-quality;
             cursor: crosshair;
-            transition: all 0.2s ease;
-            /* Professional medical image rendering */
-            filter: contrast(1.15) brightness(1.05) saturate(1.02) sharpen(0.2);
-            -webkit-filter: contrast(1.15) brightness(1.05) saturate(1.02);
-            /* Smooth loading transition */
-            opacity: 1;
-        }
-        
-        .dicom-canvas.loading {
-            opacity: 0.7;
-            filter: contrast(0.9) brightness(0.9) blur(0.5px);
+            transition: transform 0.1s ease;
+            filter: contrast(1.15) brightness(1.08) sharpen(0.3);
+            -webkit-filter: contrast(1.15) brightness(1.08);
         }
 
         .image-container {
@@ -245,22 +237,15 @@
         .dicom-image {
             max-width: 100%;
             max-height: 100%;
-            /* Professional medical image rendering optimized for X-rays */
             image-rendering: -webkit-optimize-contrast;
             image-rendering: -moz-crisp-edges;
             image-rendering: crisp-edges;
             image-rendering: high-quality;
-            image-rendering: pixelated;
-            /* Enhanced medical image filters - applied dynamically in JavaScript */
-            transition: all 0.3s ease;
-            /* Prevent image blurriness on scaling */
-            -ms-interpolation-mode: nearest-neighbor;
             cursor: crosshair;
             user-select: none;
-            -webkit-filter: none !important;
-            /* Ensure proper display */
-            object-fit: contain;
-            background: transparent;
+            transition: none;
+            filter: contrast(1.15) brightness(1.08) sharpen(0.3);
+            -webkit-filter: contrast(1.15) brightness(1.08);
         }
 
         /* Overlay Information */
@@ -319,20 +304,15 @@
             box-shadow: 0 0 2px rgba(0, 255, 255, 0.5);
         }
 
-        /* MPR Grid Layout - Full screen resolution optimized */
+        /* MPR Grid Layout */
         .mpr-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             grid-template-rows: 1fr 1fr;
             gap: 2px;
-            width: 100vw;
-            height: 100vh;
-            position: fixed;
-            top: 0;
-            left: 0;
-            background: var(--primary-bg);
-            z-index: 1000;
-            padding: 2px;
+            width: 100%;
+            height: 100%;
+            background: var(--border-color);
         }
 
         .mpr-viewport {
@@ -341,16 +321,9 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            border: 2px solid var(--border-color);
-            border-radius: 2px;
-            overflow: hidden;
+            border: 1px solid var(--border-color);
             cursor: crosshair;
-            /* Use full available space */
-            width: 100%;
-            height: 100%;
-            /* High-DPI optimization */
-            image-rendering: -webkit-optimize-contrast;
-            image-rendering: pixelated;
+            transition: all 0.1s ease;
         }
 
         .mpr-viewport:hover {
@@ -366,17 +339,8 @@
         .mpr-viewport img {
             max-width: 100%;
             max-height: 100%;
-            width: 100%;
-            height: 100%;
-            image-rendering: -webkit-optimize-contrast;
             image-rendering: pixelated;
             cursor: crosshair;
-            object-fit: contain;
-            background: transparent;
-            display: block;
-            /* Remove problematic filters */
-            filter: none !important;
-            -webkit-filter: none !important;
         }
 
         .mpr-label {
@@ -715,7 +679,40 @@
             box-shadow: 0 0 0 1px var(--accent-color);
         }
 
-        /* Toast Notifications - Disabled */
+        /* Toast Notifications */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--accent-color);
+            color: var(--text-primary);
+            padding: 12px 16px;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 2000;
+            font-size: 12px;
+            max-width: 300px;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.error {
+            border-left-color: var(--danger-color);
+        }
+
+        .toast.success {
+            border-left-color: var(--success-color);
+        }
+
+        .toast.warning {
+            border-left-color: var(--warning-color);
+        }
 
         /* Footer Status */
         .footer-status {
@@ -953,14 +950,14 @@
             <!-- Single Image View -->
             <div class="viewport-content" id="singleView">
                 <div class="image-container" id="imageContainer">
-                    <img class="dicom-image" id="dicomImage" alt="DICOM Image" style="display: block; max-width: 100%; max-height: 100%; object-fit: contain;">
-                    <canvas class="dicom-canvas" id="dicomCanvas" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
+                    <img class="dicom-image" id="dicomImage" alt="DICOM Image">
                     <div class="crosshair-overlay" id="crosshairOverlay" style="display: none;">
                         <div class="crosshair-line-h"></div>
                         <div class="crosshair-line-v"></div>
                     </div>
                     <div class="measurement-overlay" id="measurementOverlay"></div>
                 </div>
+
             </div>
 
             <!-- Professional 2x2 Orthogonal View Grid -->
@@ -1040,7 +1037,7 @@
                         <span>Zoom</span>
                         <span id="zoomValue">100%</span>
                     </div>
-                    <input type="range" class="slider" id="zoomSlider" min="25" max="1000" value="100" oninput="updateZoom(this.value)">
+                    <input type="range" class="slider" id="zoomSlider" min="25" max="500" value="100" oninput="updateZoom(this.value)">
                 </div>
             </div>
 
@@ -1291,7 +1288,7 @@
         let annotations = [];
         let currentMeasurement = null;
         
-        // Window presets - Professional medical presets including DX/CR
+        // Window presets - Professional medical presets from PyQt
         const windowPresets = {
             'lung': { ww: 1500, wl: -600 },
             'bone': { ww: 2000, wl: 300 },
@@ -1299,18 +1296,7 @@
             'brain': { ww: 100, wl: 50 },
             'liver': { ww: 160, wl: 60 },
             'mediastinum': { ww: 350, wl: 50 },
-            'cine': { ww: 800, wl: 200 },
-            // DX/CR specific presets
-            'chest_dx': { ww: 2000, wl: 1000 },
-            'abdomen_dx': { ww: 3000, wl: 1500 },
-            'extremity_dx': { ww: 2500, wl: 1200 },
-            'spine_dx': { ww: 2200, wl: 1100 },
-            'pelvis_dx': { ww: 2800, wl: 1400 },
-            'skull_dx': { ww: 2000, wl: 1000 },
-            // CR specific presets
-            'chest_cr': { ww: 1800, wl: 900 },
-            'abdomen_cr': { ww: 2500, wl: 1250 },
-            'extremity_cr': { ww: 2000, wl: 1000 }
+            'cine': { ww: 800, wl: 200 }
         };
         
         // Professional caching for performance (PyQt-inspired)
@@ -1341,7 +1327,7 @@
             updateOverlayInfo();
             updateZoomInfo();
             
-
+            showToast('DICOM Viewer initialized and ready', 'success');
         }
 
         function setupMouseEvents() {
@@ -1579,23 +1565,8 @@
 
         function applyTransform() {
             const dicomImage = document.getElementById('dicomImage');
-            const dicomCanvas = document.getElementById('dicomCanvas');
-            
-            // Always use image element for better compatibility and quality
             if (dicomImage) {
-                const transform = `scale(${zoomFactor}) translate(${panX/zoomFactor}px, ${panY/zoomFactor}px)`;
-                dicomImage.style.transform = transform;
-                dicomImage.style.transformOrigin = 'center center';
-                
-                // Ensure image is visible and properly styled
-                dicomImage.style.display = 'block';
-                dicomImage.style.maxWidth = '100%';
-                dicomImage.style.maxHeight = '100%';
-                dicomImage.style.objectFit = 'contain';
-                
-                if (dicomCanvas) {
-                    dicomCanvas.style.display = 'none';
-                }
+                dicomImage.style.transform = `scale(${zoomFactor}) translate(${panX/zoomFactor}px, ${panY/zoomFactor}px)`;
             }
         }
 
@@ -1634,7 +1605,7 @@
         }
 
         // Image Display Management
-        async function updateImageDisplay(useProgressiveLoading = true) {
+        async function updateImageDisplay() {
             if (!images.length || currentImageIndex < 0 || currentImageIndex >= images.length) {
                 return;
             }
@@ -1643,121 +1614,54 @@
             if (!currentImage) return;
             
             try {
-                const dicomImage = document.getElementById('dicomImage');
+                // Show loading
+                showLoading('Processing image...');
                 
-                // Hide welcome screen and show image view
-                const welcomeScreen = document.getElementById('welcomeScreen');
-                const singleView = document.getElementById('singleView');
-                if (welcomeScreen) welcomeScreen.style.display = 'none';
-                if (singleView) singleView.style.display = 'flex';
+                // Get processed image with current window/level settings
+                const url = `/dicom-viewer/api/image/${currentImage.id}/display/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`;
                 
-                // PROGRESSIVE LOADING: Load fast preview first, then high quality
-                if (useProgressiveLoading) {
-                    // Step 1: Load fast preview for immediate feedback
-                    showLoading('Loading preview...');
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.image_data) {
+                    const dicomImage = document.getElementById('dicomImage');
                     
-                    const fastUrl = `/dicom-viewer/api/image/${currentImage.id}/display/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}&quality=fast`;
+                    // Hide welcome screen and show image view
+                    const welcomeScreen = document.getElementById('welcomeScreen');
+                    const singleView = document.getElementById('singleView');
+                    if (welcomeScreen) welcomeScreen.style.display = 'none';
+                    if (singleView) singleView.style.display = 'flex';
                     
-                    try {
-                        const fastResponse = await fetch(fastUrl);
-                        const fastData = await fastResponse.json();
+                    dicomImage.src = data.image_data;
+                    dicomImage.onload = function() {
+                        hideLoading();
+                        updateImageInfo(data.image_info);
+                        updateMeasurementOverlay();
+                        updateAnnotationOverlay();
                         
-                        if (fastData.image_data) {
-                            dicomImage.src = fastData.image_data;
-                            dicomImage.style.filter = 'brightness(0.95) contrast(0.95)'; // Slightly dim to indicate preview
-                            updateImageInfo(fastData.image_info);
-                            showLoading('Enhancing image quality...');
-                        }
-                    } catch (error) {
-                        console.warn('Fast preview failed, loading full quality:', error);
-                    }
-                    
-                    // Step 2: Load high quality version
-                    const highQualityUrl = `/dicom-viewer/api/image/${currentImage.id}/display/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}&quality=high`;
-                    
-                    const response = await fetch(highQualityUrl);
-                    const data = await response.json();
-                    
-                    if (data.image_data) {
-                        // Smooth transition to high quality
-                        const tempImg = new Image();
-                        tempImg.onload = function() {
-                            dicomImage.src = data.image_data;
-                            dicomImage.style.filter = ''; // Remove preview filter
-                            
-                            // Apply professional medical image rendering
-                            dicomImage.style.imageRendering = '-webkit-optimize-contrast';
-                            dicomImage.style.imageRendering = 'crisp-edges';
-                            dicomImage.style.imageRendering = 'pixelated';
-                            dicomImage.style.maxWidth = '100%';
-                            dicomImage.style.maxHeight = '100%';
-                            
-                            // Apply medical-grade image enhancements for X-ray visibility
-                            dicomImage.style.filter = 'contrast(1.15) brightness(1.05) saturate(1.02)';
-                            
-                            hideLoading();
-                            updateImageInfo(data.image_info);
-                            updateMeasurementOverlay();
-                            updateAnnotationOverlay();
-                            showToast('✓ Professional image quality loaded', 'success');
-                        };
-                        tempImg.onerror = function() {
-                            hideLoading();
-                            showToast('Failed to load high-quality image', 'error');
-                        };
-                        tempImg.src = data.image_data;
-                    } else {
+                        // Apply high-quality rendering
+                        dicomImage.style.imageRendering = 'pixelated';
+                        dicomImage.style.imageRendering = 'crisp-edges';
+                        dicomImage.style.maxWidth = '100%';
+                        dicomImage.style.maxHeight = '100%';
+                    };
+                    dicomImage.onerror = function() {
                         hideLoading();
-                        if (data.warnings?.pixel_decode_error) {
-                            showToast('Image format not supported: ' + data.warnings.pixel_decode_error, 'warning');
-                        } else {
-                            showToast(data.error || 'Failed to load image data', 'error');
-                        }
-                    }
-                    
+                        showToast('Failed to load image', 'error');
+                    };
                 } else {
-                    // Standard loading without progressive enhancement
-                    showLoading('Processing image...');
-                    
-                    const url = `/dicom-viewer/api/image/${currentImage.id}/display/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}&quality=high`;
-                    
-                    const response = await fetch(url);
-                    const data = await response.json();
-                    
-                    if (data.image_data) {
-                        dicomImage.src = data.image_data;
-                        dicomImage.onload = function() {
-                            hideLoading();
-                            updateImageInfo(data.image_info);
-                            updateMeasurementOverlay();
-                            updateAnnotationOverlay();
-                            
-                            // Apply professional medical image rendering
-                            dicomImage.style.imageRendering = '-webkit-optimize-contrast';
-                            dicomImage.style.imageRendering = 'crisp-edges';
-                            dicomImage.style.imageRendering = 'pixelated';
-                            dicomImage.style.maxWidth = '100%';
-                            dicomImage.style.maxHeight = '100%';
-                            dicomImage.style.filter = 'contrast(1.15) brightness(1.05)';
-                        };
-                        dicomImage.onerror = function() {
-                            hideLoading();
-                            showToast('Failed to load image', 'error');
-                        };
+                    hideLoading();
+                    if (data.warnings?.pixel_decode_error) {
+                        showToast('Image format not supported: ' + data.warnings.pixel_decode_error, 'warning');
                     } else {
-                        hideLoading();
-                        if (data.warnings?.pixel_decode_error) {
-                            showToast('Image format not supported: ' + data.warnings.pixel_decode_error, 'warning');
-                        } else {
-                            showToast(data.error || 'Failed to load image data', 'error');
-                        }
+                        showToast('Failed to load image data', 'error');
                     }
                 }
                 
             } catch (error) {
                 hideLoading();
                 console.error('Error updating image display:', error);
-                showToast('Error loading image - Check connection', 'error');
+                showToast('Error loading image', 'error');
             }
         }
 
@@ -2643,7 +2547,7 @@
         function showLoading(message = 'Loading...') {
             const overlay = document.getElementById('loadingOverlay');
             const messageEl = document.getElementById('loadingMessage');
-            messageEl.textContent = 'Loading...';  // Keep simple, no custom messages
+            messageEl.textContent = message;
             overlay.classList.add('active');
         }
 
@@ -2653,8 +2557,25 @@
         }
 
         function showToast(message, type = 'info', duration = 3000) {
-            // Disabled - no more annoying popups
-            console.log(`[${type.toUpperCase()}] ${message}`);
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-triangle' : 'info-circle'}"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            // Show toast
+            setTimeout(() => toast.classList.add('show'), 100);
+            
+            // Hide toast
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
         }
 
         function getCSRFToken() {

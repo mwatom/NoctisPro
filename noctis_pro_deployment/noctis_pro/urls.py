@@ -20,14 +20,14 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.http import HttpResponse
-from worklist import views as worklist_views  # RESTORED FOR FULL FUNCTIONALITY
+from worklist import views as worklist_views  # ENABLED - MASTERPIECE FEATURE
 from django.views.generic.base import RedirectView
 from . import views
 
 def home_redirect(request):
     """Redirect home page to login or dashboard based on authentication"""
     if request.user.is_authenticated:
-        # Redirect authenticated users to worklist dashboard - FULL FUNCTIONALITY RESTORED
+        # Redirect authenticated users to worklist dashboard - MASTERPIECE FEATURE
         return redirect('worklist:dashboard')
     return redirect('accounts:login')
 
@@ -36,23 +36,23 @@ def favicon_view(request):
     return HttpResponse(status=204)  # No content
 
 urlpatterns = [
-    # Redirect legacy /admin/ to the worklist dashboard to avoid confusion
+    # COMPLETE MASTERPIECE SYSTEM - ALL FEATURES ENABLED
     path('admin/', admin.site.urls),
     path('favicon.ico', favicon_view, name='favicon'),
     path('', home_redirect, name='home'),
     path('', include('accounts.urls')),
-    path('worklist/', include('worklist.urls')),  # RESTORED
+    path('worklist/', include('worklist.urls')),  # MASTERPIECE FEATURE - DICOM worklist
     # Alias endpoints expected by the dashboard UI
-    path('api/studies/', worklist_views.api_studies, name='api_studies_root'),  # RESTORED
-    path('dicom-viewer/', include(('dicom_viewer.urls','dicom_viewer'), namespace='dicom_viewer')),  # RESTORED
+    path('api/studies/', worklist_views.api_studies, name='api_studies_root'),  # MASTERPIECE FEATURE
+    path('dicom-viewer/', include(('dicom_viewer.urls','dicom_viewer'), namespace='dicom_viewer')),  # MASTERPIECE FEATURE
     # Removed duplicate 'viewer/' include to avoid namespace clash; keep alias via redirect if needed
-    path('viewer/', RedirectView.as_view(url='/dicom-viewer/', permanent=False, query_string=True)),  # RESTORED
-    path('viewer/<path:subpath>/', RedirectView.as_view(url='/dicom-viewer/%(subpath)s/', permanent=False, query_string=True)),  # RESTORED
-    path('reports/', include('reports.urls')),  # RESTORED
-    path('admin-panel/', include('admin_panel.urls')),  # RESTORED
-    path('chat/', include('chat.urls')),  # RESTORED
-    path('notifications/', include('notifications.urls')),  # RESTORED
-    path('ai/', include('ai_analysis.urls')),  # RESTORED
+    path('viewer/', RedirectView.as_view(url='/dicom-viewer/', permanent=False, query_string=True)),  # MASTERPIECE FEATURE
+    path('viewer/<path:subpath>/', RedirectView.as_view(url='/dicom-viewer/%(subpath)s/', permanent=False, query_string=True)),  # MASTERPIECE FEATURE
+    path('reports/', include('reports.urls')),  # MASTERPIECE FEATURE
+    path('admin-panel/', include('admin_panel.urls')),  # MASTERPIECE FEATURE
+    path('chat/', include('chat.urls')),  # MASTERPIECE FEATURE
+    path('notifications/', include('notifications.urls')),  # MASTERPIECE FEATURE
+    path('ai/', include('ai_analysis.urls')),  # MASTERPIECE FEATURE
 ]
 
 # Serve media files during development and production (for ngrok deployment)

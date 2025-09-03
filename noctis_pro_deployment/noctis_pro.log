@@ -99,3 +99,20 @@ INFO 2025-09-02 21:43:23,429 autoreload 6519 140350812287232 Watching for file c
 WARNING 2025-09-02 21:43:23,517 misc 6519 140350812287232 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
 INFO 2025-09-02 21:43:28,713 basehttp 6519 140350228264640 "HEAD / HTTP/1.1" 302 0
 INFO 2025-09-02 21:43:44,579 basehttp 6519 140350228264640 "GET / HTTP/1.1" 302 0
+Watching for file changes with StatReloader
+"GET / HTTP/1.1" 302 0
+Watching for file changes with StatReloader
+"GET / HTTP/1.1" 302 0
+"GET /admin/ HTTP/1.1" 302 0
+"GET /admin/ HTTP/1.1" 302 0
+"GET / HTTP/1.1" 302 0
+/workspace/noctis_pro_deployment/noctis_pro/settings.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/noctis_pro_deployment/noctis_pro/urls.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/noctis_pro_deployment/noctis_pro/urls.py changed, reloading.
+Watching for file changes with StatReloader
+/workspace/noctis_pro_deployment/noctis_pro/urls.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+"GET / HTTP/1.1" 302 0

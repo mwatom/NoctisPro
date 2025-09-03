@@ -4,6 +4,7 @@ from django.views.decorators.http import require_http_methods
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 from worklist.models import Study, Series, DicomImage
+from .dicom_utils import safe_dicom_str
 import os
 import json
 import pydicom
@@ -124,10 +125,10 @@ def api_cpp_dicom_info(request, instance_uid:str):
             "institution_name": str(getattr(ds, "InstitutionName", "")),
             "rows": getattr(ds, "Rows", None),
             "columns": getattr(ds, "Columns", None),
-            "pixel_spacing": str(getattr(ds, "PixelSpacing", "")),
-            "slice_thickness": str(getattr(ds, "SliceThickness", "")),
-            "window_center": str(getattr(ds, "WindowCenter", "")),
-            "window_width": str(getattr(ds, "WindowWidth", "")),
+            "pixel_spacing": safe_dicom_str(getattr(ds, "PixelSpacing", "")),
+            "slice_thickness": safe_dicom_str(getattr(ds, "SliceThickness", "")),
+            "window_center": safe_dicom_str(getattr(ds, "WindowCenter", "")),
+            "window_width": safe_dicom_str(getattr(ds, "WindowWidth", "")),
         }
         return JsonResponse({"instance_uid": instance_uid, "dicom_info": info})
     except Exception:

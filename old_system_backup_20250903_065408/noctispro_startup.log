@@ -1,0 +1,20 @@
+Wed Aug 27 11:10:57 PM UTC 2025: Starting NoctisPro startup script...
+Wed Aug 27 11:10:57 PM UTC 2025: Starting PostgreSQL...
+ * Starting PostgreSQL 17 database server
+   ...done.
+Wed Aug 27 11:11:00 PM UTC 2025: Starting Redis...
+Starting redis-server: redis-server.
+Wed Aug 27 11:11:05 PM UTC 2025: Starting Django application...
+Operations to perform:
+  Apply all migrations: accounts, admin, admin_panel, ai_analysis, auth, chat, contenttypes, dicom_viewer, notifications, reports, sessions, worklist
+Running migrations:
+  No migrations to apply.
+
+163 static files copied to '/workspace/staticfiles', 2 unmodified.
+Wed Aug 27 11:11:06 PM UTC 2025: Django started with PID 6216
+Wed Aug 27 11:11:06 PM UTC 2025: Starting ngrok tunnel...
+Wed Aug 27 11:11:06 PM UTC 2025: Ngrok started with PID 6220
+Wed Aug 27 11:11:11 PM UTC 2025: Could not get ngrok URL immediately - check ngrok.log
+Wed Aug 27 11:11:11 PM UTC 2025: NoctisPro startup script completed
+Wed Aug 27 11:11:11 PM UTC 2025: Django should be accessible at http://localhost:8000
+Wed Aug 27 11:11:11 PM UTC 2025: Check ngrok.log for tunnel URL
