@@ -71,13 +71,13 @@ print_success "Ngrok is properly configured!"
 
 # Start NoctisPro service
 print_info "Starting NoctisPro service..."
-/workspace/noctispro_service.sh start
+/workspace/deploy_masterpiece_bulletproof.sh start
 
 # Wait for services to fully start
 sleep 10
 
 # Check if service is running
-if ! /workspace/noctispro_service.sh status > /dev/null 2>&1; then
+if ! /workspace/deploy_masterpiece_bulletproof.sh status > /dev/null 2>&1; then
     print_error "NoctisPro service failed to start!"
     print_error "Check logs: tail -f /workspace/noctispro_service.log"
     exit 1
@@ -115,10 +115,10 @@ echo -e "   Service Status: ${GREEN}Running${NC}"
 echo -e "   Tmux Session: ${YELLOW}noctispro${NC}"
 echo ""
 echo -e "${YELLOW}🛑 To stop deployment:${NC}"
-echo -e "   ${CYAN}./noctispro_service.sh stop${NC}"
+echo -e "   ${CYAN}./deploy_masterpiece_bulletproof.sh stop${NC}"
 echo ""
 echo -e "${YELLOW}📋 Service Management:${NC}"
-echo -e "   ${CYAN}./noctispro_service.sh {start|stop|restart|status}${NC}"
+echo -e "   ${CYAN}./deploy_masterpiece_bulletproof.sh {start|stop|restart|status}${NC}"
 echo ""
 echo -e "${GREEN}✨ Your medical imaging system is now accessible worldwide!${NC}"
 echo ""

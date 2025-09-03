@@ -28,9 +28,9 @@ echo ""
 
 # Use the service manager to stop
 print_status "Stopping NoctisPro service..."
-/workspace/noctispro_service.sh stop
+/workspace/deploy_masterpiece_bulletproof.sh stop
 
 print_success "✅ Deployment stopped successfully!"
 print_status "Your application is now offline."
 echo ""
-echo -e "${BLUE}ℹ️ To restart later: ${CYAN}./noctispro_service.sh start${NC}"
+echo -e "${BLUE}ℹ️ To restart later: ${CYAN}./deploy_masterpiece_bulletproof.sh start${NC}"

@@ -40,7 +40,7 @@ fi
 # Method 2: Cron job (if available)
 if command -v crontab > /dev/null 2>&1; then
     print_info "Setting up cron job..."
-    (crontab -l 2>/dev/null; echo "@reboot /workspace/noctispro_service.sh start > /workspace/autostart.log 2>&1") | sort -u | crontab -
+    (crontab -l 2>/dev/null; echo "@reboot /workspace/deploy_masterpiece_bulletproof.sh start > /workspace/autostart.log 2>&1") | sort -u | crontab -
     print_success "Cron job installed"
 else
     print_warning "Cron not available"
