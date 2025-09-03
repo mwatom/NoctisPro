@@ -32,3 +32,6 @@ INFO 2025-09-01 14:00:13,431 server 14362 140083573532352 Configuring endpoint t
 INFO 2025-09-01 14:00:13,431 server 14362 140083573532352 Listening on TCP address 127.0.0.1:8000
 WARNING 2025-09-01 14:15:36,052 misc 15935 140626146074880 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
 WARNING 2025-09-01 14:15:47,277 log 15935 140626146074880 Not Found: /dicom-viewer/api/reconstruction/types/
+WARNING 2025-09-03 05:30:55,744 misc 4017 140104709771520 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+WARNING 2025-09-03 05:31:13,036 misc 4249 140274703999232 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
+WARNING 2025-09-03 05:31:22,617 misc 4276 140111221674240 The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
