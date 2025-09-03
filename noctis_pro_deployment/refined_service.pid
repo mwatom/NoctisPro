@@ -1,0 +1,8 @@
+SERVICE_RUNNING=true
+SYSTEM_VERSION=refined_masterpiece
+SYSTEM_DIRECTORY=/workspace/noctis_pro_deployment
+STARTED_AT=2025-09-03 08:14:30
+TMUX_SESSION=noctispro_refined
+DJANGO_PORT=8000
+NGROK_URL=https://colt-charmed-lark.ngrok-free.app
+STATUS=active
