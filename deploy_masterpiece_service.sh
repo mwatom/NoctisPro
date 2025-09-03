@@ -758,16 +758,25 @@ main() {
             ;;
         *)
             echo -e "${BLUE}🚀 NoctisPro Masterpiece Service Manager${NC}"
+            echo -e "${GREEN}   Enhanced with Auto-Detection${NC}"
             echo ""
             echo "Usage: $0 {start|stop|restart|status|setup-autostart|deploy}"
             echo ""
             echo "Commands:"
-            echo "  start         - Start the service"
+            echo "  start         - Start the service (auto-detects environment)"
             echo "  stop          - Stop the service"
-            echo "  restart       - Restart the service"
+            echo "  restart       - Restart the service (auto-detects environment)"
             echo "  status        - Show service status"
             echo "  setup-autostart - Configure auto-start only"
-            echo "  deploy        - Full deployment with auto-start"
+            echo "  deploy        - Full deployment with auto-detection & auto-start"
+            echo ""
+            echo -e "${CYAN}🔍 Auto-Detection Features:${NC}"
+            echo "  • Workspace directory detection"
+            echo "  • Environment file detection (.env.production.fixed → .env.production → .env)"
+            echo "  • SECRET_KEY auto-generation if missing/default"
+            echo "  • Ngrok token detection from env files and config"
+            echo "  • Django port and static URL detection"
+            echo "  • Automatic environment file creation if none exists"
             echo ""
             exit 1
             ;;
