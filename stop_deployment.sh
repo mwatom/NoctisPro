@@ -26,32 +26,11 @@ PID_FILE="$SCRIPT_DIR/deployment_pids.env"
 echo -e "${YELLOW}🛑 Stopping NoctisPro Online Deployment...${NC}"
 echo ""
 
-# Stop processes by name
-print_status "Stopping Django server..."
-pkill -f "manage.py runserver" || print_warning "Django server not found"
-
-print_status "Stopping ngrok tunnel..."
-pkill -f "ngrok.*http" || print_warning "Ngrok tunnel not found"
-
-# Stop processes by PID if file exists
-if [ -f "$PID_FILE" ]; then
-    print_status "Stopping processes from PID file..."
-    source "$PID_FILE"
-    
-    if [ ! -z "${DJANGO_PID:-}" ]; then
-        kill $DJANGO_PID 2>/dev/null || print_warning "Django PID $DJANGO_PID not found"
-    fi
-    
-    if [ ! -z "${NGROK_PID:-}" ]; then
-        kill $NGROK_PID 2>/dev/null || print_warning "Ngrok PID $NGROK_PID not found"
-    fi
-    
-    rm "$PID_FILE"
-fi
-
-# Clean up log files
-rm -f "$SCRIPT_DIR/django_server.log"
-rm -f "$SCRIPT_DIR/ngrok.log"
+# Use the service manager to stop
+print_status "Stopping NoctisPro service..."
+/workspace/noctispro_service.sh stop
 
 print_success "✅ Deployment stopped successfully!"
 print_status "Your application is now offline."
+echo ""
+echo -e "${BLUE}ℹ️ To restart later: ${CYAN}./noctispro_service.sh start${NC}"

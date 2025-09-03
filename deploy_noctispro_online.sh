@@ -69,53 +69,21 @@ fi
 
 print_success "Ngrok is properly configured!"
 
-# Stop any existing processes
-print_info "Stopping any existing services..."
-pkill -f "manage.py runserver" 2>/dev/null || true
-pkill -f "ngrok.*http" 2>/dev/null || true
-sleep 2
+# Start NoctisPro service
+print_info "Starting NoctisPro service..."
+/workspace/noctispro_service.sh start
 
-# Start Django server
-print_info "Starting Django server..."
-cd /workspace
-source venv/bin/activate
-python manage.py runserver 0.0.0.0:$DJANGO_PORT > django_deployment.log 2>&1 &
-DJANGO_PID=$!
+# Wait for services to fully start
+sleep 10
 
-# Wait for Django to start
-sleep 5
-
-# Check if Django started successfully
-if ! kill -0 $DJANGO_PID 2>/dev/null; then
-    print_error "Django server failed to start!"
-    cat django_deployment.log
+# Check if service is running
+if ! /workspace/noctispro_service.sh status > /dev/null 2>&1; then
+    print_error "NoctisPro service failed to start!"
+    print_error "Check logs: tail -f /workspace/noctispro_service.log"
     exit 1
 fi
 
-print_success "Django server started (PID: $DJANGO_PID)"
-
-# Start ngrok with static URL
-print_info "Starting ngrok tunnel with static URL..."
-/workspace/ngrok http --url=https://$STATIC_URL $DJANGO_PORT > ngrok_deployment.log 2>&1 &
-NGROK_PID=$!
-
-# Wait for ngrok to establish tunnel
-sleep 8
-
-# Check if ngrok started successfully
-if ! kill -0 $NGROK_PID 2>/dev/null; then
-    print_error "Ngrok tunnel failed to start!"
-    cat ngrok_deployment.log
-    print_error "Stopping Django server..."
-    kill $DJANGO_PID 2>/dev/null || true
-    exit 1
-fi
-
-print_success "Ngrok tunnel established (PID: $NGROK_PID)"
-
-# Save PIDs for later cleanup
-echo "DJANGO_PID=$DJANGO_PID" > deployment_pids.txt
-echo "NGROK_PID=$NGROK_PID" >> deployment_pids.txt
+print_success "NoctisPro service is running successfully"
 
 # Display success information
 echo ""
@@ -142,15 +110,88 @@ echo ""
 echo -e "${WHITE}📊 System Status:${NC}"
 echo -e "   ${CYAN}https://$STATIC_URL/connection-info/${NC}"
 echo ""
-echo -e "${BLUE}ℹ️ Process Information:${NC}"
-echo -e "   Django PID: $DJANGO_PID"
-echo -e "   Ngrok PID: $NGROK_PID"
+echo -e "${BLUE}ℹ️ Service Information:${NC}"
+echo -e "   Service Status: ${GREEN}Running${NC}"
+echo -e "   Tmux Session: ${YELLOW}noctispro${NC}"
 echo ""
 echo -e "${YELLOW}🛑 To stop deployment:${NC}"
-echo -e "   ${CYAN}./stop_deployment.sh${NC}"
+echo -e "   ${CYAN}./noctispro_service.sh stop${NC}"
+echo ""
+echo -e "${YELLOW}📋 Service Management:${NC}"
+echo -e "   ${CYAN}./noctispro_service.sh {start|stop|restart|status}${NC}"
 echo ""
 echo -e "${GREEN}✨ Your medical imaging system is now accessible worldwide!${NC}"
 echo ""
 
+# Set up auto-start service
+print_info "Setting up auto-start service..."
+/workspace/setup_autostart.sh
+
+# Create service management instructions
+cat > /workspace/SERVICE_MANAGEMENT.md << 'EOF'
+# NoctisPro Service Management
+
+## Service Commands
+```bash
+# Start service
+./noctispro_service.sh start
+
+# Stop service  
+./noctispro_service.sh stop
+
+# Restart service
+./noctispro_service.sh restart
+
+# Check status
+./noctispro_service.sh status
+```
+
+## Auto-Start Configuration
+- ✅ Init.d script: Traditional service management (if available)
+- ✅ Auto-start script: Can be added to .bashrc/.profile for container environments
+- ✅ Tmux persistence: Services run in persistent tmux sessions
+
+## Monitoring
+- Check tmux session: `tmux attach -t noctispro`
+- View logs: `tail -f /workspace/noctispro_service.log`
+- Auto-start log: `tail -f /workspace/autostart.log`
+
+## Manual Cleanup (if needed)
+```bash
+# Kill all related processes
+pkill -f "manage.py runserver" || true
+pkill -f "ngrok.*http" || true
+pkill -f "gunicorn.*noctis" || true
+tmux kill-session -t noctispro || true
+
+# Remove auto-start
+sudo rm -f /etc/init.d/noctispro
+# If using cron: crontab -l | grep -v noctispro_service.sh | crontab -
+```
+EOF
+
+print_success "Service management documentation created: SERVICE_MANAGEMENT.md"
+
+echo ""
+echo -e "${GREEN}🎯 AUTO-START CONFIGURED!${NC}"
+echo -e "${GREEN}Your NoctisPro system will now automatically start on server reboot.${NC}"
+echo ""
+echo -e "${CYAN}📋 Service Management:${NC}"
+echo -e "   Start:   ${YELLOW}./noctispro_service.sh start${NC}"
+echo -e "   Stop:    ${YELLOW}./noctispro_service.sh stop${NC}"
+echo -e "   Status:  ${YELLOW}./noctispro_service.sh status${NC}"
+echo ""
+echo -e "${BLUE}🔄 Auto-Start Methods Configured:${NC}"
+if [ -f /etc/init.d/noctispro ]; then
+    echo -e "   ✅ Init.d service: ${GREEN}Installed${NC}"
+else
+    echo -e "   ❌ Init.d service: ${RED}Not available${NC}"
+fi
+if [ -f /workspace/autostart_noctispro.sh ]; then
+    echo -e "   ✅ Auto-start script: ${GREEN}Created${NC}"
+    echo -e "      ${YELLOW}Add to .bashrc: echo '/workspace/autostart_noctispro.sh' >> ~/.bashrc${NC}"
+fi
+echo ""
+
 # Optional: Keep script running to monitor
-read -p "Press Enter to exit (services will continue running in background)..."
+read -p "Press Enter to exit (services will continue running and auto-start on reboot)..."
