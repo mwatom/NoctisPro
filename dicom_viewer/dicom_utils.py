@@ -1,39 +1,11 @@
-"""
-DICOM Utilities - Completely Rewritten
-Advanced DICOM image processing, analysis, and quality assurance utilities.
-
-Features:
-- Optimized pixel data processing with NumPy
-- Comprehensive Hounsfield Unit calibration and validation
-- Advanced windowing and display transformations
-- Geometric calculations for measurements
-- DICOM metadata extraction and validation
-- Quality assurance phantoms and protocols
-- Memory-efficient image caching
-- Multi-threaded processing support
-"""
-
 import numpy as np
 import pydicom
-from PIL import Image, ImageEnhance
+from PIL import Image
 import os
 import json
 import logging
-import time
-from typing import Dict, List, Tuple, Optional, Any, Union
-from pathlib import Path
-from dataclasses import dataclass
-from enum import Enum
-import threading
-from concurrent.futures import ThreadPoolExecutor
-import warnings
-
 from django.conf import settings
 from django.utils import timezone
-from django.core.cache import cache
-
-# Suppress specific warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydicom")
 
 logger = logging.getLogger(__name__)
 
@@ -54,98 +26,56 @@ def safe_dicom_str(value):
     return str(value)
 
 
-class ModalityType(Enum):
-    """DICOM modality types with specific processing requirements"""
-    # Core modalities
-    CT = "CT"           # Computed Tomography
-    MR = "MR"           # Magnetic Resonance
-    XR = "XR"           # X-Ray
-    US = "US"           # Ultrasound
-    NM = "NM"           # Nuclear Medicine
-    PT = "PT"           # Positron Emission Tomography
-    RF = "RF"           # Radio Fluoroscopy
-    MG = "MG"           # Mammography
-    
-    # Digital radiography
-    CR = "CR"           # Computed Radiography
-    DX = "DX"           # Digital Radiography
-    IO = "IO"           # Intraoral Radiography
-    PX = "PX"           # Panoramic X-Ray
-    
-    # Specialized imaging
-    GM = "GM"           # General Microscopy
-    SM = "SM"           # Slide Microscopy
-    XC = "XC"           # External Camera Photography
-    ECG = "ECG"         # Electrocardiography
-    EPS = "EPS"         # Cardiac Electrophysiology
-    HD = "HD"           # Hemodynamic Waveform
-    
-    # Radiotherapy
-    RTIMAGE = "RTIMAGE" # Radiotherapy Image
-    RTDOSE = "RTDOSE"   # Radiotherapy Dose
-    RTSTRUCT = "RTSTRUCT" # Radiotherapy Structure Set
-    RTPLAN = "RTPLAN"   # Radiotherapy Plan
-    
-    # Advanced imaging
-    SPECT = "SPECT"     # Single Photon Emission Computed Tomography
-    PET_CT = "PET/CT"   # Combined PET/CT
-    MRA = "MRA"         # MR Angiography
-    CTA = "CTA"         # CT Angiography
-    
-    # Functional imaging
-    FMRI = "fMRI"       # Functional MRI
-    DTI = "DTI"         # Diffusion Tensor Imaging
-    PERFUSION = "PERF"  # Perfusion Imaging
-    
-    # Other
-    OT = "OT"           # Other
-
-
-class WindowPreset(Enum):
-    """Predefined window/level presets for different anatomical regions"""
-    # CT presets
-    LUNG = {"ww": 1500, "wl": -600, "name": "Lung"}
-    BONE = {"ww": 2000, "wl": 300, "name": "Bone"}
-    SOFT_TISSUE = {"ww": 400, "wl": 40, "name": "Soft Tissue"}
-    BRAIN = {"ww": 100, "wl": 50, "name": "Brain"}
-    ABDOMEN = {"ww": 350, "wl": 50, "name": "Abdomen"}
-    LIVER = {"ww": 150, "wl": 30, "name": "Liver"}
-    MEDIASTINUM = {"ww": 350, "wl": 50, "name": "Mediastinum"}
-    SPINE = {"ww": 400, "wl": 50, "name": "Spine"}
-    PELVIS = {"ww": 400, "wl": 50, "name": "Pelvis"}
-    
-    # MR presets
-    MR_T1 = {"ww": 600, "wl": 300, "name": "MR T1"}
-    MR_T2 = {"ww": 4000, "wl": 2000, "name": "MR T2"}
-    MR_FLAIR = {"ww": 2000, "wl": 1000, "name": "MR FLAIR"}
-    
-    # General presets
-    DEFAULT = {"ww": 2000, "wl": 1000, "name": "Default"}
-    FULL_DYNAMIC = {"ww": 4096, "wl": 2048, "name": "Full Dynamic Range"}
-
-
-@dataclass
-class HounsfieldReference:
-    """Reference Hounsfield Unit values based on NIST standards"""
-    material: str
-    hu_value: float
-    tolerance: float
-    description: str
-
-
 class DicomProcessor:
-    """Advanced DICOM image processing utilities with optimization"""
+    """Utility class for DICOM image processing"""
 
     def __init__(self):
-        self.window_presets = {preset.name.lower().replace(' ', '_'): preset.value 
-                              for preset in WindowPreset}
-        
-        # Thread pool for parallel processing
-        self._thread_pool = ThreadPoolExecutor(max_workers=4)
-        
-        # Cache for frequently used computations
-        self._cache_lock = threading.Lock()
-        self._computation_cache = {}
+        # Professional medical imaging window/level presets
+        # Based on American College of Radiology (ACR) recommendations
+        self.window_presets = {
+            # CT Presets
+            'lung': {'ww': 1600, 'wl': -600, 'description': 'Lung parenchyma and airways'},
+            'bone': {'ww': 2000, 'wl': 300, 'description': 'Bone structures and fractures'},
+            'soft': {'ww': 350, 'wl': 40, 'description': 'Soft tissue contrast'},
+            'brain': {'ww': 80, 'wl': 40, 'description': 'Brain tissue differentiation'},
+            'abdomen': {'ww': 350, 'wl': 50, 'description': 'Abdominal organs'},
+            'liver': {'ww': 160, 'wl': 60, 'description': 'Hepatic parenchyma'},
+            'mediastinum': {'ww': 350, 'wl': 50, 'description': 'Mediastinal structures'},
+            'spine': {'ww': 400, 'wl': 50, 'description': 'Spinal structures'},
+            'pelvis': {'ww': 400, 'wl': 40, 'description': 'Pelvic anatomy'},
+            'chest': {'ww': 400, 'wl': 40, 'description': 'Chest soft tissue'},
+            
+            # Enhanced tissue-specific presets
+            'muscle': {'ww': 400, 'wl': 50, 'description': 'Muscle tissue contrast'},
+            'fat': {'ww': 200, 'wl': -100, 'description': 'Adipose tissue'},
+            
+            # X-ray specific presets for optimal visualization
+            'xray_chest': {'ww': 2000, 'wl': 0, 'description': 'Chest X-ray - lungs and mediastinum'},
+            'xray_bone': {'ww': 3000, 'wl': 500, 'description': 'X-ray bone structures'},
+            'xray_soft': {'ww': 400, 'wl': 50, 'description': 'X-ray soft tissue detail'},
+            'xray_pediatric': {'ww': 1500, 'wl': 0, 'description': 'Pediatric X-ray imaging'},
+            'xray_extremity': {'ww': 2500, 'wl': 300, 'description': 'Extremity X-rays'},
+            'xray_spine': {'ww': 2000, 'wl': 200, 'description': 'Spine X-ray imaging'},
+            'xray_abdomen': {'ww': 1000, 'wl': 50, 'description': 'Abdominal X-ray'},
+            'vessels': {'ww': 600, 'wl': 100, 'description': 'Vascular structures'},
+            'kidney': {'ww': 400, 'wl': 30, 'description': 'Renal parenchyma'},
+            'pancreas': {'ww': 200, 'wl': 30, 'description': 'Pancreatic tissue'},
+            
+            # Specialized CT presets
+            'pe_study': {'ww': 700, 'wl': 100, 'description': 'Pulmonary embolism'},
+            'angio': {'ww': 600, 'wl': 150, 'description': 'CT angiography'},
+            'stroke': {'ww': 40, 'wl': 40, 'description': 'Acute stroke imaging'},
+            'trauma': {'ww': 400, 'wl': 40, 'description': 'Trauma assessment'},
+            
+            # MR-equivalent presets for CT
+            't1_like': {'ww': 400, 'wl': 40, 'description': 'T1-weighted appearance'},
+            't2_like': {'ww': 200, 'wl': 20, 'description': 'T2-weighted appearance'},
+            
+            # Projection radiography presets
+            'xray_chest': {'ww': 2000, 'wl': 500, 'description': 'Chest X-ray'},
+            'xray_bone': {'ww': 4000, 'wl': 2000, 'description': 'Bone X-ray'},
+            'mammo': {'ww': 4000, 'wl': 2000, 'description': 'Mammography'},
+        }
         
         # Standard Hounsfield Unit reference values (NIST recommendations)
         self.hu_reference_values = {
@@ -171,92 +101,265 @@ class DicomProcessor:
             'noise_threshold': 10  # HU units standard deviation
         }
 
-    def apply_windowing(self, pixel_array: np.ndarray, window_width: float, 
-                       window_level: float, invert: bool = False, 
-                       output_range: Tuple[int, int] = (0, 255)) -> np.ndarray:
-        """
-        Apply optimized windowing to DICOM pixel array
-        
-        Args:
-            pixel_array: Input pixel data
-            window_width: Window width value
-            window_level: Window center/level value
-            invert: Whether to invert the image
-            output_range: Output intensity range (min, max)
-        
-        Returns:
-            Windowed image array
-        """
-        try:
-            # Ensure input is float for precision
-            image_data = pixel_array.astype(np.float32)
+    def apply_windowing(self, pixel_array, window_width, window_level, invert=False, enhanced_contrast=True):
+        """Apply advanced windowing to DICOM pixel array with enhanced tissue contrast"""
+        image_data = pixel_array.astype(np.float32)
+
+        # Calculate window bounds
+        min_val = window_level - window_width / 2.0
+        max_val = window_level + window_width / 2.0
+
+        if enhanced_contrast:
+            # Enhanced windowing with improved tissue differentiation
+            # Apply multi-stage enhancement for better X-ray visualization
             
-            # Calculate window bounds
-            min_val = window_level - window_width / 2
-            max_val = window_level + window_width / 2
+            # Stage 1: Noise reduction with edge preservation
+            image_data = self._apply_edge_preserving_filter(image_data)
             
-            # Apply windowing with clipping
+            # Stage 2: Adaptive histogram equalization for local contrast
+            image_data = self._apply_adaptive_histogram_equalization(image_data, min_val, max_val)
+            
+            # Stage 3: Normalize to window range
+            normalized = np.clip((image_data - min_val) / max(1.0, max_val - min_val), 0.0, 1.0)
+            
+            # Stage 4: Apply contrast enhancement curve
+            # This provides better tissue differentiation by stretching contrast in mid-range
+            enhanced = self._apply_contrast_curve(normalized, window_width, window_level)
+            
+            # Stage 5: Apply unsharp masking for edge enhancement
+            enhanced = self._apply_unsharp_masking(enhanced)
+            
+            # Scale to display range
+            image_data = enhanced * 255.0
+        else:
+            # Standard linear windowing
             image_data = np.clip(image_data, min_val, max_val)
-            
-            # Normalize to output range
-            out_min, out_max = output_range
             if max_val > min_val:
-                image_data = (image_data - min_val) / (max_val - min_val) * (out_max - out_min) + out_min
+                image_data = (image_data - min_val) / (max_val - min_val) * 255
             else:
-                image_data = np.full_like(image_data, out_min)
-            
-            # Apply inversion if requested
-            if invert:
-                image_data = out_max + out_min - image_data
-            
-            # Convert to appropriate output type
-            if output_range == (0, 255):
-                return image_data.astype(np.uint8)
-            elif output_range == (0, 65535):
-                return image_data.astype(np.uint16)
-            else:
-                return image_data
-                
-        except Exception as e:
-            logger.error(f"Error applying windowing: {str(e)}")
-            # Return safe fallback
-            return np.zeros_like(pixel_array, dtype=np.uint8)
+                image_data = np.zeros_like(image_data)
+
+        # Apply gamma correction for medical displays (optional)
+        if enhanced_contrast:
+            gamma = self._get_optimal_gamma(window_width, window_level)
+            image_data = np.power(image_data / 255.0, gamma) * 255.0
+
+        if invert:
+            image_data = 255 - image_data
+
+        # Ensure proper range and type
+        image_data = np.clip(image_data, 0, 255)
+        return image_data.astype(np.uint8)
+
+    def _apply_contrast_curve(self, normalized_data, window_width, window_level):
+        """Apply contrast enhancement curve for better tissue differentiation"""
+        # Adaptive contrast enhancement based on window settings
+        if window_width > 1000:  # Wide window (e.g., lung, bone)
+            # Use moderate S-curve for wide windows
+            contrast_factor = 1.2
+        elif window_width < 200:  # Narrow window (e.g., brain)
+            # Use stronger enhancement for narrow windows
+            contrast_factor = 1.8
+        else:  # Medium window (soft tissue)
+            contrast_factor = 1.5
+        
+        # Apply sigmoid-based contrast enhancement
+        # This creates an S-curve that enhances mid-range contrast
+        center = 0.5
+        steepness = contrast_factor * 4.0
+        
+        # Sigmoid function: 1 / (1 + exp(-steepness * (x - center)))
+        enhanced = 1.0 / (1.0 + np.exp(-steepness * (normalized_data - center)))
+        
+        # Normalize to 0-1 range
+        enhanced = (enhanced - enhanced.min()) / (enhanced.max() - enhanced.min() + 1e-8)
+        
+        return enhanced
+
+    def _get_optimal_gamma(self, window_width, window_level):
+        """Get optimal gamma correction for medical imaging display"""
+        # Adaptive gamma based on window settings
+        if window_level < -200:  # Lung window
+            return 0.8  # Brighten dark areas
+        elif window_level > 200:  # Bone window  
+            return 1.2  # Darken bright areas slightly
+        else:  # Soft tissue
+            return 1.0  # Standard gamma
     
-    def get_optimal_window_level(self, pixel_array: np.ndarray, 
-                                modality: str = 'CT') -> Tuple[float, float]:
-        """
-        Calculate optimal window/level values based on image statistics
-        
-        Args:
-            pixel_array: Input pixel data
-            modality: DICOM modality type
-        
-        Returns:
-            Tuple of (window_width, window_level)
-        """
+    def _apply_edge_preserving_filter(self, image_data):
+        """Apply edge-preserving noise reduction filter for better image quality"""
         try:
-            if modality.upper() == 'CT':
-                # For CT, use statistical approach
-                mean_val = np.mean(pixel_array)
-                std_val = np.std(pixel_array)
+            from scipy import ndimage
+            from scipy.ndimage import gaussian_filter
+            
+            # Apply bilateral filter approximation using multiple Gaussian filters
+            # This reduces noise while preserving edges - critical for X-ray images
+            
+            # Calculate noise level
+            noise_level = np.std(image_data) * 0.1
+            
+            # Apply edge-preserving smoothing
+            # Use a small kernel to preserve fine details
+            smoothed = gaussian_filter(image_data, sigma=0.8)
+            
+            # Blend original and smoothed based on local gradient
+            gradient_magnitude = np.sqrt(
+                ndimage.sobel(image_data, axis=0)**2 + 
+                ndimage.sobel(image_data, axis=1)**2
+            )
+            
+            # Normalize gradient
+            gradient_norm = gradient_magnitude / (np.max(gradient_magnitude) + 1e-8)
+            
+            # Preserve edges (high gradient areas), smooth flat areas
+            edge_weight = np.clip(gradient_norm * 2.0, 0, 1)
+            result = edge_weight * image_data + (1 - edge_weight) * smoothed
+            
+            return result.astype(np.float32)
+            
+        except ImportError:
+            # Fallback: simple noise reduction
+            kernel = np.ones((3,3)) / 9
+            return ndimage.convolve(image_data, kernel, mode='reflect')
+    
+    def _apply_adaptive_histogram_equalization(self, image_data, min_val, max_val):
+        """Apply adaptive histogram equalization for improved local contrast"""
+        try:
+            # Clip to window range first
+            windowed_data = np.clip(image_data, min_val, max_val)
+            
+            # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization) approximation
+            # This enhances local contrast while preventing over-amplification
+            
+            # Divide image into tiles
+            tile_size = min(64, min(image_data.shape) // 4)
+            if tile_size < 8:
+                tile_size = 8
                 
-                # Use 2-3 standard deviations for window width
-                window_width = min(3 * std_val, 2000)  # Cap at reasonable value
-                window_level = mean_val
-                
+            rows, cols = image_data.shape
+            
+            # Create enhanced image
+            enhanced = np.copy(windowed_data)
+            
+            # Process each tile
+            for i in range(0, rows - tile_size + 1, tile_size // 2):
+                for j in range(0, cols - tile_size + 1, tile_size // 2):
+                    # Extract tile
+                    tile = windowed_data[i:i+tile_size, j:j+tile_size]
+                    
+                    # Apply local histogram equalization
+                    tile_min, tile_max = np.min(tile), np.max(tile)
+                    if tile_max > tile_min:
+                        # Normalize tile
+                        tile_norm = (tile - tile_min) / (tile_max - tile_min)
+                        
+                        # Apply contrast stretching
+                        tile_enhanced = np.power(tile_norm, 0.8)  # Slight gamma correction
+                        
+                        # Scale back to original range
+                        tile_enhanced = tile_enhanced * (tile_max - tile_min) + tile_min
+                        
+                        # Blend with original (prevent over-enhancement)
+                        alpha = 0.6  # Blend factor
+                        tile_final = alpha * tile_enhanced + (1 - alpha) * tile
+                        
+                        # Update enhanced image
+                        enhanced[i:i+tile_size, j:j+tile_size] = tile_final
+            
+            return enhanced
+            
+        except Exception as e:
+            logger.warning(f"Adaptive histogram equalization failed: {e}")
+            return image_data
+    
+    def _apply_unsharp_masking(self, normalized_data):
+        """Apply unsharp masking for edge enhancement"""
+        try:
+            from scipy.ndimage import gaussian_filter
+            
+            # Create blurred version
+            sigma = 1.0  # Blur radius
+            blurred = gaussian_filter(normalized_data, sigma=sigma)
+            
+            # Create unsharp mask
+            mask = normalized_data - blurred
+            
+            # Apply sharpening
+            amount = 0.5  # Sharpening strength
+            threshold = 0.02  # Threshold to prevent noise amplification
+            
+            # Only sharpen where the mask is above threshold
+            mask_strong = np.abs(mask) > threshold
+            sharpened = normalized_data + amount * mask * mask_strong
+            
+            # Ensure values stay in valid range
+            return np.clip(sharpened, 0.0, 1.0)
+            
+        except ImportError:
+            # Fallback: simple edge enhancement
+            kernel = np.array([[-1, -1, -1],
+                              [-1,  9, -1],
+                              [-1, -1, -1]]) / 9
+            try:
+                from scipy import ndimage
+                enhanced = ndimage.convolve(normalized_data, kernel, mode='reflect')
+                return np.clip(enhanced, 0.0, 1.0)
+            except:
+                return normalized_data
+    
+    def get_optimal_preset_for_hu_range(self, hu_min, hu_max, modality='CT'):
+        """Automatically suggest optimal window preset based on HU range"""
+        hu_range = hu_max - hu_min
+        hu_center = (hu_max + hu_min) / 2
+        
+        if modality == 'CT':
+            if hu_min < -800 and hu_max > 200:  # Wide range including air and bone
+                return 'chest'
+            elif hu_min < -800:  # Includes air/lung
+                return 'lung' 
+            elif hu_max > 400:  # High attenuation (bone/contrast)
+                return 'bone'
+            elif hu_center < 0:  # Centered below water
+                return 'lung'
+            elif hu_center > 100:  # High attenuation center
+                return 'bone'
+            elif hu_range < 100:  # Narrow range
+                return 'brain'
             else:
-                # For other modalities, use percentile-based approach
-                p5 = np.percentile(pixel_array, 5)
-                p95 = np.percentile(pixel_array, 95)
+                return 'soft'
+        else:
+            return 'soft'  # Default for non-CT
+    
+    def auto_window_from_data(self, pixel_array, percentile_range=(1, 99), modality='CT'):
+        """Automatically calculate optimal window/level from image data with X-ray optimization"""
+        try:
+            # Remove extreme outliers
+            p_low, p_high = np.percentile(pixel_array.flatten(), percentile_range)
+            
+            # Special handling for X-ray images (typically have different characteristics)
+            if modality.upper() in ['CR', 'DX', 'DR']:  # Digital radiography modalities
+                # X-ray images often have inverted intensity values
+                # Use wider percentile range for better contrast
+                percentile_range = (0.5, 99.5)
+                p_low, p_high = np.percentile(pixel_array.flatten(), percentile_range)
                 
-                window_width = p95 - p5
-                window_level = (p95 + p5) / 2
+                # Calculate optimal window for X-ray
+                window_width = (p_high - p_low) * 1.5  # Wider window for X-rays
+                window_level = (p_high + p_low) / 2
+                
+                # Ensure minimum window width for X-rays
+                if window_width < 1000:
+                    window_width = 1500
+                    
+                return float(window_width), float(window_level)
+            
+            # Calculate window width and level for CT and other modalities
+            window_width = max(50, p_high - p_low)  # Minimum width of 50 HU
+            window_level = (p_high + p_low) / 2
             
             return float(window_width), float(window_level)
-            
-        except Exception as e:
-            logger.error(f"Error calculating optimal window/level: {str(e)}")
-            return 2000.0, 1000.0  # Safe defaults
+        except:
+            return 400.0, 40.0  # Safe defaults
 
     def get_pixel_spacing(self, dicom_data):
         try:
@@ -317,141 +420,6 @@ class DicomProcessor:
             area += mm_points[i][0] * mm_points[j][1]
             area -= mm_points[j][0] * mm_points[i][1]
         return abs(area) / 2.0
-
-    def process_dicom_image_comprehensive(self, dicom_data, enhance_for_modality=True):
-        """
-        Comprehensive DICOM image processing that handles all modality types
-        with optimized display parameters and enhancements.
-        """
-        try:
-            # Get modality
-            modality = getattr(dicom_data, 'Modality', 'OT')
-            
-            # Get pixel array
-            pixel_array = dicom_data.pixel_array.copy()
-            
-            # Handle different photometric interpretations
-            photometric = getattr(dicom_data, 'PhotometricInterpretation', 'MONOCHROME2')
-            
-            # Apply modality-specific processing
-            if enhance_for_modality:
-                pixel_array = self._apply_modality_specific_processing(pixel_array, dicom_data, modality)
-            
-            # Apply appropriate windowing based on modality
-            windowed_array = self._apply_modality_windowing(pixel_array, dicom_data, modality)
-            
-            # Handle color images
-            if photometric in ['RGB', 'YBR_FULL', 'YBR_FULL_422', 'YBR_PARTIAL_422']:
-                return self._process_color_image(windowed_array, photometric)
-            
-            # Handle monochrome images
-            return self._process_monochrome_image(windowed_array, photometric)
-            
-        except Exception as e:
-            logger.error(f"Error in comprehensive DICOM processing: {str(e)}")
-            # Fallback to basic processing
-            return self._basic_image_processing(dicom_data)
-    
-    def _apply_modality_specific_processing(self, pixel_array, dicom_data, modality):
-        """Apply modality-specific image processing enhancements"""
-        try:
-            if modality in ['CT']:
-                # CT-specific processing
-                return self._process_ct_image(pixel_array, dicom_data)
-            elif modality in ['MR', 'MRA', 'FMRI', 'DTI']:
-                # MR-specific processing
-                return self._process_mr_image(pixel_array, dicom_data)
-            elif modality in ['XR', 'CR', 'DX', 'RF']:
-                # X-Ray specific processing
-                return self._process_xray_image(pixel_array, dicom_data)
-            elif modality in ['US']:
-                # Ultrasound specific processing
-                return self._process_ultrasound_image(pixel_array, dicom_data)
-            elif modality in ['MG']:
-                # Mammography specific processing
-                return self._process_mammography_image(pixel_array, dicom_data)
-            elif modality in ['NM', 'PT', 'SPECT']:
-                # Nuclear medicine specific processing
-                return self._process_nuclear_image(pixel_array, dicom_data)
-            else:
-                # Generic processing for other modalities
-                return self._process_generic_image(pixel_array, dicom_data)
-                
-        except Exception as e:
-            logger.warning(f"Modality-specific processing failed for {modality}: {str(e)}")
-            return pixel_array
-    
-    def _process_ct_image(self, pixel_array, dicom_data):
-        """CT-specific image processing"""
-        # Apply Hounsfield unit conversion
-        if hasattr(dicom_data, 'RescaleSlope') and hasattr(dicom_data, 'RescaleIntercept'):
-            slope = float(dicom_data.RescaleSlope)
-            intercept = float(dicom_data.RescaleIntercept)
-            pixel_array = pixel_array * slope + intercept
-        
-        # Noise reduction for CT
-        pixel_array = self._apply_noise_reduction(pixel_array, method='gaussian')
-        return pixel_array
-    
-    def _process_mr_image(self, pixel_array, dicom_data):
-        """MR-specific image processing"""
-        # Normalize MR intensity
-        pixel_array = self._normalize_intensity(pixel_array)
-        
-        # Apply bias field correction if needed
-        pixel_array = self._apply_bias_correction(pixel_array)
-        
-        # Enhance contrast for MR
-        pixel_array = self._enhance_contrast(pixel_array, method='adaptive')
-        return pixel_array
-    
-    def _process_xray_image(self, pixel_array, dicom_data):
-        """X-Ray specific image processing"""
-        # Apply logarithmic transformation for X-Ray
-        pixel_array = self._apply_log_transform(pixel_array)
-        
-        # Enhance edges for X-Ray
-        pixel_array = self._enhance_edges(pixel_array)
-        
-        # Apply histogram equalization
-        pixel_array = self._apply_histogram_equalization(pixel_array)
-        return pixel_array
-    
-    def _process_ultrasound_image(self, pixel_array, dicom_data):
-        """Ultrasound specific image processing"""
-        # Speckle reduction
-        pixel_array = self._apply_speckle_reduction(pixel_array)
-        
-        # Enhance contrast for ultrasound
-        pixel_array = self._enhance_contrast(pixel_array, method='ultrasound')
-        return pixel_array
-    
-    def _process_mammography_image(self, pixel_array, dicom_data):
-        """Mammography specific image processing"""
-        # Apply specialized mammography enhancement
-        pixel_array = self._apply_mammography_enhancement(pixel_array)
-        
-        # Enhance microcalcifications
-        pixel_array = self._enhance_microcalcifications(pixel_array)
-        return pixel_array
-    
-    def _process_nuclear_image(self, pixel_array, dicom_data):
-        """Nuclear medicine specific image processing"""
-        # Apply nuclear medicine specific normalization
-        pixel_array = self._normalize_nuclear_image(pixel_array)
-        
-        # Apply smoothing for nuclear images
-        pixel_array = self._apply_nuclear_smoothing(pixel_array)
-        return pixel_array
-    
-    def _process_generic_image(self, pixel_array, dicom_data):
-        """Generic image processing for other modalities"""
-        # Basic normalization
-        pixel_array = self._normalize_intensity(pixel_array)
-        
-        # Basic contrast enhancement
-        pixel_array = self._enhance_contrast(pixel_array, method='basic')
-        return pixel_array
 
     def calculate_angle(self, point1, point2, point3):
         v1 = np.array([point1[0] - point2[0], point1[1] - point2[1]])
@@ -658,254 +626,6 @@ class DicomProcessor:
         
         return report
 
-    # Helper methods for modality-specific processing
-    def _apply_modality_windowing(self, pixel_array, dicom_data, modality):
-        """Apply modality-specific windowing"""
-        try:
-            if modality == 'CT':
-                # Use appropriate CT window
-                return self.apply_windowing(pixel_array, 400, 40)  # Soft tissue
-            elif modality in ['MR', 'MRA', 'FMRI', 'DTI']:
-                # MR auto-windowing
-                ww, wl = self.get_optimal_window_level(pixel_array, 'MR')
-                return self.apply_windowing(pixel_array, ww, wl)
-            elif modality in ['XR', 'CR', 'DX']:
-                # X-Ray windowing
-                ww, wl = self.get_optimal_window_level(pixel_array, 'XR')
-                return self.apply_windowing(pixel_array, ww, wl)
-            else:
-                # Auto-windowing for other modalities
-                ww, wl = self.get_optimal_window_level(pixel_array, modality)
-                return self.apply_windowing(pixel_array, ww, wl)
-        except Exception:
-            return pixel_array
-
-    def _process_color_image(self, image_array, photometric):
-        """Process color DICOM images"""
-        if photometric == 'RGB':
-            return image_array
-        elif photometric in ['YBR_FULL', 'YBR_FULL_422', 'YBR_PARTIAL_422']:
-            # Convert YBR to RGB
-            return self._convert_ybr_to_rgb(image_array)
-        return image_array
-
-    def _process_monochrome_image(self, image_array, photometric):
-        """Process monochrome DICOM images"""
-        if photometric == 'MONOCHROME1':
-            # Invert for MONOCHROME1
-            return np.max(image_array) - image_array
-        return image_array
-
-    def _basic_image_processing(self, dicom_data):
-        """Fallback basic image processing"""
-        try:
-            pixel_array = dicom_data.pixel_array
-            return self.apply_windowing(pixel_array, 400, 40)
-        except Exception:
-            return np.zeros((512, 512), dtype=np.uint8)
-
-    def _normalize_intensity(self, pixel_array):
-        """Normalize image intensity"""
-        try:
-            min_val = np.min(pixel_array)
-            max_val = np.max(pixel_array)
-            if max_val > min_val:
-                return (pixel_array - min_val) / (max_val - min_val) * 255.0
-            return pixel_array
-        except Exception:
-            return pixel_array
-
-    def _apply_noise_reduction(self, pixel_array, method='gaussian'):
-        """Apply noise reduction"""
-        try:
-            from scipy import ndimage
-            if method == 'gaussian':
-                return ndimage.gaussian_filter(pixel_array, sigma=0.8)
-            elif method == 'median':
-                return ndimage.median_filter(pixel_array, size=3)
-            return pixel_array
-        except ImportError:
-            return pixel_array
-        except Exception:
-            return pixel_array
-
-    def _apply_bias_correction(self, pixel_array):
-        """Apply bias field correction (simplified)"""
-        try:
-            # Simple bias correction using low-pass filtering
-            from scipy import ndimage
-            bias_field = ndimage.gaussian_filter(pixel_array, sigma=50)
-            bias_field[bias_field == 0] = 1  # Avoid division by zero
-            return pixel_array / bias_field * np.mean(bias_field)
-        except (ImportError, Exception):
-            return pixel_array
-
-    def _enhance_contrast(self, pixel_array, method='adaptive'):
-        """Enhance image contrast"""
-        try:
-            if method == 'adaptive':
-                # Adaptive histogram equalization
-                return self._apply_adaptive_histogram_equalization(pixel_array)
-            elif method == 'basic':
-                # Simple contrast stretching
-                return self._apply_contrast_stretching(pixel_array)
-            elif method == 'ultrasound':
-                # Ultrasound-specific contrast enhancement
-                return self._apply_ultrasound_contrast(pixel_array)
-            return pixel_array
-        except Exception:
-            return pixel_array
-
-    def _apply_log_transform(self, pixel_array):
-        """Apply logarithmic transformation"""
-        try:
-            # Ensure positive values
-            pixel_array = pixel_array - np.min(pixel_array) + 1
-            return np.log(pixel_array + 1)
-        except Exception:
-            return pixel_array
-
-    def _enhance_edges(self, pixel_array):
-        """Enhance edges in the image"""
-        try:
-            from scipy import ndimage
-            # Sobel edge detection
-            edge_x = ndimage.sobel(pixel_array, axis=0)
-            edge_y = ndimage.sobel(pixel_array, axis=1)
-            edges = np.sqrt(edge_x**2 + edge_y**2)
-            # Combine with original
-            return pixel_array + 0.3 * edges
-        except (ImportError, Exception):
-            return pixel_array
-
-    def _apply_histogram_equalization(self, pixel_array):
-        """Apply histogram equalization"""
-        try:
-            # Flatten and get histogram
-            flat = pixel_array.flatten()
-            hist, bins = np.histogram(flat, bins=256, range=(flat.min(), flat.max()))
-            
-            # Calculate CDF
-            cdf = hist.cumsum()
-            cdf = cdf / cdf.max()
-            
-            # Interpolate
-            equalized = np.interp(flat, bins[:-1], cdf * 255)
-            return equalized.reshape(pixel_array.shape)
-        except Exception:
-            return pixel_array
-
-    def _apply_speckle_reduction(self, pixel_array):
-        """Apply speckle reduction for ultrasound"""
-        try:
-            from scipy import ndimage
-            # Anisotropic diffusion-like filtering
-            return ndimage.gaussian_filter(pixel_array, sigma=1.2)
-        except (ImportError, Exception):
-            return pixel_array
-
-    def _apply_mammography_enhancement(self, pixel_array):
-        """Apply mammography-specific enhancement"""
-        try:
-            # Enhance contrast for mammography
-            enhanced = self._apply_contrast_stretching(pixel_array)
-            # Apply unsharp masking
-            return self._apply_unsharp_masking(enhanced)
-        except Exception:
-            return pixel_array
-
-    def _enhance_microcalcifications(self, pixel_array):
-        """Enhance microcalcifications in mammography"""
-        try:
-            from scipy import ndimage
-            # High-pass filtering to enhance small features
-            low_pass = ndimage.gaussian_filter(pixel_array, sigma=3)
-            high_pass = pixel_array - low_pass
-            return pixel_array + 0.5 * high_pass
-        except (ImportError, Exception):
-            return pixel_array
-
-    def _normalize_nuclear_image(self, pixel_array):
-        """Normalize nuclear medicine images"""
-        try:
-            # Apply square root normalization for nuclear images
-            return np.sqrt(pixel_array - np.min(pixel_array) + 1)
-        except Exception:
-            return pixel_array
-
-    def _apply_nuclear_smoothing(self, pixel_array):
-        """Apply smoothing for nuclear images"""
-        try:
-            from scipy import ndimage
-            return ndimage.gaussian_filter(pixel_array, sigma=1.5)
-        except (ImportError, Exception):
-            return pixel_array
-
-    def _convert_ybr_to_rgb(self, image_array):
-        """Convert YBR color space to RGB"""
-        try:
-            if len(image_array.shape) == 3 and image_array.shape[2] == 3:
-                # YBR to RGB conversion matrix
-                y, cb, cr = image_array[:,:,0], image_array[:,:,1], image_array[:,:,2]
-                r = y + 1.402 * (cr - 128)
-                g = y - 0.344 * (cb - 128) - 0.714 * (cr - 128)
-                b = y + 1.772 * (cb - 128)
-                
-                # Clip values
-                r = np.clip(r, 0, 255)
-                g = np.clip(g, 0, 255)
-                b = np.clip(b, 0, 255)
-                
-                return np.stack([r, g, b], axis=2)
-            return image_array
-        except Exception:
-            return image_array
-
-    def _apply_adaptive_histogram_equalization(self, pixel_array):
-        """Apply adaptive histogram equalization"""
-        try:
-            # Simple adaptive histogram equalization
-            h, w = pixel_array.shape
-            result = np.zeros_like(pixel_array)
-            
-            # Process in 64x64 blocks
-            block_size = 64
-            for i in range(0, h, block_size):
-                for j in range(0, w, block_size):
-                    block = pixel_array[i:i+block_size, j:j+block_size]
-                    result[i:i+block_size, j:j+block_size] = self._apply_histogram_equalization(block)
-            
-            return result
-        except Exception:
-            return pixel_array
-
-    def _apply_contrast_stretching(self, pixel_array):
-        """Apply contrast stretching"""
-        try:
-            # Percentile-based contrast stretching
-            p2, p98 = np.percentile(pixel_array, (2, 98))
-            return np.clip((pixel_array - p2) * 255 / (p98 - p2), 0, 255)
-        except Exception:
-            return pixel_array
-
-    def _apply_ultrasound_contrast(self, pixel_array):
-        """Apply ultrasound-specific contrast enhancement"""
-        try:
-            # Log compression for ultrasound
-            return 20 * np.log10(pixel_array + 1)
-        except Exception:
-            return pixel_array
-
-    def _apply_unsharp_masking(self, pixel_array):
-        """Apply unsharp masking"""
-        try:
-            from scipy import ndimage
-            blurred = ndimage.gaussian_filter(pixel_array, sigma=2)
-            mask = pixel_array - blurred
-            return pixel_array + 0.5 * mask
-        except (ImportError, Exception):
-            return pixel_array
-
 
 class DicomFileHandler:
     """Handle DICOM file operations"""
@@ -1076,122 +796,4 @@ class ImageCache:
         self.access_order.clear()
 
 
-# Global instances
-image_cache = ImageCache(max_size=2000)
-dicom_processor = DicomProcessor()
-
-# Enhanced Hounsfield calibration validator
-class HounsfieldCalibrationValidator:
-    """Comprehensive Hounsfield Unit calibration validation system"""
-    
-    def __init__(self):
-        self.qa_thresholds = {
-            'water_tolerance': 5,      # HU units
-            'air_tolerance': 50,       # HU units
-            'noise_threshold': 10,     # HU units standard deviation
-        }
-    
-    def validate_calibration(self, dicom_dataset, pixel_array=None):
-        """Comprehensive Hounsfield calibration validation"""
-        validation_results = {
-            'is_valid': True,
-            'issues': [],
-            'warnings': [],
-            'calibration_status': 'unknown',
-            'measurements': {},
-        }
-        
-        try:
-            # Check if CT modality
-            modality = getattr(dicom_dataset, 'Modality', '')
-            if modality != 'CT':
-                validation_results['calibration_status'] = 'not_applicable'
-                validation_results['warnings'].append('Hounsfield units only applicable to CT images')
-                return validation_results
-            
-            # Check rescale parameters
-            slope = getattr(dicom_dataset, 'RescaleSlope', None)
-            intercept = getattr(dicom_dataset, 'RescaleIntercept', None)
-            
-            if slope is None or intercept is None:
-                validation_results['is_valid'] = False
-                validation_results['issues'].append('Missing rescale parameters (RescaleSlope/RescaleIntercept)')
-                validation_results['calibration_status'] = 'invalid'
-                return validation_results
-            
-            # Validate rescale slope (should typically be 1.0 for CT)
-            slope = float(slope)
-            if abs(slope - 1.0) > 0.01:
-                validation_results['warnings'].append(f'Unusual rescale slope: {slope} (expected: 1.0)')
-            
-            # If pixel array provided, perform image-based validation
-            if pixel_array is not None:
-                hu_array = self._convert_to_hu(pixel_array, dicom_dataset)
-                
-                # Estimate water and air HU values
-                water_hu = self._estimate_water_hu(hu_array)
-                air_hu = self._estimate_air_hu(hu_array)
-                
-                if water_hu is not None:
-                    validation_results['measurements']['water_hu'] = water_hu
-                    water_deviation = abs(water_hu - 0.0)
-                    
-                    if water_deviation > self.qa_thresholds['water_tolerance']:
-                        validation_results['is_valid'] = False
-                        validation_results['issues'].append(
-                            f'Water HU deviation too high: {water_deviation:.1f} HU '
-                            f'(expected: 0 ± {self.qa_thresholds["water_tolerance"]} HU)'
-                        )
-                
-                if air_hu is not None:
-                    validation_results['measurements']['air_hu'] = air_hu
-                    air_deviation = abs(air_hu - (-1000.0))
-                    
-                    if air_deviation > self.qa_thresholds['air_tolerance']:
-                        validation_results['is_valid'] = False
-                        validation_results['issues'].append(
-                            f'Air HU deviation too high: {air_deviation:.1f} HU '
-                            f'(expected: -1000 ± {self.qa_thresholds["air_tolerance"]} HU)'
-                        )
-            
-            # Set final calibration status
-            if validation_results['is_valid']:
-                validation_results['calibration_status'] = 'valid' if not validation_results['warnings'] else 'warning'
-            else:
-                validation_results['calibration_status'] = 'invalid'
-                
-        except Exception as e:
-            logger.error(f"Error validating Hounsfield calibration: {str(e)}")
-            validation_results['is_valid'] = False
-            validation_results['issues'].append(f'Validation error: {str(e)}')
-            validation_results['calibration_status'] = 'error'
-        
-        return validation_results
-    
-    def _convert_to_hu(self, pixel_array, dicom_dataset):
-        """Convert pixel values to Hounsfield Units"""
-        slope = float(getattr(dicom_dataset, 'RescaleSlope', 1.0))
-        intercept = float(getattr(dicom_dataset, 'RescaleIntercept', 0.0))
-        return pixel_array.astype(np.float32) * slope + intercept
-    
-    def _estimate_water_hu(self, hu_array):
-        """Estimate water HU value from image"""
-        try:
-            water_candidates = hu_array[(hu_array > -50) & (hu_array < 100)]
-            if len(water_candidates) > 1000:
-                return float(np.median(water_candidates))
-        except:
-            pass
-        return None
-    
-    def _estimate_air_hu(self, hu_array):
-        """Estimate air HU value from image"""
-        try:
-            air_candidates = hu_array[hu_array < -800]
-            if len(air_candidates) > 100:
-                return float(np.median(air_candidates))
-        except:
-            pass
-        return None
-
-hu_validator = HounsfieldCalibrationValidator()
+image_cache = ImageCache(max_size=200)

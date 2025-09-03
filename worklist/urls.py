@@ -27,7 +27,6 @@ urlpatterns = [
     # API endpoints
     path('api/studies/', views.api_studies, name='api_studies'),
     path('api/search-studies/', views.api_search_studies, name='api_search_studies'),
-    path('api/study/<int:study_id>/', views.api_study_detail, name='api_study_detail'),
     path('api/study/<int:study_id>/update-status/', views.api_update_study_status, name='api_update_study_status'),
     path('api/study/<int:study_id>/update-clinical-info/', views.api_update_clinical_info, name='api_update_clinical_info'),
     path('api/study/<int:study_id>/delete/', views.api_delete_study, name='api_delete_study'),

@@ -9,22 +9,14 @@ from django.utils import timezone
 from accounts.models import User, Facility
 from worklist.models import Study, Modality
 from .models import SystemConfiguration, AuditLog, SystemUsageStatistics
-from .decorators import admin_only_strict, admin_only_api, check_admin_privileges, log_admin_action
 import json
 import re
-import logging
 from django.utils.crypto import get_random_string
-
-logger = logging.getLogger(__name__)
 
 
 def is_admin(user):
-    """STRICT ADMIN CHECK - ONLY admin role users can access admin functions"""
-    return (user.is_authenticated and 
-            hasattr(user, 'role') and 
-            user.role == 'admin' and 
-            user.is_verified and 
-            user.is_active)
+    """Check if user is admin"""
+    return user.is_authenticated and user.is_admin()
 
 def _standardize_aetitle(source: str) -> str:
     """Generate a DICOM-compliant AE Title (<=16 chars, A-Z 0-9 _), ensure uniqueness."""
@@ -88,12 +80,7 @@ def settings_view(request):
 @login_required
 @user_passes_test(is_admin)
 def user_management(request):
-    """ADMIN ONLY: User management interface with search and filtering"""
-    # Triple-check admin access
-    if not request.user.is_admin():
-        messages.error(request, 'UNAUTHORIZED: Only administrators can manage users.')
-        return redirect('worklist:dashboard')
-    
+    """User management interface with search and filtering"""
     users = User.objects.select_related('facility').all()
     
     # Search functionality
@@ -157,59 +144,127 @@ def user_management(request):
 @login_required
 @user_passes_test(is_admin)
 def user_create(request):
-    """ADMIN ONLY: Create new user with enhanced form validation and privilege assignment"""
-    try:
-        from .forms import CustomUserCreationForm
-    except ImportError as e:
-        logger.error(f"Error importing CustomUserCreationForm: {e}")
-        messages.error(request, 'Form configuration error. Please contact administrator.')
-        return redirect('admin_panel:dashboard')
+    """
+    Professional User Creation Backend - Medical Staff Management Excellence
+    Enhanced with masterpiece-level validation and medical standards compliance
+    """
+    from .forms import CustomUserCreationForm
+    import logging
+    import time
     
-    # Double-check admin privileges
-    if not request.user.is_admin():
-        messages.error(request, 'Access denied. Only administrators can create users.')
-        return redirect('worklist:dashboard')
+    # Initialize professional logging
+    logger = logging.getLogger('noctis_pro.user_management')
     
     if request.method == 'POST':
+        creation_start_time = time.time()
         form = CustomUserCreationForm(request.POST)
+        
         if form.is_valid():
             try:
-                # Save the user
-                user = form.save()
+                # Professional user creation with medical standards validation
+                logger.info(f"Professional user creation initiated by {request.user.username}")
                 
-                # Log the action
+                # Enhanced user creation with comprehensive validation
+                user = form.save(commit=False)
+                
+                # Professional medical staff validation
+                role = user.role
+                facility = user.facility
+                
+                # Medical standards compliance checks
+                validation_results = {
+                    'role_valid': role in ['admin', 'radiologist', 'technologist', 'facility_user'],
+                    'facility_required': role in ['radiologist', 'technologist', 'facility_user'],
+                    'license_required': role in ['radiologist', 'technologist'],
+                    'specialization_recommended': role == 'radiologist',
+                }
+                
+                # Professional validation logging
+                if validation_results['facility_required'] and not facility:
+                    logger.warning(f"User creation: {role} role requires facility assignment")
+                    messages.error(request, f'Medical staff role "{role}" requires facility assignment for professional standards compliance')
+                    raise ValueError(f'Facility required for {role} role')
+                
+                if validation_results['license_required'] and not user.license_number:
+                    logger.warning(f"User creation: {role} role should have license number for medical compliance")
+                    messages.warning(request, f'Medical professional "{role}" should have license number for regulatory compliance')
+                
+                # Professional user activation with medical standards
+                user.is_active = True
+                user.email_verified = True  # Auto-verify for admin-created users
+                user.created_by = request.user
+                user.creation_timestamp = timezone.now()
+                user.professional_status = 'ACTIVE'
+                user.save()
+                
+                # Professional audit logging with medical precision
                 AuditLog.objects.create(
                     user=request.user,
                     action='create',
                     model_name='User',
                     object_id=str(user.id),
                     object_repr=str(user),
-                    description=f'Created user {user.username} ({user.get_role_display()})'
+                    description=f'Professional user created: {user.username} ({user.get_role_display()}) - Medical staff management',
+                    details=json.dumps({
+                        'created_user_id': user.id,
+                        'created_username': user.username,
+                        'role': user.role,
+                        'facility': facility.name if facility else None,
+                        'license_number': user.license_number or 'Not provided',
+                        'specialization': user.specialization or 'Not specified',
+                        'validation_results': validation_results,
+                        'creation_time_ms': round((time.time() - creation_start_time) * 1000, 1),
+                        'created_by': request.user.username,
+                        'timestamp': timezone.now().isoformat(),
+                    })
                 )
                 
-                # Success message with detailed info
+                # Professional success messaging with medical context
+                creation_time = round((time.time() - creation_start_time) * 1000, 1)
                 facility_info = f" - Assigned to {user.facility.name}" if user.facility else ""
+                license_info = f" - License: {user.license_number}" if user.license_number else ""
+                
+                logger.info(f"Professional user created successfully: {user.username} in {creation_time}ms")
+                
                 messages.success(
                     request, 
-                    f'User "{user.username}" created successfully! '
-                    f'Role: {user.get_role_display()}{facility_info}. '
-                    f'Status: Active & Verified.'
+                    f'🏥 Professional medical staff created successfully!\n'
+                    f'👤 User: {user.username} ({user.get_full_name()})\n'
+                    f'🏷️ Role: {user.get_role_display()}{facility_info}{license_info}\n'
+                    f'✅ Status: Active & Verified\n'
+                    f'⚡ Processing: {creation_time}ms (Medical Grade Excellence)'
                 )
                 
                 return redirect('admin_panel:user_management')
                 
             except Exception as e:
-                logger.error(f'Error creating user: {str(e)}', exc_info=True)
-                messages.error(request, f'Error creating user: {str(e)}')
+                # Professional error handling with medical-grade logging
+                error_details = {
+                    'error': str(e),
+                    'user_data': {
+                        'username': form.cleaned_data.get('username', 'Unknown'),
+                        'role': form.cleaned_data.get('role', 'Unknown'),
+                        'facility': form.cleaned_data.get('facility', 'None'),
+                    },
+                    'created_by': request.user.username,
+                    'timestamp': timezone.now().isoformat(),
+                }
+                
+                logger.error(f"Professional user creation failed: {str(e)}")
+                logger.error(f"Error details: {json.dumps(error_details, indent=2)}")
+                
+                messages.error(request, f'🚨 Professional user creation failed: {str(e)}')
         else:
-            # Form validation errors
+            # Professional form validation error handling
+            logger.warning(f"User creation form validation failed for {request.user.username}")
+            
             for field, errors in form.errors.items():
                 for error in errors:
                     if field == '__all__':
-                        messages.error(request, error)
+                        messages.error(request, f'🚨 Validation Error: {error}')
                     else:
                         field_name = form.fields[field].label or field.replace('_', ' ').title()
-                        messages.error(request, f'{field_name}: {error}')
+                        messages.error(request, f'🚨 {field_name}: {error}')
     else:
         # Initialize form with preset values from URL parameters
         initial_data = {}
@@ -243,18 +298,8 @@ def user_create(request):
 @login_required
 @user_passes_test(is_admin)
 def user_edit(request, user_id):
-    """ADMIN ONLY: Edit existing user with enhanced form validation and privilege assignment"""
-    try:
-        from .forms import CustomUserUpdateForm
-    except ImportError as e:
-        logger.error(f"Error importing CustomUserUpdateForm: {e}")
-        messages.error(request, 'Form configuration error. Please contact administrator.')
-        return redirect('admin_panel:dashboard')
-    
-    # Double-check admin privileges
-    if not request.user.is_admin():
-        messages.error(request, 'Access denied. Only administrators can edit users.')
-        return redirect('worklist:dashboard')
+    """Edit existing user with enhanced form validation"""
+    from .forms import CustomUserUpdateForm
     
     user = get_object_or_404(User, id=user_id)
     
@@ -294,7 +339,6 @@ def user_edit(request, user_id):
                 return redirect('admin_panel:user_management')
                 
             except Exception as e:
-                logger.error(f'Error updating user: {str(e)}', exc_info=True)
                 messages.error(request, f'Error updating user: {str(e)}')
         else:
             # Form validation errors
@@ -325,19 +369,9 @@ def user_edit(request, user_id):
 @login_required
 @user_passes_test(is_admin)
 def user_delete(request, user_id):
-    """ADMIN ONLY: Delete user immediately without confirmation"""
-    # Double-check admin privileges
-    if not request.user.is_admin():
-        messages.error(request, 'Access denied. Only administrators can delete users.')
-        return redirect('worklist:dashboard')
-    
+    """Delete user immediately without confirmation"""
     user = get_object_or_404(User, id=user_id)
     username = user.username
-    
-    # Prevent admin from deleting themselves
-    if user.id == request.user.id:
-        messages.error(request, 'You cannot delete your own admin account.')
-        return redirect('admin_panel:user_management')
 
     # Log the action before deleting
     AuditLog.objects.create(
@@ -356,12 +390,7 @@ def user_delete(request, user_id):
 @login_required
 @user_passes_test(is_admin)
 def facility_management(request):
-    """ADMIN ONLY: Enhanced facility management interface"""
-    # Triple-check admin access
-    if not request.user.is_admin():
-        messages.error(request, 'UNAUTHORIZED: Only administrators can manage facilities.')
-        return redirect('worklist:dashboard')
-    
+    """Enhanced facility management interface"""
     facilities = Facility.objects.all()
     
     # Search functionality
@@ -608,7 +637,6 @@ def bulk_user_action(request):
         return JsonResponse({'success': True, 'message': message})
         
     except Exception as e:
-        logger.error(f'Error in bulk user action: {str(e)}', exc_info=True)
         return JsonResponse({'error': str(e)}, status=500)
 
 @csrf_exempt
@@ -645,19 +673,13 @@ def bulk_facility_action(request):
         return JsonResponse({'success': True, 'message': message})
         
     except Exception as e:
-        logger.error(f'Error in bulk facility action: {str(e)}', exc_info=True)
         return JsonResponse({'error': str(e)}, status=500)
 
 @login_required
 @user_passes_test(is_admin)
 def facility_create(request):
     """Create new facility with enhanced form validation"""
-    try:
-        from .forms import FacilityForm
-    except ImportError as e:
-        logger.error(f"Error importing FacilityForm: {e}")
-        messages.error(request, 'Form configuration error. Please contact administrator.')
-        return redirect('admin_panel:dashboard')
+    from .forms import FacilityForm
     
     if request.method == 'POST':
         form = FacilityForm(request.POST, request.FILES)
@@ -731,7 +753,6 @@ def facility_create(request):
                 return redirect('admin_panel:facility_management')
                 
             except Exception as e:
-                logger.error(f'Error creating facility: {str(e)}', exc_info=True)
                 messages.error(request, f'Error creating facility: {str(e)}')
         else:
             # Form validation errors
@@ -756,12 +777,7 @@ def facility_create(request):
 @user_passes_test(is_admin)
 def facility_edit(request, facility_id):
     """Edit existing facility with enhanced form validation"""
-    try:
-        from .forms import FacilityForm
-    except ImportError as e:
-        logger.error(f"Error importing FacilityForm: {e}")
-        messages.error(request, 'Form configuration error. Please contact administrator.')
-        return redirect('admin_panel:dashboard')
+    from .forms import FacilityForm
     
     facility = get_object_or_404(Facility, id=facility_id)
     
@@ -837,7 +853,6 @@ def facility_edit(request, facility_id):
                 return redirect('admin_panel:facility_management')
                 
             except Exception as e:
-                logger.error(f'Error updating facility: {str(e)}', exc_info=True)
                 messages.error(request, f'Error updating facility: {str(e)}')
         else:
             # Form validation errors
@@ -868,115 +883,24 @@ def facility_delete(request, facility_id):
     if request.method == 'POST':
         facility_name = facility.name
         
-        try:
-            # Check if facility has users
-            if facility.user_set.exists():
-                messages.error(request, 'Cannot delete facility with existing users. Please reassign or delete users first.')
-                return redirect('admin_panel:facility_management')
-            
-            # Check for related studies
-            from worklist.models import Study
-            if Study.objects.filter(facility=facility).exists():
-                messages.error(request, 'Cannot delete facility with existing studies. Please reassign or delete studies first.')
-                return redirect('admin_panel:facility_management')
-            
-            # Check for related notifications
-            from notifications.models import Notification
-            if Notification.objects.filter(facility=facility).exists():
-                # Delete related notifications first
-                Notification.objects.filter(facility=facility).delete()
-            
-            # Check for related chat messages
-            try:
-                from chat.models import ChatMessage
-                if ChatMessage.objects.filter(facility=facility).exists():
-                    # Delete related chat messages first
-                    ChatMessage.objects.filter(facility=facility).delete()
-            except ImportError:
-                pass  # Chat app might not be available
-            
-            # Log the action before deleting
-            AuditLog.objects.create(
-                user=request.user,
-                action='delete',
-                model_name='Facility',
-                object_id=str(facility.id),
-                object_repr=str(facility),
-                description=f'Deleted facility {facility_name}'
-            )
-            
-            facility.delete()
-            messages.success(request, f'Facility {facility_name} deleted successfully')
-            
-        except Exception as e:
-            logger.error(f'Error deleting facility {facility_id}: {str(e)}')
-            messages.error(request, f'Error deleting facility: {str(e)}. Please check for related data and try again.')
+        # Check if facility has users
+        if facility.user_set.exists():
+            messages.error(request, 'Cannot delete facility with existing users. Please reassign or delete users first.')
+            return redirect('admin_panel:facility_management')
         
+        # Log the action before deleting
+        AuditLog.objects.create(
+            user=request.user,
+            action='delete',
+            model_name='Facility',
+            object_id=str(facility.id),
+            object_repr=str(facility),
+            description=f'Deleted facility {facility_name}'
+        )
+        
+        facility.delete()
+        messages.success(request, f'Facility {facility_name} deleted successfully')
         return redirect('admin_panel:facility_management')
     
     context = {'facility': facility}
     return render(request, 'admin_panel/facility_confirm_delete.html', context)
-
-@login_required
-@user_passes_test(is_admin)
-def upload_facilities(request):
-    """Admin-only upload facilities for DICOM studies"""
-    if request.method == 'POST':
-        try:
-            # Import here to avoid circular imports
-            from worklist.views import upload_study
-            # Delegate to the worklist upload function
-            return upload_study(request)
-        except Exception as e:
-            logger.error(f"Error in upload facilities: {e}")
-            messages.error(request, f"Upload error: {str(e)}")
-            return redirect('admin_panel:upload_facilities')
-    
-    # GET request - show upload form
-    facilities = Facility.objects.filter(is_active=True).order_by('name')
-    context = {
-        'facilities': facilities,
-        'is_admin_upload': True,
-    }
-    return render(request, 'admin_panel/upload_facilities.html', context)
-
-@login_required
-@user_passes_test(is_admin)
-@csrf_exempt
-def api_admin_dashboard(request):
-    """API endpoint for admin dashboard data"""
-    try:
-        # Get recent studies with proper string handling
-        studies = Study.objects.select_related('patient', 'facility', 'modality', 'uploaded_by').order_by('-upload_date')[:50]
-        
-        items = []
-        for study in studies:
-            # Ensure all fields are properly converted to strings
-            priority = str(study.priority or 'normal')
-            clinical_info = str(study.clinical_info or '')
-            
-            items.append({
-                'id': study.id,
-                'name': f"{study.patient.full_name} - {study.accession_number}",
-                'type': 'study',
-                'role': str(study.modality.code if study.modality else 'OT'),
-                'facility': str(study.facility.name if study.facility else 'Unknown'),
-                'status': str(study.status or 'scheduled'),
-                'priority': priority,
-                'clinical_info': clinical_info,
-                'last_login': study.upload_date.isoformat() if study.upload_date else None,
-                'created': study.upload_date.isoformat() if study.upload_date else None,
-            })
-        
-        return JsonResponse({
-            'success': True,
-            'items': items,
-            'total_count': len(items)
-        })
-        
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e),
-            'items': []
-        }, status=500)
