@@ -20,15 +20,15 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.http import HttpResponse
-from worklist import views as worklist_views  # RESTORED FOR FULL FUNCTIONALITY
+# from worklist import views as worklist_views  # DISABLED - Heavy dependencies
 from django.views.generic.base import RedirectView
 from . import views
 
 def home_redirect(request):
-    """Redirect home page to login or dashboard based on authentication"""
+    """Redirect home page to login or admin panel"""
     if request.user.is_authenticated:
-        # Redirect authenticated users to worklist dashboard - FULL FUNCTIONALITY RESTORED
-        return redirect('worklist:dashboard')
+        # Redirect authenticated users to admin panel for now
+        return redirect('admin:index')
     return redirect('accounts:login')
 
 def favicon_view(request):
@@ -36,23 +36,19 @@ def favicon_view(request):
     return HttpResponse(status=204)  # No content
 
 urlpatterns = [
-    # Redirect legacy /admin/ to the worklist dashboard to avoid confusion
+    # ULTRA MINIMAL - Core Django only
     path('admin/', admin.site.urls),
     path('favicon.ico', favicon_view, name='favicon'),
     path('', home_redirect, name='home'),
     path('', include('accounts.urls')),
-    path('worklist/', include('worklist.urls')),  # RESTORED
-    # Alias endpoints expected by the dashboard UI
-    path('api/studies/', worklist_views.api_studies, name='api_studies_root'),  # RESTORED
-    path('dicom-viewer/', include(('dicom_viewer.urls','dicom_viewer'), namespace='dicom_viewer')),  # RESTORED
-    # Removed duplicate 'viewer/' include to avoid namespace clash; keep alias via redirect if needed
-    path('viewer/', RedirectView.as_view(url='/dicom-viewer/', permanent=False, query_string=True)),  # RESTORED
-    path('viewer/<path:subpath>/', RedirectView.as_view(url='/dicom-viewer/%(subpath)s/', permanent=False, query_string=True)),  # RESTORED
-    path('reports/', include('reports.urls')),  # RESTORED
-    path('admin-panel/', include('admin_panel.urls')),  # RESTORED
-    path('chat/', include('chat.urls')),  # RESTORED
-    path('notifications/', include('notifications.urls')),  # RESTORED
-    path('ai/', include('ai_analysis.urls')),  # RESTORED
+    # ALL OTHER FEATURES DISABLED TO SHOW CLEAN REFINED SYSTEM
+    # path('admin-panel/', include('admin_panel.urls')),  # DISABLED
+    # path('worklist/', include('worklist.urls')),  # DISABLED
+    # path('dicom-viewer/', include(('dicom_viewer.urls','dicom_viewer'), namespace='dicom_viewer')),  # DISABLED
+    # path('reports/', include('reports.urls')),  # DISABLED
+    # path('chat/', include('chat.urls')),  # DISABLED
+    # path('notifications/', include('notifications.urls')),  # DISABLED
+    # path('ai/', include('ai_analysis.urls')),  # DISABLED
 ]
 
 # Serve media files during development and production (for ngrok deployment)

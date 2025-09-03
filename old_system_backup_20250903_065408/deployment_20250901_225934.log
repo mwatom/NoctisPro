@@ -1,0 +1,309 @@
+[1m[0;34m🚀 NoctisPro Bulletproof Production Deployment - FIXED[0m
+[0;34m[INFO][0m Deployment started at Mon Sep  1 10:59:34 PM UTC 2025
+[0;34m[INFO][0m Log file: deployment_20250901_225934.log
+[0;34m[INFO][0m Running as user: ubuntu
+[0;34m[INFO][0m Project directory: /workspace
+[1m[0;34m🔍 Pre-deployment Validation[0m
+[0;32m[SUCCESS][0m Python 3 found: Python 3.13.3
+[0;32m[SUCCESS][0m All required files present
+[0;32m[SUCCESS][0m Sufficient disk space available
+[0;32m[SUCCESS][0m Sudo access available
+[0;34m[INFO][0m Checking port 8000 availability...
+[0;32m[SUCCESS][0m Port 8000 is available
+[1m[0;34m🔧 Installing System Dependencies[0m
+[0;34m[INFO][0m Updating package lists...
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+73 packages can be upgraded. Run 'apt list --upgradable' to see them.
+[0;34m[INFO][0m Installing system packages...
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Reading package lists...
+Building dependency tree...
+Reading state information...
+python3 is already the newest version (3.13.3-1).
+python3-pip is already the newest version (25.0+dfsg-1ubuntu0.1).
+python3-venv is already the newest version (3.13.3-1).
+redis-server is already the newest version (5:7.0.15-3).
+jq is already the newest version (1.7.1-3ubuntu1.1).
+curl is already the newest version (8.12.1-3ubuntu1).
+wget is already the newest version (1.24.5-2ubuntu1).
+git is already the newest version (1:2.48.1-0ubuntu1.1).
+build-essential is already the newest version (12.12ubuntu1).
+libpq-dev is already the newest version (17.5-0ubuntu0.25.04.1).
+libssl-dev is already the newest version (3.4.1-1ubuntu3).
+libffi-dev is already the newest version (3.4.7-1).
+libjpeg-dev is already the newest version (8c-2ubuntu11).
+libpng-dev is already the newest version (1.6.47-1.1).
+libfreetype-dev is already the newest version (2.13.3+dfsg-1).
+liblcms2-dev is already the newest version (2.16-2).
+libwebp-dev is already the newest version (1.5.0-0.1).
+libtiff5-dev is already the newest version (4.5.1+git230720-4ubuntu4.1).
+libopenjp2-7-dev is already the newest version (2.5.3-2).
+zlib1g-dev is already the newest version (1:1.3.dfsg+really1.3.1-1ubuntu1).
+psmisc is already the newest version (23.7-2).
+procps is already the newest version (2:4.0.4-7ubuntu1).
+net-tools is already the newest version (2.10-1.1ubuntu1.25.04.4).
+Summary:
+  Upgrading: 0, Installing: 0, Removing: 0, Not Upgrading: 73
+[0;32m[SUCCESS][0m System dependencies installed
+[0;34m[INFO][0m Installing ngrok...
+[0;32m[SUCCESS][0m Ngrok installed successfully
+[1m[0;34m📦 Creating Backup[0m
+[0;32m[SUCCESS][0m Backup created at backup_20250901_225934
+[1m[0;34m🔧 Setting up Services[0m
+[0;32m[SUCCESS][0m Redis running
+[1m[0;34m📚 Installing Dependencies[0m
+[0;34m[INFO][0m Installing Python packages...
+Requirement already satisfied: Django in ./venv/lib/python3.13/site-packages (from -r requirements.txt (line 1)) (5.2.5)
+Requirement already satisfied: djangorestframework in ./venv/lib/python3.13/site-packages (from -r requirements.txt (line 2)) (3.16.1)
+Requirement already satisfied: Pillow in ./venv/lib/python3.13/site-packages (from -r requirements.txt (line 3)) (11.3.0)
+Requirement already satisfied: numpy in ./venv/lib/python3.13/site-packages (from -r requirements.txt (line 4)) (2.2.6)
+Requirement already satisfied: pydicom in ./venv/lib/python3.13/site-packages (from -r requirements.txt (line 5)) (3.0.1)
+Requirement already satisfied: python-decouple in ./venv/lib/python3.13/site-packages (from -r requirements.txt (line 6)) (3.8)
+Requirement already satisfied: django-cors-headers in ./venv/lib/python3.13/site-packages (from -r requirements.txt (line 7)) (4.7.0)
+Requirement already satisfied: channels in ./venv/lib/python3.13/site-packages (from -r requirements.txt (line 8)) (4.3.1)
+Requirement already satisfied: daphne in ./venv/lib/python3.13/site-packages (from -r requirements.txt (line 9)) (4.2.1)
+Requirement already satisfied: gunicorn in ./venv/lib/python3.13/site-packages (from -r requirements.txt (line 10)) (23.0.0)
+Requirement already satisfied: redis in ./venv/lib/python3.13/site-packages (from -r requirements.txt (line 11)) (6.4.0)
+Requirement already satisfied: python-dotenv in ./venv/lib/python3.13/site-packages (from -r requirements.txt (line 12)) (1.1.1)
+Requirement already satisfied: asgiref>=3.8.1 in ./venv/lib/python3.13/site-packages (from Django->-r requirements.txt (line 1)) (3.9.1)
+Requirement already satisfied: sqlparse>=0.3.1 in ./venv/lib/python3.13/site-packages (from Django->-r requirements.txt (line 1)) (0.5.3)
+Requirement already satisfied: autobahn>=22.4.2 in ./venv/lib/python3.13/site-packages (from daphne->-r requirements.txt (line 9)) (24.4.2)
+Requirement already satisfied: twisted>=22.4 in ./venv/lib/python3.13/site-packages (from twisted[tls]>=22.4->daphne->-r requirements.txt (line 9)) (25.5.0)
+Requirement already satisfied: packaging in ./venv/lib/python3.13/site-packages (from gunicorn->-r requirements.txt (line 10)) (25.0)
+Requirement already satisfied: txaio>=21.2.1 in ./venv/lib/python3.13/site-packages (from autobahn>=22.4.2->daphne->-r requirements.txt (line 9)) (25.6.1)
+Requirement already satisfied: cryptography>=3.4.6 in ./venv/lib/python3.13/site-packages (from autobahn>=22.4.2->daphne->-r requirements.txt (line 9)) (45.0.7)
+Requirement already satisfied: hyperlink>=21.0.0 in ./venv/lib/python3.13/site-packages (from autobahn>=22.4.2->daphne->-r requirements.txt (line 9)) (21.0.0)
+Requirement already satisfied: setuptools in ./venv/lib/python3.13/site-packages (from autobahn>=22.4.2->daphne->-r requirements.txt (line 9)) (80.9.0)
+Requirement already satisfied: cffi>=1.14 in ./venv/lib/python3.13/site-packages (from cryptography>=3.4.6->autobahn>=22.4.2->daphne->-r requirements.txt (line 9)) (1.17.1)
+Requirement already satisfied: pycparser in ./venv/lib/python3.13/site-packages (from cffi>=1.14->cryptography>=3.4.6->autobahn>=22.4.2->daphne->-r requirements.txt (line 9)) (2.22)
+Requirement already satisfied: idna>=2.5 in ./venv/lib/python3.13/site-packages (from hyperlink>=21.0.0->autobahn>=22.4.2->daphne->-r requirements.txt (line 9)) (3.10)
+Requirement already satisfied: attrs>=22.2.0 in ./venv/lib/python3.13/site-packages (from twisted>=22.4->twisted[tls]>=22.4->daphne->-r requirements.txt (line 9)) (25.3.0)
+Requirement already satisfied: automat>=24.8.0 in ./venv/lib/python3.13/site-packages (from twisted>=22.4->twisted[tls]>=22.4->daphne->-r requirements.txt (line 9)) (25.4.16)
+Requirement already satisfied: constantly>=15.1 in ./venv/lib/python3.13/site-packages (from twisted>=22.4->twisted[tls]>=22.4->daphne->-r requirements.txt (line 9)) (23.10.4)
+Requirement already satisfied: incremental>=24.7.0 in ./venv/lib/python3.13/site-packages (from twisted>=22.4->twisted[tls]>=22.4->daphne->-r requirements.txt (line 9)) (24.7.2)
+Requirement already satisfied: typing-extensions>=4.2.0 in ./venv/lib/python3.13/site-packages (from twisted>=22.4->twisted[tls]>=22.4->daphne->-r requirements.txt (line 9)) (4.15.0)
+Requirement already satisfied: zope-interface>=5 in ./venv/lib/python3.13/site-packages (from twisted>=22.4->twisted[tls]>=22.4->daphne->-r requirements.txt (line 9)) (7.2)
+Requirement already satisfied: pyopenssl>=21.0.0 in ./venv/lib/python3.13/site-packages (from twisted[tls]>=22.4->daphne->-r requirements.txt (line 9)) (25.1.0)
+Requirement already satisfied: service-identity>=18.1.0 in ./venv/lib/python3.13/site-packages (from twisted[tls]>=22.4->daphne->-r requirements.txt (line 9)) (24.2.0)
+Requirement already satisfied: pyasn1 in ./venv/lib/python3.13/site-packages (from service-identity>=18.1.0->twisted[tls]>=22.4->daphne->-r requirements.txt (line 9)) (0.6.1)
+Requirement already satisfied: pyasn1-modules in ./venv/lib/python3.13/site-packages (from service-identity>=18.1.0->twisted[tls]>=22.4->daphne->-r requirements.txt (line 9)) (0.4.2)
+[0;32m[SUCCESS][0m Dependencies installed
+Requirement already satisfied: dj-database-url in ./venv/lib/python3.13/site-packages (3.0.1)
+Requirement already satisfied: scikit-image in ./venv/lib/python3.13/site-packages (0.25.2)
+Requirement already satisfied: opencv-python in ./venv/lib/python3.13/site-packages (4.12.0.88)
+Requirement already satisfied: Django>=4.2 in ./venv/lib/python3.13/site-packages (from dj-database-url) (5.2.5)
+Requirement already satisfied: numpy>=1.24 in ./venv/lib/python3.13/site-packages (from scikit-image) (2.2.6)
+Requirement already satisfied: scipy>=1.11.4 in ./venv/lib/python3.13/site-packages (from scikit-image) (1.16.1)
+Requirement already satisfied: networkx>=3.0 in ./venv/lib/python3.13/site-packages (from scikit-image) (3.5)
+Requirement already satisfied: pillow>=10.1 in ./venv/lib/python3.13/site-packages (from scikit-image) (11.3.0)
+Requirement already satisfied: imageio!=2.35.0,>=2.33 in ./venv/lib/python3.13/site-packages (from scikit-image) (2.37.0)
+Requirement already satisfied: tifffile>=2022.8.12 in ./venv/lib/python3.13/site-packages (from scikit-image) (2025.8.28)
+Requirement already satisfied: packaging>=21 in ./venv/lib/python3.13/site-packages (from scikit-image) (25.0)
+Requirement already satisfied: lazy-loader>=0.4 in ./venv/lib/python3.13/site-packages (from scikit-image) (0.4)
+Requirement already satisfied: asgiref>=3.8.1 in ./venv/lib/python3.13/site-packages (from Django>=4.2->dj-database-url) (3.9.1)
+Requirement already satisfied: sqlparse>=0.3.1 in ./venv/lib/python3.13/site-packages (from Django>=4.2->dj-database-url) (0.5.3)
+[0;32m[SUCCESS][0m Critical packages verified
+[1m[0;34m⚙️ Configuring Environment[0m
+[0;32m[SUCCESS][0m Environment configured
+[1m[0;34m🐍 Running Django Commands[0m
+[0;34m[INFO][0m Running Django system check...
+System check identified no issues (0 silenced).
+[0;34m[INFO][0m Collecting static files...
+Deleting 'rest_framework/img/glyphicons-halflings.png'
+Deleting 'rest_framework/img/grid.png'
+Deleting 'rest_framework/img/glyphicons-halflings-white.png'
+Deleting 'rest_framework/docs/img/favicon.ico'
+Deleting 'rest_framework/docs/img/grid.png'
+Deleting 'rest_framework/docs/css/base.css'
+Deleting 'rest_framework/docs/css/highlight.css'
+Deleting 'rest_framework/docs/css/jquery.json-view.min.css'
+Deleting 'rest_framework/docs/js/api.js'
+Deleting 'rest_framework/docs/js/highlight.pack.js'
+Deleting 'rest_framework/docs/js/jquery.json-view.min.js'
+Deleting 'rest_framework/css/bootstrap-tweaks.css'
+Deleting 'rest_framework/css/bootstrap-theme.min.css'
+Deleting 'rest_framework/css/bootstrap.min.css'
+Deleting 'rest_framework/css/bootstrap-theme.min.css.map'
+Deleting 'rest_framework/css/bootstrap.min.css.map'
+Deleting 'rest_framework/css/default.css'
+Deleting 'rest_framework/css/font-awesome-4.0.3.css'
+Deleting 'rest_framework/css/prettify.css'
+Deleting 'rest_framework/js/ajax-form.js'
+Deleting 'rest_framework/js/load-ajax-form.js'
+Deleting 'rest_framework/js/jquery-3.7.1.min.js'
+Deleting 'rest_framework/js/prettify-min.js'
+Deleting 'rest_framework/js/default.js'
+Deleting 'rest_framework/js/coreapi-0.1.1.js'
+Deleting 'rest_framework/js/csrf.js'
+Deleting 'rest_framework/js/bootstrap.min.js'
+Deleting 'rest_framework/fonts/glyphicons-halflings-regular.woff'
+Deleting 'rest_framework/fonts/glyphicons-halflings-regular.ttf'
+Deleting 'rest_framework/fonts/glyphicons-halflings-regular.woff2'
+Deleting 'rest_framework/fonts/fontawesome-webfont.svg'
+Deleting 'rest_framework/fonts/glyphicons-halflings-regular.eot'
+Deleting 'rest_framework/fonts/fontawesome-webfont.ttf'
+Deleting 'rest_framework/fonts/glyphicons-halflings-regular.svg'
+Deleting 'rest_framework/fonts/fontawesome-webfont.eot'
+Deleting 'rest_framework/fonts/fontawesome-webfont.woff'
+Deleting 'admin/img/search.svg'
+Deleting 'admin/img/icon-calendar.svg'
+Deleting 'admin/img/icon-yes.svg'
+Deleting 'admin/img/icon-clock.svg'
+Deleting 'admin/img/selector-icons.svg'
+Deleting 'admin/img/icon-no.svg'
+Deleting 'admin/img/sorting-icons.svg'
+Deleting 'admin/img/icon-viewlink.svg'
+Deleting 'admin/img/icon-alert.svg'
+Deleting 'admin/img/icon-unknown.svg'
+Deleting 'admin/img/tooltag-add.svg'
+Deleting 'admin/img/icon-hidelink.svg'
+Deleting 'admin/img/icon-deletelink.svg'
+Deleting 'admin/img/LICENSE'
+Deleting 'admin/img/README.txt'
+Deleting 'admin/img/inline-delete.svg'
+Deleting 'admin/img/calendar-icons.svg'
+Deleting 'admin/img/icon-addlink.svg'
+Deleting 'admin/img/icon-changelink.svg'
+Deleting 'admin/img/icon-unknown-alt.svg'
+Deleting 'admin/img/tooltag-arrowright.svg'
+Deleting 'admin/img/gis/move_vertex_on.svg'
+Deleting 'admin/img/gis/move_vertex_off.svg'
+Deleting 'admin/css/base.css'
+Deleting 'admin/css/forms.css'
+Deleting 'admin/css/changelists.css'
+Deleting 'admin/css/dark_mode.css'
+Deleting 'admin/css/login.css'
+Deleting 'admin/css/rtl.css'
+Deleting 'admin/css/widgets.css'
+Deleting 'admin/css/responsive_rtl.css'
+Deleting 'admin/css/dashboard.css'
+Deleting 'admin/css/unusable_password_field.css'
+Deleting 'admin/css/nav_sidebar.css'
+Deleting 'admin/css/responsive.css'
+Deleting 'admin/css/autocomplete.css'
+Deleting 'admin/css/vendor/select2/select2.css'
+Deleting 'admin/css/vendor/select2/select2.min.css'
+Deleting 'admin/css/vendor/select2/LICENSE-SELECT2.md'
+Deleting 'admin/js/urlify.js'
+Deleting 'admin/js/popup_response.js'
+Deleting 'admin/js/cancel.js'
+Deleting 'admin/js/nav_sidebar.js'
+Deleting 'admin/js/SelectFilter2.js'
+Deleting 'admin/js/calendar.js'
+Deleting 'admin/js/prepopulate_init.js'
+Deleting 'admin/js/jquery.init.js'
+Deleting 'admin/js/inlines.js'
+Deleting 'admin/js/filters.js'
+Deleting 'admin/js/prepopulate.js'
+Deleting 'admin/js/SelectBox.js'
+Deleting 'admin/js/theme.js'
+Deleting 'admin/js/change_form.js'
+Deleting 'admin/js/unusable_password_field.js'
+Deleting 'admin/js/core.js'
+Deleting 'admin/js/autocomplete.js'
+Deleting 'admin/js/actions.js'
+Deleting 'admin/js/vendor/jquery/LICENSE.txt'
+Deleting 'admin/js/vendor/jquery/jquery.min.js'
+Deleting 'admin/js/vendor/jquery/jquery.js'
+Deleting 'admin/js/vendor/select2/select2.full.min.js'
+Deleting 'admin/js/vendor/select2/LICENSE.md'
+Deleting 'admin/js/vendor/select2/select2.full.js'
+Deleting 'admin/js/vendor/select2/i18n/fr.js'
+Deleting 'admin/js/vendor/select2/i18n/et.js'
+Deleting 'admin/js/vendor/select2/i18n/pt.js'
+Deleting 'admin/js/vendor/select2/i18n/sl.js'
+Deleting 'admin/js/vendor/select2/i18n/ko.js'
+Deleting 'admin/js/vendor/select2/i18n/bs.js'
+Deleting 'admin/js/vendor/select2/i18n/de.js'
+Deleting 'admin/js/vendor/select2/i18n/hr.js'
+Deleting 'admin/js/vendor/select2/i18n/it.js'
+Deleting 'admin/js/vendor/select2/i18n/el.js'
+Deleting 'admin/js/vendor/select2/i18n/ms.js'
+Deleting 'admin/js/vendor/select2/i18n/ka.js'
+Deleting 'admin/js/vendor/select2/i18n/fi.js'
+Deleting 'admin/js/vendor/select2/i18n/sk.js'
+Deleting 'admin/js/vendor/select2/i18n/sr.js'
+Deleting 'admin/js/vendor/select2/i18n/is.js'
+Deleting 'admin/js/vendor/select2/i18n/vi.js'
+Deleting 'admin/js/vendor/select2/i18n/ro.js'
+Deleting 'admin/js/vendor/select2/i18n/tr.js'
+Deleting 'admin/js/vendor/select2/i18n/ar.js'
+Deleting 'admin/js/vendor/select2/i18n/sq.js'
+Deleting 'admin/js/vendor/select2/i18n/lv.js'
+Deleting 'admin/js/vendor/select2/i18n/ru.js'
+Deleting 'admin/js/vendor/select2/i18n/da.js'
+Deleting 'admin/js/vendor/select2/i18n/en.js'
+Deleting 'admin/js/vendor/select2/i18n/uk.js'
+Deleting 'admin/js/vendor/select2/i18n/af.js'
+Deleting 'admin/js/vendor/select2/i18n/he.js'
+Deleting 'admin/js/vendor/select2/i18n/tk.js'
+Deleting 'admin/js/vendor/select2/i18n/bn.js'
+Deleting 'admin/js/vendor/select2/i18n/id.js'
+Deleting 'admin/js/vendor/select2/i18n/fa.js'
+Deleting 'admin/js/vendor/select2/i18n/hu.js'
+Deleting 'admin/js/vendor/select2/i18n/bg.js'
+Deleting 'admin/js/vendor/select2/i18n/es.js'
+Deleting 'admin/js/vendor/select2/i18n/sv.js'
+Deleting 'admin/js/vendor/select2/i18n/nl.js'
+Deleting 'admin/js/vendor/select2/i18n/hsb.js'
+Deleting 'admin/js/vendor/select2/i18n/az.js'
+Deleting 'admin/js/vendor/select2/i18n/ps.js'
+Deleting 'admin/js/vendor/select2/i18n/th.js'
+Deleting 'admin/js/vendor/select2/i18n/zh-CN.js'
+Deleting 'admin/js/vendor/select2/i18n/hy.js'
+Deleting 'admin/js/vendor/select2/i18n/km.js'
+Deleting 'admin/js/vendor/select2/i18n/dsb.js'
+Deleting 'admin/js/vendor/select2/i18n/ne.js'
+Deleting 'admin/js/vendor/select2/i18n/ja.js'
+Deleting 'admin/js/vendor/select2/i18n/pl.js'
+Deleting 'admin/js/vendor/select2/i18n/cs.js'
+Deleting 'admin/js/vendor/select2/i18n/ca.js'
+Deleting 'admin/js/vendor/select2/i18n/eu.js'
+Deleting 'admin/js/vendor/select2/i18n/mk.js'
+Deleting 'admin/js/vendor/select2/i18n/lt.js'
+Deleting 'admin/js/vendor/select2/i18n/pt-BR.js'
+Deleting 'admin/js/vendor/select2/i18n/gl.js'
+Deleting 'admin/js/vendor/select2/i18n/hi.js'
+Deleting 'admin/js/vendor/select2/i18n/zh-TW.js'
+Deleting 'admin/js/vendor/select2/i18n/sr-Cyrl.js'
+Deleting 'admin/js/vendor/select2/i18n/nb.js'
+Deleting 'admin/js/vendor/xregexp/LICENSE.txt'
+Deleting 'admin/js/vendor/xregexp/xregexp.js'
+Deleting 'admin/js/vendor/xregexp/xregexp.min.js'
+Deleting 'admin/js/admin/DateTimeShortcuts.js'
+Deleting 'admin/js/admin/RelatedObjectLookups.js'
+Deleting 'css/dicom-viewer-fixes.css'
+Deleting 'css/noctis-dashboard-style.css'
+Deleting 'css/dicom-viewer-buttons.css'
+Deleting 'css/noctis-global.css'
+Deleting 'js/movable-annotations.js'
+Deleting 'js/delete-button-fix.js'
+Deleting 'js/backup-system.js'
+Deleting 'js/worklist-button-handlers.js'
+Deleting 'js/dicom-loading-fix.js'
+Deleting 'js/hounsfield-ellipse-roi.js'
+Deleting 'js/3d-reconstruction.js'
+Deleting 'js/button-utils.js'
+Deleting 'js/dicom-viewer-mouse-fix.js'
+Deleting 'js/ai-auto-learning.js'
+Deleting 'js/dicom-print-export-fix.js'
+Deleting 'js/dicom-viewer-utils.js'
+Deleting 'js/ai-reporting-enhancement.js'
+Deleting 'js/vendor/three/OrbitControls.js'
+Deleting 'js/vendor/three/three.min.js'
+
+182 static files copied to '/workspace/staticfiles'.
+[0;32m[SUCCESS][0m Django setup completed
+[1m[0;34m🔧 Creating Systemd Service[0m
+[1;33m[WARNING][0m Systemd service creation failed (systemd may not be available)
+[1;33m[WARNING][0m Systemd service creation failed, continuing with direct startup
+[1m[0;34m🚀 Starting Application Services[0m
+[0;34m[INFO][0m 🛑 Stopping all existing services...
+[0;32m[SUCCESS][0m Port 8000 is now available
+[0;34m[INFO][0m Starting Daphne directly...
+[0;34m[INFO][0m Starting Daphne on 0.0.0.0:8000...
+[0;34m[INFO][0m Waiting for Daphne to initialize...
