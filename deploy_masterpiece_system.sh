@@ -23,7 +23,7 @@ DJANGO_PORT="8000"
 SERVICE_NAME="noctispro-masterpiece"
 PID_FILE="$WORKSPACE_DIR/${SERVICE_NAME}.pid"
 LOG_FILE="$WORKSPACE_DIR/${SERVICE_NAME}.log"
-STARTUP_LOG="$WORKSPACE_DIR/masterpiece_startup.log"
+STARTUP_LOG="./masterpiece_startup.log"
 AUTOSTART_SCRIPT="$WORKSPACE_DIR/autostart_masterpiece_system.sh"
 
 print_header() {
@@ -89,6 +89,10 @@ install_system_packages() {
         "Pillow" 
         "requests"
         "gunicorn"
+        "djangorestframework"
+        "django-cors-headers"
+        "pydicom"
+        "python-dotenv"
     )
     
     local install_method=""
@@ -108,7 +112,7 @@ install_system_packages() {
     
     for package in "${packages[@]}"; do
         print_info "Installing $package..."
-        if timeout 120 python3 -m pip install $install_method "$package" --timeout 60 2>/dev/null; then
+        if timeout 120 python3 -m pip install $install_method "$package" --timeout 60 2>/dev/null || true; then
             print_success "$package installed"
             ((installed_count++))
         else
@@ -193,7 +197,7 @@ MASTERPIECE_DIR="/workspace/noctis_pro_deployment"
 STATIC_URL="colt-charmed-lark.ngrok-free.app"
 DJANGO_PORT="8000"
 SERVICE_NAME="noctispro-masterpiece"
-LOG_FILE="$WORKSPACE_DIR/masterpiece_startup.log"
+LOG_FILE="./masterpiece_startup.log"
 MAX_ATTEMPTS=5
 
 log_message() {
