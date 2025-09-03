@@ -5,8 +5,8 @@
 # Required-Stop:     $network $remote_fs $syslog
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: NoctisPro Medical Imaging System
-# Description:       Starts NoctisPro Django application with ngrok tunnel
+# Short-Description: NoctisPro Masterpiece Medical Imaging System
+# Description:       Starts NoctisPro Masterpiece Django application with all features
 ### END INIT INFO
 
 # Change to the workspace directory
@@ -14,19 +14,19 @@ cd /workspace
 
 case "$1" in
     start)
-        echo "Starting NoctisPro service..."
-        /workspace/noctispro_service.sh start
+        echo "Starting NoctisPro Masterpiece service..."
+        /workspace/deploy_masterpiece_bulletproof.sh start
         ;;
     stop)
-        echo "Stopping NoctisPro service..."
-        /workspace/noctispro_service.sh stop
+        echo "Stopping NoctisPro Masterpiece service..."
+        /workspace/deploy_masterpiece_bulletproof.sh stop
         ;;
     restart)
-        echo "Restarting NoctisPro service..."
-        /workspace/noctispro_service.sh restart
+        echo "Restarting NoctisPro Masterpiece service..."
+        /workspace/deploy_masterpiece_bulletproof.sh restart
         ;;
     status)
-        /workspace/noctispro_service.sh status
+        /workspace/deploy_masterpiece_bulletproof.sh status
         ;;
     *)
         echo "Usage: $0 {start|stop|restart|status}"
