@@ -1,0 +1,43 @@
+[Unit]
+Description=NoctisPro Professional Medical Imaging System
+Documentation=https://noctispro.com/docs
+After=network.target
+Wants=network.target
+
+[Service]
+Type=exec
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/workspace/noctis_pro_deployment
+Environment=DJANGO_SETTINGS_MODULE=noctis_pro.settings_production
+Environment=PYTHONPATH=/workspace/noctis_pro_deployment
+Environment=SECRET_KEY=django-insecure-professional-deployment-change-in-production-2024
+Environment=DEBUG=false
+Environment=PATH=/home/ubuntu/.local/bin:/usr/local/bin:/usr/bin:/bin
+
+# Database setup
+ExecStartPre=/bin/bash -c 'cd /workspace/noctis_pro_deployment && export SECRET_KEY="django-insecure-professional-deployment-change-in-production-2024" && export PATH="/home/ubuntu/.local/bin:$PATH" && python3 manage.py migrate --noinput'
+ExecStartPre=/bin/bash -c 'cd /workspace/noctis_pro_deployment && export SECRET_KEY="django-insecure-professional-deployment-change-in-production-2024" && export PATH="/home/ubuntu/.local/bin:$PATH" && python3 manage.py collectstatic --noinput --clear'
+
+# Start the application
+ExecStart=/bin/bash -c 'cd /workspace/noctis_pro_deployment && export SECRET_KEY="django-insecure-professional-deployment-change-in-production-2024" && export PATH="/home/ubuntu/.local/bin:$PATH" && gunicorn noctis_pro.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 300 --max-requests 1000 --preload'
+
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=noctispro-professional
+
+# Resource limits for medical imaging
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Security settings
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/workspace/noctis_pro_deployment
+
+[Install]
+WantedBy=multi-user.target
