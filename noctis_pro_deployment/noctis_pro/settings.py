@@ -44,16 +44,15 @@ INSTALLED_APPS = [
     'corsheaders',  # Re-enabled for API access
     # 'channels',  # Disabled temporarily to fix Redis dependency
     
-    # Custom apps - ULTRA MINIMAL FOR DEMO
+    # Custom apps - ALL MASTERPIECE FEATURES ENABLED
     'accounts',
-    # ALL OTHER APPS DISABLED TO SHOW CLEAN REFINED SYSTEM
-    # 'worklist',  # DISABLED - DICOM functionality
-    # 'dicom_viewer',  # DISABLED - DICOM viewer
-    # 'reports',  # DISABLED - Reports functionality
-    # 'admin_panel',  # DISABLED - Has dependencies on worklist
-    # 'chat',  # DISABLED - Chat functionality
-    # 'notifications',  # DISABLED - Notifications
-    # 'ai_analysis',  # DISABLED - AI analysis
+    'worklist',  # ENABLED - DICOM functionality (MASTERPIECE FEATURE)
+    'dicom_viewer',  # ENABLED - DICOM viewer (MASTERPIECE FEATURE)
+    'reports',  # ENABLED - Reports functionality (MASTERPIECE FEATURE)
+    'admin_panel',  # ENABLED - Admin panel (MASTERPIECE FEATURE)
+    'chat',  # ENABLED - Chat functionality (MASTERPIECE FEATURE)
+    'notifications',  # ENABLED - Notifications (MASTERPIECE FEATURE)
+    'ai_analysis',  # ENABLED - AI analysis (MASTERPIECE FEATURE)
 ]
 
 MIDDLEWARE = [
