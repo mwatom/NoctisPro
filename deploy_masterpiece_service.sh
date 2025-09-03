@@ -15,7 +15,7 @@ CYAN='\033[0;36m'
 WHITE='\033[1;37m'
 NC='\033[0m'
 
-# Configuration
+# Configuration - Auto-Detection Enhanced
 WORKSPACE_DIR="/workspace"
 REFINED_SYSTEM_DIR="/workspace/noctis_pro_deployment"
 STATIC_URL="colt-charmed-lark.ngrok-free.app"
@@ -24,6 +24,11 @@ SERVICE_NAME="noctispro-masterpiece"
 PID_FILE="$WORKSPACE_DIR/${SERVICE_NAME}.pid"
 LOG_FILE="$WORKSPACE_DIR/${SERVICE_NAME}.log"
 NGROK_LOG="$WORKSPACE_DIR/ngrok_${SERVICE_NAME}.log"
+
+# Auto-detection variables
+DETECTED_SECRET_KEY=""
+DETECTED_NGROK_TOKEN=""
+DETECTED_ENV_FILE=""
 
 print_header() {
     echo ""
@@ -61,7 +66,188 @@ detect_system() {
     fi
 }
 
-# Check if ngrok is configured
+# Auto-detect workspace environment variables and tokens
+auto_detect_environment() {
+    print_info "🔍 Auto-detecting workspace environment..."
+    
+    # Detect best environment file to use
+    local env_priority=(".env.production.fixed" ".env.production" ".env" ".env.container" ".env.demo")
+    
+    for env_file in "${env_priority[@]}"; do
+        if [ -f "$WORKSPACE_DIR/$env_file" ]; then
+            DETECTED_ENV_FILE="$WORKSPACE_DIR/$env_file"
+            print_success "Found environment file: $env_file"
+            break
+        fi
+    done
+    
+    if [ -z "$DETECTED_ENV_FILE" ]; then
+        print_warning "No environment file found, will create one"
+        DETECTED_ENV_FILE="$WORKSPACE_DIR/.env.production"
+    fi
+    
+    # Auto-detect or generate SECRET_KEY
+    if [ -f "$DETECTED_ENV_FILE" ]; then
+        DETECTED_SECRET_KEY=$(grep "^SECRET_KEY=" "$DETECTED_ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "")
+    fi
+    
+    if [ -z "$DETECTED_SECRET_KEY" ] || [ "$DETECTED_SECRET_KEY" = "noctis-production-secret-2024-change-me" ]; then
+        print_info "Generating new secure SECRET_KEY..."
+        if command -v openssl > /dev/null 2>&1; then
+            DETECTED_SECRET_KEY=$(openssl rand -base64 50 | tr -d '\n')
+        elif command -v python3 > /dev/null 2>&1; then
+            DETECTED_SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(50))" 2>/dev/null || echo "masterpiece-secret-$(date +%s)")
+        else
+            DETECTED_SECRET_KEY="masterpiece-secret-$(date +%s)-$(whoami)"
+        fi
+        print_success "Generated new SECRET_KEY"
+    else
+        print_success "Using existing SECRET_KEY from $DETECTED_ENV_FILE"
+    fi
+}
+
+# Auto-detect ngrok authentication
+auto_detect_ngrok_auth() {
+    print_info "🔍 Auto-detecting ngrok authentication..."
+    
+    # Check if ngrok is already authenticated
+    if $WORKSPACE_DIR/ngrok config check > /dev/null 2>&1; then
+        print_success "Ngrok is already authenticated"
+        return 0
+    fi
+    
+    # Try to find auth token in environment files
+    local env_files=(".env.production.fixed" ".env.production" ".env.ngrok" ".env")
+    
+    for env_file in "${env_files[@]}"; do
+        if [ -f "$WORKSPACE_DIR/$env_file" ]; then
+            local token=$(grep "^NGROK.*TOKEN\|^AUTHTOKEN" "$WORKSPACE_DIR/$env_file" 2>/dev/null | cut -d'=' -f2- | tr -d '"' | head -1)
+            if [ -n "$token" ] && [ "$token" != "YOUR_TOKEN_HERE" ] && [ "$token" != "your-token-here" ]; then
+                DETECTED_NGROK_TOKEN="$token"
+                print_success "Found ngrok token in $env_file"
+                break
+            fi
+        fi
+    done
+    
+    # Check ngrok config file
+    if [ -z "$DETECTED_NGROK_TOKEN" ] && [ -f "$HOME/.config/ngrok/ngrok.yml" ]; then
+        local config_token=$(grep "authtoken:" "$HOME/.config/ngrok/ngrok.yml" 2>/dev/null | awk '{print $2}' | tr -d '"')
+        if [ -n "$config_token" ]; then
+            DETECTED_NGROK_TOKEN="$config_token"
+            print_success "Found ngrok token in config file"
+        fi
+    fi
+    
+    # If still no token found, try to configure it
+    if [ -z "$DETECTED_NGROK_TOKEN" ]; then
+        print_warning "No ngrok auth token found in environment files"
+        print_info "Attempting to use existing ngrok configuration..."
+        
+        # Check if ngrok works without explicit token (might be pre-configured)
+        if $WORKSPACE_DIR/ngrok config check > /dev/null 2>&1; then
+            print_success "Ngrok configuration is valid"
+            return 0
+        else
+            print_warning "Ngrok needs authentication setup"
+            return 1
+        fi
+    else
+        # Configure ngrok with detected token
+        print_info "Configuring ngrok with detected token..."
+        $WORKSPACE_DIR/ngrok config add-authtoken "$DETECTED_NGROK_TOKEN" > /dev/null 2>&1 || {
+            print_warning "Failed to configure ngrok with detected token"
+            return 1
+        }
+        print_success "Ngrok configured with auto-detected token"
+    fi
+    
+    return 0
+}
+
+# Auto-detect workspace configuration
+auto_detect_workspace() {
+    print_info "🔍 Auto-detecting workspace configuration..."
+    
+    # Detect workspace directory (might not always be /workspace)
+    if [ -n "$WORKSPACE" ]; then
+        WORKSPACE_DIR="$WORKSPACE"
+    elif [ -n "$PWD" ] && [ -f "$PWD/manage.py" ]; then
+        WORKSPACE_DIR="$PWD"
+    elif [ -f "/workspace/manage.py" ]; then
+        WORKSPACE_DIR="/workspace"
+    else
+        WORKSPACE_DIR="$(pwd)"
+    fi
+    
+    # Update paths based on detected workspace
+    REFINED_SYSTEM_DIR="$WORKSPACE_DIR/noctis_pro_deployment"
+    PID_FILE="$WORKSPACE_DIR/${SERVICE_NAME}.pid"
+    LOG_FILE="$WORKSPACE_DIR/${SERVICE_NAME}.log"
+    NGROK_LOG="$WORKSPACE_DIR/ngrok_${SERVICE_NAME}.log"
+    
+    print_success "Workspace detected at: $WORKSPACE_DIR"
+    
+    # Auto-detect Django port from existing configuration
+    if [ -f "$WORKSPACE_DIR/.env.ngrok" ]; then
+        local detected_port=$(grep "^DJANGO_PORT=" "$WORKSPACE_DIR/.env.ngrok" 2>/dev/null | cut -d'=' -f2)
+        if [ -n "$detected_port" ]; then
+            DJANGO_PORT="$detected_port"
+            print_success "Django port detected: $DJANGO_PORT"
+        fi
+    fi
+    
+    # Auto-detect static URL
+    if [ -f "$WORKSPACE_DIR/.env.ngrok" ]; then
+        local detected_url=$(grep "^NGROK_STATIC_URL=" "$WORKSPACE_DIR/.env.ngrok" 2>/dev/null | cut -d'=' -f2)
+        if [ -n "$detected_url" ]; then
+            STATIC_URL="$detected_url"
+            print_success "Static URL detected: $STATIC_URL"
+        fi
+    fi
+    
+    # Check if current ngrok URL file exists
+    if [ -f "$WORKSPACE_DIR/current_ngrok_url.txt" ]; then
+        local current_url=$(cat "$WORKSPACE_DIR/current_ngrok_url.txt" 2>/dev/null | head -1 | tr -d '\n')
+        if [ -n "$current_url" ] && [[ "$current_url" == *"ngrok"* ]]; then
+            STATIC_URL="$current_url"
+            print_success "Using current ngrok URL: $STATIC_URL"
+        fi
+    fi
+}
+
+# Create or update environment file with auto-detected values
+setup_environment_file() {
+    print_info "📝 Setting up environment file with auto-detected values..."
+    
+    local env_content="# NoctisPro Masterpiece - Auto-Generated Environment
+DEBUG=False
+SECRET_KEY=$DETECTED_SECRET_KEY
+DJANGO_SETTINGS_MODULE=noctis_pro.settings_production
+ALLOWED_HOSTS=*,$STATIC_URL,localhost,127.0.0.1
+USE_SQLITE=True
+STATIC_ROOT=$WORKSPACE_DIR/staticfiles
+MEDIA_ROOT=$WORKSPACE_DIR/media
+SERVE_MEDIA_FILES=True
+BUILD_TARGET=production
+ENVIRONMENT=production
+HEALTH_CHECK_ENABLED=True
+TIME_ZONE=UTC
+USE_TZ=True
+DICOM_STORAGE_PATH=$WORKSPACE_DIR/media/dicom
+DJANGO_PORT=$DJANGO_PORT
+NGROK_STATIC_URL=$STATIC_URL"
+
+    if [ -n "$DETECTED_NGROK_TOKEN" ]; then
+        env_content="$env_content
+NGROK_AUTHTOKEN=$DETECTED_NGROK_TOKEN"
+    fi
+    
+    echo "$env_content" > "$DETECTED_ENV_FILE"
+    print_success "Environment file configured: $DETECTED_ENV_FILE"
+}
+
+# Check if ngrok is configured (enhanced with auto-detection)
 check_ngrok() {
     print_info "Checking ngrok configuration..."
     
@@ -70,19 +256,26 @@ check_ngrok() {
         return 1
     fi
     
+    # Try auto-detection first
+    if auto_detect_ngrok_auth; then
+        print_success "Ngrok is properly configured"
+        return 0
+    fi
+    
+    # Fallback to manual configuration if auto-detection fails
+    print_warning "Auto-detection failed. Manual ngrok configuration needed."
+    echo ""
+    echo -e "${YELLOW}To configure ngrok:${NC}"
+    echo "1. Get your auth token from: https://dashboard.ngrok.com/get-started/your-authtoken"
+    echo "2. Run: $WORKSPACE_DIR/ngrok config add-authtoken YOUR_TOKEN_HERE"
+    echo ""
+    echo -e "${CYAN}Or add NGROK_AUTHTOKEN to your .env file${NC}"
+    echo ""
+    read -p "Press Enter after configuring ngrok, or Ctrl+C to exit..."
+    
     if ! $WORKSPACE_DIR/ngrok config check > /dev/null 2>&1; then
-        print_warning "Ngrok auth token not configured!"
-        echo ""
-        echo -e "${YELLOW}To configure ngrok:${NC}"
-        echo "1. Get your auth token from: https://dashboard.ngrok.com/get-started/your-authtoken"
-        echo "2. Run: $WORKSPACE_DIR/ngrok config add-authtoken YOUR_TOKEN_HERE"
-        echo ""
-        read -p "Press Enter after configuring ngrok, or Ctrl+C to exit..."
-        
-        if ! $WORKSPACE_DIR/ngrok config check > /dev/null 2>&1; then
-            print_error "Ngrok still not configured properly"
-            return 1
-        fi
+        print_error "Ngrok still not configured properly"
+        return 1
     fi
     
     print_success "Ngrok is properly configured"
@@ -156,11 +349,23 @@ start_service() {
     print_info "Collecting static files..."
     python manage.py collectstatic --noinput > /dev/null 2>&1 || true
     
-    # Start Django server in tmux session
-    print_info "Starting Django server..."
+    # Start Django server in tmux session with auto-detected environment
+    print_info "Starting Django server with auto-detected configuration..."
     tmux new-session -d -s $SERVICE_NAME
     tmux send-keys -t $SERVICE_NAME "cd $REFINED_SYSTEM_DIR" C-m
     tmux send-keys -t $SERVICE_NAME "source venv/bin/activate" C-m
+    
+    # Load auto-detected environment file
+    if [ -f "$DETECTED_ENV_FILE" ]; then
+        tmux send-keys -t $SERVICE_NAME "export \$(cat $DETECTED_ENV_FILE | grep -v '^#' | xargs)" C-m
+        print_success "Loaded environment from: $DETECTED_ENV_FILE"
+    fi
+    
+    # Set auto-detected SECRET_KEY if available
+    if [ -n "$DETECTED_SECRET_KEY" ]; then
+        tmux send-keys -t $SERVICE_NAME "export SECRET_KEY='$DETECTED_SECRET_KEY'" C-m
+    fi
+    
     tmux send-keys -t $SERVICE_NAME "python manage.py runserver 0.0.0.0:$DJANGO_PORT" C-m
     
     # Wait for Django to start
@@ -494,6 +699,9 @@ main() {
     case "${1:-}" in
         "start")
             print_header
+            # Auto-detect environment for start command
+            auto_detect_workspace
+            auto_detect_environment
             check_ngrok || exit 1
             check_refined_system || exit 1
             stop_existing
@@ -505,6 +713,9 @@ main() {
         "restart")
             stop_service
             sleep 2
+            # Auto-detect environment for restart
+            auto_detect_workspace
+            auto_detect_environment
             main start
             ;;
         "status")
@@ -515,17 +726,34 @@ main() {
             ;;
         "deploy")
             print_header
+            
+            # Auto-detection phase
+            auto_detect_workspace || exit 1
+            auto_detect_environment || exit 1
+            setup_environment_file || exit 1
+            
+            # Verification phase
             check_ngrok || exit 1
             check_refined_system || exit 1
+            
+            # Deployment phase
             stop_existing
             start_service
             setup_autostart
+            
+            # Success summary
             echo ""
-            print_success "🎉 Masterpiece deployment completed!"
+            print_success "🎉 Masterpiece deployment completed with auto-detection!"
             echo ""
-            echo -e "${CYAN}🌐 Your application: https://$STATIC_URL${NC}"
-            echo -e "${CYAN}🔧 Admin panel: https://$STATIC_URL/admin/${NC}"
+            echo -e "${CYAN}📍 Workspace: $WORKSPACE_DIR${NC}"
+            echo -e "${CYAN}🔑 Secret Key: Auto-generated and configured${NC}"
+            echo -e "${CYAN}🌐 Application: https://$STATIC_URL${NC}"
+            echo -e "${CYAN}🔧 Admin Panel: https://$STATIC_URL/admin/${NC}"
+            echo -e "${CYAN}📁 Environment: $DETECTED_ENV_FILE${NC}"
             echo -e "${GREEN}🚀 Auto-start: Configured for system bootup${NC}"
+            if [ -n "$DETECTED_NGROK_TOKEN" ]; then
+                echo -e "${GREEN}🔐 Ngrok: Auto-configured with detected token${NC}"
+            fi
             echo ""
             ;;
         *)
