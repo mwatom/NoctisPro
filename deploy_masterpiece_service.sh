@@ -170,7 +170,7 @@ auto_detect_workspace() {
     print_info "🔍 Auto-detecting workspace configuration..."
     
     # Detect workspace directory (might not always be /workspace)
-    if [ -n "$WORKSPACE" ]; then
+    if [ -n "${WORKSPACE:-}" ]; then
         WORKSPACE_DIR="$WORKSPACE"
     elif [ -n "$PWD" ] && [ -f "$PWD/manage.py" ]; then
         WORKSPACE_DIR="$PWD"
