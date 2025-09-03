@@ -1,0 +1,15 @@
+[Unit]
+Description=NoctisPro Masterpiece Medical Imaging System
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/workspace/noctis_pro_deployment
+Environment=PATH=/workspace/noctis_pro_deployment/venv/bin
+ExecStart=/workspace/noctis_pro_deployment/venv/bin/python manage.py runserver 0.0.0.0:8000
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
