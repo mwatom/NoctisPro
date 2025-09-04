@@ -79,7 +79,7 @@ After setup:
 - **Local**: http://localhost:8000
 - **Admin**: http://localhost:8000/admin/
 - **Health**: http://localhost:8000/health/
-- **Public**: https://colt-charmed-lark.ngrok-free.app (after ngrok auth)
+- **Public**: https://mallard-shining-curiously.ngrok-free.app (after ngrok auth)
 
 ### Default Login
 - **Username**: admin

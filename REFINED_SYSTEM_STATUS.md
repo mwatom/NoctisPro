@@ -66,7 +66,7 @@ To make this available online, you need to configure ngrok:
 3. **Start Tunnel**: 
    ```bash
    tmux new-window -t noctispro_refined -n ngrok
-   tmux send-keys -t noctispro_refined:ngrok "/workspace/ngrok http --url=https://colt-charmed-lark.ngrok-free.app 8000" Enter
+   tmux send-keys -t noctispro_refined:ngrok "/workspace/ngrok http --url=https://mallard-shining-curiously.ngrok-free.app 8000" Enter
    ```
 
 ### 💾 Old System Backup:

@@ -29,7 +29,7 @@ source venv/bin/activate
 python manage.py runserver 0.0.0.0:8000 &
 
 # Start ngrok with static URL (in separate terminal)
-./ngrok http 8000 --hostname=colt-charmed-lark.ngrok-free.app
+./ngrok http 8000 --hostname=mallard-shining-curiously.ngrok-free.app
 ```
 
 ### Step 4: Alternative - Use Deployment Script
@@ -53,12 +53,12 @@ python manage.py runserver 0.0.0.0:8000
 2. **In another terminal, start ngrok:**
 ```bash
 cd /workspace
-./ngrok http 8000 --hostname=colt-charmed-lark.ngrok-free.app
+./ngrok http 8000 --hostname=mallard-shining-curiously.ngrok-free.app
 ```
 
 3. **Access your app at:**
-- URL: https://colt-charmed-lark.ngrok-free.app
-- Admin: https://colt-charmed-lark.ngrok-free.app/admin/
+- URL: https://mallard-shining-curiously.ngrok-free.app
+- Admin: https://mallard-shining-curiously.ngrok-free.app/admin/
 - Login: admin / admin123
 
 ## 🧪 Button Testing Results
@@ -88,6 +88,6 @@ cd /workspace
 1. Get ngrok authtoken (free account)
 2. Run: `./ngrok config add-authtoken YOUR_TOKEN`
 3. Run: `./deploy_online.sh`
-4. Access at: https://colt-charmed-lark.ngrok-free.app
+4. Access at: https://mallard-shining-curiously.ngrok-free.app
 
 **No code changes needed - everything is working correctly!**

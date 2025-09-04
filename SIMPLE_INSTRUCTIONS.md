@@ -20,7 +20,7 @@ ngrok config add-authtoken YOUR_TOKEN_HERE
 sudo /usr/local/bin/start-noctispro
 ```
 
-After this, your site will be live at: **https://colt-charmed-lark.ngrok-free.app**
+After this, your site will be live at: **https://mallard-shining-curiously.ngrok-free.app**
 
 ### Option B: Just Use Local Access
 If you don't need public access right now, you're DONE! Just use:

@@ -21,7 +21,7 @@ cd /workspace
 That's it! The script will:
 - ✅ Start Django application
 - ✅ Configure ngrok tunnel 
-- ✅ Make your app publicly accessible at: `https://colt-charmed-lark.ngrok-free.app`
+- ✅ Make your app publicly accessible at: `https://mallard-shining-curiously.ngrok-free.app`
 
 ## 🛑 Stop Services
 ```bash
@@ -49,7 +49,7 @@ python manage.py runserver 0.0.0.0:8000
 ### Start Ngrok only:
 ```bash
 cd /workspace
-./ngrok http --url=colt-charmed-lark.ngrok-free.app 8000
+./ngrok http --url=mallard-shining-curiously.ngrok-free.app 8000
 ```
 
 ## 📋 System Requirements Met
@@ -65,7 +65,7 @@ cd /workspace
 ## 🏥 Access Your System
 
 Once started, access your NoctisPro system at:
-- **Public URL**: https://colt-charmed-lark.ngrok-free.app
+- **Public URL**: https://mallard-shining-curiously.ngrok-free.app
 - **Local URL**: http://localhost:8000
 
 ## 🆘 Troubleshooting

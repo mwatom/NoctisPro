@@ -5,7 +5,7 @@
 Your NoctisPro system is now configured for **automatic startup** with your **static ngrok URL preserved**!
 
 ### 🌍 Your Static URL
-**https://colt-charmed-lark.ngrok-free.app**
+**https://mallard-shining-curiously.ngrok-free.app**
 
 This URL remains the same every time your system starts, so you can bookmark it and access it reliably.
 
@@ -20,11 +20,11 @@ This URL remains the same every time your system starts, so you can bookmark it 
 - ✅ **Health Monitoring** - Continuous service health checks
 
 ### Access Points
-- 🏠 **Main App**: https://colt-charmed-lark.ngrok-free.app/
-- 📊 **Admin Panel**: https://colt-charmed-lark.ngrok-free.app/admin-panel/
-- 🏥 **DICOM Viewer**: https://colt-charmed-lark.ngrok-free.app/dicom-viewer/
-- 📋 **Worklist**: https://colt-charmed-lark.ngrok-free.app/worklist/
-- 🔧 **Connection Info**: https://colt-charmed-lark.ngrok-free.app/connection-info/
+- 🏠 **Main App**: https://mallard-shining-curiously.ngrok-free.app/
+- 📊 **Admin Panel**: https://mallard-shining-curiously.ngrok-free.app/admin-panel/
+- 🏥 **DICOM Viewer**: https://mallard-shining-curiously.ngrok-free.app/dicom-viewer/
+- 📋 **Worklist**: https://mallard-shining-curiously.ngrok-free.app/worklist/
+- 🔧 **Connection Info**: https://mallard-shining-curiously.ngrok-free.app/connection-info/
 
 ---
 
@@ -117,7 +117,7 @@ python manage.py createsuperuser
 ## 💡 Key Features
 
 ### ✅ Static URL Preservation
-- Your ngrok URL **never changes**: `colt-charmed-lark.ngrok-free.app`
+- Your ngrok URL **never changes**: `mallard-shining-curiously.ngrok-free.app`
 - No need to update bookmarks or shared links
 - Consistent access for your users
 
@@ -146,6 +146,6 @@ Your NoctisPro system will now:
 3. **Recover automatically** from any service failures
 4. **Monitor itself** continuously in the background
 
-**Your static URL**: https://colt-charmed-lark.ngrok-free.app
+**Your static URL**: https://mallard-shining-curiously.ngrok-free.app
 
 Enjoy your fully automated medical imaging platform! 🏥✨

@@ -9,7 +9,7 @@ sudo ./production_deployment.sh
 
 This will:
 - ✅ Install all system dependencies (Docker, Python, etc.)
-- ✅ Configure static ngrok URL: `colt-charmed-lark.ngrok-free.app`
+- ✅ Configure static ngrok URL: `mallard-shining-curiously.ngrok-free.app`
 - ✅ Set up Ubuntu server auto-startup services
 - ✅ Deploy with latest package versions
 - ✅ Create secure production environment
@@ -18,7 +18,7 @@ This will:
 ## 🌐 Access URLs
 
 - **Local Access**: http://localhost:8000
-- **Remote Access**: https://colt-charmed-lark.ngrok-free.app
+- **Remote Access**: https://mallard-shining-curiously.ngrok-free.app
 
 ## 🔧 System Management
 
@@ -130,14 +130,14 @@ sudo docker-compose -f docker-compose.production.yml up -d
 ## 🌐 Ngrok Configuration
 
 ### Static URL:
-- **URL**: `colt-charmed-lark.ngrok-free.app`
+- **URL**: `mallard-shining-curiously.ngrok-free.app`
 - **Protocol**: HTTPS
 - **Port**: 80 (mapped from internal 8000)
 
 ### Service Configuration:
 ```bash
 # Manual ngrok start (if needed)
-ngrok http --url=colt-charmed-lark.ngrok-free.app 80
+ngrok http --url=mallard-shining-curiously.ngrok-free.app 80
 
 # Check ngrok status
 curl http://localhost:4040/api/tunnels

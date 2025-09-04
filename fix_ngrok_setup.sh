@@ -57,7 +57,7 @@ echo -e "   ${BLUE}source venv/bin/activate${NC}"
 echo -e "   ${BLUE}python manage.py runserver 0.0.0.0:8000${NC}"
 echo ""
 echo "5. In another terminal, start ngrok:"
-echo -e "   ${BLUE}/workspace/ngrok http 8000 --hostname=colt-charmed-lark.ngrok-free.app${NC}"
+echo -e "   ${BLUE}/workspace/ngrok http 8000 --hostname=mallard-shining-curiously.ngrok-free.app${NC}"
 echo ""
 
 # Step 5: Alternative automatic setup
@@ -71,7 +71,7 @@ echo ""
 echo -e "${BLUE}📋 Current URL Status:${NC}"
 echo "Current saved URL: $(cat /workspace/current_ngrok_url.txt)"
 echo "Status: 404 (tunnel not running due to authentication)"
-echo "Target static URL: colt-charmed-lark.ngrok-free.app"
+echo "Target static URL: mallard-shining-curiously.ngrok-free.app"
 echo ""
 
 echo -e "${GREEN}🎯 Summary:${NC}"

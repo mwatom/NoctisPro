@@ -158,7 +158,7 @@
 ## 🌐 **Network & Access**
 
 #### ✅ **Public Access Configuration**
-- [x] **Static ngrok URL**: `https://colt-charmed-lark.ngrok-free.app/`
+- [x] **Static ngrok URL**: `https://mallard-shining-curiously.ngrok-free.app/`
 - [x] **Worldwide accessibility**
 - [x] **Secure tunnel** configuration
 - [x] **Professional domain** setup

@@ -13,7 +13,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 echo -e "${CYAN}🚀 NoctisPro Masterpiece - Complete Deployment${NC}"
-echo -e "${CYAN}   Static URL: colt-charmed-lark.ngrok-free.app${NC}"
+echo -e "${CYAN}   Static URL: mallard-shining-curiously.ngrok-free.app${NC}"
 echo ""
 
 # Check if ngrok is already authenticated
@@ -27,7 +27,7 @@ fi
 
 echo -e "${YELLOW}⚠️  Ngrok authentication required${NC}"
 echo ""
-echo "To complete deployment with static URL 'colt-charmed-lark.ngrok-free.app':"
+echo "To complete deployment with static URL 'mallard-shining-curiously.ngrok-free.app':"
 echo ""
 echo "1. Get your ngrok auth token:"
 echo -e "   ${CYAN}https://dashboard.ngrok.com/get-started/your-authtoken${NC}"
@@ -46,7 +46,7 @@ echo ""
 
 # Test the exact ngrok command format you specified
 echo -e "${BLUE}🧪 Testing ngrok command format...${NC}"
-echo -e "Command that will be used: ${CYAN}ngrok http --url=colt-charmed-lark.ngrok-free.app 8000${NC}"
+echo -e "Command that will be used: ${CYAN}ngrok http --url=mallard-shining-curiously.ngrok-free.app 8000${NC}"
 echo ""
 
 # Show current Django status

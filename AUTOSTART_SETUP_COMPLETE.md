@@ -69,7 +69,7 @@ sudo tail -f /var/log/noctispro-startup.log
 - **Health Check**: http://localhost:8000/health/
 
 ### Public Access (after ngrok auth):
-- **Static Domain**: https://colt-charmed-lark.ngrok-free.app
+- **Static Domain**: https://mallard-shining-curiously.ngrok-free.app
 - **Dynamic URL**: Check with `curl http://localhost:4040/api/tunnels`
 
 ## 📁 Key Files Created

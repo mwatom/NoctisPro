@@ -68,7 +68,7 @@ sudo ./remove_old_setup_new.sh
 ```
 
 **Your system will then be available at:**
-- **Online**: https://colt-charmed-lark.ngrok-free.app/
+- **Online**: https://mallard-shining-curiously.ngrok-free.app/
 
 ## 📋 Service Management Commands
 

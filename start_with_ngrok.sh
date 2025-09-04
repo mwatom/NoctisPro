@@ -46,7 +46,7 @@ print_header() {
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STATIC_URL="colt-charmed-lark.ngrok-free.app"
+STATIC_URL="mallard-shining-curiously.ngrok-free.app"
 DJANGO_PORT="8000"
 NGROK_BINARY="$SCRIPT_DIR/ngrok"
 

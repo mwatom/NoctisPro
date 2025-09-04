@@ -2,14 +2,14 @@
 
 ## ✅ What's Working
 - ✅ Django server is running successfully on port 8000
-- ✅ Static URL configured: `colt-charmed-lark.ngrok-free.app`
+- ✅ Static URL configured: `mallard-shining-curiously.ngrok-free.app`
 - ✅ All dependencies installed
 - ✅ Database migrated and ready
 - ✅ Static files collected
 
 ## 🔧 Next Step: Complete Ngrok Setup
 
-To finish the deployment with your static URL `https://colt-charmed-lark.ngrok-free.app`, you need to:
+To finish the deployment with your static URL `https://mallard-shining-curiously.ngrok-free.app`, you need to:
 
 ### 1. Get Your Ngrok Auth Token
 - Visit: https://dashboard.ngrok.com/get-started/your-authtoken
@@ -36,8 +36,8 @@ cd /workspace
 
 ## 🎯 Final Result
 Once completed, your application will be available at:
-- **Main App**: https://colt-charmed-lark.ngrok-free.app/
-- **Admin Panel**: https://colt-charmed-lark.ngrok-free.app/admin/
+- **Main App**: https://mallard-shining-curiously.ngrok-free.app/
+- **Admin Panel**: https://mallard-shining-curiously.ngrok-free.app/admin/
 
 ## 🔍 Current Status
 ```bash
