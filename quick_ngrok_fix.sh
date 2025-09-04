@@ -48,6 +48,9 @@ else
     if [ -d "venv" ]; then
         source venv/bin/activate
     fi
+    # Kill any existing Django processes first
+    pkill -f "manage.py runserver" 2>/dev/null || true
+    sleep 2
     nohup python manage.py runserver 0.0.0.0:8000 > /workspace/django_server.log 2>&1 &
     sleep 3
     
@@ -70,8 +73,8 @@ pkill ngrok || true
 sleep 2
 
 # Start ngrok with the desired static URL
-echo -e "${CYAN}Starting: /workspace/ngrok http 8000 --hostname=mallard-shining-curiously.ngrok-free.app${NC}"
-nohup /workspace/ngrok http 8000 --hostname=mallard-shining-curiously.ngrok-free.app > /workspace/ngrok_output.log 2>&1 &
+echo -e "${CYAN}Starting: /workspace/ngrok http --url=mallard-shining-curiously.ngrok-free.app 8000${NC}"
+nohup /workspace/ngrok http --url=mallard-shining-curiously.ngrok-free.app 8000 > /workspace/ngrok_output.log 2>&1 &
 
 # Wait for ngrok to start
 sleep 5
