@@ -638,6 +638,103 @@
                 padding: 3px 6px;
             }
         }
+        
+        /* Comprehensive Mobile Responsive Design */
+        @media (max-width: 768px) {
+            /* Mobile Navigation */
+            .top-navbar {
+                padding: 4px 8px;
+                height: auto;
+                flex-wrap: wrap;
+            }
+            
+            .nav-left {
+                flex-direction: column;
+                gap: 10px;
+                width: 100%;
+            }
+            
+            .nav-tabs {
+                flex-wrap: wrap;
+                gap: 1px;
+                justify-content: center;
+            }
+            
+            .nav-tab {
+                padding: 8px 12px;
+                font-size: 11px;
+                min-width: auto;
+            }
+            
+            .nav-right {
+                width: 100%;
+                justify-content: center;
+                flex-wrap: wrap;
+                margin-top: 8px;
+                gap: 4px;
+            }
+            
+            .user-info {
+                font-size: 10px;
+            }
+            
+            .user-avatar {
+                width: 24px;
+                height: 24px;
+                font-size: 10px;
+            }
+            
+            /* Mobile Button Adjustments */
+            .btn-control, .admin-btn {
+                padding: 6px 10px;
+                font-size: 10px;
+                min-width: auto;
+            }
+            
+            /* Mobile Dashboard Container */
+            .dashboard-container {
+                padding: 4px;
+                font-size: 11px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            /* Extra small mobile devices */
+            body {
+                font-size: 11px;
+            }
+            
+            .top-navbar {
+                padding: 2px 4px;
+            }
+            
+            .logo {
+                font-size: 12px;
+            }
+            
+            .nav-tab {
+                padding: 6px 8px;
+                font-size: 10px;
+            }
+            
+            .btn-control, .admin-btn {
+                padding: 4px 8px;
+                font-size: 9px;
+            }
+            
+            /* Mobile form elements */
+            input, select, textarea, button {
+                font-size: 16px; /* Prevents zoom on iOS */
+                -webkit-appearance: none;
+                appearance: none;
+            }
+            
+            /* Mobile touch targets */
+            button, .btn, .nav-tab {
+                min-height: 44px;
+                touch-action: manipulation;
+            }
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
