@@ -327,19 +327,71 @@ start_service() {
     
     cd "$REFINED_SYSTEM_DIR"
     
-    # Create virtual environment if it doesn't exist
-    if [ ! -d "venv" ]; then
-        print_info "Creating virtual environment..."
+    # Ensure Python3 is available
+    if ! command -v python3 > /dev/null 2>&1; then
+        print_error "Python3 is not installed or not in PATH"
+        return 1
+    fi
+    
+    # Create virtual environment if it doesn't exist or is corrupted
+    if [ ! -d "venv" ] || [ ! -f "venv/bin/activate" ] || [ ! -f "venv/bin/python" ]; then
+        print_info "Creating/recreating virtual environment..."
+        rm -rf venv 2>/dev/null || true
         python3 -m venv venv
+        if [ $? -ne 0 ]; then
+            print_error "Failed to create virtual environment"
+            return 1
+        fi
+        print_success "Virtual environment created successfully"
+    else
+        print_success "Virtual environment already exists"
     fi
     
-    # Activate virtual environment and install dependencies
+    # Activate virtual environment
+    print_info "Activating virtual environment..."
     source venv/bin/activate
-    
-    if [ -f "requirements.txt" ]; then
-        print_info "Installing/updating dependencies..."
-        pip install -q -r requirements.txt
+    if [ $? -ne 0 ]; then
+        print_error "Failed to activate virtual environment"
+        return 1
     fi
+    
+    # Verify virtual environment is active
+    if [[ "$VIRTUAL_ENV" != *"$REFINED_SYSTEM_DIR/venv"* ]]; then
+        print_error "Virtual environment activation failed"
+        return 1
+    fi
+    print_success "Virtual environment activated"
+    
+    # Upgrade pip to latest version
+    print_info "Upgrading pip to latest version..."
+    pip install --upgrade pip > /dev/null 2>&1 || {
+        print_warning "Failed to upgrade pip, continuing with current version"
+    }
+    
+    # Install/update dependencies
+    if [ -f "requirements.txt" ]; then
+        print_info "Installing/updating dependencies from requirements.txt..."
+        pip install -r requirements.txt
+        if [ $? -ne 0 ]; then
+            print_error "Failed to install dependencies from requirements.txt"
+            return 1
+        fi
+        print_success "Dependencies installed successfully"
+    else
+        print_warning "No requirements.txt found, installing basic Django dependencies..."
+        pip install django gunicorn > /dev/null 2>&1 || {
+            print_error "Failed to install basic Django dependencies"
+            return 1
+        }
+        print_success "Basic Django dependencies installed"
+    fi
+    
+    # Verify Django is available
+    if ! python -c "import django" > /dev/null 2>&1; then
+        print_error "Django is not properly installed in virtual environment"
+        return 1
+    fi
+    print_success "Django is available in virtual environment"
     
     # Run migrations
     print_info "Running database migrations..."
