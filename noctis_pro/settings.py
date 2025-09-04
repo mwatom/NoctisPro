@@ -25,9 +25,9 @@ import os
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-7x!8k@m$z9h#4p&x3w2v6t@n5q8r7y#3e$6u9i%m&o^2d1f0g')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
+DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*,afc14a217e7d.ngrok-free.app,803f15a13d75.ngrok-free.app,colt-charmed-lark.ngrok-free.app,localhost,127.0.0.1,0.0.0.0').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*,mallard-shining-curiously.ngrok-free.app,afc14a217e7d.ngrok-free.app,803f15a13d75.ngrok-free.app,colt-charmed-lark.ngrok-free.app,localhost,127.0.0.1,0.0.0.0').split(',')
 
 
 # Application definition
@@ -154,7 +154,6 @@ _extra_static_dir = os.path.join(BASE_DIR, 'static')
 os.makedirs(_extra_static_dir, exist_ok=True)
 STATICFILES_DIRS = [_extra_static_dir]
 
-# Force static file serving in development/testing
 SERVE_MEDIA_FILES = os.environ.get('SERVE_MEDIA_FILES', 'True').lower() == 'true'
 
 # Configure MIME types for static files
