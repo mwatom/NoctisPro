@@ -1,0 +1,28 @@
+[2025-09-04 16:46:39 +0000] [9300] [INFO] Starting gunicorn 23.0.0
+[2025-09-04 16:46:39 +0000] [9300] [INFO] Listening at: http://0.0.0.0:8000 (9300)
+[2025-09-04 16:46:39 +0000] [9300] [INFO] Using worker: sync
+[2025-09-04 16:46:39 +0000] [9301] [INFO] Booting worker with pid: 9301
+[2025-09-04 16:46:39 +0000] [9302] [INFO] Booting worker with pid: 9302
+[2025-09-04 16:46:39 +0000] [9303] [INFO] Booting worker with pid: 9303
+[2025-09-04 16:47:09 +0000] [9302] [INFO] Worker exiting (pid: 9302)
+[2025-09-04 16:47:09 +0000] [9303] [INFO] Worker exiting (pid: 9303)
+[2025-09-04 16:47:09 +0000] [9301] [INFO] Worker exiting (pid: 9301)
+[2025-09-04 16:47:09 +0000] [9300] [INFO] Handling signal: term
+[2025-09-04 16:47:09 +0000] [9300] [INFO] Shutting down: Master
+[2025-09-04 16:47:11 +0000] [9720] [INFO] Starting gunicorn 23.0.0
+[2025-09-04 16:47:11 +0000] [9720] [INFO] Listening at: http://0.0.0.0:8000 (9720)
+[2025-09-04 16:47:11 +0000] [9720] [INFO] Using worker: sync
+[2025-09-04 16:47:11 +0000] [9724] [INFO] Booting worker with pid: 9724
+[2025-09-04 16:47:11 +0000] [9725] [INFO] Booting worker with pid: 9725
+[2025-09-04 16:47:11 +0000] [9726] [INFO] Booting worker with pid: 9726
+[2025-09-04 16:47:36 +0000] [9724] [INFO] Worker exiting (pid: 9724)
+[2025-09-04 16:47:36 +0000] [9725] [INFO] Worker exiting (pid: 9725)
+[2025-09-04 16:47:36 +0000] [9726] [INFO] Worker exiting (pid: 9726)
+[2025-09-04 16:47:36 +0000] [9720] [INFO] Handling signal: term
+[2025-09-04 16:47:36 +0000] [9720] [INFO] Shutting down: Master
+[2025-09-04 16:47:38 +0000] [10250] [INFO] Starting gunicorn 23.0.0
+[2025-09-04 16:47:38 +0000] [10250] [INFO] Listening at: http://0.0.0.0:8000 (10250)
+[2025-09-04 16:47:38 +0000] [10250] [INFO] Using worker: sync
+[2025-09-04 16:47:38 +0000] [10251] [INFO] Booting worker with pid: 10251
+[2025-09-04 16:47:38 +0000] [10252] [INFO] Booting worker with pid: 10252
+[2025-09-04 16:47:38 +0000] [10253] [INFO] Booting worker with pid: 10253
