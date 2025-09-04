@@ -32,7 +32,7 @@ import logging
 
 from .models import ViewerSession, Measurement, Annotation, ReconstructionJob
 from .dicom_utils import DicomProcessor, safe_dicom_str
-# from .reconstruction import MPRProcessor, MIPProcessor, Bone3DProcessor, MRI3DProcessor
+from .reconstruction import MPRProcessor, Bone3DProcessor, MRI3DProcessor
 from .models import WindowLevelPreset, HangingProtocol
 
 # Initialize logger
