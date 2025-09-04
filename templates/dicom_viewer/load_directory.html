@@ -253,8 +253,8 @@
         <div class="spinner"></div>
         <p>Scanning directory and processing DICOM files...</p>
         <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 1rem;">
-            <strong>Please wait:</strong> Large directories may take up to 30 seconds to scan.<br>
-            Processing is limited to 1000 files and 50 DICOM files for optimal performance.
+            <strong>Please wait:</strong> Large medical datasets may take up to 1-2 minutes to scan.<br>
+            System can handle up to 5000 files and process 500 DICOM files for comprehensive loading.
         </div>
     </div>
     
@@ -278,10 +278,11 @@
             <li><strong>Linux/Mac:</strong> Use paths like <code>/media/usb/dicom</code> or <code>/home/user/dicom</code></li>
             <li><strong>Flash Drive:</strong> Insert your USB drive and navigate to its mount point</li>
             <li><strong>CD/DVD:</strong> Insert disc and use the disc mount path</li>
-            <li>The system will recursively scan subdirectories for DICOM files (max 10 levels deep)</li>
+            <li>The system will recursively scan subdirectories for DICOM files (max 15 levels deep)</li>
             <li>Supported file extensions: .dcm, .dicom, .dic, and files without extensions</li>
-            <li><strong>Performance:</strong> Limited to 1000 files scanned and 50 DICOM files processed for optimal speed</li>
-            <li><strong>Timeout:</strong> Scanning will timeout after 30 seconds to prevent system freezing</li>
+            <li><strong>Capacity:</strong> Can scan up to 5000 files and process up to 500 DICOM files per session</li>
+            <li><strong>Timeout:</strong> Scanning will timeout after 60 seconds, processing after 2 minutes for safety</li>
+            <li><strong>Large Datasets:</strong> For machines with 2000+ images, the system will process the first 500 files and show a summary</li>
         </ul>
         
         <div class="path-examples">
@@ -391,7 +392,10 @@ function showResults(data) {
                 <strong><i class="fas fa-exclamation-triangle"></i> Performance Limits Reached:</strong><br>
                 ${data.warnings.map(warning => `• ${warning}`).join('<br>')}
                 <br><br>
-                <em>For better performance with large directories, consider organizing DICOM files into smaller subdirectories.</em>
+                <em>For datasets with 2000+ images:</em><br>
+                • The first 500 files have been processed and are ready to view<br>
+                • You can organize files into smaller subdirectories and load them separately<br>
+                • Or use the system multiple times to load different parts of your dataset
             </div>
         `;
     }

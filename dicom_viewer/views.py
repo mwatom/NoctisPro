@@ -1477,11 +1477,11 @@ def load_from_directory(request):
             except Exception as e:
                 return JsonResponse({'success': False, 'error': f'Invalid directory path: {str(e)}'})
             
-            # Performance and safety limits
-            MAX_FILES_TO_SCAN = 1000  # Limit total files scanned
-            MAX_DICOM_FILES = 200     # Limit DICOM files processed
-            MAX_SCAN_TIME = 30        # Maximum scan time in seconds
-            MAX_DEPTH = 10            # Maximum directory depth
+            # Performance and safety limits - adjusted for medical imaging workflows
+            MAX_FILES_TO_SCAN = 5000   # Limit total files scanned (medical machines can have many files)
+            MAX_DICOM_FILES = 3000     # Limit DICOM files found (handle large studies)
+            MAX_SCAN_TIME = 60         # Maximum scan time in seconds (increased for large datasets)
+            MAX_DEPTH = 15             # Maximum directory depth (medical storage can be deeply nested)
             
             # Recursively find DICOM files with limits and timeout
             dicom_files = []
@@ -1502,8 +1502,8 @@ def load_from_directory(request):
                         continue
                     
                     # Limit directory traversal for performance
-                    if len(dirs) > 50:  # If too many subdirectories, skip some
-                        dirs[:] = dirs[:50]
+                    if len(dirs) > 100:  # If too many subdirectories, skip some (increased for medical storage)
+                        dirs[:] = dirs[:100]
                     
                     for file in files:
                         files_scanned += 1
@@ -1517,8 +1517,8 @@ def load_from_directory(request):
                             logger.info(f"Reached maximum DICOM files ({MAX_DICOM_FILES})")
                             break
                         
-                        # Check timeout periodically
-                        if files_scanned % 100 == 0 and time.time() - start_time > MAX_SCAN_TIME:
+                        # Check timeout periodically (less frequent checks for better performance)
+                        if files_scanned % 200 == 0 and time.time() - start_time > MAX_SCAN_TIME:
                             logger.warning(f"Directory scan timeout after {MAX_SCAN_TIME}s")
                             break
                         
@@ -1576,10 +1576,10 @@ def load_from_directory(request):
             invalid_files = 0
             rep_ds = None
             
-            # Process files in smaller chunks to prevent memory issues
-            MAX_PROCESS_FILES = min(50, len(dicom_files))  # Reduced from 100 for better performance
+            # Process files in manageable chunks for medical imaging workflows
+            MAX_PROCESS_FILES = min(500, len(dicom_files))  # Increased to handle medical studies
             processing_start = time.time()
-            MAX_PROCESS_TIME = 45  # Maximum processing time in seconds
+            MAX_PROCESS_TIME = 120  # Maximum processing time in seconds (2 minutes for large datasets)
             
             logger.info(f"Processing {MAX_PROCESS_FILES} DICOM files from {total_files} found")
             
@@ -1610,8 +1610,8 @@ def load_from_directory(request):
                     studies_map[study_uid][series_uid].append((ds, file_path))
                     processed_files += 1
                     
-                    # Log progress every 10 files
-                    if (i + 1) % 10 == 0:
+                    # Log progress every 50 files for large datasets
+                    if (i + 1) % 50 == 0:
                         logger.info(f"Processed {i + 1}/{MAX_PROCESS_FILES} files")
                         
                 except (pydicom.errors.InvalidDicomError, FileNotFoundError, PermissionError):
