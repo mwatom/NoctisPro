@@ -205,6 +205,17 @@ def viewer(request):
     return render(request, 'dicom_viewer/viewer.html', context)
 
 @login_required
+def masterpiece_viewer(request):
+    """Masterpiece DICOM viewer with enhanced features and integration."""
+    context = {
+        'study_id': request.GET.get('study', ''),
+        'series_id': request.GET.get('series', ''),
+        'current_date': timezone.now().strftime('%Y-%m-%d'),
+        'user': request.user
+    }
+    return render(request, 'dicom_viewer/masterpiece_viewer.html', context)
+
+@login_required
 def advanced_standalone_viewer(request):
     """Deprecated: web viewer removed. Redirect to desktop launcher endpoint."""
     return redirect('dicom_viewer:launch_standalone_viewer')
