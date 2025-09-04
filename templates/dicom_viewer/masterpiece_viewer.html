@@ -1397,9 +1397,27 @@
             
             const imgData = new ImageData(pixels, imageData.columns, imageData.rows);
             
-            // Clear and draw - EXACTLY AS YOUR ORIGINAL
+            // Clear and draw - YOUR ORIGINAL METHOD WITH OPTIONAL ENHANCEMENTS
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.putImageData(imgData, 0, 0);
+            
+            // If any transformations are active, use enhanced rendering
+            if (zoom !== 1.0 || panX !== 0 || panY !== 0 || rotation !== 0 || flipH || flipV) {
+                // Enhanced rendering with transformations (for new tools)
+                ctx.save();
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+                ctx.scale(zoom, zoom);
+                ctx.translate(panX, panY);
+                
+                if (rotation !== 0) ctx.rotate(rotation * Math.PI / 180);
+                if (flipH || flipV) ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+                
+                ctx.translate(-imgData.width / 2, -imgData.height / 2);
+                ctx.putImageData(imgData, 0, 0);
+                ctx.restore();
+            } else {
+                // YOUR ORIGINAL SIMPLE METHOD (default)
+                ctx.putImageData(imgData, 0, 0);
+            }
             
             // Draw overlays - SAME AS YOUR ORIGINAL
             drawMeasurements();
