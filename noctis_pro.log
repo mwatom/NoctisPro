@@ -17,3 +17,4 @@ Forbidden (CSRF token missing.): /worklist/
 "POST /worklist/ HTTP/1.1" 403 2491
 "HEAD /worklist/ HTTP/1.1" 302 0
 "GET /worklist/ HTTP/1.1" 200 53233
+Forbidden (CSRF token missing.): /worklist/
