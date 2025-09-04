@@ -282,6 +282,28 @@ check_ngrok() {
     return 0
 }
 
+# Setup virtual environment
+setup_virtual_environment() {
+    print_info "Creating virtual environment..."
+
+    # Always create venv inside project folder if it doesn't exist
+    if [ ! -d "venv" ]; then
+        python3 -m venv venv
+        print_success "Virtual environment created"
+    else
+        print_success "Virtual environment already exists"
+    fi
+
+    # Activate venv
+    source venv/bin/activate
+
+    print_info "Installing/updating dependencies..."
+    pip install --upgrade pip
+    pip install -r requirements.txt
+    
+    print_success "Virtual environment setup completed"
+}
+
 # Check if refined system exists
 check_refined_system() {
     print_info "Checking refined system..."
@@ -327,19 +349,8 @@ start_service() {
     
     cd "$REFINED_SYSTEM_DIR"
     
-    # Create virtual environment if it doesn't exist
-    if [ ! -d "venv" ]; then
-        print_info "Creating virtual environment..."
-        python3 -m venv venv
-    fi
-    
-    # Activate virtual environment and install dependencies
-    source venv/bin/activate
-    
-    if [ -f "requirements.txt" ]; then
-        print_info "Installing/updating dependencies..."
-        pip install -q -r requirements.txt
-    fi
+    # Setup virtual environment with enhanced logging
+    setup_virtual_environment
     
     # Run migrations
     print_info "Running database migrations..."
