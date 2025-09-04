@@ -30,8 +30,20 @@ print_error() {
     echo -e "${RED}❌ $1${NC}"
 }
 
-# Set working directory
-cd /workspace
+# Set working directory - use current directory if /workspace doesn't exist
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORK_DIR="${SCRIPT_DIR}"
+
+# Try to use /workspace if it exists and is writable, otherwise use script directory
+if [ -d "/workspace" ] && [ -w "/workspace" ]; then
+    WORK_DIR="/workspace"
+    cd /workspace
+else
+    WORK_DIR="${SCRIPT_DIR}"
+    cd "${SCRIPT_DIR}"
+fi
+
+echo "Working directory: ${WORK_DIR}"
 
 print_status "Starting NOCTIS PRO PACS complete deployment..."
 echo ""
@@ -179,19 +191,75 @@ nohup gunicorn noctis_pro.wsgi:application \
 sleep 3
 print_success "Gunicorn started on port 8000"
 
-# 9. START NGROK (ALWAYS TRY)
+# 9. START NGROK WITH AUTO-DETECTION
 print_status "STEP 9: Starting ngrok tunnel for public access..."
 pkill -f ngrok 2>/dev/null
 sleep 2
 
-# Try to start ngrok
-nohup ngrok http --url=mallard-shining-curiously.ngrok-free.app 80 > /workspace/ngrok.log 2>&1 &
-sleep 5
+# Auto-detect ngrok auth token from various sources
+NGROK_TOKEN=""
+NGROK_CONFIG_FILE=""
 
-if pgrep -f ngrok > /dev/null; then
+# Check for existing ngrok config
+if [ -f "$HOME/.config/ngrok/ngrok.yml" ]; then
+    NGROK_CONFIG_FILE="$HOME/.config/ngrok/ngrok.yml"
+    NGROK_TOKEN=$(grep -E "authtoken:|auth_token:" "$NGROK_CONFIG_FILE" 2>/dev/null | cut -d: -f2 | tr -d ' "')
+elif [ -f "$HOME/.ngrok2/ngrok.yml" ]; then
+    NGROK_CONFIG_FILE="$HOME/.ngrok2/ngrok.yml"
+    NGROK_TOKEN=$(grep -E "authtoken:|auth_token:" "$NGROK_CONFIG_FILE" 2>/dev/null | cut -d: -f2 | tr -d ' "')
+fi
+
+# Check environment variables
+if [ -z "$NGROK_TOKEN" ] && [ -n "$NGROK_AUTHTOKEN" ]; then
+    NGROK_TOKEN="$NGROK_AUTHTOKEN"
+fi
+
+# Try to configure ngrok if we have a token but no config
+if [ -n "$NGROK_TOKEN" ] && [ -z "$NGROK_CONFIG_FILE" ]; then
+    print_status "Configuring ngrok with detected auth token..."
+    ngrok config add-authtoken "$NGROK_TOKEN" 2>/dev/null
+fi
+
+# Try to start ngrok with different approaches
+NGROK_STARTED=false
+
+# First try: Use static URL if available
+if ! $NGROK_STARTED; then
+    print_status "Attempting to start ngrok with static URL..."
+    nohup ngrok http --url=mallard-shining-curiously.ngrok-free.app 80 > "${WORK_DIR}/ngrok.log" 2>&1 &
+    sleep 5
+    if pgrep -f ngrok > /dev/null; then
+        NGROK_STARTED=true
+        NGROK_STATUS="✅ ACTIVE (Static URL)"
+        PUBLIC_ACCESS="https://mallard-shining-curiously.ngrok-free.app"
+    fi
+fi
+
+# Second try: Use dynamic URL
+if ! $NGROK_STARTED; then
+    print_status "Attempting to start ngrok with dynamic URL..."
+    pkill -f ngrok 2>/dev/null
+    sleep 2
+    nohup ngrok http 80 > "${WORK_DIR}/ngrok.log" 2>&1 &
+    sleep 5
+    if pgrep -f ngrok > /dev/null; then
+        NGROK_STARTED=true
+        # Try to extract the URL from the log
+        sleep 3
+        DYNAMIC_URL=$(grep -o "https://[a-zA-Z0-9-]*\.ngrok-free\.app" "${WORK_DIR}/ngrok.log" 2>/dev/null | head -1)
+        if [ -n "$DYNAMIC_URL" ]; then
+            NGROK_STATUS="✅ ACTIVE (Dynamic URL)"
+            PUBLIC_ACCESS="$DYNAMIC_URL"
+        else
+            NGROK_STATUS="✅ ACTIVE (Check ngrok.log for URL)"
+            PUBLIC_ACCESS="Check ${WORK_DIR}/ngrok.log for URL"
+        fi
+    fi
+fi
+
+# Report results
+if $NGROK_STARTED; then
     print_success "Ngrok tunnel active - Public access enabled"
-    NGROK_STATUS="✅ ACTIVE"
-    PUBLIC_ACCESS="https://mallard-shining-curiously.ngrok-free.app"
 else
     print_warning "Ngrok tunnel not started - Auth token may be needed"
     NGROK_STATUS="⚠️  NEEDS AUTH TOKEN"

@@ -32,7 +32,7 @@ import logging
 
 from .models import ViewerSession, Measurement, Annotation, ReconstructionJob
 from .dicom_utils import DicomProcessor, safe_dicom_str
-# from .reconstruction import MPRProcessor, MIPProcessor, Bone3DProcessor, MRI3DProcessor
+from .reconstruction import MPRProcessor, Bone3DProcessor, MRI3DProcessor
 from .models import WindowLevelPreset, HangingProtocol
 
 # Initialize logger
@@ -196,14 +196,13 @@ def _get_mpr_volume_for_series(series):
 
 @login_required
 def viewer(request):
-    """Entry: if ?study=<id> is provided, open that study in desktop viewer; else open launcher."""
-    study_id = request.GET.get('study')
-    if study_id:
-        try:
-            return redirect('dicom_viewer:launch_study_in_desktop_viewer', study_id=int(study_id))
-        except Exception:
-            return redirect('dicom_viewer:launch_standalone_viewer')
-    return redirect('dicom_viewer:launch_standalone_viewer')
+    """Complete professional DICOM viewer with MPR, 3D reconstruction, and all medical imaging tools."""
+    context = {
+        'study_id': request.GET.get('study', ''),
+        'series_id': request.GET.get('series', ''),
+        'current_date': timezone.now().strftime('%Y-%m-%d')
+    }
+    return render(request, 'dicom_viewer/viewer.html', context)
 
 @login_required
 def advanced_standalone_viewer(request):
