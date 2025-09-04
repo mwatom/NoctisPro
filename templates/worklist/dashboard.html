@@ -701,6 +701,9 @@
             <button type="button" class="btn-dicom-viewer" onclick="launchDicomViewer()" title="Masterpiece DICOM Viewer" style="background: linear-gradient(135deg, #6b46c1, #553c9a); color: white; font-weight: bold;">
                 <i class="fas fa-cube"></i> DICOM VIEWER
             </button>
+            <button type="button" class="btn-control" onclick="loadFromDirectory()" title="Load DICOM from Directory/USB/Disc" style="background: linear-gradient(135deg, #059669, #047857); color: white; font-weight: bold;">
+                <i class="fas fa-folder-open"></i> LOAD DIRECTORY
+            </button>
             <button type="button" class="btn-control" onclick="uploadStudies()" title="Upload Studies">
                 <i class="fas fa-upload"></i>
             </button>
@@ -1158,6 +1161,11 @@
 
         function uploadStudies() {
             window.location.href = '{% url 'worklist:upload_study' %}';
+        }
+
+        function loadFromDirectory() {
+            window.location.href = '/dicom-viewer/load-directory/';
+            showToast('Opening directory loader...', 'success', 2000);
         }
 
         // Clean toast notification system
