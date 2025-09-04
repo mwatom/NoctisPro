@@ -1,0 +1,17 @@
+[Unit]
+Description=NoctisPro Masterpiece Refined Service
+After=network.target
+
+[Service]
+Type=forking
+User=root
+WorkingDirectory=/workspace
+ExecStart=/workspace/deploy_masterpiece_service.sh start
+ExecStop=/workspace/deploy_masterpiece_service.sh stop
+ExecReload=/workspace/deploy_masterpiece_service.sh restart
+PIDFile=/workspace/noctispro-masterpiece.pid
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
