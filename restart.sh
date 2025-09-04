@@ -1,6 +1,7 @@
 #!/bin/bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "🔄 Restarting NOCTIS PRO PACS services..."
-/workspace/keep_services_running.sh
+"${SCRIPT_DIR}/keep_services_running.sh"
 sleep 5
 echo "✅ Services restarted!"
-/workspace/status.sh
+"${SCRIPT_DIR}/status.sh"

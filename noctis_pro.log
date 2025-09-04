@@ -1,3 +1,19 @@
 Watching for file changes with StatReloader
 /workspace/noctis_pro/settings.py changed, reloading.
 Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Forbidden (CSRF cookie not set.): /login/
+Forbidden (CSRF token from POST has incorrect length.): /login/
+/workspace/noctis_pro/settings.py changed, reloading.
+Watching for file changes with StatReloader
+Forbidden (CSRF token from POST has incorrect length.): /login/
+Forbidden (CSRF token missing.): /worklist/
+Forbidden (CSRF cookie not set.): /login/
+"HEAD /login/ HTTP/1.1" 200 0
+Watching for file changes with StatReloader
+"GET /login/ HTTP/1.1" 200 17452
+"POST /login/ HTTP/1.1" 302 0
+Forbidden (CSRF token missing.): /worklist/
+"POST /worklist/ HTTP/1.1" 403 2491
+"HEAD /worklist/ HTTP/1.1" 302 0
+"GET /worklist/ HTTP/1.1" 200 53233
