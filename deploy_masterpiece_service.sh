@@ -247,38 +247,137 @@ NGROK_AUTHTOKEN=$DETECTED_NGROK_TOKEN"
     print_success "Environment file configured: $DETECTED_ENV_FILE"
 }
 
+# Install and setup ngrok
+install_setup_ngrok() {
+    print_info "Setting up ngrok..."
+    
+    # Check if ngrok binary exists
+    if [ ! -f "$WORKSPACE_DIR/ngrok" ]; then
+        print_info "Ngrok binary not found, attempting to install..."
+        
+        # Check if compressed ngrok package exists
+        if [ -f "$WORKSPACE_DIR/ngrok-v3-stable-linux-amd64.tgz" ]; then
+            print_info "Found ngrok package, extracting..."
+            cd "$WORKSPACE_DIR"
+            tar -xzf ngrok-v3-stable-linux-amd64.tgz
+            chmod +x ngrok
+            print_success "Ngrok extracted and made executable"
+        else
+            # Download ngrok if not present
+            print_info "Downloading ngrok..."
+            cd "$WORKSPACE_DIR"
+            
+            # Detect architecture
+            ARCH=$(uname -m)
+            case $ARCH in
+                x86_64) NGROK_ARCH="amd64" ;;
+                aarch64|arm64) NGROK_ARCH="arm64" ;;
+                armv7l) NGROK_ARCH="arm" ;;
+                i386|i686) NGROK_ARCH="386" ;;
+                *) 
+                    print_error "Unsupported architecture: $ARCH"
+                    return 1
+                ;;
+            esac
+            
+            # Download ngrok
+            NGROK_URL="https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-${NGROK_ARCH}.tgz"
+            if curl -L -o ngrok-v3-stable-linux-${NGROK_ARCH}.tgz "$NGROK_URL"; then
+                tar -xzf ngrok-v3-stable-linux-${NGROK_ARCH}.tgz
+                chmod +x ngrok
+                print_success "Ngrok downloaded and installed"
+            else
+                print_error "Failed to download ngrok"
+                return 1
+            fi
+        fi
+    else
+        print_success "Ngrok binary already exists"
+    fi
+    
+    # Verify ngrok binary works
+    if ! "$WORKSPACE_DIR/ngrok" version > /dev/null 2>&1; then
+        print_error "Ngrok binary is not working properly"
+        return 1
+    fi
+    
+    print_success "Ngrok binary is functional"
+    
+    # Configure ngrok authentication
+    setup_ngrok_auth
+}
+
+# Setup ngrok authentication
+setup_ngrok_auth() {
+    print_info "Configuring ngrok authentication..."
+    
+    # Try auto-detection first
+    if auto_detect_ngrok_auth; then
+        print_success "Ngrok is properly authenticated"
+        return 0
+    fi
+    
+    # If auto-detection fails, try to configure manually
+    print_warning "Ngrok authentication not detected automatically."
+    print_info "Attempting to set up ngrok authentication..."
+    
+    # Check if user wants to configure ngrok interactively
+    echo ""
+    echo -e "${YELLOW}Ngrok Authentication Setup:${NC}"
+    echo "1. Get your free auth token from: https://dashboard.ngrok.com/get-started/your-authtoken"
+    echo "2. You can also add NGROK_AUTHTOKEN to your .env file"
+    echo ""
+    
+    # Try to find token in environment or prompt user
+    local token=""
+    
+    # Check environment variables
+    if [ -n "${NGROK_AUTHTOKEN:-}" ]; then
+        token="$NGROK_AUTHTOKEN"
+        print_info "Using NGROK_AUTHTOKEN from environment"
+    elif [ -n "${NGROK_TOKEN:-}" ]; then
+        token="$NGROK_TOKEN"
+        print_info "Using NGROK_TOKEN from environment"
+    fi
+    
+    # If still no token, check if we're in interactive mode
+    if [ -z "$token" ] && [ -t 0 ]; then
+        echo -e "${CYAN}Enter your ngrok auth token (or press Enter to skip):${NC}"
+        read -p "Token: " token
+    fi
+    
+    # Configure ngrok if we have a token
+    if [ -n "$token" ] && [ "$token" != "YOUR_TOKEN_HERE" ] && [ "$token" != "your-token-here" ]; then
+        if "$WORKSPACE_DIR/ngrok" config add-authtoken "$token" > /dev/null 2>&1; then
+            print_success "Ngrok configured with provided token"
+            return 0
+        else
+            print_warning "Failed to configure ngrok with provided token"
+        fi
+    fi
+    
+    # Final check
+    if "$WORKSPACE_DIR/ngrok" config check > /dev/null 2>&1; then
+        print_success "Ngrok is properly configured"
+        return 0
+    else
+        print_warning "Ngrok is not authenticated - will use free tier with random URLs"
+        print_info "For static URLs, get your auth token from: https://dashboard.ngrok.com/"
+        return 0  # Don't fail deployment, just warn
+    fi
+}
+
 # Check if ngrok is configured (enhanced with auto-detection)
 check_ngrok() {
     print_info "Checking ngrok configuration..."
     
-    if [ ! -f "$WORKSPACE_DIR/ngrok" ]; then
-        print_error "Ngrok binary not found at $WORKSPACE_DIR/ngrok"
+    # First ensure ngrok is installed and set up
+    if ! install_setup_ngrok; then
+        print_error "Failed to install or setup ngrok"
         return 1
     fi
     
-    # Try auto-detection first
-    if auto_detect_ngrok_auth; then
-        print_success "Ngrok is properly configured"
-        return 0
-    fi
-    
-    # Fallback to manual configuration if auto-detection fails
-    print_warning "Auto-detection failed. Manual ngrok configuration needed."
-    echo ""
-    echo -e "${YELLOW}To configure ngrok:${NC}"
-    echo "1. Get your auth token from: https://dashboard.ngrok.com/get-started/your-authtoken"
-    echo "2. Run: $WORKSPACE_DIR/ngrok config add-authtoken YOUR_TOKEN_HERE"
-    echo ""
-    echo -e "${CYAN}Or add NGROK_AUTHTOKEN to your .env file${NC}"
-    echo ""
-    read -p "Press Enter after configuring ngrok, or Ctrl+C to exit..."
-    
-    if ! $WORKSPACE_DIR/ngrok config check > /dev/null 2>&1; then
-        print_error "Ngrok still not configured properly"
-        return 1
-    fi
-    
-    print_success "Ngrok is properly configured"
+    print_success "Ngrok is ready for use"
     return 0
 }
 
@@ -955,8 +1054,11 @@ main() {
             echo -e "${GREEN}🐍 Python Dependencies: Installed from requirements.txt${NC}"
             echo -e "${GREEN}🗄️  Database: Migrated and ready${NC}"
             echo -e "${GREEN}🚀 Auto-start: Configured for system bootup${NC}"
+            echo -e "${GREEN}🌐 Ngrok: Installed and configured${NC}"
             if [ -n "$DETECTED_NGROK_TOKEN" ]; then
-                echo -e "${GREEN}🔐 Ngrok: Auto-configured with detected token${NC}"
+                echo -e "${GREEN}🔐 Ngrok Auth: Auto-configured with detected token${NC}"
+            else
+                echo -e "${YELLOW}🔐 Ngrok Auth: Using free tier (random URLs)${NC}"
             fi
             echo ""
             echo -e "${YELLOW}📋 Next Steps:${NC}"
@@ -995,6 +1097,9 @@ main() {
             echo "  • Database migration and admin user creation"
             echo "  • Django deployment on port 8000"
             echo "  • Static file collection and serving"
+            echo "  • Automatic ngrok download, installation and configuration"
+            echo "  • Ngrok authentication setup (manual or from environment)"
+            echo "  • External access via ngrok tunneling"
             echo ""
             exit 1
             ;;
