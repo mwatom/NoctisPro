@@ -244,7 +244,7 @@ User=noctispro
 Group=noctispro
 WorkingDirectory=/workspace
 EnvironmentFile=/workspace/.env
-ExecStart=$NGROK_BINARY http $PORT --hostname=$STATIC_HOSTNAME --log=stdout
+ExecStart=$NGROK_BINARY http --url=$STATIC_HOSTNAME $PORT --log=stdout
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -313,6 +313,7 @@ show_status() {
     if systemctl is-active --quiet "$NGROK_SERVICE_NAME"; then
         echo -e "${GREEN}✅ Ngrok Service: Running${NC}"
         echo -e "   Public URL: ${CYAN}https://$STATIC_HOSTNAME${NC}"
+        echo -e "   Ngrok Command: ${CYAN}ngrok http --url=$STATIC_HOSTNAME $PORT${NC}"
         echo -e "   Admin URL: ${CYAN}https://$STATIC_HOSTNAME/admin/${NC}"
         echo -e "   Username: admin"
         echo -e "   Password: admin123"
