@@ -23,4 +23,5 @@ urlpatterns = [
     # Placeholder routes referenced by templates
     path('logs/', views.system_logs, name='system_logs'),
     path('settings/', views.settings_view, name='settings'),
+    path('upload-facilities/', views.upload_facilities, name='upload_facilities'),
 ]

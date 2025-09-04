@@ -79,6 +79,13 @@ def settings_view(request):
 
 @login_required
 @user_passes_test(is_admin)
+def upload_facilities(request):
+    """Placeholder: upload facilities view."""
+    messages.info(request, 'Upload facilities view is under construction.')
+    return dashboard(request)
+
+@login_required
+@user_passes_test(is_admin)
 def user_management(request):
     """User management interface with search and filtering"""
     users = User.objects.select_related('facility').all()
