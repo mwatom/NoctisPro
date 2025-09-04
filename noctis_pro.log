@@ -384,3 +384,4 @@ django.urls.exceptions.NoReverseMatch: Reverse for 'upload_facilities' not found
 Watching for file changes with StatReloader
 "GET / HTTP/1.1" 302 0
 "HEAD / HTTP/1.1" 302 0
+"HEAD / HTTP/1.1" 302 0
