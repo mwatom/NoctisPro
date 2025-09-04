@@ -1125,6 +1125,51 @@ def api_update_study_status(request, study_id):
         return JsonResponse({'error': str(e)}, status=500)
 
 @login_required
+def api_study_detail(request, study_id):
+    """API endpoint to get study details for verification"""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        # Get study and check permissions
+        user = request.user
+        if user.is_facility_user() and getattr(user, 'facility', None):
+            study = get_object_or_404(Study, id=study_id, facility=user.facility)
+        else:
+            study = get_object_or_404(Study, id=study_id)
+        
+        # Return study data
+        study_data = {
+            'id': study.id,
+            'accession_number': study.accession_number,
+            'study_date': study.study_date.isoformat() if study.study_date else None,
+            'study_time': study.study_time.isoformat() if study.study_time else None,
+            'modality': study.modality.name if study.modality else None,
+            'study_description': study.study_description,
+            'patient': {
+                'name': study.patient.full_name if study.patient else 'Unknown',
+                'id': study.patient.patient_id if study.patient else None,
+                'birth_date': study.patient.birth_date.isoformat() if study.patient and study.patient.birth_date else None,
+                'sex': study.patient.sex if study.patient else None
+            },
+            'status': study.status,
+            'priority': study.priority,
+            'series_count': study.series_set.count(),
+            'images_count': sum(series.images.count() for series in study.series_set.all()),
+            'facility': study.facility.name if study.facility else None
+        }
+        
+        return JsonResponse({
+            'success': True,
+            'study': study_data
+        })
+        
+    except Study.DoesNotExist:
+        return JsonResponse({'error': 'Study not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
 @csrf_exempt
 def api_delete_study(request, study_id):
     """API endpoint to delete a study (admin only)
