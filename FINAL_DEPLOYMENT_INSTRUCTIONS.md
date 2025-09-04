@@ -38,8 +38,8 @@ cd /workspace
 ```
 
 ### **Step 4: Access Your App**
-- **Live URL**: https://colt-charmed-lark.ngrok-free.app
-- **Admin Panel**: https://colt-charmed-lark.ngrok-free.app/admin/
+- **Live URL**: https://mallard-shining-curiously.ngrok-free.app
+- **Admin Panel**: https://mallard-shining-curiously.ngrok-free.app/admin/
 - **Login**: admin / admin123
 
 ## 📊 **Management Commands**
@@ -100,7 +100,7 @@ tail -f logs/ngrok.log     # Ngrok tunnel logs
 ## 🚨 **Important Notes:**
 
 1. **Ngrok Authtoken**: Must be configured on your server before deployment
-2. **Static URL**: Using `colt-charmed-lark.ngrok-free.app`
+2. **Static URL**: Using `mallard-shining-curiously.ngrok-free.app`
 3. **Database**: SQLite (ready for production)
 4. **Admin Access**: Username `admin`, Password `admin123`
 

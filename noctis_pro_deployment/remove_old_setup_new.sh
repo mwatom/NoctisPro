@@ -20,7 +20,7 @@ NEW_WORKSPACE="/workspace/noctis_pro_deployment"
 SERVICE_NAME="noctispro-refined"
 SERVICE_USER="ubuntu"
 DJANGO_PORT="8000"
-STATIC_URL="colt-charmed-lark.ngrok-free.app"
+STATIC_URL="mallard-shining-curiously.ngrok-free.app"
 
 print_header() {
     echo ""
@@ -277,7 +277,7 @@ case "${1:-status}" in
         echo "   Local: http://localhost:8000/"
         echo "   Admin: http://localhost:8000/admin/ (admin/admin123)"
         if /workspace/ngrok config check > /dev/null 2>&1; then
-            echo "   Online: https://colt-charmed-lark.ngrok-free.app/"
+            echo "   Online: https://mallard-shining-curiously.ngrok-free.app/"
         else
             echo "   Online: Configure ngrok for internet access"
         fi

@@ -13,7 +13,7 @@ if [ ! -f "/workspace/ngrok" ]; then
     exit 1
 fi
 
-echo "📝 To use the static URL 'colt-charmed-lark.ngrok-free.app', you need:"
+echo "📝 To use the static URL 'mallard-shining-curiously.ngrok-free.app', you need:"
 echo "   1. An ngrok account (free or paid)"
 echo "   2. Your ngrok auth token"
 echo ""

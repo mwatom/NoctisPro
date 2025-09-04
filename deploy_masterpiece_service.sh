@@ -18,7 +18,7 @@ NC='\033[0m'
 # Configuration - Auto-Detection Enhanced
 WORKSPACE_DIR="/workspace"
 REFINED_SYSTEM_DIR="/workspace/noctis_pro_deployment"
-STATIC_URL="colt-charmed-lark.ngrok-free.app"
+STATIC_URL="mallard-shining-curiously.ngrok-free.app"
 DJANGO_PORT="8000"
 SERVICE_NAME="noctispro-masterpiece"
 PID_FILE="$WORKSPACE_DIR/${SERVICE_NAME}.pid"

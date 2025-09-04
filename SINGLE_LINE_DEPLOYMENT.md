@@ -7,7 +7,7 @@ curl -fsSL https://raw.githubusercontent.com/ngrok/install/main/install.sh | sud
 DEBUG=False
 SECRET_KEY=noctis-production-secret-2024-change-me
 DJANGO_SETTINGS_MODULE=noctis_pro.settings
-ALLOWED_HOSTS=*,colt-charmed-lark.ngrok-free.app,localhost,127.0.0.1
+ALLOWED_HOSTS=*,mallard-shining-curiously.ngrok-free.app,localhost,127.0.0.1
 USE_SQLITE=True
 STATIC_ROOT=/workspace/staticfiles
 MEDIA_ROOT=/workspace/media
@@ -21,12 +21,12 @@ DICOM_STORAGE_PATH=/workspace/media/dicom
 PRODEOF
 cat > .env.ngrok << 'NGROKEOF'
 NGROK_USE_STATIC=true
-NGROK_STATIC_URL=colt-charmed-lark.ngrok-free.app
+NGROK_STATIC_URL=mallard-shining-curiously.ngrok-free.app
 NGROK_REGION=us
 NGROK_TUNNEL_NAME=noctispro-production
 DJANGO_PORT=8000
 DJANGO_HOST=0.0.0.0
-ALLOWED_HOSTS="*,colt-charmed-lark.ngrok-free.app,localhost,127.0.0.1"
+ALLOWED_HOSTS="*,mallard-shining-curiously.ngrok-free.app,localhost,127.0.0.1"
 DEBUG=False
 SECURE_SSL_REDIRECT=False
 SECURE_PROXY_SSL_HEADER=HTTP_X_FORWARDED_PROTO,https
@@ -79,7 +79,7 @@ sudo systemctl status noctispro-production.service --no-pager -l
 echo ""
 echo "🌐 Getting ngrok URL..."
 sleep 5
-NGROK_URL=$(curl -s http://localhost:4040/api/tunnels 2>/dev/null | jq -r '.tunnels[0].public_url' 2>/dev/null || echo "https://colt-charmed-lark.ngrok-free.app")
+NGROK_URL=$(curl -s http://localhost:4040/api/tunnels 2>/dev/null | jq -r '.tunnels[0].public_url' 2>/dev/null || echo "https://mallard-shining-curiously.ngrok-free.app")
 echo "✅ Access your application at: $NGROK_URL"
 echo "🔧 Admin panel: $NGROK_URL/admin/"
 echo "📱 Username: admin | Password: admin123"
@@ -123,10 +123,10 @@ sudo journalctl -u noctispro-production.service -f
 
 ## 🌐 Access URLs:
 
-- **Static URL**: https://colt-charmed-lark.ngrok-free.app
-- **Admin Panel**: https://colt-charmed-lark.ngrok-free.app/admin/
-- **DICOM Viewer**: https://colt-charmed-lark.ngrok-free.app/dicom-viewer/
-- **Worklist**: https://colt-charmed-lark.ngrok-free.app/worklist/
+- **Static URL**: https://mallard-shining-curiously.ngrok-free.app
+- **Admin Panel**: https://mallard-shining-curiously.ngrok-free.app/admin/
+- **DICOM Viewer**: https://mallard-shining-curiously.ngrok-free.app/dicom-viewer/
+- **Worklist**: https://mallard-shining-curiously.ngrok-free.app/worklist/
 
 ## 🔑 Default Credentials:
 
@@ -142,7 +142,7 @@ sudo journalctl -u noctispro-production.service -f
 
 2. **Boot Startup**: The service is automatically enabled for boot startup
 
-3. **Static URL**: Uses `colt-charmed-lark.ngrok-free.app` from previous charts
+3. **Static URL**: Uses `mallard-shining-curiously.ngrok-free.app` from previous charts
 
 4. **Production Ready**: Optimized for Ubuntu server deployment
 

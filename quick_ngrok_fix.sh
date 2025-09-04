@@ -70,8 +70,8 @@ pkill ngrok || true
 sleep 2
 
 # Start ngrok with the desired static URL
-echo -e "${CYAN}Starting: /workspace/ngrok http 8000 --hostname=colt-charmed-lark.ngrok-free.app${NC}"
-nohup /workspace/ngrok http 8000 --hostname=colt-charmed-lark.ngrok-free.app > /workspace/ngrok_output.log 2>&1 &
+echo -e "${CYAN}Starting: /workspace/ngrok http 8000 --hostname=mallard-shining-curiously.ngrok-free.app${NC}"
+nohup /workspace/ngrok http 8000 --hostname=mallard-shining-curiously.ngrok-free.app > /workspace/ngrok_output.log 2>&1 &
 
 # Wait for ngrok to start
 sleep 5
@@ -81,21 +81,21 @@ if pgrep ngrok > /dev/null; then
     echo -e "${GREEN}✅ Ngrok tunnel started successfully!${NC}"
     
     # Update the URL file
-    echo "https://colt-charmed-lark.ngrok-free.app" > /workspace/current_ngrok_url.txt
+    echo "https://mallard-shining-curiously.ngrok-free.app" > /workspace/current_ngrok_url.txt
     
     echo ""
     echo -e "${GREEN}🎉 SUCCESS! Your application is now online at:${NC}"
-    echo -e "${CYAN}https://colt-charmed-lark.ngrok-free.app${NC}"
+    echo -e "${CYAN}https://mallard-shining-curiously.ngrok-free.app${NC}"
     echo ""
     echo -e "${BLUE}Admin access:${NC}"
-    echo -e "${CYAN}https://colt-charmed-lark.ngrok-free.app/admin/${NC}"
+    echo -e "${CYAN}https://mallard-shining-curiously.ngrok-free.app/admin/${NC}"
     echo "Username: admin"
     echo "Password: admin123"
     echo ""
     
     # Test the URL
     echo -e "${BLUE}Testing URL accessibility...${NC}"
-    if curl -I https://colt-charmed-lark.ngrok-free.app 2>/dev/null | grep -q "200\|302"; then
+    if curl -I https://mallard-shining-curiously.ngrok-free.app 2>/dev/null | grep -q "200\|302"; then
         echo -e "${GREEN}✅ URL is accessible!${NC}"
     else
         echo -e "${YELLOW}⚠️  URL test inconclusive - may still be starting up${NC}"

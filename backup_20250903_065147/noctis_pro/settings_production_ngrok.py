@@ -26,7 +26,7 @@ ALLOWED_HOSTS = [
     '*.ngrok-free.app',
     '*.ngrok.app',
     # Add your specific ngrok subdomain here if you have one
-    'colt-charmed-lark.ngrok-free.app',
+    'mallard-shining-curiously.ngrok-free.app',
 ]
 
 # Database - Use SQLite for production demo, PostgreSQL for real production

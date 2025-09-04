@@ -22,13 +22,13 @@ cd /workspace
 ### **Step 3: Deploy with Your Static URL**
 ```bash
 cd /workspace
-./ngrok http --url=colt-charmed-lark.ngrok-free.app 8000
+./ngrok http --url=mallard-shining-curiously.ngrok-free.app 8000
 ```
 
 ### **Step 4: Access Your System**
-- **Public URL**: https://colt-charmed-lark.ngrok-free.app/
-- **Login Page**: https://colt-charmed-lark.ngrok-free.app/login/
-- **DICOM Viewer**: https://colt-charmed-lark.ngrok-free.app/dicom-viewer/
+- **Public URL**: https://mallard-shining-curiously.ngrok-free.app/
+- **Login Page**: https://mallard-shining-curiously.ngrok-free.app/login/
+- **DICOM Viewer**: https://mallard-shining-curiously.ngrok-free.app/dicom-viewer/
 
 ---
 
@@ -146,12 +146,12 @@ The system is **fully responsive** and works on:
 1. **Start Ngrok** (if you want public access):
    ```bash
    ./ngrok config add-authtoken YOUR_AUTHTOKEN
-   ./ngrok http --url=colt-charmed-lark.ngrok-free.app 8000
+   ./ngrok http --url=mallard-shining-curiously.ngrok-free.app 8000
    ```
 
 2. **Access Your System**:
    - Local: http://localhost:8000/
-   - Public: https://colt-charmed-lark.ngrok-free.app/
+   - Public: https://mallard-shining-curiously.ngrok-free.app/
 
 3. **Login as Admin**:
    - Username: `admin`

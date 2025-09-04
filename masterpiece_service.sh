@@ -7,7 +7,7 @@ SERVICE_NAME="noctispro-masterpiece"
 MASTERPIECE_DIR="/workspace/noctis_pro_deployment"
 WORKSPACE_DIR="/workspace"
 DJANGO_PORT="8000"
-STATIC_URL="colt-charmed-lark.ngrok-free.app"
+STATIC_URL="mallard-shining-curiously.ngrok-free.app"
 
 case "${1:-start}" in
     start)

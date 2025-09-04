@@ -15,7 +15,7 @@ Your NoctisPro system is **LIVE and AUTO-STARTING ON BOOT!**
 - **Local**: http://localhost:8000
 - **Admin**: http://localhost:8000/admin/
 - **Health**: http://localhost:8000/health/
-- **Static Domain**: https://colt-charmed-lark.ngrok-free.app (when ngrok configured)
+- **Static Domain**: https://mallard-shining-curiously.ngrok-free.app (when ngrok configured)
 
 ### 👤 Login Credentials:
 - **Username**: admin

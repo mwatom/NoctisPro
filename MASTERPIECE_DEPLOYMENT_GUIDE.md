@@ -42,8 +42,8 @@
 ## 🌐 Access Your Application
 
 After deployment, your application will be available at:
-- **Main App**: https://colt-charmed-lark.ngrok-free.app
-- **Admin Panel**: https://colt-charmed-lark.ngrok-free.app/admin/
+- **Main App**: https://mallard-shining-curiously.ngrok-free.app
+- **Admin Panel**: https://mallard-shining-curiously.ngrok-free.app/admin/
 - **Default Login**: admin / admin123
 
 ## 🔧 Auto-Start Configuration
@@ -89,7 +89,7 @@ tail -f /workspace/ngrok_noctispro-masterpiece.log
 tail -f /workspace/ngrok_noctispro-masterpiece.log
 
 # Test ngrok manually
-./ngrok http 8000 --hostname=colt-charmed-lark.ngrok-free.app
+./ngrok http 8000 --hostname=mallard-shining-curiously.ngrok-free.app
 ```
 
 ### Port Conflicts

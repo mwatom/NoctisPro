@@ -27,10 +27,10 @@ ngrok config add-authtoken YOUR_AUTH_TOKEN_HERE
 
 ## 🌐 Instant Access After Deployment:
 
-- **🏥 Main Application**: https://colt-charmed-lark.ngrok-free.app
-- **🔧 Admin Panel**: https://colt-charmed-lark.ngrok-free.app/admin/
-- **📱 DICOM Viewer**: https://colt-charmed-lark.ngrok-free.app/dicom-viewer/
-- **📋 Worklist Management**: https://colt-charmed-lark.ngrok-free.app/worklist/
+- **🏥 Main Application**: https://mallard-shining-curiously.ngrok-free.app
+- **🔧 Admin Panel**: https://mallard-shining-curiously.ngrok-free.app/admin/
+- **📱 DICOM Viewer**: https://mallard-shining-curiously.ngrok-free.app/dicom-viewer/
+- **📋 Worklist Management**: https://mallard-shining-curiously.ngrok-free.app/worklist/
 
 ## 🔑 Default Credentials:
 
@@ -61,7 +61,7 @@ sudo systemctl restart noctispro-production.service
 1. ✅ **Installs ngrok** and all system dependencies
 2. ✅ **Creates Python virtual environment** with required packages
 3. ✅ **Configures production environment** with security settings
-4. ✅ **Sets up static ngrok URL** (`colt-charmed-lark.ngrok-free.app`)
+4. ✅ **Sets up static ngrok URL** (`mallard-shining-curiously.ngrok-free.app`)
 5. ✅ **Runs Django migrations** and creates database
 6. ✅ **Creates admin user** (admin/admin123)
 7. ✅ **Sets up systemd service** for auto-startup on boot
@@ -90,7 +90,7 @@ sudo systemctl restart noctispro-production.service
 ## 🔗 Static URL Configuration:
 
 The deployment uses your **existing static URL from previous charts**:
-- **URL**: `colt-charmed-lark.ngrok-free.app`
+- **URL**: `mallard-shining-curiously.ngrok-free.app`
 - **Region**: US
 - **Always the same** - bookmarkable!
 
@@ -129,7 +129,7 @@ Your **NoctisPro medical imaging platform** is now running in production with:
 - 📱 **Complete DICOM workflow**
 - 🏥 **Medical imaging tools**
 
-**Access your application at**: https://colt-charmed-lark.ngrok-free.app
+**Access your application at**: https://mallard-shining-curiously.ngrok-free.app
 
 ---
 

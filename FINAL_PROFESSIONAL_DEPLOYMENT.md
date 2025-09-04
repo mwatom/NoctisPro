@@ -106,13 +106,13 @@ To make the system accessible via your static ngrok URL:
 
 2. **Start ngrok with your static URL:**
    ```bash
-   ./ngrok http --url=colt-charmed-lark.ngrok-free.app 8000
+   ./ngrok http --url=mallard-shining-curiously.ngrok-free.app 8000
    ```
 
 3. **Access your system:**
-   - **Public URL**: https://colt-charmed-lark.ngrok-free.app/
-   - **Login Page**: https://colt-charmed-lark.ngrok-free.app/login/
-   - **DICOM Viewer**: https://colt-charmed-lark.ngrok-free.app/dicom-viewer/
+   - **Public URL**: https://mallard-shining-curiously.ngrok-free.app/
+   - **Login Page**: https://mallard-shining-curiously.ngrok-free.app/login/
+   - **DICOM Viewer**: https://mallard-shining-curiously.ngrok-free.app/dicom-viewer/
 
 ### 🏥 **PROFESSIONAL FEATURES READY**
 
@@ -167,7 +167,7 @@ The **Professional Noctis Pro PACS** system now includes:
 
 **For Public Access**: Configure ngrok with your authtoken and use:
 ```bash
-./ngrok http --url=colt-charmed-lark.ngrok-free.app 8000
+./ngrok http --url=mallard-shining-curiously.ngrok-free.app 8000
 ```
 
 **The system is now professional-grade and ready to handle all medical imaging operations with advanced reconstruction capabilities for CT, MRI, PET, SPECT, and Nuclear Medicine modalities.**

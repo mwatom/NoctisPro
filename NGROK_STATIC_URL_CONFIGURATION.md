@@ -2,8 +2,8 @@
 
 ## Static URL Details
 
-**Static Domain**: `colt-charmed-lark.ngrok-free.app`
-**Full URL**: `https://colt-charmed-lark.ngrok-free.app`
+**Static Domain**: `mallard-shining-curiously.ngrok-free.app`
+**Full URL**: `https://mallard-shining-curiously.ngrok-free.app`
 
 ## Configuration Added to Bulletproof Deployment
 
@@ -11,14 +11,14 @@
 ```bash
 # Ngrok Static URL Configuration
 NGROK_USE_STATIC=true
-NGROK_STATIC_URL=colt-charmed-lark.ngrok-free.app
-NGROK_STATIC_DOMAIN=colt-charmed-lark.ngrok-free.app
+NGROK_STATIC_URL=mallard-shining-curiously.ngrok-free.app
+NGROK_STATIC_DOMAIN=mallard-shining-curiously.ngrok-free.app
 NGROK_REGION=us
 ```
 
 ### ALLOWED_HOSTS Updated:
 ```bash
-ALLOWED_HOSTS=localhost,127.0.0.1,*.ngrok.io,*.ngrok-free.app,colt-charmed-lark.ngrok-free.app
+ALLOWED_HOSTS=localhost,127.0.0.1,*.ngrok.io,*.ngrok-free.app,mallard-shining-curiously.ngrok-free.app
 ```
 
 ### Ngrok Startup Logic:
@@ -26,7 +26,7 @@ The bulletproof deployment now includes intelligent ngrok startup:
 
 1. **Static URL (Priority 1)**: If `NGROK_USE_STATIC=true` and `NGROK_STATIC_URL` is set
    ```bash
-   ngrok http --url="colt-charmed-lark.ngrok-free.app" 8000
+   ngrok http --url="mallard-shining-curiously.ngrok-free.app" 8000
    ```
 
 2. **Authenticated Static Domain (Priority 2)**: If `NGROK_AUTHTOKEN` and `NGROK_STATIC_DOMAIN` are set
@@ -60,12 +60,12 @@ The bulletproof deployment now includes intelligent ngrok startup:
 
 Once deployed, the application will be available at:
 
-- **Main Application**: `https://colt-charmed-lark.ngrok-free.app/`
-- **Admin Panel**: `https://colt-charmed-lark.ngrok-free.app/admin/`
-- **DICOM Viewer**: `https://colt-charmed-lark.ngrok-free.app/dicom-viewer/`
-- **Worklist**: `https://colt-charmed-lark.ngrok-free.app/worklist/`
-- **Health Check**: `https://colt-charmed-lark.ngrok-free.app/health/`
-- **API Endpoints**: `https://colt-charmed-lark.ngrok-free.app/api/`
+- **Main Application**: `https://mallard-shining-curiously.ngrok-free.app/`
+- **Admin Panel**: `https://mallard-shining-curiously.ngrok-free.app/admin/`
+- **DICOM Viewer**: `https://mallard-shining-curiously.ngrok-free.app/dicom-viewer/`
+- **Worklist**: `https://mallard-shining-curiously.ngrok-free.app/worklist/`
+- **Health Check**: `https://mallard-shining-curiously.ngrok-free.app/health/`
+- **API Endpoints**: `https://mallard-shining-curiously.ngrok-free.app/api/`
 
 ## Deployment Usage:
 
@@ -84,7 +84,7 @@ The deployment will:
 
 After deployment, verify the static URL is working:
 ```bash
-curl -I https://colt-charmed-lark.ngrok-free.app
+curl -I https://mallard-shining-curiously.ngrok-free.app
 ```
 
 Should return a proper HTTP response indicating the application is accessible via the static URL.

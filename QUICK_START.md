@@ -39,7 +39,7 @@ The `start_with_ngrok.sh` script will automatically:
 
 ## What the script provides:
 - **Local access**: http://localhost:8000 (or port 80)
-- **Public access**: https://colt-charmed-lark.ngrok-free.app
+- **Public access**: https://mallard-shining-curiously.ngrok-free.app
 - **Admin panel**: /admin/ (admin/admin123)
 
 ## To stop:

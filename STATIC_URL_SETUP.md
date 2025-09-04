@@ -2,7 +2,7 @@
 
 ## Your Configuration
 
-**Static URL**: `https://colt-charmed-lark.ngrok-free.app`
+**Static URL**: `https://mallard-shining-curiously.ngrok-free.app`
 **Port**: `80`
 **Image Optimization**: ✅ Enabled for slow connections
 
@@ -21,11 +21,11 @@ cd /workspace
 ```
 
 ### 3. Access Your Application
-- **Main App**: https://colt-charmed-lark.ngrok-free.app/
-- **Admin Panel**: https://colt-charmed-lark.ngrok-free.app/admin-panel/
-- **DICOM Viewer**: https://colt-charmed-lark.ngrok-free.app/dicom-viewer/
-- **Worklist**: https://colt-charmed-lark.ngrok-free.app/worklist/
-- **Connection Info**: https://colt-charmed-lark.ngrok-free.app/connection-info/
+- **Main App**: https://mallard-shining-curiously.ngrok-free.app/
+- **Admin Panel**: https://mallard-shining-curiously.ngrok-free.app/admin-panel/
+- **DICOM Viewer**: https://mallard-shining-curiously.ngrok-free.app/dicom-viewer/
+- **Worklist**: https://mallard-shining-curiously.ngrok-free.app/worklist/
+- **Connection Info**: https://mallard-shining-curiously.ngrok-free.app/connection-info/
 
 ## 🖼️ Image Optimization Features
 
@@ -58,13 +58,13 @@ Add these parameters to any image URL:
 ### Example URLs
 ```bash
 # Original image
-https://colt-charmed-lark.ngrok-free.app/media/dicom/image.jpg
+https://mallard-shining-curiously.ngrok-free.app/media/dicom/image.jpg
 
 # Optimized for slow connection
-https://colt-charmed-lark.ngrok-free.app/media/dicom/image.jpg?connection=slow
+https://mallard-shining-curiously.ngrok-free.app/media/dicom/image.jpg?connection=slow
 
 # Custom optimization
-https://colt-charmed-lark.ngrok-free.app/media/dicom/image.jpg?quality=40&max_width=600
+https://mallard-shining-curiously.ngrok-free.app/media/dicom/image.jpg?quality=40&max_width=600
 ```
 
 ## 🔧 Configuration Files
@@ -72,7 +72,7 @@ https://colt-charmed-lark.ngrok-free.app/media/dicom/image.jpg?quality=40&max_wi
 ### Primary Configuration: `.env.ngrok`
 ```bash
 NGROK_USE_STATIC=true
-NGROK_STATIC_URL=colt-charmed-lark.ngrok-free.app
+NGROK_STATIC_URL=mallard-shining-curiously.ngrok-free.app
 DJANGO_PORT=80
 DJANGO_HOST=0.0.0.0
 SERVE_MEDIA_FILES=True
@@ -85,7 +85,7 @@ tunnels:
   noctispro-static-url:
     proto: http
     addr: 80
-    hostname: colt-charmed-lark.ngrok-free.app
+    hostname: mallard-shining-curiously.ngrok-free.app
     inspect: true
 ```
 
@@ -99,7 +99,7 @@ tunnels:
 ### Manual Start
 ```bash
 # Start ngrok with your static URL
-ngrok http --url=https://colt-charmed-lark.ngrok-free.app 80
+ngrok http --url=https://mallard-shining-curiously.ngrok-free.app 80
 
 # In another terminal, start Django
 source venv/bin/activate
@@ -116,13 +116,13 @@ python manage.py runserver 0.0.0.0:80
 
 ### Test Image Optimization
 1. Upload an image to the media folder
-2. Access: `https://colt-charmed-lark.ngrok-free.app/media/your-image.jpg?connection=slow`
+2. Access: `https://mallard-shining-curiously.ngrok-free.app/media/your-image.jpg?connection=slow`
 3. Check headers for optimization info:
    - `X-Image-Optimized: true`
    - `X-Compression-Ratio: XX.X%`
 
 ### Test Connection Detection
-Visit: `https://colt-charmed-lark.ngrok-free.app/connection-info/`
+Visit: `https://mallard-shining-curiously.ngrok-free.app/connection-info/`
 
 ## 🔒 Login Credentials
 
@@ -151,7 +151,7 @@ The system automatically detects:
 
 ### Static URL Not Working
 1. Check auth token: `ngrok config check`
-2. Verify URL in `.env.ngrok`: `NGROK_STATIC_URL=colt-charmed-lark.ngrok-free.app`
+2. Verify URL in `.env.ngrok`: `NGROK_STATIC_URL=mallard-shining-curiously.ngrok-free.app`
 3. Restart application: `./start_with_ngrok.sh`
 
 ### Images Not Optimizing
@@ -166,12 +166,12 @@ The system automatically detects:
 DJANGO_PORT=8080
 
 # Then use:
-ngrok http --url=https://colt-charmed-lark.ngrok-free.app 8080
+ngrok http --url=https://mallard-shining-curiously.ngrok-free.app 8080
 ```
 
 ## ✅ Status
 
-- ✅ Static URL configured: `colt-charmed-lark.ngrok-free.app`
+- ✅ Static URL configured: `mallard-shining-curiously.ngrok-free.app`
 - ✅ Image optimization enabled
 - ✅ Slow connection support
 - ✅ WebP format support
