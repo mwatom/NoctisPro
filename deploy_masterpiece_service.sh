@@ -383,7 +383,7 @@ start_service() {
     print_info "Starting ngrok with static URL..."
     tmux new-window -t $SERVICE_NAME
     tmux send-keys -t $SERVICE_NAME "cd $WORKSPACE_DIR" C-m
-    tmux send-keys -t $SERVICE_NAME "./ngrok http $DJANGO_PORT --hostname=$STATIC_URL --log=stdout" C-m
+    tmux send-keys -t $SERVICE_NAME "./ngrok http --url=$STATIC_URL $DJANGO_PORT" C-m
     
     # Wait for ngrok to start
     sleep 5
