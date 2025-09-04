@@ -27,7 +27,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-7x!8k@m$z9h#4p&x3w2v6
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*,mallard-shining-curiously.ngrok-free.app,localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*,afc14a217e7d.ngrok-free.app,803f15a13d75.ngrok-free.app,colt-charmed-lark.ngrok-free.app,localhost,127.0.0.1,0.0.0.0').split(',')
 
 
 # Application definition
@@ -191,9 +191,21 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    "https://afc14a217e7d.ngrok-free.app",
+    "https://803f15a13d75.ngrok-free.app",
+    "https://colt-charmed-lark.ngrok-free.app",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+# CSRF trusted origins - Fix for 403 errors
+CSRF_TRUSTED_ORIGINS = [
+    "https://afc14a217e7d.ngrok-free.app",
+    "https://803f15a13d75.ngrok-free.app", 
+    "https://colt-charmed-lark.ngrok-free.app",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
 
 # Custom user model
 AUTH_USER_MODEL = 'accounts.User'
