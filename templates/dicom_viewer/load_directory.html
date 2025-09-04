@@ -5,13 +5,36 @@
 
 {% block extra_css %}
 <style>
+    /* Mobile-first responsive design */
     .directory-loader {
         max-width: 800px;
-        margin: 2rem auto;
-        padding: 2rem;
+        margin: 1rem auto;
+        padding: 1.5rem;
         background: var(--card-bg);
         border-radius: 12px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        width: calc(100% - 2rem);
+        min-height: calc(100vh - 100px);
+        display: flex;
+        flex-direction: column;
+    }
+    
+    /* Mobile responsive adjustments */
+    @media (max-width: 768px) {
+        .directory-loader {
+            margin: 0.5rem auto;
+            padding: 1rem;
+            width: calc(100% - 1rem);
+            border-radius: 8px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .directory-loader {
+            margin: 0.25rem auto;
+            padding: 0.75rem;
+            width: calc(100% - 0.5rem);
+        }
     }
     
     .loader-header {
@@ -23,11 +46,37 @@
         color: var(--accent-color);
         font-size: 2.5rem;
         margin-bottom: 0.5rem;
+        word-break: break-word;
     }
     
     .loader-header p {
         color: var(--text-secondary);
         font-size: 1.1rem;
+    }
+    
+    /* Mobile header adjustments */
+    @media (max-width: 768px) {
+        .loader-header {
+            margin-bottom: 1.5rem;
+        }
+        
+        .loader-header h1 {
+            font-size: 2rem;
+        }
+        
+        .loader-header p {
+            font-size: 1rem;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .loader-header h1 {
+            font-size: 1.75rem;
+        }
+        
+        .loader-header p {
+            font-size: 0.9rem;
+        }
     }
     
     .directory-form {
@@ -36,6 +85,22 @@
         border-radius: 8px;
         border: 1px solid var(--border-color);
         margin-bottom: 2rem;
+        flex: 1;
+    }
+    
+    /* Mobile form adjustments */
+    @media (max-width: 768px) {
+        .directory-form {
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .directory-form {
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
     }
     
     .form-group {
@@ -57,12 +122,39 @@
         border-radius: 6px;
         color: var(--text-primary);
         font-size: 1rem;
+        -webkit-appearance: none;
+        appearance: none;
     }
     
     .form-control:focus {
         outline: none;
         border-color: var(--accent-color);
         box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+    }
+    
+    /* Mobile form control adjustments */
+    @media (max-width: 768px) {
+        .form-control {
+            padding: 14px 16px;
+            font-size: 16px; /* Prevents zoom on iOS */
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .form-control {
+            padding: 16px;
+            font-size: 16px;
+        }
+    }
+    
+    .directory-input-group {
+        display: flex;
+        gap: 0.5rem;
+        align-items: stretch;
+    }
+    
+    .directory-input-group .form-control {
+        flex: 1;
     }
     
     .btn-browse {
@@ -74,7 +166,8 @@
         font-weight: 600;
         cursor: pointer;
         transition: all 0.2s;
-        margin-left: 1rem;
+        white-space: nowrap;
+        flex-shrink: 0;
     }
     
     .btn-browse:hover {
@@ -93,6 +186,7 @@
         font-weight: 600;
         cursor: pointer;
         transition: all 0.2s;
+        touch-action: manipulation; /* Better mobile touch */
     }
     
     .btn-load:hover {
@@ -104,6 +198,36 @@
         background: var(--text-secondary);
         cursor: not-allowed;
         transform: none;
+    }
+    
+    /* Mobile button adjustments */
+    @media (max-width: 768px) {
+        .directory-input-group {
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        
+        .btn-browse {
+            padding: 14px 20px;
+            font-size: 16px;
+        }
+        
+        .btn-load {
+            padding: 18px;
+            font-size: 16px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .btn-browse {
+            padding: 16px;
+            font-size: 16px;
+        }
+        
+        .btn-load {
+            padding: 20px;
+            font-size: 16px;
+        }
     }
     
     .loading-spinner {
@@ -197,6 +321,35 @@
     
     .help-text li {
         margin-bottom: 0.5rem;
+        word-wrap: break-word;
+    }
+    
+    /* Mobile help text adjustments */
+    @media (max-width: 768px) {
+        .help-text {
+            padding: 1rem;
+            margin-top: 1.5rem;
+        }
+        
+        .help-text ul {
+            padding-left: 1rem;
+        }
+        
+        .help-text h3 {
+            font-size: 1.1rem;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .help-text {
+            padding: 0.75rem;
+            margin-top: 1rem;
+        }
+        
+        .help-text li {
+            font-size: 0.9rem;
+            margin-bottom: 0.75rem;
+        }
     }
     
     .path-examples {
@@ -207,11 +360,33 @@
         font-family: 'Courier New', monospace;
         font-size: 0.9rem;
         border: 1px solid var(--border-color);
+        overflow-x: auto;
     }
     
     .path-examples .example {
         color: var(--accent-color);
         margin-bottom: 0.5rem;
+        word-break: break-all;
+    }
+    
+    /* Mobile path examples adjustments */
+    @media (max-width: 768px) {
+        .path-examples {
+            padding: 0.75rem;
+            font-size: 0.8rem;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .path-examples {
+            padding: 0.5rem;
+            font-size: 0.75rem;
+        }
+        
+        .path-examples .example {
+            margin-bottom: 0.75rem;
+            line-height: 1.4;
+        }
     }
 </style>
 {% endblock %}
@@ -229,7 +404,7 @@
             <label class="form-label" for="directory_path">
                 <i class="fas fa-folder"></i> Directory Path
             </label>
-            <div style="display: flex; align-items: center;">
+            <div class="directory-input-group">
                 <input 
                     type="text" 
                     id="directory_path" 
@@ -252,6 +427,10 @@
     <div class="loading-spinner" id="loadingSpinner">
         <div class="spinner"></div>
         <p>Scanning directory and processing DICOM files...</p>
+        <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 1rem;">
+            <strong>Please wait:</strong> Large medical datasets may take up to 1-2 minutes to scan.<br>
+            System can handle up to 5000 files and process 500 DICOM files for comprehensive loading.
+        </div>
     </div>
     
     <div class="results" id="results">
@@ -274,8 +453,11 @@
             <li><strong>Linux/Mac:</strong> Use paths like <code>/media/usb/dicom</code> or <code>/home/user/dicom</code></li>
             <li><strong>Flash Drive:</strong> Insert your USB drive and navigate to its mount point</li>
             <li><strong>CD/DVD:</strong> Insert disc and use the disc mount path</li>
-            <li>The system will recursively scan all subdirectories for DICOM files</li>
+            <li>The system will recursively scan subdirectories for DICOM files (max 15 levels deep)</li>
             <li>Supported file extensions: .dcm, .dicom, .dic, and files without extensions</li>
+            <li><strong>Capacity:</strong> Can scan up to 5000 files and process up to 500 DICOM files per session</li>
+            <li><strong>Timeout:</strong> Scanning will timeout after 60 seconds, processing after 2 minutes for safety</li>
+            <li><strong>Large Datasets:</strong> For machines with 2000+ images, the system will process the first 500 files and show a summary</li>
         </ul>
         
         <div class="path-examples">
@@ -367,17 +549,34 @@ function showResults(data) {
     
     let html = `
         <div style="margin-bottom: 1rem;">
-            <strong>Summary:</strong><br>
+            <strong>Processing Summary:</strong><br>
             • Directory: ${data.directory}<br>
-            • Total files found: ${data.total_files_found}<br>
-            • Processed files: ${data.processed_files}<br>
+            • Files scanned: ${data.files_scanned || data.total_files_found}<br>
+            • DICOM files found: ${data.total_files_found}<br>
+            • Files processed: ${data.processed_files}<br>
             • Invalid files: ${data.invalid_files}<br>
-            • Studies created: ${data.studies.length}
+            • Studies created: ${data.studies.length}<br>
+            • Scan time: ${data.scan_time || 'N/A'}s
         </div>
     `;
     
+    // Show warnings if any
+    if (data.warnings && data.warnings.length > 0) {
+        html += `
+            <div style="background: #fbbf24; color: #92400e; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;">
+                <strong><i class="fas fa-exclamation-triangle"></i> Performance Limits Reached:</strong><br>
+                ${data.warnings.map(warning => `• ${warning}`).join('<br>')}
+                <br><br>
+                <em>For datasets with 2000+ images:</em><br>
+                • The first 500 files have been processed and are ready to view<br>
+                • You can organize files into smaller subdirectories and load them separately<br>
+                • Or use the system multiple times to load different parts of your dataset
+            </div>
+        `;
+    }
+    
     if (data.studies.length > 0) {
-        html += '<h4>Loaded Studies:</h4>';
+        html += '<h4>Successfully Loaded Studies:</h4>';
         data.studies.forEach(study => {
             html += `
                 <div class="study-item">
@@ -387,13 +586,26 @@ function showResults(data) {
                     <div class="study-details">
                         Study: ${study.study_description}<br>
                         Series: ${study.series_count} | Images: ${study.images_count}<br>
-                        <a href="/dicom-viewer/?study=${study.id}" class="btn-control" style="margin-top: 0.5rem; display: inline-block; text-decoration: none;">
+                        <a href="/dicom-viewer/?study=${study.id}" class="btn-control" style="margin-top: 0.5rem; display: inline-block; text-decoration: none; background: var(--accent-color); color: white; padding: 0.5rem 1rem; border-radius: 4px;">
                             <i class="fas fa-eye"></i> View Study
                         </a>
                     </div>
                 </div>
             `;
         });
+    }
+    
+    // Show performance info for transparency
+    if (data.limits_info) {
+        html += `
+            <div style="background: var(--primary-bg); padding: 1rem; border-radius: 6px; margin-top: 1rem; font-size: 0.85rem; color: var(--text-secondary);">
+                <strong>Performance Limits:</strong> 
+                Max scan: ${data.limits_info.max_files_scanned} files, 
+                Max DICOM: ${data.limits_info.max_dicom_files}, 
+                Max process: ${data.limits_info.max_processed}, 
+                Timeout: ${data.limits_info.max_scan_time}s
+            </div>
+        `;
     }
     
     resultsBody.innerHTML = html;
