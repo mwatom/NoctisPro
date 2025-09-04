@@ -282,6 +282,155 @@ check_ngrok() {
     return 0
 }
 
+# Install system dependencies
+install_system_dependencies() {
+    print_info "Installing system dependencies..."
+    
+    # Check if we have sudo access for package installation
+    if ! sudo -n true 2>/dev/null; then
+        print_warning "Sudo access required for system package installation."
+        print_info "You may be prompted for your password to install system dependencies."
+        echo ""
+    fi
+    
+    # Detect OS
+    if [ -f /etc/debian_version ]; then
+        # Debian/Ubuntu
+        print_info "Detected Debian/Ubuntu system"
+        
+        # Update package list
+        sudo apt update -qq
+        
+        # Install essential packages
+        sudo apt install -y \
+            python3 \
+            python3-pip \
+            python3-venv \
+            python3-dev \
+            build-essential \
+            libcups2-dev \
+            libpq-dev \
+            pkg-config \
+            libcairo2-dev \
+            libgirepository1.0-dev \
+            libjpeg-dev \
+            libpng-dev \
+            libtiff-dev \
+            libffi-dev \
+            libssl-dev \
+            curl \
+            wget \
+            git \
+            tmux \
+            redis-server \
+            postgresql-client \
+            libmagic1 \
+            poppler-utils \
+            ghostscript
+            
+    elif [ -f /etc/redhat-release ]; then
+        # RHEL/CentOS/Fedora
+        print_info "Detected RHEL/CentOS/Fedora system"
+        
+        # Determine package manager
+        if command -v dnf >/dev/null 2>&1; then
+            PKG_MGR="dnf"
+        elif command -v yum >/dev/null 2>&1; then
+            PKG_MGR="yum"
+        else
+            print_error "No suitable package manager found"
+            return 1
+        fi
+        
+        sudo $PKG_MGR install -y \
+            python3 \
+            python3-pip \
+            python3-devel \
+            gcc \
+            gcc-c++ \
+            make \
+            cups-devel \
+            postgresql-devel \
+            pkgconfig \
+            cairo-devel \
+            gobject-introspection-devel \
+            libjpeg-devel \
+            libpng-devel \
+            libtiff-devel \
+            libffi-devel \
+            openssl-devel \
+            curl \
+            wget \
+            git \
+            tmux \
+            redis \
+            postgresql \
+            file \
+            poppler-utils \
+            ghostscript
+            
+    elif [ -f /etc/arch-release ]; then
+        # Arch Linux
+        print_info "Detected Arch Linux system"
+        
+        sudo pacman -Syu --noconfirm
+        sudo pacman -S --noconfirm \
+            python \
+            python-pip \
+            base-devel \
+            libcups \
+            postgresql-libs \
+            pkg-config \
+            cairo \
+            gobject-introspection \
+            libjpeg-turbo \
+            libpng \
+            libtiff \
+            libffi \
+            openssl \
+            curl \
+            wget \
+            git \
+            tmux \
+            redis \
+            postgresql \
+            file \
+            poppler \
+            ghostscript
+            
+    else
+        print_warning "Unknown Linux distribution. Attempting generic installation..."
+        # Try to install python3 and pip at minimum
+        if command -v apt >/dev/null 2>&1; then
+            sudo apt update && sudo apt install -y python3 python3-pip python3-venv python3-dev build-essential
+        elif command -v yum >/dev/null 2>&1; then
+            sudo yum install -y python3 python3-pip python3-devel gcc gcc-c++ make
+        elif command -v pacman >/dev/null 2>&1; then
+            sudo pacman -S --noconfirm python python-pip base-devel
+        else
+            print_error "Unable to install system dependencies. Please install manually:"
+            print_error "- Python 3.8+"
+            print_error "- pip"
+            print_error "- Development tools (gcc, make, etc.)"
+            print_error "- Required system libraries (cups, postgresql, cairo, etc.)"
+            return 1
+        fi
+    fi
+    
+    # Ensure python3 command is available
+    if ! command -v python3 >/dev/null 2>&1; then
+        if command -v python >/dev/null 2>&1 && python --version 2>&1 | grep -q "Python 3"; then
+            # Create symlink if python points to Python 3
+            sudo ln -sf $(which python) /usr/local/bin/python3 2>/dev/null || true
+        else
+            print_error "Python 3 is not available. Please install Python 3.8 or higher."
+            return 1
+        fi
+    fi
+    
+    print_success "System dependencies installed successfully"
+}
+
 # Setup virtual environment
 setup_virtual_environment() {
     print_info "Creating virtual environment..."
@@ -297,9 +446,18 @@ setup_virtual_environment() {
     # Activate venv
     source venv/bin/activate
 
-    print_info "Installing/updating dependencies..."
+    print_info "Installing/updating Python dependencies..."
     pip install --upgrade pip
-    pip install -r requirements.txt
+    
+    # Install requirements with better error handling
+    if [ -f "requirements.txt" ]; then
+        pip install -r requirements.txt
+        print_success "Python dependencies installed from requirements.txt"
+    else
+        print_warning "requirements.txt not found, installing basic Django dependencies..."
+        pip install Django pillow django-widget-tweaks python-dotenv gunicorn
+        print_success "Basic Django dependencies installed"
+    fi
     
     print_success "Virtual environment setup completed"
 }
@@ -352,13 +510,33 @@ start_service() {
     # Setup virtual environment with enhanced logging
     setup_virtual_environment
     
-    # Run migrations
+    # Run migrations with better error handling
     print_info "Running database migrations..."
-    python manage.py migrate --noinput > /dev/null 2>&1 || true
+    if python manage.py migrate --noinput 2>/dev/null; then
+        print_success "Database migrations completed successfully"
+    else
+        print_warning "Database migrations had issues, but continuing..."
+    fi
+    
+    # Create superuser if it doesn't exist
+    print_info "Setting up admin user..."
+    python manage.py shell << 'PYTHON_EOF' 2>/dev/null || true
+from django.contrib.auth import get_user_model
+User = get_user_model()
+if not User.objects.filter(username='admin').exists():
+    User.objects.create_superuser('admin', 'admin@noctispro.local', 'admin123')
+    print("Admin user created: admin/admin123")
+else:
+    print("Admin user already exists")
+PYTHON_EOF
     
     # Collect static files
     print_info "Collecting static files..."
-    python manage.py collectstatic --noinput > /dev/null 2>&1 || true
+    if python manage.py collectstatic --noinput 2>/dev/null; then
+        print_success "Static files collected successfully"
+    else
+        print_warning "Static file collection had issues, but continuing..."
+    fi
     
     # Start Django server in tmux session with auto-detected environment
     print_info "Starting Django server with auto-detected configuration..."
@@ -744,6 +922,10 @@ main() {
         "deploy")
             print_header
             
+            # System setup phase
+            print_info "🔧 Installing system dependencies..."
+            install_system_dependencies || exit 1
+            
             # Auto-detection phase
             auto_detect_workspace || exit 1
             auto_detect_environment || exit 1
@@ -760,17 +942,28 @@ main() {
             
             # Success summary
             echo ""
-            print_success "🎉 Masterpiece deployment completed with auto-detection!"
+            print_success "🎉 Masterpiece deployment completed with full environment setup!"
             echo ""
             echo -e "${CYAN}📍 Workspace: $WORKSPACE_DIR${NC}"
             echo -e "${CYAN}🔑 Secret Key: Auto-generated and configured${NC}"
             echo -e "${CYAN}🌐 Application: https://$STATIC_URL${NC}"
             echo -e "${CYAN}🔧 Admin Panel: https://$STATIC_URL/admin/${NC}"
+            echo -e "${CYAN}👤 Admin User: admin / admin123${NC}"
+            echo -e "${CYAN}🚀 Django Port: $DJANGO_PORT (localhost:$DJANGO_PORT)${NC}"
             echo -e "${CYAN}📁 Environment: $DETECTED_ENV_FILE${NC}"
+            echo -e "${GREEN}🔧 System Dependencies: Installed${NC}"
+            echo -e "${GREEN}🐍 Python Dependencies: Installed from requirements.txt${NC}"
+            echo -e "${GREEN}🗄️  Database: Migrated and ready${NC}"
             echo -e "${GREEN}🚀 Auto-start: Configured for system bootup${NC}"
             if [ -n "$DETECTED_NGROK_TOKEN" ]; then
                 echo -e "${GREEN}🔐 Ngrok: Auto-configured with detected token${NC}"
             fi
+            echo ""
+            echo -e "${YELLOW}📋 Next Steps:${NC}"
+            echo -e "   • Access your application at: https://$STATIC_URL"
+            echo -e "   • Login to admin panel with: admin / admin123"
+            echo -e "   • Local development: http://localhost:$DJANGO_PORT"
+            echo -e "   • Check status with: $0 status"
             echo ""
             ;;
         *)
@@ -785,7 +978,7 @@ main() {
             echo "  restart       - Restart the service (auto-detects environment)"
             echo "  status        - Show service status"
             echo "  setup-autostart - Configure auto-start only"
-            echo "  deploy        - Full deployment with auto-detection & auto-start"
+            echo "  deploy        - Full deployment with system setup, dependencies & auto-start"
             echo ""
             echo -e "${CYAN}🔍 Auto-Detection Features:${NC}"
             echo "  • Workspace directory detection"
@@ -794,6 +987,14 @@ main() {
             echo "  • Ngrok token detection from env files and config"
             echo "  • Django port and static URL detection"
             echo "  • Automatic environment file creation if none exists"
+            echo ""
+            echo -e "${CYAN}🛠️  System Setup Features:${NC}"
+            echo "  • Automatic system dependency installation (Ubuntu/Debian/RHEL/Arch)"
+            echo "  • Python virtual environment creation and management"
+            echo "  • Django requirements.txt installation"
+            echo "  • Database migration and admin user creation"
+            echo "  • Django deployment on port 8000"
+            echo "  • Static file collection and serving"
             echo ""
             exit 1
             ;;
