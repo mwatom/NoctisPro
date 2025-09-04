@@ -10,19 +10,45 @@ echo ""
 
 # Check only admin user exists
 echo "👤 PRODUCTION USER VERIFICATION:"
-cd /workspace
-source venv/bin/activate
+
+# Auto-detect workspace directory
+detect_workspace() {
+    if [ -f "manage.py" ] && [ -f "db.sqlite3" ]; then
+        echo "$(pwd)"
+    elif [ -f "/workspace/manage.py" ] && [ -f "/workspace/db.sqlite3" ]; then
+        echo "/workspace"
+    else
+        echo "$(pwd)"
+    fi
+}
+
+WORKSPACE_DIR=$(detect_workspace)
+cd "$WORKSPACE_DIR" || exit 1
+
+# Setup virtual environment if it exists
+if [ -d "venv/bin" ]; then
+    source venv/bin/activate
+elif command -v python3 >/dev/null 2>&1; then
+    # Use system python if no venv
+    alias python=python3
+fi
+
 python -c "
 import sqlite3
-conn = sqlite3.connect('/workspace/db.sqlite3')
-cursor = conn.cursor()
-cursor.execute('SELECT username, is_superuser, email FROM accounts_user;')
-users = cursor.fetchall()
-print(f'   Total users in system: {len(users)}')
-for username, is_super, email in users:
-    admin_status = 'ADMIN' if is_super else 'USER'
-    print(f'   👤 {username} - {admin_status}')
-conn.close()
+import os
+db_path = os.path.join('$(pwd)', 'db.sqlite3')
+if os.path.exists(db_path):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute('SELECT username, is_superuser, email FROM accounts_user;')
+    users = cursor.fetchall()
+    print(f'   Total users in system: {len(users)}')
+    for username, is_super, email in users:
+        admin_status = 'ADMIN' if is_super else 'USER'
+        print(f'   👤 {username} - {admin_status}')
+    conn.close()
+else:
+    print('   ⚠️  Database not found, will be created on first run')
 "
 
 echo ""
@@ -44,7 +70,11 @@ if pgrep -f "python manage.py runserver" > /dev/null; then
     echo "✅ Production server already running on port 80"
 else
     echo "🚀 Starting production server..."
-    nohup sudo venv/bin/python manage.py runserver 0.0.0.0:80 > production_server.log 2>&1 &
+    if [ -d "venv/bin" ]; then
+        nohup sudo venv/bin/python manage.py runserver 0.0.0.0:80 > production_server.log 2>&1 &
+    else
+        nohup sudo python3 manage.py runserver 0.0.0.0:80 > production_server.log 2>&1 &
+    fi
     
     # Wait for server to start
     sleep 5

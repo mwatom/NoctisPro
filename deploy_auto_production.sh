@@ -47,7 +47,65 @@ cat << "EOF"
 EOF
 echo -e "${NC}"
 
-# Get current directory
+# Function to auto-detect workspace directory
+detect_workspace() {
+    local current_dir=$(pwd)
+    local script_dir=$(dirname "$(realpath "$0")")
+    
+    # Check if we're already in a Django project directory
+    if [ -f "manage.py" ] && [ -f "requirements.txt" ]; then
+        echo "$current_dir"
+        return 0
+    fi
+    
+    # Check if the script directory contains Django project
+    if [ -f "$script_dir/manage.py" ] && [ -f "$script_dir/requirements.txt" ]; then
+        echo "$script_dir"
+        return 0
+    fi
+    
+    # Look for common workspace patterns
+    for workspace_path in "/workspace" "$HOME/workspace" "$HOME/NoctisPro" "$HOME/noctis_pro" "$(pwd)/workspace"; do
+        if [ -d "$workspace_path" ] && [ -f "$workspace_path/manage.py" ]; then
+            echo "$workspace_path"
+            return 0
+        fi
+    done
+    
+    # Look in parent directories for Django project
+    local search_dir="$current_dir"
+    for i in {1..3}; do
+        search_dir=$(dirname "$search_dir")
+        if [ -f "$search_dir/manage.py" ] && [ -f "$search_dir/requirements.txt" ]; then
+            echo "$search_dir"
+            return 0
+        fi
+    done
+    
+    # Default to current directory
+    echo "$current_dir"
+}
+
+# Auto-detect and navigate to workspace
+WORKSPACE_DIR=$(detect_workspace)
+log "Auto-detected workspace: $WORKSPACE_DIR"
+
+# Navigate to workspace directory
+if [ "$WORKSPACE_DIR" != "$(pwd)" ]; then
+    log "Navigating to workspace directory..."
+    cd "$WORKSPACE_DIR" || {
+        error "Failed to navigate to workspace directory: $WORKSPACE_DIR"
+        exit 1
+    }
+fi
+
+# Verify we're in a Django project
+if [ ! -f "manage.py" ]; then
+    error "manage.py not found in $WORKSPACE_DIR. This doesn't appear to be a Django project."
+    info "Please run this script from your Django project directory or ensure manage.py exists."
+    exit 1
+fi
+
 CURRENT_DIR=$(pwd)
 log "Working directory: $CURRENT_DIR"
 
@@ -310,6 +368,8 @@ validate_installation() {
     python -c "
 import django
 import os
+import sys
+sys.path.insert(0, '$(pwd)')
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'noctis_pro.settings')
 django.setup()
 from django.db import connection
