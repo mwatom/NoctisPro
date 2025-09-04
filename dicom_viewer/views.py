@@ -1460,6 +1460,7 @@ def load_from_directory(request):
         try:
             import os
             import glob
+            import time
             from pathlib import Path
             
             directory_path = request.POST.get('directory_path', '').strip()
@@ -1476,35 +1477,95 @@ def load_from_directory(request):
             except Exception as e:
                 return JsonResponse({'success': False, 'error': f'Invalid directory path: {str(e)}'})
             
-            # Recursively find all DICOM files
+            # Performance and safety limits
+            MAX_FILES_TO_SCAN = 1000  # Limit total files scanned
+            MAX_DICOM_FILES = 200     # Limit DICOM files processed
+            MAX_SCAN_TIME = 30        # Maximum scan time in seconds
+            MAX_DEPTH = 10            # Maximum directory depth
+            
+            # Recursively find DICOM files with limits and timeout
             dicom_files = []
             supported_extensions = ['.dcm', '.dicom', '.dic', '']  # Include files without extension
+            start_time = time.time()
+            files_scanned = 0
             
-            for root, dirs, files in os.walk(directory_path):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    # Check if file might be DICOM
-                    file_ext = os.path.splitext(file)[1].lower()
-                    if file_ext in supported_extensions or not file_ext:
-                        try:
-                            # Quick DICOM validation
-                            with open(file_path, 'rb') as f:
-                                header = f.read(132)
-                                if len(header) >= 132 and header[128:132] == b'DICM':
-                                    dicom_files.append(file_path)
-                                elif len(header) >= 8:
-                                    # Check for DICOM without preamble
-                                    f.seek(0)
-                                    test_data = f.read(256)
-                                    if b'DICM' in test_data or any(tag in test_data for tag in [b'\x08\x00', b'\x10\x00', b'\x20\x00']):
+            try:
+                for root, dirs, files in os.walk(directory_path):
+                    # Check timeout
+                    if time.time() - start_time > MAX_SCAN_TIME:
+                        logger.warning(f"Directory scan timeout after {MAX_SCAN_TIME}s, processed {files_scanned} files")
+                        break
+                    
+                    # Check depth limit
+                    depth = root[len(directory_path):].count(os.sep)
+                    if depth > MAX_DEPTH:
+                        continue
+                    
+                    # Limit directory traversal for performance
+                    if len(dirs) > 50:  # If too many subdirectories, skip some
+                        dirs[:] = dirs[:50]
+                    
+                    for file in files:
+                        files_scanned += 1
+                        
+                        # Check limits
+                        if files_scanned > MAX_FILES_TO_SCAN:
+                            logger.warning(f"Reached maximum files to scan ({MAX_FILES_TO_SCAN})")
+                            break
+                        
+                        if len(dicom_files) >= MAX_DICOM_FILES:
+                            logger.info(f"Reached maximum DICOM files ({MAX_DICOM_FILES})")
+                            break
+                        
+                        # Check timeout periodically
+                        if files_scanned % 100 == 0 and time.time() - start_time > MAX_SCAN_TIME:
+                            logger.warning(f"Directory scan timeout after {MAX_SCAN_TIME}s")
+                            break
+                        
+                        file_path = os.path.join(root, file)
+                        file_ext = os.path.splitext(file)[1].lower()
+                        
+                        # Quick extension check first
+                        if file_ext in supported_extensions or not file_ext:
+                            try:
+                                # Quick DICOM validation with timeout protection
+                                with open(file_path, 'rb') as f:
+                                    header = f.read(132)
+                                    if len(header) >= 132 and header[128:132] == b'DICM':
                                         dicom_files.append(file_path)
-                        except Exception:
-                            continue
+                                    elif len(header) >= 8:
+                                        # Check for DICOM without preamble (limited read)
+                                        f.seek(0)
+                                        test_data = f.read(256)  # Reduced from larger read
+                                        if b'DICM' in test_data or any(tag in test_data for tag in [b'\x08\x00', b'\x10\x00', b'\x20\x00']):
+                                            dicom_files.append(file_path)
+                            except (OSError, IOError, PermissionError):
+                                # Skip files that can't be read (permission issues, etc.)
+                                continue
+                            except Exception:
+                                # Skip any other file-related errors
+                                continue
+                    
+                    # Break outer loop if limits reached
+                    if files_scanned > MAX_FILES_TO_SCAN or len(dicom_files) >= MAX_DICOM_FILES:
+                        break
+                        
+            except Exception as e:
+                logger.error(f"Error during directory scan: {str(e)}")
+                return JsonResponse({'success': False, 'error': f'Error scanning directory: {str(e)}'})
             
             if not dicom_files:
-                return JsonResponse({'success': False, 'error': f'No DICOM files found in {directory_path}'})
+                # Provide helpful message based on what was scanned
+                if files_scanned > 0:
+                    return JsonResponse({
+                        'success': False, 
+                        'error': f'No DICOM files found in {directory_path}. Scanned {files_scanned} files.',
+                        'files_scanned': files_scanned
+                    })
+                else:
+                    return JsonResponse({'success': False, 'error': f'No files found in {directory_path}'})
             
-            # Process found DICOM files
+            # Process found DICOM files with chunked processing
             upload_id = str(uuid.uuid4())
             total_files = len(dicom_files)
             processed_files = 0
@@ -1515,22 +1576,47 @@ def load_from_directory(request):
             invalid_files = 0
             rep_ds = None
             
-            for file_path in dicom_files[:100]:  # Limit to first 100 files for performance
+            # Process files in smaller chunks to prevent memory issues
+            MAX_PROCESS_FILES = min(50, len(dicom_files))  # Reduced from 100 for better performance
+            processing_start = time.time()
+            MAX_PROCESS_TIME = 45  # Maximum processing time in seconds
+            
+            logger.info(f"Processing {MAX_PROCESS_FILES} DICOM files from {total_files} found")
+            
+            for i, file_path in enumerate(dicom_files[:MAX_PROCESS_FILES]):
+                # Check processing timeout
+                if time.time() - processing_start > MAX_PROCESS_TIME:
+                    logger.warning(f"DICOM processing timeout after {MAX_PROCESS_TIME}s, processed {processed_files} files")
+                    break
+                
                 try:
-                    ds = pydicom.dcmread(file_path, force=True)
+                    # Process with timeout protection
+                    ds = pydicom.dcmread(file_path, force=True, stop_before_pixels=True)  # Don't load pixel data initially
                     study_uid = getattr(ds, 'StudyInstanceUID', None)
                     series_uid = getattr(ds, 'SeriesInstanceUID', None)
+                    
                     if not study_uid or not series_uid:
                         invalid_files += 1
                         continue
+                        
                     if rep_ds is None:
                         rep_ds = ds
+                        
                     if study_uid not in studies_map:
                         studies_map[study_uid] = {}
                     if series_uid not in studies_map[study_uid]:
                         studies_map[study_uid][series_uid] = []
+                        
                     studies_map[study_uid][series_uid].append((ds, file_path))
                     processed_files += 1
+                    
+                    # Log progress every 10 files
+                    if (i + 1) % 10 == 0:
+                        logger.info(f"Processed {i + 1}/{MAX_PROCESS_FILES} files")
+                        
+                except (pydicom.errors.InvalidDicomError, FileNotFoundError, PermissionError):
+                    invalid_files += 1
+                    continue
                 except Exception as e:
                     invalid_files += 1
                     logger.warning(f"Failed to process DICOM file {file_path}: {str(e)}")
@@ -1557,14 +1643,38 @@ def load_from_directory(request):
                     logger.error(f"Failed to process study {study_uid}: {str(e)}")
                     continue
             
+            # Enhanced response with processing statistics
+            scan_time = time.time() - start_time
+            message = f'Successfully loaded {len(created_studies)} studies from directory'
+            
+            # Add helpful information about limits reached
+            warnings = []
+            if files_scanned >= MAX_FILES_TO_SCAN:
+                warnings.append(f'Reached maximum scan limit of {MAX_FILES_TO_SCAN} files')
+            if len(dicom_files) >= MAX_DICOM_FILES:
+                warnings.append(f'Reached maximum DICOM files limit of {MAX_DICOM_FILES}')
+            if processed_files >= MAX_PROCESS_FILES:
+                warnings.append(f'Processed maximum of {MAX_PROCESS_FILES} files')
+            if scan_time >= MAX_SCAN_TIME * 0.9:  # If close to timeout
+                warnings.append(f'Scan took {scan_time:.1f}s (near timeout limit)')
+                
             return JsonResponse({
                 'success': True,
-                'message': f'Successfully loaded {len(created_studies)} studies from directory',
+                'message': message,
                 'studies': created_studies,
                 'total_files_found': total_files,
+                'files_scanned': files_scanned,
                 'processed_files': processed_files,
                 'invalid_files': invalid_files,
-                'directory': directory_path
+                'directory': directory_path,
+                'scan_time': round(scan_time, 2),
+                'warnings': warnings,
+                'limits_info': {
+                    'max_files_scanned': MAX_FILES_TO_SCAN,
+                    'max_dicom_files': MAX_DICOM_FILES,
+                    'max_processed': MAX_PROCESS_FILES,
+                    'max_scan_time': MAX_SCAN_TIME
+                }
             })
             
         except Exception as e:

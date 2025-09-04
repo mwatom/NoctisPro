@@ -252,6 +252,10 @@
     <div class="loading-spinner" id="loadingSpinner">
         <div class="spinner"></div>
         <p>Scanning directory and processing DICOM files...</p>
+        <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 1rem;">
+            <strong>Please wait:</strong> Large directories may take up to 30 seconds to scan.<br>
+            Processing is limited to 1000 files and 50 DICOM files for optimal performance.
+        </div>
     </div>
     
     <div class="results" id="results">
@@ -274,8 +278,10 @@
             <li><strong>Linux/Mac:</strong> Use paths like <code>/media/usb/dicom</code> or <code>/home/user/dicom</code></li>
             <li><strong>Flash Drive:</strong> Insert your USB drive and navigate to its mount point</li>
             <li><strong>CD/DVD:</strong> Insert disc and use the disc mount path</li>
-            <li>The system will recursively scan all subdirectories for DICOM files</li>
+            <li>The system will recursively scan subdirectories for DICOM files (max 10 levels deep)</li>
             <li>Supported file extensions: .dcm, .dicom, .dic, and files without extensions</li>
+            <li><strong>Performance:</strong> Limited to 1000 files scanned and 50 DICOM files processed for optimal speed</li>
+            <li><strong>Timeout:</strong> Scanning will timeout after 30 seconds to prevent system freezing</li>
         </ul>
         
         <div class="path-examples">
@@ -367,17 +373,31 @@ function showResults(data) {
     
     let html = `
         <div style="margin-bottom: 1rem;">
-            <strong>Summary:</strong><br>
+            <strong>Processing Summary:</strong><br>
             • Directory: ${data.directory}<br>
-            • Total files found: ${data.total_files_found}<br>
-            • Processed files: ${data.processed_files}<br>
+            • Files scanned: ${data.files_scanned || data.total_files_found}<br>
+            • DICOM files found: ${data.total_files_found}<br>
+            • Files processed: ${data.processed_files}<br>
             • Invalid files: ${data.invalid_files}<br>
-            • Studies created: ${data.studies.length}
+            • Studies created: ${data.studies.length}<br>
+            • Scan time: ${data.scan_time || 'N/A'}s
         </div>
     `;
     
+    // Show warnings if any
+    if (data.warnings && data.warnings.length > 0) {
+        html += `
+            <div style="background: #fbbf24; color: #92400e; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;">
+                <strong><i class="fas fa-exclamation-triangle"></i> Performance Limits Reached:</strong><br>
+                ${data.warnings.map(warning => `• ${warning}`).join('<br>')}
+                <br><br>
+                <em>For better performance with large directories, consider organizing DICOM files into smaller subdirectories.</em>
+            </div>
+        `;
+    }
+    
     if (data.studies.length > 0) {
-        html += '<h4>Loaded Studies:</h4>';
+        html += '<h4>Successfully Loaded Studies:</h4>';
         data.studies.forEach(study => {
             html += `
                 <div class="study-item">
@@ -387,13 +407,26 @@ function showResults(data) {
                     <div class="study-details">
                         Study: ${study.study_description}<br>
                         Series: ${study.series_count} | Images: ${study.images_count}<br>
-                        <a href="/dicom-viewer/?study=${study.id}" class="btn-control" style="margin-top: 0.5rem; display: inline-block; text-decoration: none;">
+                        <a href="/dicom-viewer/?study=${study.id}" class="btn-control" style="margin-top: 0.5rem; display: inline-block; text-decoration: none; background: var(--accent-color); color: white; padding: 0.5rem 1rem; border-radius: 4px;">
                             <i class="fas fa-eye"></i> View Study
                         </a>
                     </div>
                 </div>
             `;
         });
+    }
+    
+    // Show performance info for transparency
+    if (data.limits_info) {
+        html += `
+            <div style="background: var(--primary-bg); padding: 1rem; border-radius: 6px; margin-top: 1rem; font-size: 0.85rem; color: var(--text-secondary);">
+                <strong>Performance Limits:</strong> 
+                Max scan: ${data.limits_info.max_files_scanned} files, 
+                Max DICOM: ${data.limits_info.max_dicom_files}, 
+                Max process: ${data.limits_info.max_processed}, 
+                Timeout: ${data.limits_info.max_scan_time}s
+            </div>
+        `;
     }
     
     resultsBody.innerHTML = html;
