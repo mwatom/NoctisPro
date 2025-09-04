@@ -196,22 +196,13 @@ def _get_mpr_volume_for_series(series):
 
 @login_required
 def viewer(request):
-    """Web-based DICOM viewer with Cornerstone integration."""
-    context = {
-        'study_id': request.GET.get('study', ''),
-        'current_date': timezone.now().strftime('%Y-%m-%d')
-    }
-    return render(request, 'dicom_viewer/viewer.html', context)
-
-@login_required
-def mpr_viewer(request):
-    """Professional MPR viewer with 2x2 layout, 3D reconstruction, and crosshair sync."""
+    """Complete professional DICOM viewer with MPR, 3D reconstruction, and all medical imaging tools."""
     context = {
         'study_id': request.GET.get('study', ''),
         'series_id': request.GET.get('series', ''),
         'current_date': timezone.now().strftime('%Y-%m-%d')
     }
-    return render(request, 'dicom_viewer/mpr_viewer.html', context)
+    return render(request, 'dicom_viewer/viewer.html', context)
 
 @login_required
 def advanced_standalone_viewer(request):
