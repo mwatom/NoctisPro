@@ -1,12 +1,8 @@
-version: 2
-region: us
-console_ui: false
-update_channel: stable
-update_check: true
-web_addr: false
-
+version: "2"
+authtoken: ""
 tunnels:
-  noctispro-http:
+  noctispro:
     proto: http
     addr: 80
-    hostname: colt-charmed-lark.ngrok-free.app
+    hostname: mallard-shining-curiously.ngrok-free.app
+    schemes: [https, http]
