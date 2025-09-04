@@ -1130,6 +1130,7 @@
             canvas.addEventListener('mousemove', handleMouseMove);
             canvas.addEventListener('mouseup', handleMouseUp);
             canvas.addEventListener('wheel', handleWheel);
+            canvas.addEventListener('contextmenu', (e) => e.preventDefault()); // Prevent default right-click menu
 
             // Keyboard shortcuts
             document.addEventListener('keydown', handleKeyDown);
@@ -1419,10 +1420,12 @@
                 ctx.putImageData(imgData, 0, 0);
             }
             
-            // Draw overlays - SAME AS YOUR ORIGINAL
+            // Always draw measurements and annotations after rendering the image
             drawMeasurements();
             drawAnnotations();
-            if (crosshair) drawCrosshair();
+            if (crosshair) {
+                drawCrosshair();
+            }
             
             updateOverlayLabels();
         }
@@ -1444,20 +1447,54 @@
         let currentMeasurement = null;
 
         function handleMouseDown(event) {
-            isDragging = true;
             const rect = canvas.getBoundingClientRect();
             lastMouseX = event.clientX - rect.left;
             lastMouseY = event.clientY - rect.top;
             
-            if (activeTool === 'measure') {
-                startMeasurement(lastMouseX, lastMouseY);
-            } else if (activeTool === 'angle') {
-                startAngleMeasurement(lastMouseX, lastMouseY);
-            } else if (activeTool === 'area') {
-                startAreaMeasurement(lastMouseX, lastMouseY);
-            } else if (activeTool === 'annotate') {
-                addAnnotation(lastMouseX, lastMouseY);
+            // Handle right-click for context menu
+            if (event.button === 2) {
+                event.preventDefault();
+                
+                // Check if right-click is on a measurement
+                const clickedMeasurement = findMeasurementAtPoint(lastMouseX, lastMouseY);
+                if (clickedMeasurement !== -1) {
+                    // Show context menu at cursor position
+                    showContextMenu(event.clientX, event.clientY, clickedMeasurement);
+                    return;
+                }
+                
+                // Hide context menu if clicking elsewhere
+                hideContextMenu();
+                return;
             }
+            
+            // Handle left-click (button 0)
+            if (event.button === 0) {
+                isDragging = true;
+                hideContextMenu(); // Hide any open context menu
+                
+                if (activeTool === 'measure') {
+                    startMeasurement(lastMouseX, lastMouseY);
+                } else if (activeTool === 'angle') {
+                    startAngleMeasurement(lastMouseX, lastMouseY);
+                } else if (activeTool === 'area') {
+                    startAreaMeasurement(lastMouseX, lastMouseY);
+                } else if (activeTool === 'annotate') {
+                    addAnnotation(lastMouseX, lastMouseY);
+                }
+            }
+        }
+
+        function findMeasurementAtPoint(x, y) {
+            for (let i = measurements.length - 1; i >= 0; i--) {
+                const measurement = measurements[i];
+                if (measurement.bounds && 
+                    x >= measurement.bounds.x1 && x <= measurement.bounds.x2 &&
+                    y >= measurement.bounds.y1 && y <= measurement.bounds.y2) {
+                    return i;
+                }
+            }
+            return -1;
         }
 
         function handleMouseMove(event) {
@@ -1552,6 +1589,16 @@
                 case ' ':
                     event.preventDefault();
                     toggleCineMode();
+                    break;
+                case 'Delete':
+                case 'Backspace':
+                    if (measurements.length > 0) {
+                        clearAllMeasurements();
+                    }
+                    break;
+                case 'Escape':
+                    hideContextMenu();
+                    currentMeasurement = null;
                     break;
             }
         }
@@ -1649,7 +1696,12 @@
 
         function redrawCurrentImage() {
             if (currentImageIndex >= 0 && currentImageIndex < imageData.length) {
-                loadCurrentImage();
+                loadCurrentImage().then(() => {
+                    // Redraw measurements and annotations after image is loaded
+                    drawMeasurements();
+                    drawAnnotations();
+                    drawCurrentMeasurement();
+                });
             }
         }
 
@@ -1709,25 +1761,108 @@
         }
 
         function drawMeasurements() {
+            if (!measurements || measurements.length === 0) return;
+            
             ctx.strokeStyle = '#ff0000';
             ctx.lineWidth = 2;
+            ctx.fillStyle = '#ff0000';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'center';
             
-            measurements.forEach(measurement => {
+            measurements.forEach((measurement, index) => {
                 if (measurement.type === 'distance') {
+                    // Draw measurement line
                     ctx.beginPath();
                     ctx.moveTo(measurement.startX, measurement.startY);
                     ctx.lineTo(measurement.endX, measurement.endY);
                     ctx.stroke();
                     
-                    // Draw distance text
+                    // Draw measurement points
+                    ctx.fillStyle = '#ff0000';
+                    ctx.beginPath();
+                    ctx.arc(measurement.startX, measurement.startY, 4, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(measurement.endX, measurement.endY, 4, 0, 2 * Math.PI);
+                    ctx.fill();
+                    
+                    // Draw distance text with background
                     const distance = calculateDistance(measurement);
                     const midX = (measurement.startX + measurement.endX) / 2;
                     const midY = (measurement.startY + measurement.endY) / 2;
                     
-                    ctx.fillStyle = '#ff0000';
-                    ctx.font = '14px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(distance.text, midX, midY - 10);
+                    // Text background
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    ctx.fillRect(midX - 30, midY - 20, 60, 16);
+                    
+                    // Text
+                    ctx.fillStyle = '#ffff00';
+                    ctx.fillText(distance.text, midX, midY - 8);
+                    
+                    // Store measurement bounds for context menu
+                    measurement.bounds = {
+                        x1: Math.min(measurement.startX, measurement.endX) - 10,
+                        y1: Math.min(measurement.startY, measurement.endY) - 10,
+                        x2: Math.max(measurement.startX, measurement.endX) + 10,
+                        y2: Math.max(measurement.startY, measurement.endY) + 10,
+                        index: index
+                    };
+                } else if (measurement.type === 'angle' && measurement.points && measurement.points.length >= 3) {
+                    // Draw angle measurement
+                    const points = measurement.points;
+                    ctx.beginPath();
+                    ctx.moveTo(points[0].x, points[0].y);
+                    ctx.lineTo(points[1].x, points[1].y);
+                    ctx.lineTo(points[2].x, points[2].y);
+                    ctx.stroke();
+                    
+                    // Draw angle arc
+                    const angle = calculateAngle(points[0], points[1], points[2]);
+                    ctx.beginPath();
+                    ctx.arc(points[1].x, points[1].y, 20, 0, angle.radians);
+                    ctx.stroke();
+                    
+                    // Draw angle text
+                    ctx.fillStyle = '#ffff00';
+                    ctx.fillText(`${angle.degrees.toFixed(1)}°`, points[1].x + 25, points[1].y - 10);
+                    
+                    measurement.bounds = {
+                        x1: Math.min(...points.map(p => p.x)) - 10,
+                        y1: Math.min(...points.map(p => p.y)) - 10,
+                        x2: Math.max(...points.map(p => p.x)) + 10,
+                        y2: Math.max(...points.map(p => p.y)) + 10,
+                        index: index
+                    };
+                } else if (measurement.type === 'area' && measurement.points && measurement.points.length >= 3) {
+                    // Draw area measurement
+                    const points = measurement.points;
+                    ctx.beginPath();
+                    ctx.moveTo(points[0].x, points[0].y);
+                    for (let i = 1; i < points.length; i++) {
+                        ctx.lineTo(points[i].x, points[i].y);
+                    }
+                    ctx.closePath();
+                    ctx.stroke();
+                    
+                    // Fill with transparent color
+                    ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+                    ctx.fill();
+                    
+                    // Calculate and display area
+                    const area = calculatePolygonArea(points);
+                    const centerX = points.reduce((sum, p) => sum + p.x, 0) / points.length;
+                    const centerY = points.reduce((sum, p) => sum + p.y, 0) / points.length;
+                    
+                    ctx.fillStyle = '#ffff00';
+                    ctx.fillText(`${area.toFixed(2)} mm²`, centerX, centerY);
+                    
+                    measurement.bounds = {
+                        x1: Math.min(...points.map(p => p.x)) - 10,
+                        y1: Math.min(...points.map(p => p.y)) - 10,
+                        x2: Math.max(...points.map(p => p.x)) + 10,
+                        y2: Math.max(...points.map(p => p.y)) + 10,
+                        index: index
+                    };
                 }
             });
         }
@@ -1912,6 +2047,139 @@
             updateMeasurementsList();
             redrawCurrentImage();
             showToast('All measurements cleared', 'success');
+        }
+
+        function deleteMeasurement(index) {
+            if (index >= 0 && index < measurements.length) {
+                const measurement = measurements[index];
+                measurements.splice(index, 1);
+                updateMeasurementsList();
+                redrawCurrentImage();
+                showToast(`${measurement.type} measurement deleted`, 'success');
+                hideContextMenu();
+            }
+        }
+
+        function calculateAngle(p1, p2, p3) {
+            const a = Math.sqrt(Math.pow(p2.x - p3.x, 2) + Math.pow(p2.y - p3.y, 2));
+            const b = Math.sqrt(Math.pow(p1.x - p3.x, 2) + Math.pow(p1.y - p3.y, 2));
+            const c = Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+            
+            const radians = Math.acos((a * a + c * c - b * b) / (2 * a * c));
+            const degrees = radians * (180 / Math.PI);
+            
+            return { radians, degrees };
+        }
+
+        function calculatePolygonArea(points) {
+            if (points.length < 3) return 0;
+            
+            let area = 0;
+            for (let i = 0; i < points.length; i++) {
+                const j = (i + 1) % points.length;
+                area += points[i].x * points[j].y;
+                area -= points[j].x * points[i].y;
+            }
+            return Math.abs(area / 2);
+        }
+
+        // Context Menu Functions
+        function showContextMenu(x, y, measurementIndex) {
+            hideContextMenu();
+            
+            const contextMenu = document.createElement('div');
+            contextMenu.id = 'measurementContextMenu';
+            contextMenu.style.cssText = `
+                position: fixed;
+                left: ${x}px;
+                top: ${y}px;
+                background: var(--card-bg);
+                border: 1px solid var(--border-color);
+                border-radius: 6px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                z-index: 10000;
+                min-width: 150px;
+                padding: 5px 0;
+                font-size: 14px;
+            `;
+            
+            const deleteOption = document.createElement('div');
+            deleteOption.style.cssText = `
+                padding: 8px 16px;
+                cursor: pointer;
+                color: var(--danger-color);
+                transition: background 0.2s;
+            `;
+            deleteOption.innerHTML = '<i class="fas fa-trash"></i> Delete Measurement';
+            deleteOption.addEventListener('mouseenter', () => {
+                deleteOption.style.background = 'rgba(255, 68, 68, 0.1)';
+            });
+            deleteOption.addEventListener('mouseleave', () => {
+                deleteOption.style.background = 'transparent';
+            });
+            deleteOption.addEventListener('click', () => {
+                deleteMeasurement(measurementIndex);
+            });
+            
+            const copyOption = document.createElement('div');
+            copyOption.style.cssText = `
+                padding: 8px 16px;
+                cursor: pointer;
+                color: var(--text-primary);
+                transition: background 0.2s;
+            `;
+            copyOption.innerHTML = '<i class="fas fa-copy"></i> Copy Value';
+            copyOption.addEventListener('mouseenter', () => {
+                copyOption.style.background = 'var(--border-color)';
+            });
+            copyOption.addEventListener('mouseleave', () => {
+                copyOption.style.background = 'transparent';
+            });
+            copyOption.addEventListener('click', () => {
+                copyMeasurementValue(measurementIndex);
+            });
+            
+            contextMenu.appendChild(deleteOption);
+            contextMenu.appendChild(copyOption);
+            document.body.appendChild(contextMenu);
+            
+            // Close context menu when clicking elsewhere
+            setTimeout(() => {
+                document.addEventListener('click', hideContextMenu, { once: true });
+            }, 100);
+        }
+
+        function hideContextMenu() {
+            const existingMenu = document.getElementById('measurementContextMenu');
+            if (existingMenu) {
+                existingMenu.remove();
+            }
+        }
+
+        function copyMeasurementValue(index) {
+            if (index >= 0 && index < measurements.length) {
+                const measurement = measurements[index];
+                let value = '';
+                
+                if (measurement.type === 'distance') {
+                    const distance = calculateDistance(measurement);
+                    value = distance.text;
+                } else if (measurement.type === 'angle') {
+                    const angle = calculateAngle(measurement.points[0], measurement.points[1], measurement.points[2]);
+                    value = `${angle.degrees.toFixed(1)}°`;
+                } else if (measurement.type === 'area') {
+                    const area = calculatePolygonArea(measurement.points);
+                    value = `${area.toFixed(2)} mm²`;
+                }
+                
+                navigator.clipboard.writeText(value).then(() => {
+                    showToast(`Copied: ${value}`, 'success');
+                    hideContextMenu();
+                }).catch(() => {
+                    showToast('Failed to copy to clipboard', 'error');
+                    hideContextMenu();
+                });
+            }
         }
 
         function updatePatientInfo(study) {

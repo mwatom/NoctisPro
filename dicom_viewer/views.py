@@ -1454,6 +1454,263 @@ def api_export_measurements(request, study_id):
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 @login_required
+def load_from_directory(request):
+    """Load DICOM files from local directory, flash drive, or disc"""
+    if request.method == 'POST':
+        try:
+            import os
+            import glob
+            from pathlib import Path
+            
+            directory_path = request.POST.get('directory_path', '').strip()
+            if not directory_path:
+                return JsonResponse({'success': False, 'error': 'Directory path is required'})
+            
+            # Security check: ensure path is safe
+            try:
+                directory_path = os.path.abspath(directory_path)
+                if not os.path.exists(directory_path):
+                    return JsonResponse({'success': False, 'error': 'Directory does not exist'})
+                if not os.path.isdir(directory_path):
+                    return JsonResponse({'success': False, 'error': 'Path is not a directory'})
+            except Exception as e:
+                return JsonResponse({'success': False, 'error': f'Invalid directory path: {str(e)}'})
+            
+            # Recursively find all DICOM files
+            dicom_files = []
+            supported_extensions = ['.dcm', '.dicom', '.dic', '']  # Include files without extension
+            
+            for root, dirs, files in os.walk(directory_path):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    # Check if file might be DICOM
+                    file_ext = os.path.splitext(file)[1].lower()
+                    if file_ext in supported_extensions or not file_ext:
+                        try:
+                            # Quick DICOM validation
+                            with open(file_path, 'rb') as f:
+                                header = f.read(132)
+                                if len(header) >= 132 and header[128:132] == b'DICM':
+                                    dicom_files.append(file_path)
+                                elif len(header) >= 8:
+                                    # Check for DICOM without preamble
+                                    f.seek(0)
+                                    test_data = f.read(256)
+                                    if b'DICM' in test_data or any(tag in test_data for tag in [b'\x08\x00', b'\x10\x00', b'\x20\x00']):
+                                        dicom_files.append(file_path)
+                        except Exception:
+                            continue
+            
+            if not dicom_files:
+                return JsonResponse({'success': False, 'error': f'No DICOM files found in {directory_path}'})
+            
+            # Process found DICOM files
+            upload_id = str(uuid.uuid4())
+            total_files = len(dicom_files)
+            processed_files = 0
+            processed_images = []
+            
+            # Group by StudyInstanceUID and SeriesInstanceUID
+            studies_map = {}
+            invalid_files = 0
+            rep_ds = None
+            
+            for file_path in dicom_files[:100]:  # Limit to first 100 files for performance
+                try:
+                    ds = pydicom.dcmread(file_path, force=True)
+                    study_uid = getattr(ds, 'StudyInstanceUID', None)
+                    series_uid = getattr(ds, 'SeriesInstanceUID', None)
+                    if not study_uid or not series_uid:
+                        invalid_files += 1
+                        continue
+                    if rep_ds is None:
+                        rep_ds = ds
+                    if study_uid not in studies_map:
+                        studies_map[study_uid] = {}
+                    if series_uid not in studies_map[study_uid]:
+                        studies_map[study_uid][series_uid] = []
+                    studies_map[study_uid][series_uid].append((ds, file_path))
+                    processed_files += 1
+                except Exception as e:
+                    invalid_files += 1
+                    logger.warning(f"Failed to process DICOM file {file_path}: {str(e)}")
+                    continue
+            
+            if not studies_map:
+                return JsonResponse({'success': False, 'error': 'No valid DICOM files found in directory'})
+            
+            # Process each study found
+            created_studies = []
+            for study_uid, series_map in studies_map.items():
+                try:
+                    study_obj = process_dicom_study(study_uid, series_map, rep_ds, request.user, upload_id)
+                    if study_obj:
+                        created_studies.append({
+                            'id': study_obj.id,
+                            'accession_number': study_obj.accession_number,
+                            'patient_name': study_obj.patient.full_name if study_obj.patient else 'Unknown',
+                            'study_description': study_obj.study_description,
+                            'series_count': len(series_map),
+                            'images_count': sum(len(items) for items in series_map.values())
+                        })
+                except Exception as e:
+                    logger.error(f"Failed to process study {study_uid}: {str(e)}")
+                    continue
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Successfully loaded {len(created_studies)} studies from directory',
+                'studies': created_studies,
+                'total_files_found': total_files,
+                'processed_files': processed_files,
+                'invalid_files': invalid_files,
+                'directory': directory_path
+            })
+            
+        except Exception as e:
+            logger.error(f"Directory loading error: {str(e)}")
+            return JsonResponse({'success': False, 'error': f'Failed to load from directory: {str(e)}'})
+    
+    return render(request, 'dicom_viewer/load_directory.html')
+
+def process_dicom_study(study_uid, series_map, rep_ds, user, upload_id):
+    """Helper function to process a DICOM study from directory loading"""
+    from datetime import datetime
+    
+    # Extract patient info
+    patient_id = str(getattr(rep_ds, 'PatientID', f'DIR_{upload_id[:8]}'))
+    patient_name = str(getattr(rep_ds, 'PatientName', 'DIRECTORY^LOAD'))
+    name_parts = patient_name.replace('^', ' ').split()
+    first_name = name_parts[0] if len(name_parts) > 0 else 'DIRECTORY'
+    last_name = name_parts[1] if len(name_parts) > 1 else upload_id[:8]
+    birth_date = getattr(rep_ds, 'PatientBirthDate', None)
+    
+    if birth_date:
+        try:
+            dob = datetime.strptime(birth_date, '%Y%m%d').date()
+        except Exception:
+            dob = timezone.now().date()
+    else:
+        dob = timezone.now().date()
+    
+    gender = getattr(rep_ds, 'PatientSex', 'O')
+    if gender not in ['M', 'F', 'O']:
+        gender = 'O'
+    
+    patient, _ = Patient.objects.get_or_create(
+        patient_id=patient_id,
+        defaults={'first_name': first_name, 'last_name': last_name, 'date_of_birth': dob, 'gender': gender}
+    )
+    
+    # Get or create facility
+    facility = getattr(user, 'facility', None)
+    if not facility:
+        facility = Facility.objects.filter(is_active=True).first()
+    if not facility:
+        if hasattr(user, 'is_admin') and user.is_admin():
+            facility = Facility.objects.create(
+                name='Directory Load Facility',
+                address='Local Directory',
+                phone='N/A',
+                email='directory@local.load',
+                license_number=f'DIR-{upload_id[:8]}',
+                ae_title='',
+                is_active=True
+            )
+        else:
+            raise Exception('No active facility configured')
+    
+    # Get or create modality
+    modality_code = getattr(rep_ds, 'Modality', 'OT')
+    modality_obj, _ = Modality.objects.get_or_create(code=modality_code, defaults={'name': modality_code})
+    
+    # Create study
+    study_description = getattr(rep_ds, 'StudyDescription', 'Directory DICOM Load')
+    referring_physician = str(getattr(rep_ds, 'ReferringPhysicianName', 'DIRECTORY')).replace('^', ' ')
+    accession_number = getattr(rep_ds, 'AccessionNumber', f"DIR_{upload_id[:8]}")
+    study_date = getattr(rep_ds, 'StudyDate', None)
+    study_time = getattr(rep_ds, 'StudyTime', '000000')
+    
+    if study_date:
+        try:
+            sdt = datetime.strptime(f"{study_date}{study_time[:6]}", '%Y%m%d%H%M%S')
+            sdt = timezone.make_aware(sdt)
+        except Exception:
+            sdt = timezone.now()
+    else:
+        sdt = timezone.now()
+    
+    study_obj, created = Study.objects.get_or_create(
+        study_instance_uid=study_uid,
+        defaults={
+            'accession_number': accession_number,
+            'patient': patient,
+            'facility': facility,
+            'modality': modality_obj,
+            'study_description': study_description,
+            'study_date': sdt,
+            'referring_physician': referring_physician,
+            'status': 'completed',
+            'priority': 'normal',
+            'uploaded_by': user,
+        }
+    )
+    
+    # Create series and images
+    for series_uid, items in series_map.items():
+        ds0, file_path0 = items[0]
+        series_number = getattr(ds0, 'SeriesNumber', 1) or 1
+        series_desc = getattr(ds0, 'SeriesDescription', f'Series {series_number}')
+        slice_thickness = getattr(ds0, 'SliceThickness', None)
+        pixel_spacing = safe_dicom_str(getattr(ds0, 'PixelSpacing', ''))
+        image_orientation = str(getattr(ds0, 'ImageOrientationPatient', ''))
+        
+        series_obj, series_created = Series.objects.get_or_create(
+            series_instance_uid=series_uid,
+            defaults={
+                'study': study_obj,
+                'series_number': int(series_number),
+                'series_description': series_desc,
+                'modality': getattr(ds0, 'Modality', modality_code),
+                'body_part': getattr(ds0, 'BodyPartExamined', ''),
+                'slice_thickness': slice_thickness if slice_thickness is not None else None,
+                'pixel_spacing': pixel_spacing,
+                'image_orientation_patient': image_orientation,
+            }
+        )
+        
+        # Create images for this series
+        for ds, file_path in items:
+            instance_number = getattr(ds, 'InstanceNumber', 1) or 1
+            slice_location = getattr(ds, 'SliceLocation', 0.0)
+            if slice_location is None:
+                slice_location = 0.0
+            
+            # Copy file to media directory
+            import shutil
+            from django.conf import settings
+            
+            relative_path = f'dicom/directory_load/{upload_id}/{series_uid}/{os.path.basename(file_path)}'
+            full_media_path = os.path.join(settings.MEDIA_ROOT, relative_path)
+            os.makedirs(os.path.dirname(full_media_path), exist_ok=True)
+            shutil.copy2(file_path, full_media_path)
+            
+            DicomImage.objects.get_or_create(
+                sop_instance_uid=getattr(ds, 'SOPInstanceUID', f'DIR_{uuid.uuid4()}'),
+                defaults={
+                    'series': series_obj,
+                    'instance_number': int(instance_number),
+                    'slice_location': float(slice_location),
+                    'file_path': relative_path,
+                    'file_size': os.path.getsize(file_path),
+                    'window_center': getattr(ds, 'WindowCenter', 40),
+                    'window_width': getattr(ds, 'WindowWidth', 400),
+                }
+            )
+    
+    return study_obj
+
+@login_required
 @csrf_exempt
 def upload_dicom(request):
     """Upload DICOM files for processing"""

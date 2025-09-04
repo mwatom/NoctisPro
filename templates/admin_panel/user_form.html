@@ -652,11 +652,17 @@
         const visibleStep = document.querySelector('.form-step.active, .form-step:not([style*="display: none"])');
         if (visibleStep) {
           console.log('Using visible step as fallback');
-          currentFormStep = visibleStep;
+          // Fix: assign to the variable, not redeclare it
+          return validateStepFields(visibleStep);
         } else {
           return false;
         }
       }
+      
+      return validateStepFields(currentFormStep);
+    }
+    
+    function validateStepFields(currentFormStep) {
       
       const requiredFields = currentFormStep.querySelectorAll('[required]');
       console.log('Required fields in step:', requiredFields.length);

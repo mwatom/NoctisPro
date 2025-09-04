@@ -1,0 +1,408 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Load DICOM from Directory{% endblock %}
+
+{% block extra_css %}
+<style>
+    .directory-loader {
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 2rem;
+        background: var(--card-bg);
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+    
+    .loader-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    
+    .loader-header h1 {
+        color: var(--accent-color);
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .loader-header p {
+        color: var(--text-secondary);
+        font-size: 1.1rem;
+    }
+    
+    .directory-form {
+        background: var(--primary-bg);
+        padding: 2rem;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        margin-bottom: 2rem;
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-label {
+        display: block;
+        color: var(--text-primary);
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-control {
+        width: 100%;
+        padding: 12px 16px;
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        color: var(--text-primary);
+        font-size: 1rem;
+    }
+    
+    .form-control:focus {
+        outline: none;
+        border-color: var(--accent-color);
+        box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+    }
+    
+    .btn-browse {
+        background: var(--accent-color);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-left: 1rem;
+    }
+    
+    .btn-browse:hover {
+        background: #0284c7;
+        transform: translateY(-1px);
+    }
+    
+    .btn-load {
+        width: 100%;
+        background: var(--success-color);
+        color: white;
+        border: none;
+        padding: 16px;
+        border-radius: 6px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .btn-load:hover {
+        background: #059669;
+        transform: translateY(-1px);
+    }
+    
+    .btn-load:disabled {
+        background: var(--text-secondary);
+        cursor: not-allowed;
+        transform: none;
+    }
+    
+    .loading-spinner {
+        display: none;
+        text-align: center;
+        padding: 2rem;
+    }
+    
+    .spinner {
+        border: 4px solid var(--border-color);
+        border-top: 4px solid var(--accent-color);
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1rem;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .results {
+        display: none;
+        margin-top: 2rem;
+    }
+    
+    .results-header {
+        background: var(--success-color);
+        color: white;
+        padding: 1rem;
+        border-radius: 6px 6px 0 0;
+        font-weight: 600;
+    }
+    
+    .results-body {
+        background: var(--card-bg);
+        border: 1px solid var(--success-color);
+        border-top: none;
+        border-radius: 0 0 6px 6px;
+        padding: 1rem;
+    }
+    
+    .study-item {
+        background: var(--primary-bg);
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-radius: 6px;
+        border: 1px solid var(--border-color);
+    }
+    
+    .study-header {
+        font-weight: 600;
+        color: var(--accent-color);
+        margin-bottom: 0.5rem;
+    }
+    
+    .study-details {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+    }
+    
+    .error-message {
+        background: var(--danger-color);
+        color: white;
+        padding: 1rem;
+        border-radius: 6px;
+        margin-top: 1rem;
+        display: none;
+    }
+    
+    .help-text {
+        background: var(--primary-bg);
+        padding: 1.5rem;
+        border-radius: 8px;
+        border-left: 4px solid var(--accent-color);
+        margin-top: 2rem;
+    }
+    
+    .help-text h3 {
+        color: var(--accent-color);
+        margin-bottom: 1rem;
+    }
+    
+    .help-text ul {
+        color: var(--text-secondary);
+        margin: 0;
+        padding-left: 1.5rem;
+    }
+    
+    .help-text li {
+        margin-bottom: 0.5rem;
+    }
+    
+    .path-examples {
+        background: var(--card-bg);
+        padding: 1rem;
+        border-radius: 6px;
+        margin-top: 1rem;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9rem;
+        border: 1px solid var(--border-color);
+    }
+    
+    .path-examples .example {
+        color: var(--accent-color);
+        margin-bottom: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="directory-loader">
+    <div class="loader-header">
+        <h1><i class="fas fa-folder-open"></i> Load DICOM from Directory</h1>
+        <p>Load DICOM studies from local directories, flash drives, or disc storage</p>
+    </div>
+    
+    <form class="directory-form" id="directoryForm">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label" for="directory_path">
+                <i class="fas fa-folder"></i> Directory Path
+            </label>
+            <div style="display: flex; align-items: center;">
+                <input 
+                    type="text" 
+                    id="directory_path" 
+                    name="directory_path" 
+                    class="form-control" 
+                    placeholder="Enter full path to DICOM directory (e.g., /media/usb/dicom or C:\DICOM\Studies)"
+                    required
+                >
+                <button type="button" class="btn-browse" onclick="browseDirectory()">
+                    <i class="fas fa-search"></i> Browse
+                </button>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn-load" id="loadButton">
+            <i class="fas fa-upload"></i> Load DICOM Studies
+        </button>
+    </form>
+    
+    <div class="loading-spinner" id="loadingSpinner">
+        <div class="spinner"></div>
+        <p>Scanning directory and processing DICOM files...</p>
+    </div>
+    
+    <div class="results" id="results">
+        <div class="results-header">
+            <i class="fas fa-check-circle"></i> Loading Complete
+        </div>
+        <div class="results-body" id="resultsBody">
+            <!-- Results will be populated here -->
+        </div>
+    </div>
+    
+    <div class="error-message" id="errorMessage">
+        <!-- Error messages will be displayed here -->
+    </div>
+    
+    <div class="help-text">
+        <h3><i class="fas fa-info-circle"></i> How to Use</h3>
+        <ul>
+            <li><strong>Windows:</strong> Use paths like <code>C:\DICOM\Studies</code> or <code>D:\Medical_Images</code></li>
+            <li><strong>Linux/Mac:</strong> Use paths like <code>/media/usb/dicom</code> or <code>/home/user/dicom</code></li>
+            <li><strong>Flash Drive:</strong> Insert your USB drive and navigate to its mount point</li>
+            <li><strong>CD/DVD:</strong> Insert disc and use the disc mount path</li>
+            <li>The system will recursively scan all subdirectories for DICOM files</li>
+            <li>Supported file extensions: .dcm, .dicom, .dic, and files without extensions</li>
+        </ul>
+        
+        <div class="path-examples">
+            <strong>Example Paths:</strong><br>
+            <div class="example">Windows USB: D:\DICOM_DATA</div>
+            <div class="example">Windows CD: E:\PATIENT_STUDIES</div>
+            <div class="example">Linux USB: /media/username/USB_DRIVE/dicom</div>
+            <div class="example">Mac USB: /Volumes/USB_DRIVE/medical_images</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('directoryForm');
+    const loadButton = document.getElementById('loadButton');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const results = document.getElementById('results');
+    const resultsBody = document.getElementById('resultsBody');
+    const errorMessage = document.getElementById('errorMessage');
+    
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const directoryPath = document.getElementById('directory_path').value.trim();
+        if (!directoryPath) {
+            showError('Please enter a directory path');
+            return;
+        }
+        
+        // Show loading state
+        loadButton.disabled = true;
+        loadButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+        loadingSpinner.style.display = 'block';
+        results.style.display = 'none';
+        errorMessage.style.display = 'none';
+        
+        // Prepare form data
+        const formData = new FormData(form);
+        
+        // Send request
+        fetch('{% url "dicom_viewer:load_from_directory" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            loadingSpinner.style.display = 'none';
+            loadButton.disabled = false;
+            loadButton.innerHTML = '<i class="fas fa-upload"></i> Load DICOM Studies';
+            
+            if (data.success) {
+                showResults(data);
+            } else {
+                showError(data.error || 'Failed to load DICOM files');
+            }
+        })
+        .catch(error => {
+            loadingSpinner.style.display = 'none';
+            loadButton.disabled = false;
+            loadButton.innerHTML = '<i class="fas fa-upload"></i> Load DICOM Studies';
+            showError('Network error: ' + error.message);
+        });
+    });
+});
+
+function browseDirectory() {
+    // Note: Web browsers cannot directly access the file system for security reasons
+    // This is a placeholder - in a real implementation, you might use:
+    // 1. A desktop application wrapper (like Electron)
+    // 2. A server-side directory browser
+    // 3. Native file system access APIs (limited browser support)
+    
+    alert('Directory browsing is not available in web browsers for security reasons.\n\n' +
+          'Please manually enter the full path to your DICOM directory.\n\n' +
+          'Examples:\n' +
+          '• Windows: C:\\DICOM\\Studies or D:\\Medical_Images\n' +
+          '• Linux: /media/usb/dicom or /home/user/dicom\n' +
+          '• Mac: /Volumes/USB_DRIVE/medical_images');
+}
+
+function showResults(data) {
+    results.style.display = 'block';
+    
+    let html = `
+        <div style="margin-bottom: 1rem;">
+            <strong>Summary:</strong><br>
+            • Directory: ${data.directory}<br>
+            • Total files found: ${data.total_files_found}<br>
+            • Processed files: ${data.processed_files}<br>
+            • Invalid files: ${data.invalid_files}<br>
+            • Studies created: ${data.studies.length}
+        </div>
+    `;
+    
+    if (data.studies.length > 0) {
+        html += '<h4>Loaded Studies:</h4>';
+        data.studies.forEach(study => {
+            html += `
+                <div class="study-item">
+                    <div class="study-header">
+                        ${study.patient_name} - ${study.accession_number}
+                    </div>
+                    <div class="study-details">
+                        Study: ${study.study_description}<br>
+                        Series: ${study.series_count} | Images: ${study.images_count}<br>
+                        <a href="/dicom-viewer/?study=${study.id}" class="btn-control" style="margin-top: 0.5rem; display: inline-block; text-decoration: none;">
+                            <i class="fas fa-eye"></i> View Study
+                        </a>
+                    </div>
+                </div>
+            `;
+        });
+    }
+    
+    resultsBody.innerHTML = html;
+}
+
+function showError(message) {
+    errorMessage.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + message;
+    errorMessage.style.display = 'block';
+    results.style.display = 'none';
+}
+</script>
+{% endblock %}
