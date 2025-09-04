@@ -185,7 +185,7 @@ fi
 
 # Run Django system checks
 echo -e "${BLUE}🔍 Running Django system checks...${NC}"
-$PYTHON_CMD manage.py check --deploy --quiet
+$PYTHON_CMD manage.py check --deploy
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✅ Django system checks passed${NC}"
 else
@@ -199,7 +199,7 @@ echo -e "${GREEN}✅ Database migrations completed${NC}"
 
 # Collect static files
 echo -e "${BLUE}📁 Collecting static files...${NC}"
-$PYTHON_CMD manage.py collectstatic --noinput --quiet
+$PYTHON_CMD manage.py collectstatic --noinput
 echo -e "${GREEN}✅ Static files collected${NC}"
 
 # =============================================================================
