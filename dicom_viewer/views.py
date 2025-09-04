@@ -206,19 +206,14 @@ def viewer(request):
 
 @login_required
 def masterpiece_viewer(request):
-    """Masterpiece DICOM viewer with enhanced features and integration."""
-    try:
-        context = {
-            'study_id': request.GET.get('study', ''),
-            'series_id': request.GET.get('series', ''),
-            'current_date': timezone.now().strftime('%Y-%m-%d'),
-            'user': request.user
-        }
-        return render(request, 'dicom_viewer/masterpiece_viewer.html', context)
-    except Exception as e:
-        logger.error(f"Error in masterpiece_viewer: {e}")
-        # Fallback to original viewer if masterpiece fails
-        return redirect('dicom_viewer:legacy_viewer')
+    """Masterpiece DICOM viewer - THE MAIN DICOM VIEWER with enhanced features."""
+    context = {
+        'study_id': request.GET.get('study', ''),
+        'series_id': request.GET.get('series', ''),
+        'current_date': timezone.now().strftime('%Y-%m-%d'),
+        'user': request.user
+    }
+    return render(request, 'dicom_viewer/masterpiece_viewer.html', context)
 
 @login_required
 def advanced_standalone_viewer(request):

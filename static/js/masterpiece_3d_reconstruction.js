@@ -3,6 +3,147 @@
  * Advanced Three.js implementation for 3D bone reconstruction in DICOM viewer
  */
 
+// Simple OrbitControls implementation for Three.js
+THREE.OrbitControls = function(object, domElement) {
+    this.object = object;
+    this.domElement = domElement || document;
+    this.target = new THREE.Vector3();
+    
+    // Configuration
+    this.enableDamping = false;
+    this.dampingFactor = 0.25;
+    this.minDistance = 0;
+    this.maxDistance = Infinity;
+    this.maxPolarAngle = Math.PI;
+    this.autoRotate = false;
+    this.autoRotateSpeed = 2.0;
+    this.zoomSpeed = 1.0;
+    this.rotateSpeed = 1.0;
+    this.panSpeed = 1.0;
+    
+    // Internal state
+    this.spherical = new THREE.Spherical();
+    this.sphericalDelta = new THREE.Spherical();
+    this.scale = 1;
+    this.panOffset = new THREE.Vector3();
+    
+    // Mouse state
+    this.rotateStart = new THREE.Vector2();
+    this.rotateEnd = new THREE.Vector2();
+    this.rotateDelta = new THREE.Vector2();
+    
+    // Event handlers
+    const scope = this;
+    
+    function onMouseDown(event) {
+        scope.rotateStart.set(event.clientX, event.clientY);
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    }
+    
+    function onMouseMove(event) {
+        scope.rotateEnd.set(event.clientX, event.clientY);
+        scope.rotateDelta.subVectors(scope.rotateEnd, scope.rotateStart).multiplyScalar(scope.rotateSpeed);
+        
+        const element = scope.domElement === document ? scope.domElement.body : scope.domElement;
+        scope.rotateLeft(2 * Math.PI * scope.rotateDelta.x / element.clientHeight);
+        scope.rotateUp(2 * Math.PI * scope.rotateDelta.y / element.clientHeight);
+        
+        scope.rotateStart.copy(scope.rotateEnd);
+        scope.update();
+    }
+    
+    function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+    }
+    
+    function onMouseWheel(event) {
+        if (event.deltaY < 0) {
+            scope.dollyIn(scope.getZoomScale());
+        } else if (event.deltaY > 0) {
+            scope.dollyOut(scope.getZoomScale());
+        }
+        scope.update();
+    }
+    
+    this.domElement.addEventListener('mousedown', onMouseDown);
+    this.domElement.addEventListener('wheel', onMouseWheel);
+    
+    this.rotateLeft = function(angle) {
+        this.sphericalDelta.theta -= angle;
+    };
+    
+    this.rotateUp = function(angle) {
+        this.sphericalDelta.phi -= angle;
+    };
+    
+    this.dollyIn = function(dollyScale) {
+        this.scale /= dollyScale;
+    };
+    
+    this.dollyOut = function(dollyScale) {
+        this.scale *= dollyScale;
+    };
+    
+    this.getZoomScale = function() {
+        return Math.pow(0.95, this.zoomSpeed);
+    };
+    
+    this.update = function() {
+        const offset = new THREE.Vector3();
+        const quat = new THREE.Quaternion().setFromUnitVectors(this.object.up, new THREE.Vector3(0, 1, 0));
+        const quatInverse = quat.clone().invert();
+        
+        offset.copy(this.object.position).sub(this.target);
+        offset.applyQuaternion(quat);
+        
+        this.spherical.setFromVector3(offset);
+        
+        if (this.autoRotate) {
+            this.rotateLeft(this.getAutoRotationAngle());
+        }
+        
+        this.spherical.theta += this.sphericalDelta.theta;
+        this.spherical.phi += this.sphericalDelta.phi;
+        
+        this.spherical.phi = Math.max(0.000001, Math.min(Math.PI - 0.000001, this.spherical.phi));
+        this.spherical.radius *= this.scale;
+        this.spherical.radius = Math.max(this.minDistance, Math.min(this.maxDistance, this.spherical.radius));
+        
+        this.target.add(this.panOffset);
+        
+        offset.setFromSpherical(this.spherical);
+        offset.applyQuaternion(quatInverse);
+        
+        this.object.position.copy(this.target).add(offset);
+        this.object.lookAt(this.target);
+        
+        if (this.enableDamping) {
+            this.sphericalDelta.theta *= (1 - this.dampingFactor);
+            this.sphericalDelta.phi *= (1 - this.dampingFactor);
+        } else {
+            this.sphericalDelta.set(0, 0, 0);
+        }
+        
+        this.scale = 1;
+        this.panOffset.set(0, 0, 0);
+        
+        return false;
+    };
+    
+    this.getAutoRotationAngle = function() {
+        return 2 * Math.PI / 60 / 60 * this.autoRotateSpeed;
+    };
+    
+    this.dispose = function() {
+        this.domElement.removeEventListener('mousedown', onMouseDown);
+        this.domElement.removeEventListener('wheel', onMouseWheel);
+    };
+    
+    this.update();
+};
+
 class MasterpieceBoneReconstruction3D {
     constructor(canvasId, options = {}) {
         this.canvasId = canvasId;
