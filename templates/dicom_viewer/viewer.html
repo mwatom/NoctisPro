@@ -18,8 +18,31 @@
         body { font-family: Arial, sans-serif; background: #0a0a0a; color: white; overflow: hidden; }
         .viewer-container { height: 100vh; display: flex; flex-direction: column; }
         .toolbar { background: #1a1a1a; padding: 10px; border-bottom: 1px solid #404040; display: flex; gap: 10px; }
-        .tool-btn { background: #252525; border: 1px solid #404040; color: white; padding: 8px 12px; border-radius: 4px; cursor: pointer; }
-        .tool-btn:hover, .tool-btn.active { background: #00d4ff; color: #000; }
+        .tool-btn { 
+            background: #252525; 
+            border: 1px solid #404040; 
+            color: #ffffff; 
+            padding: 8px 12px; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .tool-btn:hover { 
+            background: #404040; 
+            color: #ffffff;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 212, 255, 0.2);
+        }
+        .tool-btn.active { 
+            background: #00d4ff; 
+            color: #0a0a0a;
+            box-shadow: 0 2px 8px rgba(0, 212, 255, 0.3);
+        }
         .viewer-content { flex: 1; display: flex; }
         .sidebar { width: 300px; background: #1a1a1a; border-right: 1px solid #404040; overflow-y: auto; }
         .sidebar-section { border-bottom: 1px solid #404040; }
@@ -28,7 +51,25 @@
         .main-viewer { flex: 1; position: relative; background: #000; }
         .dicom-canvas { width: 100%; height: 100%; cursor: crosshair; }
         .viewport-info { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 10px; border-radius: 4px; font-size: 11px; font-family: monospace; }
-        .back-btn { background: #ff4444; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+        .back-btn { 
+            background: #ff4444; 
+            color: #ffffff; 
+            border: none; 
+            padding: 8px 16px; 
+            border-radius: 4px; 
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .back-btn:hover {
+            background: #cc3333;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(255, 68, 68, 0.3);
+        }
         .study-item, .series-item { padding: 8px; border-bottom: 1px solid #404040; cursor: pointer; font-size: 11px; }
         .study-item:hover, .series-item:hover { background: #252525; }
         .study-item.active, .series-item.active { background: #00d4ff; color: #000; }
