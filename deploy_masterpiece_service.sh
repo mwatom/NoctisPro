@@ -383,7 +383,13 @@ start_service() {
     print_info "Starting ngrok with static URL..."
     tmux new-window -t $SERVICE_NAME
     tmux send-keys -t $SERVICE_NAME "cd $WORKSPACE_DIR" C-m
-    tmux send-keys -t $SERVICE_NAME "./ngrok http --url=$STATIC_URL $DJANGO_PORT" C-m
+    # Check if account supports static URLs, fallback to dynamic
+    if [[ "$STATIC_URL" == *"ngrok-free.app"* ]] || [[ "$STATIC_URL" == *"ngrok.io"* ]]; then
+        print_info "Using dynamic ngrok URL (free plan)"
+        tmux send-keys -t $SERVICE_NAME "./ngrok http $DJANGO_PORT" C-m
+    else
+        tmux send-keys -t $SERVICE_NAME "./ngrok http --url=$STATIC_URL $DJANGO_PORT" C-m
+    fi
     
     # Wait for ngrok to start
     sleep 5

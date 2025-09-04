@@ -28,6 +28,18 @@ ALLOWED_HOSTS = [
 if os.environ.get('DOMAIN_NAME'):
     ALLOWED_HOSTS.append(os.environ.get('DOMAIN_NAME'))
 
+# Add ngrok URL if provided
+if os.environ.get('NGROK_STATIC_URL'):
+    ALLOWED_HOSTS.append(os.environ.get('NGROK_STATIC_URL'))
+
+# Allow all hosts from environment if configured
+if os.environ.get('ALLOWED_HOSTS'):
+    env_hosts = os.environ.get('ALLOWED_HOSTS').split(',')
+    for host in env_hosts:
+        host = host.strip()
+        if host and host not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(host)
+
 # Application definition
 INSTALLED_APPS = [
     'daphne',
