@@ -154,7 +154,6 @@ _extra_static_dir = os.path.join(BASE_DIR, 'static')
 os.makedirs(_extra_static_dir, exist_ok=True)
 STATICFILES_DIRS = [_extra_static_dir]
 
-# Force static file serving in development/testing
 SERVE_MEDIA_FILES = os.environ.get('SERVE_MEDIA_FILES', 'True').lower() == 'true'
 
 # Configure MIME types for static files
