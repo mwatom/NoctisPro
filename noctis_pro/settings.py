@@ -219,9 +219,9 @@ SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE = 86400  # 24 hours
 SESSION_SAVE_EVERY_REQUEST = True
 
-# File upload settings
-FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100MB
-DATA_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100MB
+# File upload settings - 3GB for large DICOM files
+FILE_UPLOAD_MAX_MEMORY_SIZE = 3 * 1024 * 1024 * 1024  # 3GB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 3 * 1024 * 1024 * 1024  # 3GB
 
 # Security settings
 SECURE_BROWSER_XSS_FILTER = True
