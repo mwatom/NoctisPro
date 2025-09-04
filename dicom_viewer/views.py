@@ -204,6 +204,16 @@ def viewer(request):
     return render(request, 'dicom_viewer/viewer.html', context)
 
 @login_required
+def mpr_viewer(request):
+    """Professional MPR viewer with 2x2 layout, 3D reconstruction, and crosshair sync."""
+    context = {
+        'study_id': request.GET.get('study', ''),
+        'series_id': request.GET.get('series', ''),
+        'current_date': timezone.now().strftime('%Y-%m-%d')
+    }
+    return render(request, 'dicom_viewer/mpr_viewer.html', context)
+
+@login_required
 def advanced_standalone_viewer(request):
     """Deprecated: web viewer removed. Redirect to desktop launcher endpoint."""
     return redirect('dicom_viewer:launch_standalone_viewer')
