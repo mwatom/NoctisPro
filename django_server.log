@@ -1,6 +1,0 @@
-nohup: ignoring input
-2025-09-04 14:00:57,394 INFO     Starting server at tcp:port=8000:interface=0.0.0.0
-2025-09-04 14:00:57,394 INFO     HTTP/2 support not enabled (install the http2 and tls Twisted extras)
-2025-09-04 14:00:57,394 INFO     Configuring endpoint tcp:port=8000:interface=0.0.0.0
-2025-09-04 14:00:57,395 INFO     Listening on TCP address 0.0.0.0:8000
-2025-09-04 14:01:06,402 WARNING  The 'pydicom.pixel_data_handlers' module will be removed in v4.0, please use 'from pydicom.pixels import apply_voi_lut' instead
