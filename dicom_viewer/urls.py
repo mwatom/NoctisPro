@@ -6,7 +6,7 @@ app_name = 'dicom_viewer'
 
 urlpatterns = [
     # Main viewer interface
-    path('', views.masterpiece_viewer, name='viewer'),
+    path('', views.viewer, name='viewer'),
     path('legacy/', views.viewer, name='legacy_viewer'),
     path('masterpiece/', views.masterpiece_viewer, name='masterpiece_viewer'),
     # path('standalone/', views.standalone_viewer, name='standalone_viewer'),

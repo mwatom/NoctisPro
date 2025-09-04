@@ -698,8 +698,11 @@
             <button type="button" class="btn-control" onclick="resetFilters()" title="Reset Filters">
                 <i class="fas fa-filter-circle-xmark"></i>
             </button>
-            <button type="button" class="btn-dicom-viewer" onclick="launchDicomViewer()" title="Launch Masterpiece DICOM Viewer" style="background: linear-gradient(135deg, #6b46c1, #553c9a); color: white; font-weight: bold;">
-                <i class="fas fa-cube"></i> DICOM VIEWER
+            <button type="button" class="btn-dicom-viewer" onclick="launchDicomViewer()" title="DICOM Viewer">
+                <i class="fas fa-external-link-alt"></i>
+            </button>
+            <button type="button" class="btn-control" onclick="launchMasterpieceViewer()" title="Enhanced DICOM Viewer (Beta)" style="background: linear-gradient(135deg, #6b46c1, #553c9a); color: white;">
+                <i class="fas fa-cube"></i>
             </button>
             <button type="button" class="btn-control" onclick="uploadStudies()" title="Upload Studies">
                 <i class="fas fa-upload"></i>
@@ -1134,8 +1137,8 @@
                     return;
                 }
                 
-                // Open in same tab to the masterpiece DICOM viewer
-                const url = `/dicom-viewer/masterpiece/?study=${studyId}`;
+                // Open in same tab - use original working URL for compatibility
+                const url = `/dicom-viewer/?study=${studyId}`;
                 window.location.href = url;
                 
                 showToast('Loading DICOM viewer...', 'success', 2000);
@@ -1147,12 +1150,23 @@
 
         async function launchDicomViewer() {
             try {
-                // Open the masterpiece DICOM viewer
-                window.location.href = '/dicom-viewer/masterpiece/';
+                // Open the original working DICOM viewer for compatibility
+                window.location.href = '/dicom-viewer/';
                 showToast('Launching DICOM viewer...', 'success', 2000);
             } catch (error) {
                 console.error('Error launching DICOM viewer:', error);
                 showToast('Failed to launch DICOM viewer', 'error');
+            }
+        }
+
+        // Function to launch masterpiece viewer (can be used for enhanced features)
+        async function launchMasterpieceViewer() {
+            try {
+                window.location.href = '/dicom-viewer/masterpiece/';
+                showToast('Launching enhanced DICOM viewer...', 'success', 2000);
+            } catch (error) {
+                console.error('Error launching masterpiece viewer:', error);
+                showToast('Failed to launch enhanced viewer', 'error');
             }
         }
 
