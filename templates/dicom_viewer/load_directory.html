@@ -5,13 +5,36 @@
 
 {% block extra_css %}
 <style>
+    /* Mobile-first responsive design */
     .directory-loader {
         max-width: 800px;
-        margin: 2rem auto;
-        padding: 2rem;
+        margin: 1rem auto;
+        padding: 1.5rem;
         background: var(--card-bg);
         border-radius: 12px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        width: calc(100% - 2rem);
+        min-height: calc(100vh - 100px);
+        display: flex;
+        flex-direction: column;
+    }
+    
+    /* Mobile responsive adjustments */
+    @media (max-width: 768px) {
+        .directory-loader {
+            margin: 0.5rem auto;
+            padding: 1rem;
+            width: calc(100% - 1rem);
+            border-radius: 8px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .directory-loader {
+            margin: 0.25rem auto;
+            padding: 0.75rem;
+            width: calc(100% - 0.5rem);
+        }
     }
     
     .loader-header {
@@ -23,11 +46,37 @@
         color: var(--accent-color);
         font-size: 2.5rem;
         margin-bottom: 0.5rem;
+        word-break: break-word;
     }
     
     .loader-header p {
         color: var(--text-secondary);
         font-size: 1.1rem;
+    }
+    
+    /* Mobile header adjustments */
+    @media (max-width: 768px) {
+        .loader-header {
+            margin-bottom: 1.5rem;
+        }
+        
+        .loader-header h1 {
+            font-size: 2rem;
+        }
+        
+        .loader-header p {
+            font-size: 1rem;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .loader-header h1 {
+            font-size: 1.75rem;
+        }
+        
+        .loader-header p {
+            font-size: 0.9rem;
+        }
     }
     
     .directory-form {
@@ -36,6 +85,22 @@
         border-radius: 8px;
         border: 1px solid var(--border-color);
         margin-bottom: 2rem;
+        flex: 1;
+    }
+    
+    /* Mobile form adjustments */
+    @media (max-width: 768px) {
+        .directory-form {
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .directory-form {
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
     }
     
     .form-group {
@@ -57,12 +122,39 @@
         border-radius: 6px;
         color: var(--text-primary);
         font-size: 1rem;
+        -webkit-appearance: none;
+        appearance: none;
     }
     
     .form-control:focus {
         outline: none;
         border-color: var(--accent-color);
         box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+    }
+    
+    /* Mobile form control adjustments */
+    @media (max-width: 768px) {
+        .form-control {
+            padding: 14px 16px;
+            font-size: 16px; /* Prevents zoom on iOS */
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .form-control {
+            padding: 16px;
+            font-size: 16px;
+        }
+    }
+    
+    .directory-input-group {
+        display: flex;
+        gap: 0.5rem;
+        align-items: stretch;
+    }
+    
+    .directory-input-group .form-control {
+        flex: 1;
     }
     
     .btn-browse {
@@ -74,7 +166,8 @@
         font-weight: 600;
         cursor: pointer;
         transition: all 0.2s;
-        margin-left: 1rem;
+        white-space: nowrap;
+        flex-shrink: 0;
     }
     
     .btn-browse:hover {
@@ -93,6 +186,7 @@
         font-weight: 600;
         cursor: pointer;
         transition: all 0.2s;
+        touch-action: manipulation; /* Better mobile touch */
     }
     
     .btn-load:hover {
@@ -104,6 +198,36 @@
         background: var(--text-secondary);
         cursor: not-allowed;
         transform: none;
+    }
+    
+    /* Mobile button adjustments */
+    @media (max-width: 768px) {
+        .directory-input-group {
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        
+        .btn-browse {
+            padding: 14px 20px;
+            font-size: 16px;
+        }
+        
+        .btn-load {
+            padding: 18px;
+            font-size: 16px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .btn-browse {
+            padding: 16px;
+            font-size: 16px;
+        }
+        
+        .btn-load {
+            padding: 20px;
+            font-size: 16px;
+        }
     }
     
     .loading-spinner {
@@ -197,6 +321,35 @@
     
     .help-text li {
         margin-bottom: 0.5rem;
+        word-wrap: break-word;
+    }
+    
+    /* Mobile help text adjustments */
+    @media (max-width: 768px) {
+        .help-text {
+            padding: 1rem;
+            margin-top: 1.5rem;
+        }
+        
+        .help-text ul {
+            padding-left: 1rem;
+        }
+        
+        .help-text h3 {
+            font-size: 1.1rem;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .help-text {
+            padding: 0.75rem;
+            margin-top: 1rem;
+        }
+        
+        .help-text li {
+            font-size: 0.9rem;
+            margin-bottom: 0.75rem;
+        }
     }
     
     .path-examples {
@@ -207,11 +360,33 @@
         font-family: 'Courier New', monospace;
         font-size: 0.9rem;
         border: 1px solid var(--border-color);
+        overflow-x: auto;
     }
     
     .path-examples .example {
         color: var(--accent-color);
         margin-bottom: 0.5rem;
+        word-break: break-all;
+    }
+    
+    /* Mobile path examples adjustments */
+    @media (max-width: 768px) {
+        .path-examples {
+            padding: 0.75rem;
+            font-size: 0.8rem;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .path-examples {
+            padding: 0.5rem;
+            font-size: 0.75rem;
+        }
+        
+        .path-examples .example {
+            margin-bottom: 0.75rem;
+            line-height: 1.4;
+        }
     }
 </style>
 {% endblock %}
@@ -229,7 +404,7 @@
             <label class="form-label" for="directory_path">
                 <i class="fas fa-folder"></i> Directory Path
             </label>
-            <div style="display: flex; align-items: center;">
+            <div class="directory-input-group">
                 <input 
                     type="text" 
                     id="directory_path" 
