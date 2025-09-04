@@ -1,2 +1,9 @@
 nohup: ignoring input
-nohup: failed to run command 'ngrok': No such file or directory
+ERROR:  authentication failed: The authtoken you specified does not look like a proper ngrok tunnel authtoken.
+ERROR:  Your authtoken: 32E2HmoUqz
+ERROR:  Instructions to install your authtoken are on your ngrok dashboard:
+ERROR:  https://dashboard.ngrok.com/get-started/your-authtoken
+ERROR:  
+ERROR:  ERR_NGROK_105
+ERROR:  https://ngrok.com/docs/errors/err_ngrok_105
+ERROR:  
