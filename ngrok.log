@@ -1,4 +1,3 @@
-nohup: ignoring input
 ERROR:  authentication failed: Usage of ngrok requires a verified account and authtoken.
 ERROR:  
 ERROR:  Sign up for an account: https://dashboard.ngrok.com/signup

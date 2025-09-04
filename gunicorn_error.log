@@ -26,3 +26,14 @@
 [2025-09-04 16:47:38 +0000] [10251] [INFO] Booting worker with pid: 10251
 [2025-09-04 16:47:38 +0000] [10252] [INFO] Booting worker with pid: 10252
 [2025-09-04 16:47:38 +0000] [10253] [INFO] Booting worker with pid: 10253
+[2025-09-04 16:50:14 +0000] [10250] [INFO] Handling signal: term
+[2025-09-04 16:50:14 +0000] [10251] [INFO] Worker exiting (pid: 10251)
+[2025-09-04 16:50:14 +0000] [10253] [INFO] Worker exiting (pid: 10253)
+[2025-09-04 16:50:14 +0000] [10252] [INFO] Worker exiting (pid: 10252)
+[2025-09-04 16:50:14 +0000] [10250] [INFO] Shutting down: Master
+[2025-09-04 16:50:16 +0000] [11577] [INFO] Starting gunicorn 23.0.0
+[2025-09-04 16:50:16 +0000] [11577] [INFO] Listening at: http://0.0.0.0:8000 (11577)
+[2025-09-04 16:50:16 +0000] [11577] [INFO] Using worker: sync
+[2025-09-04 16:50:16 +0000] [11578] [INFO] Booting worker with pid: 11578
+[2025-09-04 16:50:16 +0000] [11579] [INFO] Booting worker with pid: 11579
+[2025-09-04 16:50:16 +0000] [11580] [INFO] Booting worker with pid: 11580
