@@ -194,7 +194,7 @@ fi
 
 # Run migrations
 echo -e "${BLUE}🔄 Running database migrations...${NC}"
-$PYTHON_CMD manage.py migrate --quiet
+$PYTHON_CMD manage.py migrate
 echo -e "${GREEN}✅ Database migrations completed${NC}"
 
 # Collect static files

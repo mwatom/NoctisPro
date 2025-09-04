@@ -381,3 +381,7 @@ Traceback (most recent call last):
   File "/workspace/venv/lib/python3.13/site-packages/django/urls/resolvers.py", line 831, in _reverse_with_prefix
     raise NoReverseMatch(msg)
 django.urls.exceptions.NoReverseMatch: Reverse for 'upload_facilities' not found. 'upload_facilities' is not a valid view function or pattern name.
+Watching for file changes with StatReloader
+"GET / HTTP/1.1" 302 0
+"HEAD / HTTP/1.1" 302 0
+"HEAD / HTTP/1.1" 302 0
