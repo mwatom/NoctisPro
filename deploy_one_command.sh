@@ -146,7 +146,7 @@ echo -e "${GREEN}✅ Django settings optimized${NC}"
 
 # Run Django setup
 echo -e "${BLUE}🔄 Setting up Django...${NC}"
-$PYTHON manage.py migrate --quiet
+$PYTHON manage.py migrate
 $PYTHON manage.py collectstatic --noinput --quiet
 
 # Create media directories

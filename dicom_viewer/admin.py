@@ -42,7 +42,7 @@ class DicomImageInline(admin.TabularInline):
 # Viewer Session Admin
 @admin.register(ViewerSession)
 class ViewerSessionAdmin(admin.ModelAdmin):
-    list_display = ['user', 'study_info', 'last_accessed', 'session_duration']
+    list_display = ['user', 'study_info', 'updated_at', 'session_duration']
     list_filter = ['created_at', 'updated_at']
     search_fields = ['user__username', 'study__accession_number']
     readonly_fields = ['created_at', 'updated_at', 'session_preview']
