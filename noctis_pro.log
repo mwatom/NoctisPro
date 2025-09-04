@@ -32,3 +32,9 @@ Watching for file changes with StatReloader
 Not Found: /api/
 "GET /api/ HTTP/1.1" 404 179
 "GET /worklist/ HTTP/1.1" 302 0
+Watching for file changes with StatReloader
+"GET / HTTP/1.1" 302 0
+"GET / HTTP/1.1" 302 0
+"GET / HTTP/1.1" 302 0
+"GET /login/ HTTP/1.1" 200 17452
+"GET /admin/ HTTP/1.1" 302 0
