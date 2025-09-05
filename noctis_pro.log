@@ -410,3 +410,5 @@ Watching for file changes with StatReloader
 "GET / HTTP/1.1" 302 0
 "GET / HTTP/1.1" 302 0
 "GET / HTTP/1.1" 302 0
+Watching for file changes with StatReloader
+"HEAD / HTTP/1.1" 302 0
