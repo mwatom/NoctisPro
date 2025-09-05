@@ -13,6 +13,8 @@ import pydicom
 import os
 import threading
 import time
+import re
+import requests
 
 from worklist.models import Study, DicomImage, Series
 from accounts.models import User
@@ -813,9 +815,67 @@ def generate_report_content(study, analyses, template):
     # Generate recommendations
     recommendations_text = template.recommendations_template or "Recommend correlation with clinical findings."
     
+    # Add a professional nudge to encourage clinician review and research
+    research_nudge = ("Note: This AI-generated summary is for preliminary support only. "
+                      "Please review images directly, correlate clinically, and consult authoritative references. "
+                      "Consider reviewing current guidelines and differential diagnoses relevant to the findings.")
+    
     return {
-        'findings': findings_text,
+        'findings': findings_text + "\n\n" + research_nudge,
         'impression': impression_text,
         'recommendations': recommendations_text,
         'confidence': overall_confidence
     }
+
+
+@login_required
+@csrf_exempt
+def api_medical_references(request):
+    """
+    Provide curated external references based on query keywords (e.g., suspected finding/body part/modality).
+    Returns titles and URLs from public reputable sources where possible.
+    """
+    try:
+        query = request.GET.get('q', '').strip()
+        if not query:
+            return JsonResponse({'success': False, 'error': 'Missing query parameter q'}, status=400)
+
+        # Basic source filters (avoid scraping TOS-sensitive sites; use public pages where permissible)
+        sources = [
+            'site:radiopaedia.org',
+            'site:nih.gov',
+            'site:ncbi.nlm.nih.gov',
+            'site:who.int',
+            'site:rsna.org'
+        ]
+        search_query = f"{query} ({' OR '.join(sources)})"
+
+        # Use a simple web search via DuckDuckGo HTML (no API key); degrade gracefully if blocked
+        ddg_url = 'https://duckduckgo.com/html/'
+        params = { 'q': search_query }
+        headers = { 'User-Agent': 'Mozilla/5.0 (compatible; NoctisPro/1.0)' }
+        results = []
+        try:
+            resp = requests.post(ddg_url, data=params, headers=headers, timeout=8)
+            if resp.ok:
+                html = resp.text
+                # Parse minimal anchors
+                for m in re.finditer(r'<a[^>]+class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>', html, re.I | re.S):
+                    url = m.group(1)
+                    title_raw = re.sub('<[^<]+?>', '', m.group(2))
+                    title = re.sub('\s+', ' ', title_raw).strip()
+                    if url and title:
+                        results.append({'title': title, 'url': url})
+                    if len(results) >= 8:
+                        break
+        except Exception:
+            # If search unavailable, return empty list
+            results = []
+
+        return JsonResponse({
+            'success': True,
+            'query': query,
+            'references': results
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
