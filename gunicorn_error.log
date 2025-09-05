@@ -162,3 +162,14 @@
 [2025-09-05 23:04:51 +0000] [3783] [INFO] Booting worker with pid: 3783
 [2025-09-05 23:04:51 +0000] [3784] [INFO] Booting worker with pid: 3784
 [2025-09-05 23:04:51 +0000] [3785] [INFO] Booting worker with pid: 3785
+[2025-09-05 23:09:14 +0000] [3783] [INFO] Worker exiting (pid: 3783)
+[2025-09-05 23:09:14 +0000] [3784] [INFO] Worker exiting (pid: 3784)
+[2025-09-05 23:09:14 +0000] [3782] [INFO] Handling signal: term
+[2025-09-05 23:09:14 +0000] [3785] [INFO] Worker exiting (pid: 3785)
+[2025-09-05 23:09:14 +0000] [3782] [INFO] Shutting down: Master
+[2025-09-05 23:09:21 +0000] [6128] [INFO] Starting gunicorn 23.0.0
+[2025-09-05 23:09:21 +0000] [6128] [INFO] Listening at: http://0.0.0.0:8000 (6128)
+[2025-09-05 23:09:21 +0000] [6128] [INFO] Using worker: sync
+[2025-09-05 23:09:21 +0000] [6129] [INFO] Booting worker with pid: 6129
+[2025-09-05 23:09:21 +0000] [6130] [INFO] Booting worker with pid: 6130
+[2025-09-05 23:09:21 +0000] [6131] [INFO] Booting worker with pid: 6131
