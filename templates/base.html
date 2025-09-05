@@ -15,6 +15,7 @@
     {% load dicts %}
     <link rel="stylesheet" href="{% static 'css/noctis-dashboard-style.css' %}">
     <link href="{% static 'css/dicom-viewer-buttons.css' %}" rel="stylesheet">
+    <link href="{% static 'css/enhanced-buttons.css' %}" rel="stylesheet">
     <script src="{% static 'js/dicom-viewer-utils.js' %}" defer></script>
     <style>
         :root {
@@ -719,5 +720,7 @@
     </script>
     {% block extra_js %}{% endblock %}
     <script src="{% static 'js/button-utils.js' %}"></script>
+    <script src="{% static 'js/unified-button-handlers.js' %}"></script>
+    <script src="{% static 'js/button-functionality-test.js' %}"></script>
 </body>
 </html>
