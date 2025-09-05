@@ -44,15 +44,15 @@ INSTALLED_APPS = [
     'corsheaders',  # Re-enabled for API access
     # 'channels',  # Disabled temporarily to fix Redis dependency
     
-    # Custom apps - ALL ENABLED FOR FULL FUNCTIONALITY
+    # Custom apps - TEMPORARILY DISABLED TO GET BASIC SERVER RUNNING
     'accounts',
-    'worklist',  # ENABLED - DICOM functionality restored
-    'dicom_viewer',  # ENABLED - DICOM viewer restored
-    'reports',  # ENABLED - Reports functionality restored
-    'admin_panel',  # ENABLED - Admin panel restored
-    'chat',  # ENABLED - Chat functionality restored
-    'notifications',  # ENABLED - Notifications restored
-    'ai_analysis',  # ENABLED - AI analysis restored
+    # 'worklist',  # TEMPORARILY DISABLED - missing dependencies
+    # 'dicom_viewer',  # TEMPORARILY DISABLED - missing dependencies
+    # 'reports',  # TEMPORARILY DISABLED - missing dependencies
+    # 'admin_panel',  # TEMPORARILY DISABLED - missing dependencies
+    # 'chat',  # TEMPORARILY DISABLED - missing dependencies
+    # 'notifications',  # TEMPORARILY DISABLED - missing dependencies
+    # 'ai_analysis',  # TEMPORARILY DISABLED - missing dependencies
 ]
 
 MIDDLEWARE = [
