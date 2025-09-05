@@ -45,17 +45,18 @@ main() {
     print_info "Step 2: Setting up boot startup protection..."
     
     # Add to crontab for boot startup
-    (crontab -l 2>/dev/null | grep -v "boot_startup.sh"; echo "@reboot /workspace/boot_startup.sh") | crontab -
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    (crontab -l 2>/dev/null | grep -v "boot_startup.sh"; echo "@reboot $SCRIPT_DIR/boot_startup.sh") | crontab -
     
     # Also add to rc.local as backup
     if [[ -f /etc/rc.local ]]; then
         if ! grep -q "boot_startup.sh" /etc/rc.local; then
-            sed -i '/^exit 0/i /workspace/boot_startup.sh &' /etc/rc.local
+            sed -i "/^exit 0/i $SCRIPT_DIR/boot_startup.sh &" /etc/rc.local
         fi
     else
-        cat > /etc/rc.local << 'EOF'
+        cat > /etc/rc.local << EOF
 #!/bin/bash
-/workspace/boot_startup.sh &
+$SCRIPT_DIR/boot_startup.sh &
 exit 0
 EOF
         chmod +x /etc/rc.local
