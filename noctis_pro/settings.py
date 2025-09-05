@@ -44,15 +44,15 @@ INSTALLED_APPS = [
     'corsheaders',  # Re-enabled for API access
     # 'channels',  # Disabled temporarily to fix Redis dependency
     
-    # Custom apps - TEMPORARILY DISABLED TO GET BASIC SERVER RUNNING
+    # Custom apps - ENABLED FOR MEDICAL EMERGENCY
     'accounts',
-    # 'worklist',  # TEMPORARILY DISABLED - missing dependencies
-    # 'dicom_viewer',  # TEMPORARILY DISABLED - missing dependencies
-    # 'reports',  # TEMPORARILY DISABLED - missing dependencies
-    # 'admin_panel',  # TEMPORARILY DISABLED - missing dependencies
-    # 'chat',  # TEMPORARILY DISABLED - missing dependencies
-    # 'notifications',  # TEMPORARILY DISABLED - missing dependencies
-    # 'ai_analysis',  # TEMPORARILY DISABLED - missing dependencies
+    'worklist',  # ENABLED - CRITICAL FOR PATIENT DATA ACCESS
+    'dicom_viewer',  # ENABLED - CRITICAL FOR MEDICAL IMAGING
+    'reports',  # ENABLED - CRITICAL FOR MEDICAL REPORTS
+    'admin_panel',  # ENABLED - CRITICAL FOR SYSTEM MANAGEMENT
+    'chat',  # ENABLED - CRITICAL FOR MEDICAL COMMUNICATION
+    'notifications',  # ENABLED - CRITICAL FOR MEDICAL ALERTS
+    'ai_analysis',  # ENABLED - CRITICAL FOR MEDICAL AI
 ]
 
 MIDDLEWARE = [
