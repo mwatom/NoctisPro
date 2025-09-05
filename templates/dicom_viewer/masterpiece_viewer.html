@@ -1388,7 +1388,7 @@
                 const response = await fetch(`/dicom-viewer/api/study/${studyId}/data/`);
                 const data = await response.json();
                 
-                if (data.success) {
+                if (data && data.study && Array.isArray(data.series)) {
                     currentStudy = data.study;
                     displaySeriesList(data.series);
                     updatePatientInfo(currentStudy);
