@@ -1,19 +1,34 @@
-# Minimal requirements for development without PostgreSQL
-Django>=4.2
+# Core Django
+Django==5.2.6
 Pillow
 django-widget-tweaks
 python-dotenv
+
+# Production server
 gunicorn
 whitenoise
+
+# Database
+psycopg2-binary
+dj-database-url
+
+# Redis and caching
+redis
+django-redis
+
+# API
 djangorestframework
 django-cors-headers
-channels
-daphne
+
+# DICOM processing (minimal)
 pydicom
-numpy
+pynetdicom
+
+# Utilities
+python-magic
 requests
+urllib3
+qrcode
+
+# Extensions
 django-extensions
-django-health-check
-# Commented out PostgreSQL-specific packages
-# psycopg2-binary
-# dj-database-url
