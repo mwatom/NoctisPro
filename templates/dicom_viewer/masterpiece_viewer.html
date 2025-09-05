@@ -777,8 +777,12 @@
                     Noctis Pro DICOM Viewer
                 </div>
                 
+                <button class="btn" onclick="showDirectoryLoader()">
+                    <i class="fas fa-folder-open"></i> Load Directory
+                </button>
+                
                 <button class="btn" onclick="loadStudies()">
-                    <i class="fas fa-folder-open"></i> Load Studies
+                    <i class="fas fa-list"></i> Load Studies
                 </button>
                 
                 <select class="btn" id="studySelector" onchange="selectStudy()" style="min-width: 200px;">
@@ -2513,6 +2517,101 @@
                 }
             }
         }, 30000); // Save every 30 seconds
+
+        // Directory Loader Functions
+        function showDirectoryLoader() {
+            document.getElementById('directoryModal').style.display = 'flex';
+        }
+
+        function hideDirectoryLoader() {
+            document.getElementById('directoryModal').style.display = 'none';
+        }
+
+        async function loadFromDirectory() {
+            const directoryPath = document.getElementById('directoryPath').value.trim();
+            if (!directoryPath) {
+                showToast('Please enter a directory path', 'error');
+                return;
+            }
+
+            try {
+                showLoading(true);
+                hideDirectoryLoader();
+                
+                const formData = new FormData();
+                formData.append('directory_path', directoryPath);
+
+                const response = await fetch('/dicom-viewer/load-directory/', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrf-token]').getAttribute('content')
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast(`Successfully loaded ${result.processed_files} DICOM files`, 'success');
+                    // Refresh the studies list
+                    loadStudies();
+                } else {
+                    showToast(`Failed to load directory: ${result.error}`, 'error');
+                }
+                
+            } catch (error) {
+                console.error('Error loading directory:', error);
+                showToast('Failed to load directory', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Add keyboard shortcut for directory loader
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'o') {
+                e.preventDefault();
+                showDirectoryLoader();
+            }
+            if (e.key === 'Escape') {
+                hideDirectoryLoader();
+            }
+        });
     </script>
+
+    <!-- Directory Loader Modal -->
+    <div id="directoryModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 10000; justify-content: center; align-items: center;">
+        <div style="background: var(--card-bg); padding: 30px; border-radius: 12px; border: 1px solid var(--border-color); max-width: 500px; width: 90%;">
+            <h3 style="color: var(--text-primary); margin-bottom: 20px; text-align: center;">
+                <i class="fas fa-folder-open"></i> Load DICOM Directory
+            </h3>
+            <p style="color: var(--text-secondary); margin-bottom: 20px; font-size: 14px;">
+                Enter the full path to a directory containing DICOM files. The system will recursively scan for DICOM files.
+            </p>
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; color: var(--text-secondary); margin-bottom: 8px; font-size: 14px;">Directory Path:</label>
+                <input type="text" id="directoryPath" placeholder="/path/to/dicom/directory" 
+                       style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--secondary-bg); color: var(--text-primary); font-family: monospace;">
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button onclick="hideDirectoryLoader()" 
+                        style="padding: 10px 20px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--secondary-bg); color: var(--text-secondary); cursor: pointer;">
+                    Cancel
+                </button>
+                <button onclick="loadFromDirectory()" 
+                        style="padding: 10px 20px; border: none; border-radius: 6px; background: var(--accent-color); color: white; cursor: pointer;">
+                    <i class="fas fa-folder-open"></i> Load Directory
+                </button>
+            </div>
+            <div style="margin-top: 15px; padding: 10px; background: var(--secondary-bg); border-radius: 6px; font-size: 12px; color: var(--text-muted);">
+                <strong>Examples:</strong><br>
+                • /media/usb/dicom_studies/<br>
+                • /mnt/cdrom/DICOM/<br>
+                • /home/user/Downloads/patient_study/<br>
+                <br>
+                <strong>Tip:</strong> Use Ctrl+O to quickly open this dialog
+            </div>
+        </div>
+    </div>
 </body>
 </html>
