@@ -1,8 +1,9 @@
 #!/bin/bash
 
 # =============================================================================
-# NOCTIS PRO - COMPLETE ONE-TIME DEPLOYMENT
+# NOCTIS PRO - COMPLETE ZERO-INTERACTION DEPLOYMENT
 # Everything in one go: DuckDNS + Cloudflare + Application
+# Usage: ./deploy_everything_once.sh DUCKDNS_DOMAIN DUCKDNS_TOKEN
 # =============================================================================
 
 set -e
@@ -21,63 +22,63 @@ echo -e "${PURPLE}"
 cat << "EOF"
 ╔══════════════════════════════════════════════════════════════╗
 ║                                                              ║
-║     🚀 NOCTIS PRO - COMPLETE ONE-TIME DEPLOYMENT 🚀          ║
+║     🚀 NOCTIS PRO - ZERO-INTERACTION DEPLOYMENT 🚀          ║
 ║                                                              ║
 ║    🦆 DuckDNS + ☁️ Cloudflare + 🏥 Medical PACS System      ║
-║    Everything deployed in one command!                      ║
+║    Everything deployed automatically - NO USER INPUT!       ║
 ║                                                              ║
 ╚══════════════════════════════════════════════════════════════╝
 EOF
 echo -e "${NC}"
 
-echo -e "${CYAN}🔧 This script will set up everything:${NC}"
+echo -e "${CYAN}🔧 This script will set up everything automatically:${NC}"
 echo -e "${GREEN}   ✅ Python environment and dependencies${NC}"
 echo -e "${GREEN}   ✅ DuckDNS domain configuration${NC}"
-echo -e "${GREEN}   ✅ Cloudflare tunnel (optional)${NC}"
+echo -e "${GREEN}   ✅ Cloudflare tunnel (automatic)${NC}"
 echo -e "${GREEN}   ✅ Django application with admin user${NC}"
 echo -e "${GREEN}   ✅ Auto-start services${NC}"
+echo -e "${GREEN}   ✅ System monitoring and auto-restart${NC}"
 echo ""
 
 # =============================================================================
-# PHASE 1: GATHER CREDENTIALS
+# PHASE 1: GET CREDENTIALS FROM PARAMETERS OR ENVIRONMENT
 # =============================================================================
 
-echo -e "${YELLOW}📋 PHASE 1: DOMAIN CONFIGURATION${NC}"
-echo ""
+echo -e "${YELLOW}📋 PHASE 1: CREDENTIAL CONFIGURATION${NC}"
 
-# Check if DuckDNS config already exists
-if [ -f "/workspace/.duckdns_config" ]; then
+# Get DuckDNS credentials from parameters or environment
+if [ -n "$1" ] && [ -n "$2" ]; then
+    DUCKDNS_DOMAIN="$1"
+    DUCKDNS_TOKEN="$2"
+    echo -e "${GREEN}✅ DuckDNS credentials provided via parameters${NC}"
+elif [ -n "$DUCKDNS_DOMAIN" ] && [ -n "$DUCKDNS_TOKEN" ]; then
+    echo -e "${GREEN}✅ DuckDNS credentials found in environment${NC}"
+elif [ -f "/workspace/.duckdns_config" ]; then
     source /workspace/.duckdns_config
     echo -e "${GREEN}✅ Found existing DuckDNS config: ${DUCKDNS_DOMAIN}.duckdns.org${NC}"
 else
-    echo -e "${BLUE}🦆 DuckDNS Setup Required${NC}"
-    echo "To get your DuckDNS credentials:"
-    echo "1. Go to https://www.duckdns.org"
-    echo "2. Sign in with Google/GitHub/Reddit/Twitter"
-    echo "3. Create a subdomain (e.g., 'noctispro', 'clinic2024')"
-    echo "4. Copy your token from the top of the page"
+    echo -e "${RED}❌ DuckDNS credentials required!${NC}"
     echo ""
-    
-    # Prompt for DuckDNS credentials
-    read -p "Enter your DuckDNS subdomain (without .duckdns.org): " DUCKDNS_DOMAIN
-    read -p "Enter your DuckDNS token: " DUCKDNS_TOKEN
-    
-    if [ -z "$DUCKDNS_DOMAIN" ] || [ -z "$DUCKDNS_TOKEN" ]; then
-        echo -e "${RED}❌ DuckDNS credentials are required!${NC}"
-        exit 1
-    fi
+    echo -e "${YELLOW}Usage:${NC}"
+    echo "  ./deploy_everything_once.sh YOUR_SUBDOMAIN YOUR_TOKEN"
+    echo ""
+    echo -e "${BLUE}Example:${NC}"
+    echo "  ./deploy_everything_once.sh noctispro 9d40387a-ac37-4268-8d51-69985ae32c30"
+    echo ""
+    echo -e "${CYAN}Or set environment variables:${NC}"
+    echo "  export DUCKDNS_DOMAIN=noctispro"
+    echo "  export DUCKDNS_TOKEN=9d40387a-ac37-4268-8d51-69985ae32c30"
+    echo "  ./deploy_everything_once.sh"
+    echo ""
+    exit 1
 fi
 
-# Ask about Cloudflare Tunnel
-echo ""
-echo -e "${BLUE}☁️ Cloudflare Tunnel Setup (Optional but Recommended)${NC}"
-echo "Cloudflare Tunnel provides:"
-echo "✅ Better security (no port forwarding needed)"
-echo "✅ Automatic SSL/TLS encryption"
-echo "✅ DDoS protection"
-echo "✅ Works behind NAT/firewall"
-echo ""
-read -p "Do you want to set up Cloudflare Tunnel? (y/N): " setup_cloudflare
+echo -e "${GREEN}🦆 DuckDNS Domain: ${DUCKDNS_DOMAIN}.duckdns.org${NC}"
+echo -e "${GREEN}🔑 Token: ${DUCKDNS_TOKEN:0:8}...${NC}"
+
+# Automatically set up Cloudflare Tunnel (no prompts)
+setup_cloudflare="y"
+echo -e "${GREEN}☁️ Cloudflare Tunnel: Enabled (automatic)${NC}"
 
 echo ""
 
@@ -188,71 +189,41 @@ if [ "$setup_cloudflare" = "y" ] || [ "$setup_cloudflare" = "Y" ]; then
         echo -e "${GREEN}✅ Cloudflared already installed${NC}"
     fi
     
-    # Check if tunnel already exists
-    if [ ! -f "/workspace/.cloudflared/config.yml" ]; then
-        echo ""
-        echo -e "${YELLOW}🔐 AUTHENTICATION REQUIRED${NC}"
-        echo -e "${BLUE}A browser window will open for Cloudflare authentication.${NC}"
-        echo "Please log in to your Cloudflare account and authorize the tunnel."
-        echo ""
-        read -p "Press Enter to continue..."
-        
-        # Authenticate with Cloudflare
-        cloudflared tunnel login
-        
-        if [ $? -ne 0 ]; then
-            echo -e "${RED}❌ Authentication failed. Skipping Cloudflare Tunnel.${NC}"
-        else
-            echo -e "${GREEN}✅ Authentication successful${NC}"
-            
-            # Create tunnel
-            TUNNEL_NAME="noctispro-$(date +%s)"
-            echo -e "${BLUE}Creating tunnel: ${TUNNEL_NAME}${NC}"
-            
-            cloudflared tunnel create ${TUNNEL_NAME}
-            
-            if [ $? -eq 0 ]; then
-                # Get tunnel UUID
-                TUNNEL_UUID=$(cloudflared tunnel list | grep ${TUNNEL_NAME} | awk '{print $1}')
-                echo -e "${GREEN}✅ Tunnel created with UUID: ${TUNNEL_UUID}${NC}"
-                
-                # Create config directory
-                mkdir -p /workspace/.cloudflared
-                
-                # Create tunnel configuration
-                cat > /workspace/.cloudflared/config.yml << EOF
-tunnel: ${TUNNEL_UUID}
-credentials-file: /home/$(whoami)/.cloudflared/${TUNNEL_UUID}.json
-
-ingress:
-  - hostname: ${DUCKDNS_DOMAIN}.duckdns.org
-    service: http://localhost:8000
-  - service: http_status:404
-EOF
-                
-                # Save tunnel info
-                echo "TUNNEL_NAME=${TUNNEL_NAME}" > /workspace/.tunnel_config
-                echo "TUNNEL_UUID=${TUNNEL_UUID}" >> /workspace/.tunnel_config
-                chmod 600 /workspace/.tunnel_config
-                
-                echo -e "${GREEN}✅ Cloudflare Tunnel configured${NC}"
-                
-                # Start tunnel in background
-                echo -e "${BLUE}🚇 Starting Cloudflare Tunnel...${NC}"
-                nohup cloudflared tunnel --config /workspace/.cloudflared/config.yml run > cloudflare_tunnel.log 2>&1 &
-                TUNNEL_PID=$!
-                echo $TUNNEL_PID > .tunnel_pid
-                echo -e "${GREEN}✅ Cloudflare Tunnel started (PID: ${TUNNEL_PID})${NC}"
-                
-                # Set up DNS record
-                echo -e "${BLUE}🌐 Setting up DNS record...${NC}"
-                cloudflared tunnel route dns ${TUNNEL_NAME} ${DUCKDNS_DOMAIN}.duckdns.org || echo -e "${YELLOW}⚠️ Manual DNS setup may be required${NC}"
-            else
-                echo -e "${RED}❌ Failed to create tunnel. Continuing without Cloudflare Tunnel.${NC}"
+    # Use Cloudflare Quick Tunnels (no authentication required)
+    echo -e "${BLUE}🚇 Starting Cloudflare Quick Tunnel (no auth required)...${NC}"
+    
+    # Start cloudflared quick tunnel
+    nohup cloudflared tunnel --url http://localhost:8000 > cloudflare_tunnel.log 2>&1 &
+    TUNNEL_PID=$!
+    echo $TUNNEL_PID > .tunnel_pid
+    
+    # Wait for tunnel to establish
+    echo -e "${BLUE}⏳ Waiting for tunnel to establish...${NC}"
+    sleep 10
+    
+    # Extract tunnel URL from logs
+    TUNNEL_URL=""
+    for i in {1..30}; do
+        if [ -f "cloudflare_tunnel.log" ]; then
+            TUNNEL_URL=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' cloudflare_tunnel.log | head -1)
+            if [ -n "$TUNNEL_URL" ]; then
+                break
             fi
         fi
+        sleep 2
+    done
+    
+    if [ -n "$TUNNEL_URL" ]; then
+        echo -e "${GREEN}✅ Cloudflare Quick Tunnel started${NC}"
+        echo -e "${GREEN}🌐 Tunnel URL: $TUNNEL_URL${NC}"
+        
+        # Save tunnel info
+        echo "TUNNEL_URL=${TUNNEL_URL}" > /workspace/.tunnel_config
+        echo "TUNNEL_PID=${TUNNEL_PID}" >> /workspace/.tunnel_config
+        chmod 600 /workspace/.tunnel_config
     else
-        echo -e "${GREEN}✅ Cloudflare Tunnel already configured${NC}"
+        echo -e "${YELLOW}⚠️ Cloudflare tunnel started but URL not detected yet${NC}"
+        echo -e "${BLUE}Check cloudflare_tunnel.log for the URL${NC}"
     fi
 else
     echo -e "${BLUE}⏭️ Skipping Cloudflare Tunnel setup${NC}"
