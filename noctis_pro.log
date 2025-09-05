@@ -396,3 +396,8 @@ Watching for file changes with StatReloader
 "GET / HTTP/1.1" 302 0
 "GET /admin/ HTTP/1.1" 302 0
 "GET /admin/login/?next=/admin/ HTTP/1.1" 200 4177
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+"HEAD / HTTP/1.1" 302 0
+"HEAD / HTTP/1.1" 302 0
