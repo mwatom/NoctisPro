@@ -173,3 +173,26 @@
 [2025-09-05 23:09:21 +0000] [6129] [INFO] Booting worker with pid: 6129
 [2025-09-05 23:09:21 +0000] [6130] [INFO] Booting worker with pid: 6130
 [2025-09-05 23:09:21 +0000] [6131] [INFO] Booting worker with pid: 6131
+[2025-09-05 23:11:04 +0000] [6129] [INFO] Worker exiting (pid: 6129)
+[2025-09-05 23:11:04 +0000] [6128] [INFO] Handling signal: term
+[2025-09-05 23:11:04 +0000] [6130] [INFO] Worker exiting (pid: 6130)
+[2025-09-05 23:11:04 +0000] [6131] [INFO] Worker exiting (pid: 6131)
+[2025-09-05 23:11:04 +0000] [6128] [ERROR] Worker (pid:6131) was sent SIGTERM!
+[2025-09-05 23:11:04 +0000] [6128] [INFO] Shutting down: Master
+[2025-09-05 23:11:09 +0000] [7105] [INFO] Starting gunicorn 23.0.0
+[2025-09-05 23:11:09 +0000] [7105] [INFO] Listening at: http://0.0.0.0:8000 (7105)
+[2025-09-05 23:11:09 +0000] [7105] [INFO] Using worker: sync
+[2025-09-05 23:11:09 +0000] [7106] [INFO] Booting worker with pid: 7106
+[2025-09-05 23:11:09 +0000] [7113] [INFO] Booting worker with pid: 7113
+[2025-09-05 23:11:09 +0000] [7114] [INFO] Booting worker with pid: 7114
+[2025-09-05 23:11:32 +0000] [7114] [INFO] Worker exiting (pid: 7114)
+[2025-09-05 23:11:32 +0000] [7106] [INFO] Worker exiting (pid: 7106)
+[2025-09-05 23:11:32 +0000] [7105] [INFO] Handling signal: term
+[2025-09-05 23:11:32 +0000] [7113] [INFO] Worker exiting (pid: 7113)
+[2025-09-05 23:11:32 +0000] [7105] [INFO] Shutting down: Master
+[2025-09-05 23:11:37 +0000] [7386] [INFO] Starting gunicorn 23.0.0
+[2025-09-05 23:11:37 +0000] [7386] [INFO] Listening at: http://0.0.0.0:8000 (7386)
+[2025-09-05 23:11:37 +0000] [7386] [INFO] Using worker: sync
+[2025-09-05 23:11:37 +0000] [7387] [INFO] Booting worker with pid: 7387
+[2025-09-05 23:11:37 +0000] [7388] [INFO] Booting worker with pid: 7388
+[2025-09-05 23:11:37 +0000] [7389] [INFO] Booting worker with pid: 7389
