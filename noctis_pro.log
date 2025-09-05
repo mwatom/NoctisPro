@@ -46,3 +46,12 @@ Watching for file changes with StatReloader
 Watching for file changes with StatReloader
 "HEAD / HTTP/1.1" 302 0
 Not Found: /worklist/
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Forbidden (CSRF cookie not set.): /login/
+"POST /login/ HTTP/1.1" 403 2855
+"GET /login/ HTTP/1.1" 200 17452

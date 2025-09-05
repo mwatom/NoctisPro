@@ -198,10 +198,8 @@ def user_create(request):
                 
                 # Professional user activation with medical standards
                 user.is_active = True
-                user.email_verified = True  # Auto-verify for admin-created users
-                user.created_by = request.user
-                user.creation_timestamp = timezone.now()
-                user.professional_status = 'ACTIVE'
+                user.is_verified = True  # Auto-verify for admin-created users
+                # Note: removed non-existent fields that were causing errors
                 user.save()
                 
                 # Professional audit logging with medical precision
