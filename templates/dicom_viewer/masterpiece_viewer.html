@@ -1075,6 +1075,46 @@
             brain: { ww: 100, wl: 50 }
         };
 
+        async function fetchReferences(customQuery) {
+            try {
+                const qInput = document.getElementById('refQuery');
+                const base = customQuery || (qInput ? qInput.value.trim() : '');
+                let query = base;
+                if (!query && currentStudy) {
+                    const modality = (currentStudy.modality || '').toString();
+                    const bodyPart = (currentStudy.body_part || '').toString();
+                    const desc = (currentStudy.description || '').toString();
+                    query = [modality, bodyPart, desc].filter(Boolean).join(' ');
+                }
+                if (!query) {
+                    const list = document.getElementById('referencesList');
+                    if (list) list.innerHTML = 'Add a query (e.g., “CT brain hemorrhage”).';
+                    return;
+                }
+                const url = `/ai/api/references/?q=${encodeURIComponent(query)}`;
+                const resp = await fetch(url, { credentials: 'same-origin' });
+                if (!resp.ok) throw new Error('Network error');
+                const data = await resp.json();
+                const list = document.getElementById('referencesList');
+                if (list) {
+                    if (data.success && data.references && data.references.length) {
+                        list.innerHTML = data.references.map(r => `
+                            <div style="margin-bottom:6px;">
+                                <a href="${r.url}" target="_blank" style="color: var(--accent-color); text-decoration: none;">
+                                    <i class="fas fa-external-link-alt"></i> ${r.title}
+                                </a>
+                            </div>
+                        `).join('');
+                    } else {
+                        list.innerHTML = 'No references found. Try refining your query.';
+                    }
+                }
+            } catch (e) {
+                const list = document.getElementById('referencesList');
+                if (list) list.innerHTML = 'Failed to load references.';
+            }
+        }
+
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
             initializeViewer();
@@ -1297,6 +1337,8 @@
                     currentStudy = data.study;
                     displaySeriesList(data.series);
                     updatePatientInfo(currentStudy);
+                    // Load related references automatically based on study context
+                    try { fetchReferences(); } catch (e) {}
                     
                     // Auto-load first series
                     if (data.series.length > 0) {
