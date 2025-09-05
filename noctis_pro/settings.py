@@ -27,7 +27,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-7x!8k@m$z9h#4p&x3w2v6
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*,noctispro,mallard-shining-curiously.ngrok-free.app,*.ngrok-free.app,localhost,127.0.0.1,0.0.0.0').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*,noctispro,noctispro2.duckdns.org,*.duckdns.org,localhost,127.0.0.1,0.0.0.0').split(',')
 
 
 # Application definition
