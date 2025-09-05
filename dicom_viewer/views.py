@@ -1850,27 +1850,7 @@ def process_dicom_study(study_uid, series_map, rep_ds, user, upload_id):
                 }
             )
     
-            # Return success response
-            return JsonResponse({
-                'success': True,
-                'processed_files': processed_files,
-                'study_id': study_obj.id,
-                'study_name': f"{study_obj.patient.full_name} - {study_obj.study_date.strftime('%Y-%m-%d') if study_obj.study_date else 'Unknown Date'}",
-                'message': f'Successfully loaded {processed_files} DICOM files from directory'
-            })
-            
-        except Exception as e:
-            logger.error(f"Error loading directory {directory_path}: {str(e)}")
-            import traceback
-            logger.error(f"Directory load traceback: {traceback.format_exc()}")
-            return JsonResponse({
-                'success': False,
-                'error': f'Failed to load directory: {str(e)}',
-                'directory_path': directory_path if 'directory_path' in locals() else 'Unknown'
-            }, status=500)
-    
-    # For GET requests, show the directory loader form
-    return render(request, 'dicom_viewer/load_directory.html')
+    return study_obj
 
 @login_required
 @csrf_exempt
