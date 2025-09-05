@@ -16,7 +16,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Configuration
-WORKSPACE_DIR="/workspace"
+WORKSPACE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICE_NAME="noctispro-pacs"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 DJANGO_PORT="8000"
@@ -88,19 +88,35 @@ install_python_dependencies() {
     print_info "Installing Python dependencies..."
     cd "$WORKSPACE_DIR"
     
-    # Install pip if not available
-    if ! command -v pip3 &> /dev/null; then
-        print_warning "pip3 not found, installing..."
-        apt-get update -qq
-        apt-get install -y python3-pip
-    fi
+    # Install system dependencies required for Python packages
+    print_info "Installing system dependencies..."
+    apt-get update -qq || print_warning "Package update failed, continuing with cached packages"
+    
+    # Install essential packages first
+    apt-get install -y python3-pip python3-dev build-essential || print_warning "Some essential packages failed to install"
+    
+    # Install additional packages if available
+    apt-get install -y libcups2-dev libssl-dev libffi-dev libjpeg-dev libpng-dev pkg-config python3-venv git 2>/dev/null || print_warning "Some optional packages failed to install"
     
     # Install requirements
     if [[ -f "requirements.txt" ]]; then
-        pip3 install -r requirements.txt --quiet
-        print_success "Python dependencies installed"
+        print_info "Attempting to install full requirements..."
+        if pip3 install -r requirements.txt --quiet --break-system-packages; then
+            print_success "Full Python dependencies installed"
+        elif [[ -f "requirements.minimal.txt" ]]; then
+            print_warning "Full requirements failed, trying minimal requirements..."
+            pip3 install -r requirements.minimal.txt --quiet --break-system-packages
+            print_success "Minimal Python dependencies installed"
+        else
+            print_error "Failed to install Python dependencies"
+            exit 1
+        fi
+    elif [[ -f "requirements.minimal.txt" ]]; then
+        print_info "Installing minimal requirements..."
+        pip3 install -r requirements.minimal.txt --quiet --break-system-packages
+        print_success "Minimal Python dependencies installed"
     else
-        print_warning "requirements.txt not found, skipping Python dependencies"
+        print_warning "No requirements files found, skipping Python dependencies"
     fi
 }
 
