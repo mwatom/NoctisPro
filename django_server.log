@@ -35,9 +35,9 @@ Traceback (most recent call last):
   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
   File "/workspace/dicom_viewer/urls.py", line 2, in <module>
     from . import views
-  File "/workspace/dicom_viewer/views.py", line 14, in <module>
-    import numpy as np
-ModuleNotFoundError: No module named 'numpy'
+  File "/workspace/dicom_viewer/views.py", line 30, in <module>
+    import scipy.ndimage as ndimage
+ModuleNotFoundError: No module named 'scipy'
 
 During handling of the above exception, another exception occurred:
 
@@ -95,6 +95,6 @@ Traceback (most recent call last):
   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
   File "/workspace/dicom_viewer/urls.py", line 2, in <module>
     from . import views
-  File "/workspace/dicom_viewer/views.py", line 14, in <module>
-    import numpy as np
-ModuleNotFoundError: No module named 'numpy'
+  File "/workspace/dicom_viewer/views.py", line 30, in <module>
+    import scipy.ndimage as ndimage
+ModuleNotFoundError: No module named 'scipy'
