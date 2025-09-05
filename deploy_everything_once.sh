@@ -381,8 +381,8 @@ elif [ -f ".tunnel_pid" ]; then
 fi
 
 # Show URLs
-if [ -f ".duckdns_config" ]; then
-    source .duckdns_config
+if [ -f "/workspace/.duckdns_config" ]; then
+    source /workspace/.duckdns_config
     echo ""
     echo "🌐 Access URLs:"
     echo "   https://${DUCKDNS_DOMAIN}.duckdns.org"
