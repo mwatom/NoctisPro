@@ -25,27 +25,11 @@ def login_view(request):
         
         user = authenticate(request, username=username, password=password)
         if user and user.is_active and user.is_verified:
-            # Track login session
+            # Simple login without session tracking for now
             login(request, user)
             
-            # Get client information
-            user_agent = request.META.get('HTTP_USER_AGENT', '')
-            ip_address = get_client_ip(request)
-            
-            # Update user login tracking
-            user.last_login_ip = ip_address
-            user.save()
-            
-            # Create session record
-            UserSession.objects.create(
-                user=user,
-                session_key=request.session.session_key,
-                ip_address=ip_address,
-                user_agent=user_agent
-            )
-            
-            # Redirect all users to the worklist dashboard after login
-            return redirect('worklist:dashboard')
+            # Redirect all users to the admin panel after login (since worklist is disabled)
+            return redirect('/admin/')
         else:
             # Clear any existing messages before adding error
             list(messages.get_messages(request))
