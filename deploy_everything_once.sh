@@ -63,7 +63,7 @@ else
     echo "  ./deploy_everything_once.sh YOUR_SUBDOMAIN YOUR_TOKEN"
     echo ""
     echo -e "${BLUE}Example:${NC}"
-    echo "  ./deploy_everything_once.sh noctispro 9d40387a-ac37-4268-8d51-69985ae32c30"
+    echo "  ./deploy_everything_once.sh noctispro2 9d40387a-ac37-4268-8d51-69985ae32c30"
     echo ""
     echo -e "${CYAN}Or set environment variables:${NC}"
     echo "  export DUCKDNS_DOMAIN=noctispro"
