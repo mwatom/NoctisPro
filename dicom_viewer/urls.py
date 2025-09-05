@@ -54,6 +54,7 @@ urlpatterns = [
     # DICOM file upload and processing
     path('upload/', views.upload_dicom, name='upload_dicom'),
     path('load-directory/', views.load_from_directory, name='load_from_directory'),
+    path('api/mounts/', views.api_list_mounted_media, name='api_list_mounted_media'),
     path('api/upload/progress/<str:upload_id>/', views.api_upload_progress, name='api_upload_progress'),
     path('api/process/study/<int:study_id>/', views.api_process_study, name='api_process_study'),
 

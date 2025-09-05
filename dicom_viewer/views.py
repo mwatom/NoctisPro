@@ -29,6 +29,7 @@ import base64
 from pydicom.pixel_data_handlers.util import apply_voi_lut
 import scipy.ndimage as ndimage
 import logging
+import subprocess
 
 from .models import ViewerSession, Measurement, Annotation, ReconstructionJob
 from .dicom_utils import DicomProcessor, safe_dicom_str
@@ -4317,3 +4318,98 @@ def mpr_slice_api(request, series_id, plane, slice_index):
         logger.error(f"MPR slice error: {e}")
         from django.http import Http404
         raise Http404("MPR slice not found")
+
+
+@login_required
+def api_list_mounted_media(request):
+    """
+    List mounted USB/DVD media paths for quick selection in load-directory UI.
+    Returns a JSON with an array of mounts including path, type and label if available.
+    Linux: parses /proc/mounts and common /media, /mnt locations.
+    macOS: scans /Volumes.
+    Windows: lists available drive letters.
+    """
+    try:
+        mounts = []
+        platform = os.name
+
+        # Identify OS more precisely
+        import sys
+        sys_platform = sys.platform
+
+        if sys_platform.startswith('linux'):
+            try:
+                # Read /proc/mounts
+                with open('/proc/mounts', 'r') as f:
+                    lines = f.readlines()
+                for line in lines:
+                    parts = line.split()
+                    if len(parts) < 3:
+                        continue
+                    device, mount_point, fstype = parts[0], parts[1], parts[2]
+                    # Heuristics for removable media
+                    if mount_point.startswith('/media') or mount_point.startswith('/mnt') or '/run/media' in mount_point:
+                        mounts.append({
+                            'path': mount_point,
+                            'type': 'dvd' if 'iso9660' in fstype.lower() else 'usb',
+                            'label': os.path.basename(mount_point) or mount_point
+                        })
+            except Exception:
+                pass
+
+            # Also scan typical directories
+            for base in ['/media', '/mnt', '/run/media']:
+                if os.path.isdir(base):
+                    try:
+                        for entry in os.listdir(base):
+                            path = os.path.join(base, entry)
+                            if os.path.ismount(path) or os.path.isdir(path):
+                                if not any(m['path'] == path for m in mounts):
+                                    mounts.append({'path': path, 'type': 'unknown', 'label': entry})
+                    except Exception:
+                        continue
+
+        elif sys_platform == 'darwin':
+            volumes = '/Volumes'
+            if os.path.isdir(volumes):
+                try:
+                    for entry in os.listdir(volumes):
+                        path = os.path.join(volumes, entry)
+                        if os.path.ismount(path) or os.path.isdir(path):
+                            mounts.append({'path': path, 'type': 'removable', 'label': entry})
+                except Exception:
+                    pass
+
+        elif sys_platform.startswith('win'):
+            try:
+                # Query available drives
+                import string
+                available = []
+                bitmask = ctypes.windll.kernel32.GetLogicalDrives()
+                for letter in string.ascii_uppercase:
+                    if bitmask & 1:
+                        drive = f"{letter}:\\"
+                        # Determine drive type
+                        dtype = ctypes.windll.kernel32.GetDriveTypeW(drive)
+                        # 2: removable, 5: CD/DVD
+                        if dtype in (2, 5):
+                            mounts.append({'path': drive, 'type': 'dvd' if dtype == 5 else 'usb', 'label': drive})
+                    bitmask >>= 1
+            except Exception:
+                # Fallback: common letters
+                for letter in ['D', 'E', 'F', 'G', 'H']:
+                    mounts.append({'path': f'{letter}:\\', 'type': 'removable', 'label': f'{letter}:'})
+
+        # Deduplicate
+        dedup = []
+        seen = set()
+        for m in mounts:
+            key = m['path']
+            if key not in seen:
+                seen.add(key)
+                dedup.append(m)
+
+        return JsonResponse({'success': True, 'mounts': dedup})
+    except Exception as e:
+        logger.error(f"Failed to list mounted media: {e}")
+        return JsonResponse({'success': False, 'error': f'Failed to list mounted media: {str(e)}'})
