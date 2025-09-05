@@ -12,7 +12,7 @@ fi
 
 # Get current public IP with fallback methods
 PUBLIC_IP=""
-for service in "ifconfig.me" "ipinfo.io/ip" "icanhazip.com" "checkip.amazonaws.com"; do
+for service in "checkip.amazonaws.com" "ipinfo.io/ip" "ifconfig.me" "icanhazip.com"; do
     PUBLIC_IP=$(curl -s --connect-timeout 10 "$service" 2>/dev/null | tr -d '\n\r' | grep -oE '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$')
     if [[ $PUBLIC_IP =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
         break
@@ -20,16 +20,24 @@ for service in "ifconfig.me" "ipinfo.io/ip" "icanhazip.com" "checkip.amazonaws.c
     PUBLIC_IP=""
 done
 
+# If no IP detected, let DuckDNS auto-detect
 if [ -z "$PUBLIC_IP" ]; then
-    echo "$(date): ERROR: Could not determine public IP" >> /workspace/duckdns.log
-    exit 1
+    echo "$(date): INFO: Using DuckDNS auto-detection for IP" >> /workspace/duckdns.log
 fi
 
-# Update Duck DNS
-RESPONSE=$(curl -s --connect-timeout 30 "https://www.duckdns.org/update?domains=${DUCKDNS_DOMAIN}&token=${DUCKDNS_TOKEN}&ip=${PUBLIC_IP}")
+# Update Duck DNS (with or without IP parameter)
+if [ -n "$PUBLIC_IP" ]; then
+    RESPONSE=$(curl -s --connect-timeout 30 "https://www.duckdns.org/update?domains=${DUCKDNS_DOMAIN}&token=${DUCKDNS_TOKEN}&ip=${PUBLIC_IP}")
+else
+    RESPONSE=$(curl -s --connect-timeout 30 "https://www.duckdns.org/update?domains=${DUCKDNS_DOMAIN}&token=${DUCKDNS_TOKEN}")
+fi
 
 if [ "$RESPONSE" = "OK" ]; then
-    echo "$(date): SUCCESS: Updated ${DUCKDNS_DOMAIN}.duckdns.org to ${PUBLIC_IP}" >> /workspace/duckdns.log
+    if [ -n "$PUBLIC_IP" ]; then
+        echo "$(date): SUCCESS: Updated ${DUCKDNS_DOMAIN}.duckdns.org to ${PUBLIC_IP}" >> /workspace/duckdns.log
+    else
+        echo "$(date): SUCCESS: Updated ${DUCKDNS_DOMAIN}.duckdns.org (auto-detected IP)" >> /workspace/duckdns.log
+    fi
 else
     echo "$(date): ERROR: Failed to update DNS. Response: ${RESPONSE}" >> /workspace/duckdns.log
 fi
