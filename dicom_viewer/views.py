@@ -627,53 +627,85 @@ def api_bone_reconstruction(request, series_id):
 @csrf_exempt
 def api_realtime_studies(request):
     """API endpoint for real-time study updates"""
-    user = request.user
-    
-    # Get timestamp from request
-    last_update = request.GET.get('last_update')
-    
     try:
-        if last_update:
-            last_update_time = timezone.datetime.fromisoformat(last_update.replace('Z', '+00:00'))
-        else:
+        user = request.user
+        
+        # Get timestamp from request
+        last_update = request.GET.get('last_update')
+        
+        try:
+            if last_update:
+                last_update_time = timezone.datetime.fromisoformat(last_update.replace('Z', '+00:00'))
+            else:
+                last_update_time = timezone.now() - timezone.timedelta(minutes=5)
+        except:
             last_update_time = timezone.now() - timezone.timedelta(minutes=5)
-    except:
-        last_update_time = timezone.now() - timezone.timedelta(minutes=5)
-    
-    # Get studies updated since last check
-    if user.is_facility_user():
-        studies = Study.objects.filter(
-            facility=user.facility,
-            last_updated__gt=last_update_time
-        ).order_by('-last_updated')[:20]
-    else:
-        studies = Study.objects.filter(
-            last_updated__gt=last_update_time
-        ).order_by('-last_updated')[:20]
-    
-    studies_data = []
-    for study in studies:
-        studies_data.append({
-            'id': study.id,
-            'accession_number': study.accession_number,
-            'patient_name': study.patient.full_name,
-            'patient_id': study.patient.patient_id,
-            'study_date': study.study_date.isoformat(),
-            'modality': study.modality.code,
-            'description': study.study_description,
-            'status': study.status,
-            'priority': study.priority,
-            'facility': study.facility.name,
-            'last_updated': study.last_updated.isoformat(),
-            'series_count': study.series_set.count(),
-            'image_count': sum(series.images.count() for series in study.series_set.all())
+        
+        # Get studies updated since last check
+        try:
+            if hasattr(user, 'is_facility_user') and user.is_facility_user() and hasattr(user, 'facility') and user.facility:
+                studies = Study.objects.filter(
+                    facility=user.facility,
+                    last_updated__gt=last_update_time
+                ).select_related('patient', 'modality', 'facility').prefetch_related('series_set__images').order_by('-last_updated')[:20]
+            else:
+                # For admin users or users without facility, show all studies
+                studies = Study.objects.filter(
+                    last_updated__gt=last_update_time
+                ).select_related('patient', 'modality', 'facility').prefetch_related('series_set__images').order_by('-last_updated')[:20]
+        except Exception as e:
+            logger.error(f"Error fetching studies: {str(e)}")
+            # Return empty list if there's an issue
+            return JsonResponse({
+                'studies': [],
+                'timestamp': timezone.now().isoformat(),
+                'count': 0,
+                'error': 'No studies available'
+            })
+        
+        studies_data = []
+        for study in studies:
+            try:
+                # Safe access to related objects
+                patient_name = study.patient.full_name if study.patient else 'Unknown Patient'
+                patient_id = study.patient.patient_id if study.patient else 'Unknown'
+                modality_code = study.modality.code if study.modality else 'Unknown'
+                facility_name = study.facility.name if study.facility else 'Unknown Facility'
+                
+                studies_data.append({
+                    'id': study.id,
+                    'accession_number': study.accession_number or 'N/A',
+                    'patient_name': patient_name,
+                    'patient_id': patient_id,
+                    'study_date': study.study_date.isoformat() if study.study_date else timezone.now().isoformat(),
+                    'modality': modality_code,
+                    'description': study.study_description or 'No Description',
+                    'status': study.status or 'unknown',
+                    'priority': study.priority or 'normal',
+                    'facility': facility_name,
+                    'last_updated': study.last_updated.isoformat() if study.last_updated else timezone.now().isoformat(),
+                    'series_count': study.series_set.count(),
+                    'image_count': sum(series.images.count() for series in study.series_set.all())
+                })
+            except Exception as e:
+                logger.error(f"Error processing study {study.id}: {str(e)}")
+                continue
+        
+        return JsonResponse({
+            'studies': studies_data,
+            'timestamp': timezone.now().isoformat(),
+            'count': len(studies_data)
         })
-    
-    return JsonResponse({
-        'studies': studies_data,
-        'timestamp': timezone.now().isoformat(),
-        'count': len(studies_data)
-    })
+        
+    except Exception as e:
+        logger.error(f"Error in api_realtime_studies: {str(e)}")
+        return JsonResponse({
+            'error': 'Failed to load studies',
+            'message': str(e),
+            'studies': [],
+            'timestamp': timezone.now().isoformat(),
+            'count': 0
+        }, status=500)
 
 @login_required
 @csrf_exempt
@@ -1818,7 +1850,27 @@ def process_dicom_study(study_uid, series_map, rep_ds, user, upload_id):
                 }
             )
     
-    return study_obj
+            # Return success response
+            return JsonResponse({
+                'success': True,
+                'processed_files': processed_files,
+                'study_id': study_obj.id,
+                'study_name': f"{study_obj.patient.full_name} - {study_obj.study_date.strftime('%Y-%m-%d') if study_obj.study_date else 'Unknown Date'}",
+                'message': f'Successfully loaded {processed_files} DICOM files from directory'
+            })
+            
+        except Exception as e:
+            logger.error(f"Error loading directory {directory_path}: {str(e)}")
+            import traceback
+            logger.error(f"Directory load traceback: {traceback.format_exc()}")
+            return JsonResponse({
+                'success': False,
+                'error': f'Failed to load directory: {str(e)}',
+                'directory_path': directory_path if 'directory_path' in locals() else 'Unknown'
+            }, status=500)
+    
+    # For GET requests, show the directory loader form
+    return render(request, 'dicom_viewer/load_directory.html')
 
 @login_required
 @csrf_exempt

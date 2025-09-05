@@ -1178,8 +1178,14 @@ def api_delete_study(request, study_id):
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
     # Check if user is admin or superuser
-    if not (request.user.is_admin() or request.user.is_superuser):
-        return JsonResponse({'error': 'Permission denied. Only administrators can delete studies.'}, status=403)
+    try:
+        is_admin = hasattr(request.user, 'is_admin') and request.user.is_admin()
+        is_superuser = request.user.is_superuser
+        if not (is_admin or is_superuser):
+            return JsonResponse({'error': 'Permission denied. Only administrators can delete studies.'}, status=403)
+    except Exception as e:
+        logger.error(f"Error checking user permissions: {str(e)}")
+        return JsonResponse({'error': 'Permission error'}, status=403)
     
     try:
         study = get_object_or_404(Study, id=study_id)
