@@ -161,8 +161,10 @@ EOF
     echo -e "${GREEN}✅ Auto-update cron job created (runs every 5 minutes)${NC}"
     
     # Save credentials for later use
-    echo "DUCKDNS_DOMAIN=${DUCKDNS_DOMAIN}" > /workspace/.duckdns_config
-    echo "DUCKDNS_TOKEN=${DUCKDNS_TOKEN}" >> /workspace/.duckdns_config
+    cat > /workspace/.duckdns_config << EOF
+DUCKDNS_DOMAIN=${DUCKDNS_DOMAIN}
+DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
+EOF
     chmod 600 /workspace/.duckdns_config
     
     echo -e "${GREEN}✅ DuckDNS configuration saved${NC}"
