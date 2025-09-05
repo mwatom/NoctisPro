@@ -145,7 +145,7 @@ if [ ! -f "/workspace/.duckdns_config" ]; then
     fi
     
     # Create update script for cron
-    cat > /workspace/update_duckdns.sh << EOF
+    cat > update_duckdns.sh << EOF
 #!/bin/bash
 # Auto-update Duck DNS IP
 PUBLIC_IP=\$(curl -s ifconfig.me)
@@ -153,10 +153,10 @@ curl -s "https://www.duckdns.org/update?domains=${DUCKDNS_DOMAIN}&token=${DUCKDN
 echo "\$(date): Updated ${DUCKDNS_DOMAIN}.duckdns.org to \${PUBLIC_IP}" >> /workspace/duckdns.log
 EOF
     
-    chmod +x /workspace/update_duckdns.sh
+    chmod +x update_duckdns.sh
     
     # Set up cron job for automatic updates
-    (crontab -l 2>/dev/null; echo "*/5 * * * * /workspace/update_duckdns.sh") | crontab -
+    (crontab -l 2>/dev/null; echo "*/5 * * * * $(pwd)/update_duckdns.sh") | crontab -
     
     echo -e "${GREEN}✅ Auto-update cron job created (runs every 5 minutes)${NC}"
     
@@ -256,7 +256,8 @@ mkdir -p media/letterheads
 # Create superuser if it doesn't exist
 echo -e "${BLUE}👤 Creating admin user...${NC}"
 $PYTHON manage.py shell << EOF
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
+User = get_user_model()
 if not User.objects.filter(username='admin').exists():
     User.objects.create_superuser('admin', 'admin@noctispro.com', 'admin123')
     print('✅ Admin user created: admin/admin123')
