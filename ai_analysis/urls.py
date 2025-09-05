@@ -17,4 +17,7 @@ urlpatterns = [
     # Auto-report generation
     path('api/study/<int:study_id>/generate-report/', views.generate_auto_report, name='generate_auto_report'),
     path('report/<int:report_id>/review/', views.review_auto_report, name='review_auto_report'),
+
+    # Evidence and references
+    path('api/references/', views.api_medical_references, name='api_medical_references'),
 ]

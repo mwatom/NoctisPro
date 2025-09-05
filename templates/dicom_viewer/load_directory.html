@@ -404,6 +404,12 @@
             <label class="form-label" for="directory_path">
                 <i class="fas fa-folder"></i> Directory Path
             </label>
+            <div id="mountedMedia" style="margin-bottom: 0.75rem; display: none;">
+                <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">
+                    <i class="fas fa-plug"></i> Detected media:
+                </div>
+                <div id="mountedChips" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
+            </div>
             <div class="directory-input-group">
                 <input 
                     type="text" 
@@ -480,6 +486,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const results = document.getElementById('results');
     const resultsBody = document.getElementById('resultsBody');
     const errorMessage = document.getElementById('errorMessage');
+    const mountedMedia = document.getElementById('mountedMedia');
+    const mountedChips = document.getElementById('mountedChips');
     
     form.addEventListener('submit', function(e) {
         e.preventDefault();
@@ -527,6 +535,31 @@ document.addEventListener('DOMContentLoaded', function() {
             showError('Network error: ' + error.message);
         });
     });
+
+    // Fetch mounted media for quick-pick
+    fetch('/dicom-viewer/api/mounts/', { credentials: 'same-origin' })
+        .then(r => r.json())
+        .then(data => {
+            if (data && data.success && Array.isArray(data.mounts) && data.mounts.length > 0) {
+                mountedMedia.style.display = 'block';
+                mountedChips.innerHTML = '';
+                data.mounts.forEach(m => {
+                    const chip = document.createElement('button');
+                    chip.type = 'button';
+                    chip.className = 'btn-control';
+                    chip.style.cssText = 'border-radius:16px; padding:6px 10px;';
+                    const icon = m.type === 'dvd' ? 'compact-disc' : (m.type === 'usb' ? 'usb-drive' : 'hdd');
+                    chip.innerHTML = `<i class="fas fa-${icon}"></i> ${m.label || m.path}`;
+                    chip.addEventListener('click', () => {
+                        const input = document.getElementById('directory_path');
+                        input.value = m.path;
+                        input.focus();
+                    });
+                    mountedChips.appendChild(chip);
+                });
+            }
+        })
+        .catch(() => {});
 });
 
 function browseDirectory() {

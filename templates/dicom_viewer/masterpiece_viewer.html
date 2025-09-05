@@ -256,6 +256,29 @@
             border-left: 2px solid var(--border-color);
             overflow-y: auto;
             box-shadow: -2px 0 10px rgba(0, 0, 0, 0.5);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+
+        .toolbar, .top-bar {
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+
+        .ui-hidden .toolbar { opacity: 0; transform: translateX(-12px); pointer-events: none; }
+        .ui-hidden .top-bar { opacity: 0; transform: translateY(-12px); pointer-events: none; }
+        .ui-hidden .right-panel { opacity: 0; transform: translateX(12px); pointer-events: none; }
+
+        .ui-toggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 20;
+            background: rgba(0,0,0,0.5);
+            color: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 6px 10px;
+            font-size: 11px;
+            cursor: pointer;
         }
 
         .panel-section {
@@ -692,6 +715,7 @@
 </head>
 <body>
     <div class="viewer-container">
+        <button class="ui-toggle" onclick="toggleUI()"><i class="fas fa-eye-slash"></i> UI</button>
         <!-- Left Toolbar -->
         <div class="toolbar">
             <button class="tool-btn active" data-tool="windowing" title="Window/Level">
@@ -1013,6 +1037,21 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Related References -->
+            <div class="panel-section">
+                <div class="panel-title">
+                    <i class="fas fa-book-medical"></i>
+                    Related References
+                </div>
+                <div style="display:flex; gap:6px; margin-bottom:8px;">
+                    <input id="refQuery" class="form-control" placeholder="e.g., CT head hemorrhage" style="flex:1;">
+                    <button class="btn" onclick="fetchReferences()"><i class="fas fa-search"></i></button>
+                </div>
+                <div id="referencesList" style="max-height:180px; overflow:auto; font-size:12px; color: var(--text-secondary);">
+                    Enter a query or load a study to see suggestions.
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1060,10 +1099,51 @@
             brain: { ww: 100, wl: 50 }
         };
 
+        async function fetchReferences(customQuery) {
+            try {
+                const qInput = document.getElementById('refQuery');
+                const base = customQuery || (qInput ? qInput.value.trim() : '');
+                let query = base;
+                if (!query && currentStudy) {
+                    const modality = (currentStudy.modality || '').toString();
+                    const bodyPart = (currentStudy.body_part || '').toString();
+                    const desc = (currentStudy.description || '').toString();
+                    query = [modality, bodyPart, desc].filter(Boolean).join(' ');
+                }
+                if (!query) {
+                    const list = document.getElementById('referencesList');
+                    if (list) list.innerHTML = 'Add a query (e.g., “CT brain hemorrhage”).';
+                    return;
+                }
+                const url = `/ai/api/references/?q=${encodeURIComponent(query)}`;
+                const resp = await fetch(url, { credentials: 'same-origin' });
+                if (!resp.ok) throw new Error('Network error');
+                const data = await resp.json();
+                const list = document.getElementById('referencesList');
+                if (list) {
+                    if (data.success && data.references && data.references.length) {
+                        list.innerHTML = data.references.map(r => `
+                            <div style="margin-bottom:6px;">
+                                <a href="${r.url}" target="_blank" style="color: var(--accent-color); text-decoration: none;">
+                                    <i class="fas fa-external-link-alt"></i> ${r.title}
+                                </a>
+                            </div>
+                        `).join('');
+                    } else {
+                        list.innerHTML = 'No references found. Try refining your query.';
+                    }
+                }
+            } catch (e) {
+                const list = document.getElementById('referencesList');
+                if (list) list.innerHTML = 'Failed to load references.';
+            }
+        }
+
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
             initializeViewer();
             setupEventListeners();
+            setupUIAutoHide();
             
             // Check if study ID is provided in URL
             const urlParams = new URLSearchParams(window.location.search);
@@ -1096,6 +1176,36 @@
             
             // Set up 3D canvas for bone reconstruction
             setupBone3DCanvas();
+        }
+
+        // Auto-hide UI
+        let uiHideTimer = null;
+        let uiManuallyHidden = false;
+        function setupUIAutoHide() {
+            const container = document.querySelector('.viewer-container');
+            const resetTimer = () => {
+                if (uiManuallyHidden) return;
+                container.classList.remove('ui-hidden');
+                if (uiHideTimer) clearTimeout(uiHideTimer);
+                uiHideTimer = setTimeout(() => {
+                    container.classList.add('ui-hidden');
+                }, 2000);
+            };
+            ['mousemove','mousedown','wheel','keydown','touchstart','touchmove'].forEach(ev => {
+                window.addEventListener(ev, resetTimer, { passive: true });
+            });
+            resetTimer();
+        }
+
+        function toggleUI() {
+            const container = document.querySelector('.viewer-container');
+            if (container.classList.contains('ui-hidden')) {
+                container.classList.remove('ui-hidden');
+                uiManuallyHidden = false;
+            } else {
+                container.classList.add('ui-hidden');
+                uiManuallyHidden = true;
+            }
         }
 
         function setupBone3DCanvas() {
@@ -1278,10 +1388,12 @@
                 const response = await fetch(`/dicom-viewer/api/study/${studyId}/data/`);
                 const data = await response.json();
                 
-                if (data.success) {
+                if (data && data.study && Array.isArray(data.series)) {
                     currentStudy = data.study;
                     displaySeriesList(data.series);
                     updatePatientInfo(currentStudy);
+                    // Load related references automatically based on study context
+                    try { fetchReferences(); } catch (e) {}
                     
                     // Auto-load first series
                     if (data.series.length > 0) {
