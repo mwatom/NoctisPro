@@ -97,7 +97,7 @@ services:
     environment:
       - DEBUG=False
       - SECRET_KEY=${SECRET_KEY}
-      - DJANGO_SETTINGS_MODULE=noctis_pro.settings_production
+      - DJANGO_SETTINGS_MODULE=noctis_pro.settings
       - POSTGRES_DB=${POSTGRES_DB:-noctisprodb}
       - POSTGRES_USER=${POSTGRES_USER:-noctispro}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -157,7 +157,7 @@ services:
     environment:
       - DEBUG=False
       - SECRET_KEY=${SECRET_KEY}
-      - DJANGO_SETTINGS_MODULE=noctis_pro.settings_production
+      - DJANGO_SETTINGS_MODULE=noctis_pro.settings
       - POSTGRES_DB=${POSTGRES_DB:-noctisprodb}
       - POSTGRES_USER=${POSTGRES_USER:-noctispro}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -204,7 +204,7 @@ services:
     environment:
       - DEBUG=False
       - SECRET_KEY=${SECRET_KEY}
-      - DJANGO_SETTINGS_MODULE=noctis_pro.settings_production
+      - DJANGO_SETTINGS_MODULE=noctis_pro.settings
       - POSTGRES_DB=${POSTGRES_DB:-noctisprodb}
       - POSTGRES_USER=${POSTGRES_USER:-noctispro}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -250,7 +250,7 @@ services:
     environment:
       - DEBUG=False
       - SECRET_KEY=${SECRET_KEY}
-      - DJANGO_SETTINGS_MODULE=noctis_pro.settings_production
+      - DJANGO_SETTINGS_MODULE=noctis_pro.settings
       - POSTGRES_DB=${POSTGRES_DB:-noctisprodb}
       - POSTGRES_USER=${POSTGRES_USER:-noctispro}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}

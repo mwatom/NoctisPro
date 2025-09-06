@@ -47,7 +47,7 @@ services:
     environment:
       - DEBUG=${DEBUG:-False}
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
-      - DJANGO_SETTINGS_MODULE=noctis_pro.settings_production
+      - DJANGO_SETTINGS_MODULE=noctis_pro.settings
       - POSTGRES_DB=noctis_pro
       - POSTGRES_USER=noctis_user
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-noctis_secure_password}
@@ -90,7 +90,7 @@ services:
     environment:
       - DEBUG=${DEBUG:-False}
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
-      - DJANGO_SETTINGS_MODULE=noctis_pro.settings_production
+      - DJANGO_SETTINGS_MODULE=noctis_pro.settings
       - POSTGRES_DB=noctis_pro
       - POSTGRES_USER=noctis_user
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-noctis_secure_password}
@@ -120,7 +120,7 @@ services:
     environment:
       - DEBUG=${DEBUG:-False}
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
-      - DJANGO_SETTINGS_MODULE=noctis_pro.settings_production
+      - DJANGO_SETTINGS_MODULE=noctis_pro.settings
       - POSTGRES_DB=noctis_pro
       - POSTGRES_USER=noctis_user
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-noctis_secure_password}

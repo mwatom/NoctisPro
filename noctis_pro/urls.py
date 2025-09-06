@@ -48,11 +48,11 @@ urlpatterns = [
     # Removed duplicate 'viewer/' include to avoid namespace clash; keep alias via redirect if needed
     path('viewer/', RedirectView.as_view(url='/dicom-viewer/', permanent=False, query_string=True)),  # RESTORED
     path('viewer/<path:subpath>/', RedirectView.as_view(url='/dicom-viewer/%(subpath)s/', permanent=False, query_string=True)),  # RESTORED
-    path('reports/', include('reports.urls')),  # RESTORED
-    # path('admin-panel/', include('admin_panel.urls')),  # RESTORED
-    # path('chat/', include('chat.urls')),  # RESTORED
-    # path('notifications/', include('notifications.urls')),  # RESTORED
-    # path('ai/', include('ai_analysis.urls')),  # RESTORED
+    path('reports/', include('reports.urls')),
+    path('admin-panel/', include('admin_panel.urls')),
+    path('chat/', include('chat.urls')),
+    path('notifications/', include('notifications.urls')),
+    path('ai/', include('ai_analysis.urls'))
 ]
 
 # Serve media files during development and production (for ngrok deployment)

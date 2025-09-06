@@ -182,6 +182,42 @@
         position: relative;
         animation: iconGlow 3s ease-in-out infinite alternate;
     }
+
+    .upload-capabilities {
+        display: flex;
+        justify-content: center;
+        gap: 2rem;
+        margin-top: 1.5rem;
+        padding: 1rem;
+        background: rgba(0, 212, 255, 0.05);
+        border-radius: 8px;
+        border: 1px solid rgba(0, 212, 255, 0.2);
+    }
+
+    .capability-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .capability-item i {
+        font-size: 1.1rem;
+    }
+
+    .text-accent {
+        color: var(--accent-color) !important;
+    }
+
+    @media (max-width: 768px) {
+        .upload-capabilities {
+            flex-direction: column;
+            gap: 0.5rem;
+            text-align: center;
+        }
+    }
     
     @keyframes iconGlow {
         0% { 
@@ -742,8 +778,22 @@
                 <div class="upload-icon">
                     <i class="fas fa-cloud-upload-alt"></i>
                 </div>
-                <h2 class="text-light">Upload DICOM Studies</h2>
-                <p class="text-secondary">Upload individual DICOM files or entire folders containing CT/MRI studies with multiple series</p>
+                <h2 class="text-light">📁 Upload DICOM Studies</h2>
+                <p class="text-secondary">Professional medical imaging upload system supporting CT, MRI, X-Ray, and other DICOM modalities</p>
+                <div class="upload-capabilities">
+                    <div class="capability-item">
+                        <i class="fas fa-images text-accent"></i>
+                        <span>Up to 5,000 images</span>
+                    </div>
+                    <div class="capability-item">
+                        <i class="fas fa-hdd text-accent"></i>
+                        <span>5GB total capacity</span>
+                    </div>
+                    <div class="capability-item">
+                        <i class="fas fa-layer-group text-accent"></i>
+                        <span>Multi-series support</span>
+                    </div>
+                </div>
             </div>
 
         <form id="uploadForm" enctype="multipart/form-data">
@@ -783,7 +833,10 @@
                     <i class="fas fa-file-medical" style="font-size: 3.5rem; margin-bottom: 1rem; color: var(--accent-color); text-shadow: 0 0 20px rgba(0, 212, 255, 0.5); animation: floatIcon 3s ease-in-out infinite alternate;"></i>
                 </div>
                 <h4 class="text-light mb-3" style="font-size: 1.4rem; font-weight: 600;">Drop DICOM files or folders here</h4>
-                <p class="text-secondary mb-4" style="font-size: 1.1rem; line-height: 1.6;">Files will be uploaded automatically once selected<br><strong style="color: var(--accent-color);">Supports large CT/MRI studies with multiple series in subfolders</strong></p>
+                <p class="text-secondary mb-3" style="font-size: 1.1rem; line-height: 1.6;">Files will be uploaded automatically once selected<br><strong style="color: var(--accent-color);">Supports large CT/MRI studies with multiple series in subfolders</strong></p>
+                <div style="background: rgba(0, 212, 255, 0.1); padding: 8px 16px; border-radius: 8px; font-size: 12px; color: var(--accent-color); border: 1px solid rgba(0, 212, 255, 0.3); margin-bottom: 1rem; display: inline-block;">
+                    <i class="fas fa-info-circle"></i> <strong>Enhanced Capacity:</strong> Up to 5,000 DICOM images (5GB total)
+                </div>
                 <button type="button" class="btn-control primary" id="chooseFilesBtn">
                     <i class="fas fa-folder-open me-2"></i>
                     Choose Files / Folder
@@ -1005,8 +1058,23 @@ document.addEventListener('DOMContentLoaded', function() {
             return file.size > 132; // don't over-restrict; backend will validate
         });
 
+        // Check file count limit (5000 images max)
+        const maxFiles = 5000;
+        if (dicomFiles.length > maxFiles) {
+            showNotification(`Too many files selected. Maximum allowed: ${maxFiles} DICOM images. You selected ${dicomFiles.length} files.`, 'error');
+            return;
+        }
+
         if (dicomFiles.length === 0) {
             showNotification('Please select DICOM files or folders. Files without .dcm are allowed; they will be validated during upload.', 'error');
+            return;
+        }
+
+        // Check total size limit (5GB max)
+        const totalSize = dicomFiles.reduce((sum, file) => sum + file.size, 0);
+        const maxSize = 5 * 1024 * 1024 * 1024; // 5GB
+        if (totalSize > maxSize) {
+            showNotification(`Total file size too large. Maximum allowed: 5GB. Your files: ${formatFileSize(totalSize)}`, 'error');
             return;
         }
 

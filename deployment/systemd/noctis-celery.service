@@ -9,7 +9,7 @@ Type=simple
 User=noctis
 Group=noctis
 WorkingDirectory=/opt/noctis
-Environment=DJANGO_SETTINGS_MODULE=noctis_pro.settings_production
+Environment=DJANGO_SETTINGS_MODULE=noctis_pro.settings
 EnvironmentFile=/opt/noctis/.env
 ExecStart=/opt/noctis/venv/bin/celery -A noctis_pro worker -l info --concurrency=2
 ExecReload=/bin/kill -s HUP $MAINPID

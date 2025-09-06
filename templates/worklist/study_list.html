@@ -316,9 +316,8 @@
                     <div class="nav-tab" onclick="window.location.href='{% url 'worklist:dashboard' %}'">WORKLIST</div>
                     <div class="nav-tab active" onclick="window.location.href='{% url 'worklist:study_list' %}'">STUDIES</div>
                     <div class="nav-tab" onclick="window.location.href='{% url 'reports:report_list' %}'">REPORTS</div>
-                    {% if user.is_authenticated and user.role == 'admin' %}
-                    <div class="nav-tab" onclick="window.location.href='{% url 'admin_panel:dashboard' %}'">DASHBOARD</div>
-                    <div class="nav-tab" onclick="window.location.href='{% url 'admin_panel:user_management' %}'"><i class="fas fa-user-cog"></i> MANAGE USERS</div>
+                    {% if user.is_authenticated and user.is_admin %}
+                    <div class="nav-tab" onclick="window.location.href='{% url 'admin_panel:dashboard' %}'">ADMIN PANEL</div>
                     {% endif %}
                 </div>
             </div>
@@ -331,7 +330,7 @@
                     <div class="user-avatar">{{ user.get_full_name|default:user.username|slice:":2"|upper }}</div>
                     <div>
                         <div>{{ user.get_full_name|default:user.username }}</div>
-                        <div style="color: var(--text-muted); font-size: 10px;">{% if user.role == 'admin' %}Administrator{% elif user.role == 'radiologist' %}Radiologist{% else %}Facility User{% endif %}</div>
+                        <div style="color: var(--text-muted); font-size: 10px;">{% if user.is_admin %}Administrator{% elif user.is_radiologist %}Radiologist{% else %}Facility User{% endif %}</div>
                     </div>
                 </div>
                 <button type="button" class="btn-control" onclick="window.location.href='{% url 'notifications:notification_list' %}'"   title="Notifications">
@@ -430,9 +429,25 @@
 				</td>
 				<td>
 					<div class="d-flex gap-2">
+						<!-- View Study Detail - All authenticated users -->
 						<a class="btn-control" href="{% url 'worklist:study_detail' s.id %}" title="Open"><i class="fas fa-folder-open"></i></a>
+						
+						<!-- DICOM Viewer - All authenticated users -->
 						<a class="btn-dicom-viewer btn-sm" href="{% url 'dicom_viewer:viewer' %}?study={{ s.id }}" title="View in DICOM Viewer"><i class="fas fa-eye"></i></a>
+						
+						<!-- Report Writing - Only admin and radiologist -->
+						{% if user.is_admin or user.is_radiologist %}
 						<a class="btn-control" href="{% url 'reports:write_report' s.id %}" title="Report"><i class="fas fa-file-medical"></i></a>
+						{% endif %}
+						
+						<!-- Delete Study - Only admin and radiologist -->
+						{% if user.is_admin or user.is_radiologist %}
+						<button type="button" class="btn-control" style="background: var(--danger-color);" 
+								onclick="deleteStudy({{ s.id }}, '{{ s.accession_number|escapejs }}')" 
+								title="Delete Study (Admin/Radiologist Only)">
+							<i class="fas fa-trash"></i>
+						</button>
+						{% endif %}
 					</div>
 				</td>
 			</tr>
@@ -507,6 +522,45 @@
             document.getElementById('applyFilters').addEventListener('click', go);
             document.getElementById('search').addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); go(); }});
         })();
+
+        // Delete study functionality (admin/radiologist only)
+        async function deleteStudy(studyId, accessionNumber) {
+            if (!confirm(`Are you sure you want to delete study ${accessionNumber}?\n\nThis action cannot be undone and will permanently remove all associated data including:\n• DICOM images\n• Series data\n• Reports\n• Measurements\n• Annotations`)) {
+                return;
+            }
+
+            try {
+                // Get CSRF token
+                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                                 document.querySelector('meta[name=csrf-token]')?.getAttribute('content') ||
+                                 '{{ csrf_token }}';
+
+                const response = await fetch(`/worklist/api/study/${studyId}/delete/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin'
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // Show success message
+                    alert(`Study ${accessionNumber} deleted successfully`);
+                    // Reload the page to refresh the study list
+                    location.reload();
+                } else {
+                    // Show error message
+                    alert(`Failed to delete study: ${data.error || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('Error deleting study:', error);
+                alert(`Failed to delete study: ${error.message}`);
+            }
+        }
     </script>
 </body>
 </html>

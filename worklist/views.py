@@ -902,7 +902,11 @@ def view_attachment(request, attachment_id):
     attachment = get_object_or_404(StudyAttachment, id=attachment_id)
     user = request.user
     
-    # All authenticated users can view attachments
+    # Check permissions - facility users can only view attachments from their facility
+    if user.is_facility_user() and getattr(user, 'facility', None):
+        if attachment.study.facility != user.facility:
+            messages.error(request, 'You do not have permission to view this attachment.')
+            return redirect('worklist:study_list')
     
     # Increment access count
     attachment.increment_access_count()
@@ -1003,7 +1007,12 @@ def delete_attachment(request, attachment_id):
     attachment = get_object_or_404(StudyAttachment, id=attachment_id)
     user = request.user
     
-    # All authenticated users can delete attachments
+    # Check permissions - only admin/radiologist or facility users from same facility can delete attachments
+    if user.is_facility_user() and getattr(user, 'facility', None):
+        if attachment.study.facility != user.facility:
+            return JsonResponse({'error': 'Permission denied. You can only delete attachments from your facility.'}, status=403)
+    elif not (user.is_admin() or user.is_radiologist()):
+        return JsonResponse({'error': 'Permission denied. Only administrators, radiologists, or facility users can delete attachments.'}, status=403)
     
     if request.method == 'POST':
         try:
