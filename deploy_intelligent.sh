@@ -863,6 +863,7 @@ requests
 # DICOM processing
 pydicom
 pynetdicom
+numpy
 EOF
 
     # Add optional dependencies based on system resources
@@ -883,7 +884,6 @@ EOF
         cat >> "${req_file}" << EOF
 
 # AI and machine learning (high memory requirement)
-numpy
 scipy
 pandas
 torch
@@ -1283,7 +1283,7 @@ create_monitoring_script() {
 # NoctisPro Optimized Management Script
 
 DEPLOYMENT_MODE="{{DEPLOYMENT_MODE}}"
-PROJECT_DIR="{{PROJECT_DIR}}"
+PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 
 case "$1" in
     start)
