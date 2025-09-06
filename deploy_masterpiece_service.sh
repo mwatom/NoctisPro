@@ -223,7 +223,7 @@ setup_environment_file() {
     local env_content="# NoctisPro Masterpiece - Auto-Generated Environment
 DEBUG=False
 SECRET_KEY=$DETECTED_SECRET_KEY
-DJANGO_SETTINGS_MODULE=noctis_pro.settings_production
+DJANGO_SETTINGS_MODULE=noctis_pro.settings
 ALLOWED_HOSTS=*,$STATIC_URL,localhost,127.0.0.1
 USE_SQLITE=True
 STATIC_ROOT=$WORKSPACE_DIR/staticfiles

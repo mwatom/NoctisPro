@@ -106,10 +106,16 @@
 							{% if a.file_type == 'pdf_document' %}<i class="fas fa-file-pdf"></i>{% elif a.file_type == 'image' %}<i class="fas fa-image"></i>{% elif a.file_type == 'dicom_study' %}<i class="fas fa-cubes"></i>{% else %}<i class="fas fa-paperclip"></i>{% endif %}
 							&nbsp;{{ a.name|truncatechars:30 }}
 						</a>
+						<!-- Delete attachment - only for admin/radiologist or same facility users -->
+						{% if user.is_admin or user.is_radiologist or user.facility == study.facility %}
 						<form method="post" action="{% url 'worklist:delete_attachment' a.id %}" class="d-inline ms-1">
 							{% csrf_token %}
-							<button type="submit" class="btn-mini" title="Delete"><i class="fas fa-trash"></i></button>
+							<button type="submit" class="btn-mini" title="Delete" 
+									onclick="return confirm('Are you sure you want to delete this attachment?')">
+								<i class="fas fa-trash"></i>
+							</button>
 						</form>
+						{% endif %}
 					{% empty %}
 						<span class="small-muted">No attachments yet.</span>
 					{% endfor %}

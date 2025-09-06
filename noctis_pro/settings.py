@@ -27,7 +27,25 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-7x!8k@m$z9h#4p&x3w2v6
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*,noctispro,noctispro2.duckdns.org,*.duckdns.org,localhost,127.0.0.1,0.0.0.0,3.222.223.4,172.30.0.2').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+
+# Add ngrok and deployment specific hosts
+ALLOWED_HOSTS.extend([
+    'localhost',
+    '127.0.0.1',
+    '0.0.0.0',
+    'noctispro',
+    'noctispro2.duckdns.org',
+    '*.duckdns.org',
+    '*.ngrok.io',
+    '*.ngrok-free.app',
+    '*.ngrok.app',
+    '3.222.223.4',
+    '172.30.0.2',
+])
+
+# Remove duplicates and empty strings
+ALLOWED_HOSTS = list(filter(None, list(set(ALLOWED_HOSTS))))
 
 
 # Application definition
@@ -184,31 +202,41 @@ REST_FRAMEWORK = {
     ],
 }
 
-# CORS settings
+# CORS settings for ngrok and deployment
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-    "https://afc14a217e7d.ngrok-free.app",
-    "https://803f15a13d75.ngrok-free.app",
-    "https://colt-charmed-lark.ngrok-free.app",
+    "https://localhost:8000",
+    "https://127.0.0.1:8000",
 ]
+
+# Add ngrok support dynamically
+CORS_ALLOW_ALL_ORIGINS = DEBUG  # Allow all origins in debug mode for development/ngrok
 
 CORS_ALLOW_CREDENTIALS = True
 
-# CSRF trusted origins - Fix for 403 errors
+# CSRF trusted origins - Fix for 403 errors and ngrok support
 CSRF_TRUSTED_ORIGINS = [
     "http://noctispro",
     "https://noctispro", 
-    "https://mallard-shining-curiously.ngrok-free.app",
+    "https://*.ngrok.io",
     "https://*.ngrok-free.app",
+    "https://*.ngrok.app",
+    "http://*.ngrok.io",
+    "http://*.ngrok-free.app", 
+    "http://*.ngrok.app",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
     "http://localhost:80",
     "http://127.0.0.1:80",
     "http://localhost",
     "http://127.0.0.1",
+    "https://localhost:8000",
+    "https://127.0.0.1:8000",
+    "https://*.duckdns.org",
+    "http://*.duckdns.org",
 ]
 
 # Custom user model
@@ -231,7 +259,7 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 3 * 1024 * 1024 * 1024  # 3GB
 # Security settings
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = 'DENY'
+X_FRAME_OPTIONS = 'SAMEORIGIN' if DEBUG else 'DENY'  # Allow embedding for ngrok in debug mode
 
 # Production security enhancements
 if not DEBUG:
