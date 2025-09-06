@@ -26,8 +26,14 @@ from pathlib import Path
 from typing import Optional, Dict, Any, Tuple
 import json
 
+# Resolve project base directory dynamically
+from pathlib import Path
+BASE_DIR = Path(os.environ.get('NOCTIS_PROJECT_DIR', Path(__file__).resolve().parent))
+
 # Add Django project to path
-sys.path.append('/workspace')
+if str(BASE_DIR) not in sys.path:
+    sys.path.append(str(BASE_DIR))
+
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'noctis_pro.settings')
 
 import django
@@ -64,8 +70,10 @@ class DicomReceiverLogger:
             logger.removeHandler(handler)
         
         # File handler with rotation
+        logs_dir = BASE_DIR / 'logs'
+        logs_dir.mkdir(parents=True, exist_ok=True)
         file_handler = RotatingFileHandler(
-            '/workspace/logs/dicom_receiver.log',
+            str(logs_dir / 'dicom_receiver.log'),
             maxBytes=10*1024*1024,  # 10MB
             backupCount=5
         )
