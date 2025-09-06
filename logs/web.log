@@ -1,0 +1,9 @@
+[2025-09-06 22:26:40 +0000] [8899] [INFO] Starting gunicorn 23.0.0
+[2025-09-06 22:26:40 +0000] [8899] [INFO] Listening at: http://0.0.0.0:8000 (8899)
+[2025-09-06 22:26:40 +0000] [8899] [INFO] Using worker: sync
+[2025-09-06 22:26:40 +0000] [8902] [INFO] Booting worker with pid: 8902
+[2025-09-06 22:26:40 +0000] [8903] [INFO] Booting worker with pid: 8903
+[2025-09-06 22:26:40 +0000] [8907] [INFO] Booting worker with pid: 8907
+[2025-09-06 22:26:40 +0000] [8908] [INFO] Booting worker with pid: 8908
+/workspace/ai_analysis/views.py:866: SyntaxWarning: invalid escape sequence '\s'
+  title = re.sub('\s+', ' ', title_raw).strip()
