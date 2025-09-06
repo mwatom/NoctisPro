@@ -2,7 +2,7 @@
 
 # NoctisPro Optimized Management Script
 
-DEPLOYMENT_MODE="native_systemd"
+DEPLOYMENT_MODE="native_simple"
 PROJECT_DIR="/workspace"
 
 case "$1" in

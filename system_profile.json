@@ -1,0 +1,21 @@
+{
+  "profile_id": "os=ubuntu_arch=x86_64_mem=15gb_cpu=4cores",
+  "timestamp": "2025-09-06T13:17:41+00:00",
+  "os": "ubuntu",
+  "os_version": "25.04",
+  "architecture": "x86_64",
+  "memory_gb": 15,
+  "cpu_cores": 4,
+  "storage_gb": 106,
+  "deployment_mode": "native_simple",
+  "capabilities": {
+    "has_docker": false,
+    "has_systemd": false,
+    "has_nginx": false,
+    "has_python3": true,
+    "internet_access": true
+  },
+  "optimal_workers": 8,
+  "use_nginx": false,
+  "use_ssl": false
+}
