@@ -452,20 +452,14 @@ ALTER USER noctis_user CREATEDB;
 \q
 EOF
     
-    print_step "Running Django migrations..."
+    print_step "Setting up clean database with all features..."
     cd "$NOCTIS_DIR/app"
-    sudo -u "$NOCTIS_USER" "$VENV_DIR/bin/python" manage.py makemigrations
-    sudo -u "$NOCTIS_USER" "$VENV_DIR/bin/python" manage.py migrate
     
-    print_step "Collecting static files..."
-    sudo -u "$NOCTIS_USER" "$VENV_DIR/bin/python" manage.py collectstatic --noinput
+    # Make the setup script executable
+    chmod +x setup_clean_database.py
     
-    print_step "Setting up report templates for radiologists..."
-    sudo -u "$NOCTIS_USER" "$VENV_DIR/bin/python" manage.py setup_report_templates
-    
-    print_step "Creating superuser account..."
-    echo "Please create an administrator account for the system:"
-    sudo -u "$NOCTIS_USER" "$VENV_DIR/bin/python" manage.py createsuperuser
+    # Run the comprehensive database setup
+    sudo -u "$NOCTIS_USER" "$VENV_DIR/bin/python" setup_clean_database.py
     
     print_success "Database setup completed"
 }
@@ -705,6 +699,10 @@ EOF
     
     chmod +x "$NOCTIS_DIR/status.sh"
     chown "$NOCTIS_USER:$NOCTIS_USER" "$NOCTIS_DIR/status.sh"
+    
+    print_step "Running system functionality tests..."
+    cd "$NOCTIS_DIR/app"
+    sudo -u "$NOCTIS_USER" "$VENV_DIR/bin/python" test_system_functionality.py
     
     print_success "Final configuration completed"
 }
