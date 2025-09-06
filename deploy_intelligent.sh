@@ -1283,7 +1283,7 @@ create_monitoring_script() {
 # NoctisPro Optimized Management Script
 
 DEPLOYMENT_MODE="{{DEPLOYMENT_MODE}}"
-PROJECT_DIR="{{PROJECT_DIR}}"
+PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 
 case "$1" in
     start)
