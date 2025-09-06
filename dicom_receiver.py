@@ -268,12 +268,12 @@ class DicomReceiver:
             'last_received': None
         }
         
-        # Storage directory
-        self.storage_dir = Path('/workspace/media/dicom/received')
+        # Storage directory rooted at project base directory
+        self.storage_dir = BASE_DIR / 'media' / 'dicom' / 'received'
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         
-        # Thumbnail directory
-        self.thumbnail_dir = Path('/workspace/media/dicom/thumbnails')
+        # Thumbnail directory rooted at project base directory
+        self.thumbnail_dir = BASE_DIR / 'media' / 'dicom' / 'thumbnails'
         self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
         
         # Setup logging
@@ -616,7 +616,7 @@ class DicomReceiver:
         """Create DICOM image database record"""
         try:
             # Create relative path for database storage
-            relative_path = str(file_path.relative_to(Path('/workspace/media')))
+            relative_path = str(file_path.relative_to(BASE_DIR / 'media'))
             file_size = file_path.stat().st_size
             
             # Create DICOM image record
@@ -796,8 +796,8 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
-    # Create logs directory
-    os.makedirs('/workspace/logs', exist_ok=True)
+    # Ensure logs directory exists under project base directory
+    (BASE_DIR / 'logs').mkdir(parents=True, exist_ok=True)
     
     # Create receiver instance
     receiver = DicomReceiver(port=args.port, aet=args.aet, max_pdu_size=args.max_pdu)
