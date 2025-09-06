@@ -182,6 +182,42 @@
         position: relative;
         animation: iconGlow 3s ease-in-out infinite alternate;
     }
+
+    .upload-capabilities {
+        display: flex;
+        justify-content: center;
+        gap: 2rem;
+        margin-top: 1.5rem;
+        padding: 1rem;
+        background: rgba(0, 212, 255, 0.05);
+        border-radius: 8px;
+        border: 1px solid rgba(0, 212, 255, 0.2);
+    }
+
+    .capability-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .capability-item i {
+        font-size: 1.1rem;
+    }
+
+    .text-accent {
+        color: var(--accent-color) !important;
+    }
+
+    @media (max-width: 768px) {
+        .upload-capabilities {
+            flex-direction: column;
+            gap: 0.5rem;
+            text-align: center;
+        }
+    }
     
     @keyframes iconGlow {
         0% { 
@@ -742,8 +778,22 @@
                 <div class="upload-icon">
                     <i class="fas fa-cloud-upload-alt"></i>
                 </div>
-                <h2 class="text-light">Upload DICOM Studies</h2>
-                <p class="text-secondary">Upload individual DICOM files or entire folders containing CT/MRI studies with multiple series</p>
+                <h2 class="text-light">📁 Upload DICOM Studies</h2>
+                <p class="text-secondary">Professional medical imaging upload system supporting CT, MRI, X-Ray, and other DICOM modalities</p>
+                <div class="upload-capabilities">
+                    <div class="capability-item">
+                        <i class="fas fa-images text-accent"></i>
+                        <span>Up to 5,000 images</span>
+                    </div>
+                    <div class="capability-item">
+                        <i class="fas fa-hdd text-accent"></i>
+                        <span>5GB total capacity</span>
+                    </div>
+                    <div class="capability-item">
+                        <i class="fas fa-layer-group text-accent"></i>
+                        <span>Multi-series support</span>
+                    </div>
+                </div>
             </div>
 
         <form id="uploadForm" enctype="multipart/form-data">
