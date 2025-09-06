@@ -1,55 +1,13 @@
-2025-09-06 13:33:30,857 - dicom_receiver - INFO - [__init__:277] - DICOM Receiver initialized - AET: NOCTIS_SCP, Port: 11112, Max PDU: 16384
-2025-09-06 13:33:30,857 - dicom_receiver - INFO - [start:713] - Starting DICOM receiver on port 11112
-2025-09-06 13:33:30,863 - dicom_receiver - INFO - [setup_ae:304] - Application Entity configured successfully
-2025-09-06 13:33:30,863 - dicom_receiver - INFO - [start:721] - ============================================================
-2025-09-06 13:33:30,863 - dicom_receiver - INFO - [start:722] - NOCTIS PRO DICOM RECEIVER SERVICE
-2025-09-06 13:33:30,863 - dicom_receiver - INFO - [start:723] - ============================================================
-2025-09-06 13:33:30,863 - dicom_receiver - INFO - [start:724] - Application Entity Title: NOCTIS_SCP
-2025-09-06 13:33:30,863 - dicom_receiver - INFO - [start:725] - Listening on port: 11112
-2025-09-06 13:33:30,863 - dicom_receiver - INFO - [start:726] - Maximum PDU size: 16384
-2025-09-06 13:33:30,863 - dicom_receiver - INFO - [start:727] - Storage directory: /workspace/media/dicom/received
-2025-09-06 13:33:30,863 - dicom_receiver - INFO - [start:728] - Waiting for DICOM connections...
-2025-09-06 13:33:30,863 - dicom_receiver - INFO - [start:729] - ============================================================
-2025-09-06 13:33:30,864 - dicom_receiver - ERROR - [start:737] - Error starting DICOM receiver: [Errno 98] Address already in use
-2025-09-06 13:33:30,865 - dicom_receiver - ERROR - [start:738] - Traceback: Traceback (most recent call last):
-  File "/workspace/dicom_receiver.py", line 732, in start
-    self.ae.start_server(('', self.port), block=True)
-    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/workspace/venv_optimized/lib/python3.13/site-packages/pynetdicom/ae.py", line 1431, in start_server
-    server = self.make_server(
-        address,
-    ...<3 lines>...
-        evt_handlers=evt_handlers,
-    )
-  File "/workspace/venv_optimized/lib/python3.13/site-packages/pynetdicom/ae.py", line 879, in make_server
-    return server_class(  # type: ignore
-        self,
-    ...<5 lines>...
-        **kwargs,
-    )
-  File "/workspace/venv_optimized/lib/python3.13/site-packages/pynetdicom/transport.py", line 860, in __init__
-    super().__init__(address, request_handler, bind_and_activate=True)
-    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.13/socketserver.py", line 457, in __init__
-    self.server_bind()
-    ~~~~~~~~~~~~~~~~^^
-  File "/workspace/venv_optimized/lib/python3.13/site-packages/pynetdicom/transport.py", line 1007, in server_bind
-    self.socket.bind(self.server_address)
-    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
-OSError: [Errno 98] Address already in use
-
-2025-09-06 13:33:30,865 - dicom_receiver - INFO - [start:741] - DICOM receiver service stopped
-2025-09-06 13:33:30,865 - dicom_receiver - INFO - [start:745] - Final Statistics:
-2025-09-06 13:33:30,865 - dicom_receiver - INFO - [start:746] -   Total received: 0
-2025-09-06 13:33:30,865 - dicom_receiver - INFO - [start:747] -   Total stored: 0
-2025-09-06 13:33:30,865 - dicom_receiver - INFO - [start:748] -   Total errors: 0
-2025-09-06 13:33:30,865 - dicom_receiver - INFO - [start:749] -   Success rate: 0.0%
-2025-09-06 13:33:30,865 - dicom_receiver - INFO - [start:751] -   Runtime: 0 seconds
-2025-09-06 13:33:30,865 - dicom_receiver - INFO - [stop:755] - Stopping DICOM receiver...
-🚀 Noctis Pro PACS Settings Loaded:
-   • Debug Mode: True
-   • Ngrok Mode: False
-   • Ngrok URL: Not set
-   • Allowed Hosts: 12 configured
-   • Database: sqlite3
-   • Security: Development profile
+nohup: ignoring input
+2025-09-06 13:42:10,235 - dicom_receiver - INFO - [__init__:277] - DICOM Receiver initialized - AET: NOCTIS_SCP, Port: 11112, Max PDU: 16384
+2025-09-06 13:42:10,236 - dicom_receiver - INFO - [start:713] - Starting DICOM receiver on port 11112
+2025-09-06 13:42:10,242 - dicom_receiver - INFO - [setup_ae:304] - Application Entity configured successfully
+2025-09-06 13:42:10,243 - dicom_receiver - INFO - [start:721] - ============================================================
+2025-09-06 13:42:10,243 - dicom_receiver - INFO - [start:722] - NOCTIS PRO DICOM RECEIVER SERVICE
+2025-09-06 13:42:10,243 - dicom_receiver - INFO - [start:723] - ============================================================
+2025-09-06 13:42:10,243 - dicom_receiver - INFO - [start:724] - Application Entity Title: NOCTIS_SCP
+2025-09-06 13:42:10,243 - dicom_receiver - INFO - [start:725] - Listening on port: 11112
+2025-09-06 13:42:10,243 - dicom_receiver - INFO - [start:726] - Maximum PDU size: 16384
+2025-09-06 13:42:10,243 - dicom_receiver - INFO - [start:727] - Storage directory: /workspace/media/dicom/received
+2025-09-06 13:42:10,243 - dicom_receiver - INFO - [start:728] - Waiting for DICOM connections...
+2025-09-06 13:42:10,243 - dicom_receiver - INFO - [start:729] - ============================================================

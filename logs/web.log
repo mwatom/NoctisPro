@@ -1,9 +1,0 @@
-[INFO] 2025-09-06 13:33:30,421 Watching for file changes with StatReloader
-Error: That port is already in use.
-🚀 Noctis Pro PACS Settings Loaded:
-   • Debug Mode: True
-   • Ngrok Mode: False
-   • Ngrok URL: Not set
-   • Allowed Hosts: 12 configured
-   • Database: sqlite3
-   • Security: Development profile
