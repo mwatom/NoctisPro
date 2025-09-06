@@ -44,6 +44,8 @@ ALLOWED_HOSTS.extend([
     '*.ngrok.io',
     '*.ngrok-free.app',
     '*.ngrok.app',
+    '*.loca.lt',
+    'khaki-pigs-press.loca.lt',
     '3.222.223.4',
     '172.30.0.2',
 ])
