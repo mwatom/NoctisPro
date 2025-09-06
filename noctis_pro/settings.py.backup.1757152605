@@ -408,36 +408,3 @@ print(f"   • Ngrok URL: {NGROK_URL or 'Not set'}")
 print(f"   • Allowed Hosts: {len(ALLOWED_HOSTS)} configured")
 print(f"   • Database: {DATABASES['default']['ENGINE'].split('.')[-1]}")
 print(f"   • Security: {'Development' if DEBUG else 'Production'} profile")
-
-
-# Masterpiece Auto-Deploy Optimizations
-ALLOWED_HOSTS = ['mallard-shining-curiously.ngrok-free.app', 'localhost', '127.0.0.1', '0.0.0.0']
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_SSL_REDIRECT = False  # ngrok handles SSL
-
-# CSRF trusted origins for ngrok
-CSRF_TRUSTED_ORIGINS = [
-    'https://mallard-shining-curiously.ngrok-free.app',
-    'http://localhost:8000',
-    'http://127.0.0.1:8000'
-]
-
-# Session security for ngrok
-SESSION_COOKIE_SECURE = False  # ngrok handles SSL
-CSRF_COOKIE_SECURE = False     # ngrok handles SSL
-
-# Static files optimization
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-
-# DICOM viewer masterpiece settings
-DICOM_VIEWER_SETTINGS = {
-    'MAX_UPLOAD_SIZE': 100 * 1024 * 1024,  # 100MB
-    'SUPPORTED_MODALITIES': ['CT', 'MR', 'CR', 'DX', 'US', 'XA'],
-    'CACHE_TIMEOUT': 3600,
-    'ENABLE_3D_RECONSTRUCTION': True,
-    'ENABLE_MEASUREMENTS': True,
-    'ENABLE_ANNOTATIONS': True,
-    'ENABLE_AI_ANALYSIS': True,
-    'ENABLE_QR_CODES': True,
-    'ENABLE_LETTERHEADS': True,
-}
