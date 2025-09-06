@@ -1,0 +1,3 @@
+[INFO] 2025-09-06 09:23:23,804 django.utils.autoreload autoreload 3115 139860851441920 Watching for file changes with StatReloader
+[INFO] 2025-09-06 09:23:33,470 django.server basehttp 3115 139860258059968 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-06 09:23:47,461 django.server basehttp 3115 139860258059968 "GET / HTTP/1.1" 302 0
