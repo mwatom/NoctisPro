@@ -11,3 +11,5 @@
 [INFO] 2025-09-06 09:59:44,926 django.utils.autoreload autoreload 4243 140611506462976 Watching for file changes with StatReloader
 [INFO] 2025-09-06 09:59:52,204 django.server basehttp 4243 140610824566464 "GET / HTTP/1.1" 302 0
 [INFO] 2025-09-06 10:00:08,184 django.server basehttp 4243 140610824566464 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-06 10:14:33,636 django.utils.autoreload autoreload 4453 140241094734080 Watching for file changes with StatReloader
+[INFO] 2025-09-06 10:15:55,860 django.server basehttp 4453 140240522106560 "HEAD / HTTP/1.1" 302 0
