@@ -42,7 +42,11 @@ declare -g INTERNET_ACCESS=false
 # Configuration
 # Only declare PROJECT_DIR if not already set (to avoid readonly conflicts)
 if [[ -z "${PROJECT_DIR:-}" ]]; then
-    readonly PROJECT_DIR="/workspace"
+    if [[ -d "/workspace" ]]; then
+        readonly PROJECT_DIR="/workspace"
+    else
+        readonly PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    fi
 fi
 # Only declare SCRIPT_DIR if not already set (to avoid readonly conflicts)
 if [[ -z "${SCRIPT_DIR:-}" ]]; then
@@ -173,8 +177,16 @@ detect_system_resources() {
         AVAILABLE_CPU_CORES=1
     fi
     
-    # Detect available storage in GB
-    local storage_kb=$(df "${PROJECT_DIR}" | tail -1 | awk '{print $4}')
+    # Detect available storage in GB (robust fallback if path is unavailable)
+    local storage_kb=""
+    storage_kb=$(df -P "${PROJECT_DIR}" 2>/dev/null | tail -1 | awk '{print $4}') || true
+    if [[ -z "${storage_kb}" ]]; then
+        storage_kb=$(df -P . | tail -1 | awk '{print $4}')
+    fi
+    if [[ -z "${storage_kb}" ]]; then
+        storage_kb=$(df -P / | tail -1 | awk '{print $4}')
+    fi
+    storage_kb=${storage_kb:-0}
     AVAILABLE_STORAGE_GB=$((storage_kb / 1024 / 1024))
     
     info "System Resources:"

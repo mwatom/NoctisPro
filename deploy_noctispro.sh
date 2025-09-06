@@ -21,7 +21,12 @@ NC='\033[0m' # No Color
 NGROK_AUTH_TOKEN="32E2HmoUqzrZxaYRNT77wAI0HQs_5N5QNSrxU4Z7d4MFSRF4x"
 NGROK_STATIC_URL="mallard-shining-curiously.ngrok-free.app"
 DJANGO_PORT=8000
-PROJECT_DIR="/workspace"
+# Determine project directory dynamically with fallback to /workspace
+if [[ -d "/workspace" ]]; then
+    PROJECT_DIR="/workspace"
+else
+    PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
 VENV_DIR="$PROJECT_DIR/venv"
 
 # Logging function

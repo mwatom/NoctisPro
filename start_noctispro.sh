@@ -3,7 +3,9 @@
 # NoctisPro PACS - Simple Startup Script
 # This script starts the NoctisPro PACS system in the background
 
-cd /workspace
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="${PROJECT_DIR:-$SCRIPT_DIR}"
+cd "$PROJECT_DIR"
 
 echo "🚀 Starting NoctisPro PACS..."
 echo "================================"

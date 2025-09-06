@@ -3,7 +3,9 @@
 # NoctisPro PACS - Simple Stop Script
 # This script stops all NoctisPro PACS services
 
-cd /workspace
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="${PROJECT_DIR:-$SCRIPT_DIR}"
+cd "$PROJECT_DIR"
 
 echo "🛑 Stopping NoctisPro PACS..."
 echo "==============================="

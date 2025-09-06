@@ -112,7 +112,15 @@ test_system_detection() {
     # Extract system detection functions from main script
     cat > "${temp_script}" << 'EOF'
 #!/bin/bash
-source /workspace/deploy_intelligent.sh
+# Source deploy script relative to repository root if /workspace is unavailable
+if [[ -f "$(dirname "$0")/deploy_intelligent.sh" ]]; then
+  source "$(dirname "$0")/deploy_intelligent.sh"
+elif [[ -f "/workspace/deploy_intelligent.sh" ]]; then
+  source "/workspace/deploy_intelligent.sh"
+else
+  echo "deploy_intelligent.sh not found" >&2
+  exit 1
+fi
 
 # Test system detection functions
 detect_operating_system

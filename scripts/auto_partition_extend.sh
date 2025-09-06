@@ -226,6 +226,10 @@ create_service() {
     local service_file="/etc/systemd/system/${SCRIPT_NAME}.service"
     local timer_file="/etc/systemd/system/${SCRIPT_NAME}.timer"
     
+    # Resolve script path dynamically
+    local script_path
+    script_path="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+
     # Create service file
     cat > "$service_file" << EOF
 [Unit]
@@ -234,7 +238,7 @@ After=multi-user.target
 
 [Service]
 Type=oneshot
-ExecStart=/workspace/scripts/auto_partition_extend.sh --monitor
+ExecStart=${script_path} --monitor
 User=root
 StandardOutput=journal
 StandardError=journal

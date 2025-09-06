@@ -5,9 +5,10 @@ Requires=noctis-pro.service
 
 [Service]
 Type=simple
-WorkingDirectory=/workspace
+Environment=APP_DIR=/opt/noctispro
+WorkingDirectory=%E{APP_DIR}
 Environment=DJANGO_SETTINGS_MODULE=noctis_pro.settings
-ExecStart=/workspace/venv/bin/celery -A noctis_pro worker -l info
+ExecStart=%E{APP_DIR}/venv/bin/celery -A noctis_pro worker -l info
 Restart=always
 RestartSec=5
 
