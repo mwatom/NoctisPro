@@ -17,6 +17,7 @@ if [[ -z "${RED:-}" ]]; then
     readonly BLUE='\033[0;34m'
     readonly PURPLE='\033[0;35m'
     readonly CYAN='\033[0;36m'
+    readonly BOLD='\033[1m'
     readonly NC='\033[0m' # No Color
 fi
 
@@ -39,9 +40,18 @@ declare -g USE_SSL=false
 declare -g INTERNET_ACCESS=false
 
 # Configuration
-readonly PROJECT_DIR="/workspace"
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly LOG_FILE="/tmp/noctis_deploy_$(date +%Y%m%d_%H%M%S).log"
+# Only declare PROJECT_DIR if not already set (to avoid readonly conflicts)
+if [[ -z "${PROJECT_DIR:-}" ]]; then
+    readonly PROJECT_DIR="/workspace"
+fi
+# Only declare SCRIPT_DIR if not already set (to avoid readonly conflicts)
+if [[ -z "${SCRIPT_DIR:-}" ]]; then
+    readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
+# Only declare LOG_FILE if not already set (to avoid readonly conflicts)
+if [[ -z "${LOG_FILE:-}" ]]; then
+    readonly LOG_FILE="/tmp/noctis_deploy_$(date +%Y%m%d_%H%M%S).log"
+fi
 
 # =============================================================================
 # LOGGING FUNCTIONS
@@ -198,14 +208,27 @@ detect_installed_software() {
         local docker_version=$(docker --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
         info "Docker detected: ${docker_version}"
     else
-        info "Docker not available"
+        # Check if Docker is installed but daemon not running
+        if command -v docker >/dev/null 2>&1; then
+            warn "Docker installed but daemon not running (container environment)"
+        else
+            info "Docker not available"
+        fi
+        HAS_DOCKER=false
     fi
     
     # Check for systemd
     if command -v systemctl >/dev/null 2>&1 && systemctl --version >/dev/null 2>&1; then
-        HAS_SYSTEMD=true
-        info "Systemd detected"
+        # Check if systemd is actually running as init system
+        if [[ -d /run/systemd/system ]]; then
+            HAS_SYSTEMD=true
+            info "Systemd detected and running"
+        else
+            HAS_SYSTEMD=false
+            warn "Systemd installed but not running as init system (container environment)"
+        fi
     else
+        HAS_SYSTEMD=false
         info "Systemd not available"
     fi
     
@@ -324,6 +347,27 @@ install_debian_dependencies() {
         else
             packages+=("python3" "python3-venv" "python3-dev" "python3-pip")
         fi
+    else
+        # Even if Python is detected, we might need the venv package
+        # Check Python version and add appropriate venv package
+        local python_version=$(python3 --version 2>&1 | grep -oE '[0-9]+\.[0-9]+')
+        case "${python_version}" in
+            "3.13")
+                packages+=("python3.13-venv")
+                ;;
+            "3.12")
+                packages+=("python3.12-venv")
+                ;;
+            "3.11")
+                packages+=("python3.11-venv")
+                ;;
+            "3.10")
+                packages+=("python3.10-venv")
+                ;;
+            *)
+                packages+=("python3-venv")
+                ;;
+        esac
     fi
     
     # Add Docker if not detected and system has enough resources
@@ -347,10 +391,22 @@ install_debian_dependencies() {
     # Configure Docker if just installed
     if [[ "${HAS_DOCKER}" == false ]] && [[ ${AVAILABLE_MEMORY_GB} -ge 2 ]]; then
         sudo usermod -aG docker "${USER}"
-        sudo systemctl enable docker
-        sudo systemctl start docker
-        HAS_DOCKER=true
-        warn "Docker installed. You may need to log out and back in for group changes to take effect."
+        # Only try to start Docker service if systemd is running
+        if [[ -d /run/systemd/system ]]; then
+            sudo systemctl enable docker
+            sudo systemctl start docker
+            # Re-check if Docker is now working
+            if docker info >/dev/null 2>&1; then
+                HAS_DOCKER=true
+                info "Docker service started successfully"
+            else
+                warn "Docker installed but service failed to start"
+            fi
+        else
+            warn "Docker installed but cannot start service (no systemd init)"
+            warn "Docker daemon needs to be started manually or by container runtime"
+        fi
+        warn "You may need to log out and back in for group changes to take effect."
     fi
 }
 
@@ -387,9 +443,20 @@ install_rhel_dependencies() {
     # Configure Docker if just installed
     if [[ "${HAS_DOCKER}" == false ]] && [[ ${AVAILABLE_MEMORY_GB} -ge 2 ]]; then
         sudo usermod -aG docker "${USER}"
-        sudo systemctl enable docker
-        sudo systemctl start docker
-        HAS_DOCKER=true
+        # Only try to start Docker service if systemd is running
+        if [[ -d /run/systemd/system ]]; then
+            sudo systemctl enable docker
+            sudo systemctl start docker
+            # Re-check if Docker is now working
+            if docker info >/dev/null 2>&1; then
+                HAS_DOCKER=true
+                info "Docker service started successfully"
+            else
+                warn "Docker installed but service failed to start"
+            fi
+        else
+            warn "Docker installed but cannot start service (no systemd init)"
+        fi
     fi
 }
 
@@ -414,9 +481,20 @@ install_fedora_dependencies() {
     # Configure Docker if just installed
     if [[ "${HAS_DOCKER}" == false ]] && [[ ${AVAILABLE_MEMORY_GB} -ge 2 ]]; then
         sudo usermod -aG docker "${USER}"
-        sudo systemctl enable docker
-        sudo systemctl start docker
-        HAS_DOCKER=true
+        # Only try to start Docker service if systemd is running
+        if [[ -d /run/systemd/system ]]; then
+            sudo systemctl enable docker
+            sudo systemctl start docker
+            # Re-check if Docker is now working
+            if docker info >/dev/null 2>&1; then
+                HAS_DOCKER=true
+                info "Docker service started successfully"
+            else
+                warn "Docker installed but service failed to start"
+            fi
+        else
+            warn "Docker installed but cannot start service (no systemd init)"
+        fi
     fi
 }
 
@@ -768,6 +846,7 @@ django-redis
 # API
 djangorestframework
 django-cors-headers
+requests
 
 # DICOM processing
 pydicom
@@ -996,6 +1075,80 @@ EOF
     success "Systemd services created"
 }
 
+create_simple_services() {
+    log "Creating simple service management scripts..."
+    
+    # Create logs directory
+    mkdir -p "${PROJECT_DIR}/logs"
+    
+    # Create simple start script
+    cat > "${PROJECT_DIR}/start_services.sh" << EOF
+#!/bin/bash
+# Simple service starter for NoctisPro PACS
+
+cd "${PROJECT_DIR}"
+source venv_optimized/bin/activate
+
+echo "Starting NoctisPro PACS services..."
+
+# Start web service
+nohup gunicorn --bind 0.0.0.0:8000 --workers ${OPTIMAL_WORKERS} --timeout 120 noctis_pro.wsgi:application > logs/web.log 2>&1 &
+echo \$! > logs/web.pid
+echo "Web service started (PID: \$(cat logs/web.pid))"
+
+# Start DICOM receiver
+nohup python dicom_receiver.py --port 11112 --aet NOCTIS_SCP > logs/dicom.log 2>&1 &
+echo \$! > logs/dicom.pid
+echo "DICOM receiver started (PID: \$(cat logs/dicom.pid))"
+
+echo "All services started successfully"
+echo "Web interface: http://localhost:8000"
+echo "DICOM port: localhost:11112"
+EOF
+    
+    # Create simple stop script
+    cat > "${PROJECT_DIR}/stop_services.sh" << EOF
+#!/bin/bash
+# Simple service stopper for NoctisPro PACS
+
+cd "${PROJECT_DIR}"
+
+echo "Stopping NoctisPro PACS services..."
+
+# Stop web service
+if [[ -f logs/web.pid ]]; then
+    PID=\$(cat logs/web.pid)
+    if kill -0 "\$PID" 2>/dev/null; then
+        kill "\$PID"
+        echo "Web service stopped (PID: \$PID)"
+    else
+        echo "Web service was not running"
+    fi
+    rm -f logs/web.pid
+fi
+
+# Stop DICOM receiver
+if [[ -f logs/dicom.pid ]]; then
+    PID=\$(cat logs/dicom.pid)
+    if kill -0 "\$PID" 2>/dev/null; then
+        kill "\$PID"
+        echo "DICOM receiver stopped (PID: \$PID)"
+    else
+        echo "DICOM receiver was not running"
+    fi
+    rm -f logs/dicom.pid
+fi
+
+echo "All services stopped"
+EOF
+    
+    # Make scripts executable
+    chmod +x "${PROJECT_DIR}/start_services.sh"
+    chmod +x "${PROJECT_DIR}/stop_services.sh"
+    
+    success "Simple service management scripts created"
+}
+
 start_native_services() {
     log "Starting native services..."
     
@@ -1029,21 +1182,48 @@ perform_health_checks() {
     
     local health_status=true
     
-    # Check web service
-    if curl -f -s "http://localhost:8000/" >/dev/null 2>&1; then
-        success "✅ Web service is healthy"
-    else
-        error "❌ Web service is not responding"
-        health_status=false
-    fi
+    # Wait for services to fully start
+    log "Waiting for services to initialize..."
+    sleep 10
     
-    # Check DICOM port
-    if timeout 5 bash -c "</dev/tcp/localhost/11112" >/dev/null 2>&1; then
-        success "✅ DICOM port is accessible"
-    else
-        error "❌ DICOM port is not accessible"
-        health_status=false
-    fi
+    # Check web service with retries
+    log "Testing web service..."
+    local web_attempts=0
+    local max_attempts=6
+    while [[ $web_attempts -lt $max_attempts ]]; do
+        if curl -f -s --max-time 10 "http://localhost:8000/" >/dev/null 2>&1; then
+            success "✅ Web service is healthy"
+            break
+        else
+            ((web_attempts++))
+            if [[ $web_attempts -eq $max_attempts ]]; then
+                error "❌ Web service is not responding after $max_attempts attempts"
+                health_status=false
+            else
+                log "Web service not ready yet, attempt $web_attempts/$max_attempts..."
+                sleep 5
+            fi
+        fi
+    done
+    
+    # Check DICOM port with retries
+    log "Testing DICOM port..."
+    local dicom_attempts=0
+    while [[ $dicom_attempts -lt $max_attempts ]]; do
+        if timeout 5 bash -c "</dev/tcp/localhost/11112" >/dev/null 2>&1; then
+            success "✅ DICOM port is accessible"
+            break
+        else
+            ((dicom_attempts++))
+            if [[ $dicom_attempts -eq $max_attempts ]]; then
+                error "❌ DICOM port is not accessible after $max_attempts attempts"
+                health_status=false
+            else
+                log "DICOM port not ready yet, attempt $dicom_attempts/$max_attempts..."
+                sleep 5
+            fi
+        fi
+    done
     
     # Check database (Docker or native)
     if [[ "${DEPLOYMENT_MODE}" == "docker_"* ]]; then

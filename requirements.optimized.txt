@@ -19,6 +19,7 @@ django-redis
 # API
 djangorestframework
 django-cors-headers
+requests
 
 # DICOM processing
 pydicom
