@@ -863,6 +863,7 @@ requests
 # DICOM processing
 pydicom
 pynetdicom
+numpy
 EOF
 
     # Add optional dependencies based on system resources
@@ -883,7 +884,6 @@ EOF
         cat >> "${req_file}" << EOF
 
 # AI and machine learning (high memory requirement)
-numpy
 scipy
 pandas
 torch
