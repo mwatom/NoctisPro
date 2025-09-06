@@ -9,24 +9,26 @@
 # Description:       Starts NoctisPro Masterpiece Django application with all features
 ### END INIT INFO
 
-# Change to the workspace directory
-cd /workspace
+# Change to the project directory dynamically
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="${PROJECT_DIR:-$SCRIPT_DIR}"
+cd "$PROJECT_DIR"
 
 case "$1" in
     start)
         echo "Starting NoctisPro Masterpiece service..."
-        /workspace/deploy_masterpiece_bulletproof.sh start
+        "$PROJECT_DIR"/deploy_masterpiece_bulletproof.sh start
         ;;
     stop)
         echo "Stopping NoctisPro Masterpiece service..."
-        /workspace/deploy_masterpiece_bulletproof.sh stop
+        "$PROJECT_DIR"/deploy_masterpiece_bulletproof.sh stop
         ;;
     restart)
         echo "Restarting NoctisPro Masterpiece service..."
-        /workspace/deploy_masterpiece_bulletproof.sh restart
+        "$PROJECT_DIR"/deploy_masterpiece_bulletproof.sh restart
         ;;
     status)
-        /workspace/deploy_masterpiece_bulletproof.sh status
+        "$PROJECT_DIR"/deploy_masterpiece_bulletproof.sh status
         ;;
     *)
         echo "Usage: $0 {start|stop|restart|status}"

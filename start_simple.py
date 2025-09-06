@@ -41,8 +41,10 @@ def start_server():
     print("  Facility: test_facility / TestPass123!")
     print("=" * 60)
     
-    # Start the server
-    os.system('cd /workspace && python3 manage.py runserver 0.0.0.0:8000')
+    # Start the server from this script's directory if /workspace doesn't exist
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_dir = '/workspace' if os.path.isdir('/workspace') else script_dir
+    os.system(f'cd {project_dir} && python3 manage.py runserver 0.0.0.0:8000')
 
 if __name__ == '__main__':
     try:
