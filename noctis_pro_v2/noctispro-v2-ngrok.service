@@ -1,0 +1,21 @@
+[Unit]
+Description=NoctisPro V2 Ngrok Tunnel
+After=network.target noctispro-v2.service
+Wants=network.target
+Requires=noctispro-v2.service
+
+[Service]
+Type=exec
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/workspace
+ExecStartPre=/bin/sleep 10
+ExecStart=/workspace/ngrok http 8000 --hostname=colt-charmed-lark.ngrok-free.app --log=stdout
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=noctispro-v2-ngrok
+
+[Install]
+WantedBy=multi-user.target

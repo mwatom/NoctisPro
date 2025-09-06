@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoctisPro V2 - DICOM Viewer</title>
+    <style>
+        :root {
+            --primary-bg: #0a0a0a;
+            --secondary-bg: #1a1a1a;
+            --card-bg: #252525;
+            --header-bg: #333333;
+            --border-color: #404040;
+            --accent-color: #00d4ff;
+            --text-primary: #ffffff;
+            --text-secondary: #b3b3b3;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--primary-bg);
+            color: var(--text-primary);
+            font-size: 12px;
+            overflow: hidden;
+        }
+
+        .viewer-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .viewer-header {
+            background: var(--header-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 50px;
+        }
+
+        .viewer-title {
+            color: var(--accent-color);
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .viewer-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-viewer {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 6px 12px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-viewer:hover {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+        }
+
+        .viewer-main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .series-panel {
+            width: 250px;
+            background: var(--secondary-bg);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .series-item {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            margin-bottom: 5px;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: all 0.2s ease;
+        }
+
+        .series-item:hover {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+        }
+
+        .series-item.active {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+        }
+
+        .series-title {
+            font-weight: bold;
+            font-size: 11px;
+        }
+
+        .series-info {
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .image-viewer {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--primary-bg);
+        }
+
+        .image-controls {
+            background: var(--secondary-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 8px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .control-label {
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+
+        .control-input {
+            background: var(--primary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 2px 6px;
+            font-size: 10px;
+            border-radius: 2px;
+            width: 60px;
+        }
+
+        .image-display {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--primary-bg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .image-canvas {
+            max-width: 100%;
+            max-height: 100%;
+            border: 1px solid var(--border-color);
+        }
+
+        .image-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .image-placeholder i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .patient-info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        .study-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 11px;
+            line-height: 1.4;
+            text-align: right;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: var(--text-secondary);
+        }
+
+        .loading i {
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="viewer-container">
+        <div class="viewer-header">
+            <div class="viewer-title">🏥 NoctisPro V2 - Universal DICOM Viewer</div>
+            <div class="viewer-controls">
+                <button class="btn-viewer" onclick="window.close()">Close</button>
+                <button class="btn-viewer" onclick="window.location.href='{% url "worklist:dashboard" %}'">Back to Worklist</button>
+            </div>
+        </div>
+
+        <div class="viewer-main">
+            <div class="series-panel">
+                <h3 style="margin-bottom: 10px; color: var(--accent-color);">Series</h3>
+                <div id="series-list">
+                    {% if study %}
+                        <div class="loading">
+                            <i class="fas fa-spinner"></i>
+                            Loading series...
+                        </div>
+                    {% else %}
+                        <div class="image-placeholder">
+                            <i class="fas fa-folder-open"></i>
+                            <p>No study selected</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="image-viewer">
+                <div class="image-controls">
+                    <div class="control-group">
+                        <span class="control-label">W/L:</span>
+                        <input type="number" class="control-input" id="window-width" placeholder="Width" value="400">
+                        <input type="number" class="control-input" id="window-level" placeholder="Level" value="40">
+                    </div>
+                    <div class="control-group">
+                        <button class="btn-viewer" onclick="resetWindowing()">Reset</button>
+                    </div>
+                    <div class="control-group">
+                        <button class="btn-viewer" onclick="zoomIn()">Zoom In</button>
+                        <button class="btn-viewer" onclick="zoomOut()">Zoom Out</button>
+                        <button class="btn-viewer" onclick="resetZoom()">Reset Zoom</button>
+                    </div>
+                </div>
+
+                <div class="image-display" id="image-display">
+                    {% if study %}
+                        <div class="patient-info">
+                            <strong>{{ study.patient.patient_name }}</strong><br>
+                            ID: {{ study.patient.patient_id }}<br>
+                            DOB: {{ study.patient.date_of_birth|default:"N/A" }}<br>
+                            Sex: {{ study.patient.get_sex_display|default:"N/A" }}
+                        </div>
+                        
+                        <div class="study-info">
+                            Study: {{ study.study_description }}<br>
+                            Date: {{ study.study_date|date:"Y-m-d" }}<br>
+                            Modality: {{ study.modality.code|default:"N/A" }}<br>
+                            Accession: {{ study.accession_number|default:"N/A" }}
+                        </div>
+                        
+                        <canvas id="image-canvas" class="image-canvas"></canvas>
+                    {% else %}
+                        <div class="image-placeholder">
+                            <i class="fas fa-image"></i>
+                            <p>Select a study from the worklist to view DICOM images</p>
+                            <button class="btn-viewer" onclick="window.location.href='{% url "worklist:dashboard" %}'" style="margin-top: 10px;">
+                                Go to Worklist
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentStudy = {% if study %}{{ study.id }}{% else %}null{% endif %};
+        let currentSeries = null;
+        let currentImage = null;
+        let zoomLevel = 1;
+
+        // Load study data if available
+        if (currentStudy) {
+            loadStudyData(currentStudy);
+        }
+
+        function loadStudyData(studyId) {
+            fetch(`/dicom-viewer/api/study/${studyId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    displaySeriesList(data.series);
+                    if (data.series.length > 0) {
+                        selectSeries(data.series[0]);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading study:', error);
+                    document.getElementById('series-list').innerHTML = 
+                        '<div class="image-placeholder"><i class="fas fa-exclamation-triangle"></i><p>Error loading study</p></div>';
+                });
+        }
+
+        function displaySeriesList(series) {
+            const seriesList = document.getElementById('series-list');
+            seriesList.innerHTML = '';
+            
+            series.forEach((s, index) => {
+                const seriesItem = document.createElement('div');
+                seriesItem.className = 'series-item';
+                seriesItem.onclick = () => selectSeries(s);
+                
+                seriesItem.innerHTML = `
+                    <div class="series-title">Series ${s.series_number}</div>
+                    <div class="series-info">
+                        ${s.series_description || 'No description'}<br>
+                        ${s.modality} • ${s.image_count} images
+                    </div>
+                `;
+                
+                seriesList.appendChild(seriesItem);
+                
+                if (index === 0) {
+                    seriesItem.classList.add('active');
+                }
+            });
+        }
+
+        function selectSeries(series) {
+            // Update active series
+            document.querySelectorAll('.series-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.target.closest('.series-item').classList.add('active');
+            
+            currentSeries = series;
+            
+            // Load first image of series
+            if (series.images && series.images.length > 0) {
+                loadImage(series.images[0]);
+            } else {
+                displayPlaceholder('No images in this series');
+            }
+        }
+
+        function loadImage(image) {
+            currentImage = image;
+            
+            // Show loading state
+            const canvas = document.getElementById('image-canvas');
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#666';
+                ctx.font = '14px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('Loading image...', canvas.width/2, canvas.height/2);
+            }
+            
+            // Load image data
+            fetch(`/dicom-viewer/api/image/${image.id}/display/`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success' || data.status === 'placeholder') {
+                        displayImage(data);
+                    } else {
+                        displayPlaceholder('Error loading image: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading image:', error);
+                    displayPlaceholder('Failed to load image');
+                });
+        }
+
+        function displayImage(imageData) {
+            const canvas = document.getElementById('image-canvas');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas size
+            canvas.width = 512;
+            canvas.height = 512;
+            
+            // Create image from base64 data
+            const img = new Image();
+            img.onload = function() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            };
+            img.src = imageData.image_data;
+            
+            // Update windowing controls
+            document.getElementById('window-width').value = imageData.window_width || 400;
+            document.getElementById('window-level').value = imageData.window_center || 40;
+        }
+
+        function displayPlaceholder(message) {
+            const canvas = document.getElementById('image-canvas');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            canvas.width = 512;
+            canvas.height = 512;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#666';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(message, canvas.width/2, canvas.height/2);
+        }
+
+        // Viewer controls
+        function resetWindowing() {
+            document.getElementById('window-width').value = 400;
+            document.getElementById('window-level').value = 40;
+            if (currentImage) {
+                loadImage(currentImage);
+            }
+        }
+
+        function zoomIn() {
+            zoomLevel *= 1.2;
+            applyZoom();
+        }
+
+        function zoomOut() {
+            zoomLevel /= 1.2;
+            applyZoom();
+        }
+
+        function resetZoom() {
+            zoomLevel = 1;
+            applyZoom();
+        }
+
+        function applyZoom() {
+            const canvas = document.getElementById('image-canvas');
+            if (canvas) {
+                canvas.style.transform = `scale(${zoomLevel})`;
+            }
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(event) {
+            switch(event.key) {
+                case 'Escape':
+                    window.close();
+                    break;
+                case '=':
+                case '+':
+                    zoomIn();
+                    break;
+                case '-':
+                    zoomOut();
+                    break;
+                case '0':
+                    resetZoom();
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>

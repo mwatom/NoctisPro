@@ -1,0 +1,41 @@
+# NoctisPro V2 - Production Requirements
+# Core Django Framework
+Django>=4.2,<5.0
+djangorestframework>=3.14.0
+
+# Database & Storage
+# sqlite3 is built into Python
+
+# Image Processing & DICOM
+Pillow>=10.0.0
+pydicom>=2.4.0
+numpy>=1.24.0
+
+# Web Server & Production
+gunicorn>=21.0.0
+whitenoise>=6.5.0
+daphne>=4.0.0
+
+# Real-time Features
+channels>=4.0.0
+channels-redis>=4.2.0
+
+# Security & CORS
+django-cors-headers>=4.3.0
+python-dotenv>=1.0.0
+
+# UI & Forms
+django-widget-tweaks>=1.5.0
+
+# Utilities
+requests>=2.31.0
+django-extensions>=3.2.0
+
+# Health Monitoring
+django-health-check>=3.17.0
+
+# Development Tools (optional)
+django-debug-toolbar>=4.2.0
+
+# File Handling
+django-storages>=1.14.0

@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoctisPro V2 - Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-bg: #0a0a0a;
+            --secondary-bg: #1a1a1a;
+            --card-bg: #252525;
+            --header-bg: #333333;
+            --border-color: #404040;
+            --accent-color: #00d4ff;
+            --text-primary: #ffffff;
+            --text-secondary: #b3b3b3;
+            --text-muted: #666666;
+            --success-color: #00ff88;
+            --warning-color: #ffaa00;
+            --danger-color: #ff4444;
+            --urgent-color: #ff0066;
+            --scheduled-color: #4a90e2;
+            --in-progress-color: #f5a623;
+            --completed-color: #7ed321;
+            --cancelled-color: #d0021b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--primary-bg);
+            color: var(--text-primary);
+            font-size: 12px;
+            overflow: hidden;
+        }
+
+        .dashboard-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Navigation */
+        .top-navbar {
+            background: var(--header-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 50px;
+        }
+
+        .nav-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo {
+            color: var(--accent-color);
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 2px;
+        }
+
+        .nav-tab {
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 6px 12px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+
+        .nav-tab.active {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+            font-weight: bold;
+        }
+
+        .nav-tab:hover:not(.active) {
+            background: var(--card-bg);
+            color: var(--text-primary);
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 11px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .user-avatar {
+            background: var(--accent-color);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: var(--primary-bg);
+            font-size: 10px;
+        }
+
+        /* Controls Bar */
+        .controls-bar {
+            background: var(--secondary-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            height: 40px;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .control-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .btn-control {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 4px 12px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-control:hover {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Stats Cards */
+        .stats-cards {
+            display: flex;
+            gap: 10px;
+            padding: 10px 16px;
+            background: var(--secondary-bg);
+        }
+
+        .stat-card {
+            flex: 1;
+            background: var(--card-bg);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        /* Data Table */
+        .data-table-container {
+            flex: 1;
+            overflow: auto;
+            background: var(--primary-bg);
+            margin: 10px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 11px;
+        }
+
+        .data-table th {
+            background: var(--header-bg);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .data-table th:last-child {
+            border-right: none;
+        }
+
+        .data-table td {
+            padding: 6px 12px;
+            border-bottom: 1px solid rgba(64, 64, 64, 0.3);
+            border-right: 1px solid rgba(64, 64, 64, 0.3);
+            color: var(--text-secondary);
+            white-space: nowrap;
+            vertical-align: middle;
+            font-size: 11px;
+        }
+
+        .data-table td:last-child {
+            border-right: none;
+        }
+
+        .data-table tbody tr {
+            transition: background-color 0.1s ease;
+            cursor: pointer;
+        }
+
+        .data-table tbody tr:hover {
+            background: rgba(0, 212, 255, 0.08);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 9px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status-scheduled { background: var(--scheduled-color); color: white; }
+        .status-in-progress { background: var(--in-progress-color); color: white; }
+        .status-completed { background: var(--completed-color); color: white; }
+        .status-urgent { background: var(--urgent-color); color: white; }
+        .status-cancelled { background: var(--cancelled-color); color: white; }
+
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+        }
+
+        .btn-action {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 2px 6px;
+            font-size: 9px;
+            cursor: pointer;
+            border-radius: 2px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-action:hover {
+            background: var(--accent-color);
+            color: var(--primary-bg);
+        }
+
+        .btn-danger:hover {
+            background: var(--danger-color);
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        .loading i {
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Empty State */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Top Navigation -->
+        <div class="top-navbar">
+            <div class="nav-left">
+                <div class="logo">🏥 NoctisPro V2</div>
+                <div class="nav-tabs">
+                    <a href="{% url 'worklist:dashboard' %}" class="nav-tab active">Worklist</a>
+                    <a href="{% url 'dicom_viewer:viewer' %}" class="nav-tab">DICOM Viewer</a>
+                    <a href="{% url 'admin_panel:dashboard' %}" class="nav-tab">Admin</a>
+                    <a href="{% url 'reports:dashboard' %}" class="nav-tab">Reports</a>
+                </div>
+            </div>
+            <div class="nav-right">
+                <div class="user-info">
+                    <div class="user-avatar">{{ user.username|first|upper }}</div>
+                    <span>{{ user.username }}</span>
+                </div>
+                <a href="{% url 'accounts:logout' %}" class="btn-control">Logout</a>
+            </div>
+        </div>
+
+        <!-- Controls Bar -->
+        <div class="controls-bar">
+            <div class="control-group">
+                <button class="btn-control" id="refresh-btn">
+                    <i class="fas fa-sync-alt"></i> REFRESH
+                </button>
+            </div>
+            <div class="control-group">
+                <button class="btn-control" onclick="window.location.href='{% url 'worklist:upload' %}'">
+                    <i class="fas fa-upload"></i> UPLOAD
+                </button>
+            </div>
+            <div class="control-group">
+                <button class="btn-control" id="reset-filters-btn">
+                    <i class="fas fa-filter"></i> RESET FILTERS
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Stats Cards -->
+            <div class="stats-cards">
+                <div class="stat-card">
+                    <div class="stat-value">{{ stats.total_studies }}</div>
+                    <div class="stat-label">Total Studies</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ stats.completed_today }}</div>
+                    <div class="stat-label">Completed Today</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ stats.in_progress }}</div>
+                    <div class="stat-label">In Progress</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ stats.urgent }}</div>
+                    <div class="stat-label">Urgent</div>
+                </div>
+            </div>
+
+            <!-- Data Table -->
+            <div class="data-table-container">
+                {% if studies %}
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Patient Name</th>
+                            <th>Patient ID</th>
+                            <th>Study Date</th>
+                            <th>Study Description</th>
+                            <th>Modality</th>
+                            <th>Status</th>
+                            <th>Accession #</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studies-tbody">
+                        {% for study in studies %}
+                        <tr onclick="openDicomViewer({{ study.id }})">
+                            <td>{{ study.patient.patient_name }}</td>
+                            <td>{{ study.patient.patient_id }}</td>
+                            <td>{{ study.study_date|date:"Y-m-d" }}</td>
+                            <td>{{ study.study_description|truncatechars:50 }}</td>
+                            <td>{{ study.modality.code|default:"N/A" }}</td>
+                            <td>
+                                <span class="status-badge status-{{ study.status }}">
+                                    {{ study.get_status_display }}
+                                </span>
+                            </td>
+                            <td>{{ study.accession_number|default:"N/A" }}</td>
+                            <td onclick="event.stopPropagation()">
+                                <div class="action-buttons">
+                                    <button class="btn-action" onclick="openDicomViewer({{ study.id }})">
+                                        <i class="fas fa-eye"></i> View
+                                    </button>
+                                    <button class="btn-action btn-danger" onclick="deleteStudy({{ study.id }})">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-folder-open"></i>
+                    <h3>No Studies Found</h3>
+                    <p>Upload DICOM files to get started</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global functions for button handlers
+        function openDicomViewer(studyId) {
+            window.open(`/dicom-viewer/?study=${studyId}`, '_blank');
+        }
+
+        function deleteStudy(studyId) {
+            if (confirm('Are you sure you want to delete this study?')) {
+                fetch(`/worklist/api/study/${studyId}/delete/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}',
+                        'Content-Type': 'application/json',
+                    },
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to delete study');
+                });
+            }
+        }
+
+        // Refresh button handler
+        document.getElementById('refresh-btn').addEventListener('click', function() {
+            const btn = this;
+            const icon = btn.querySelector('i');
+            
+            btn.disabled = true;
+            icon.classList.add('fa-spin');
+            
+            fetch('/worklist/api/refresh-worklist/')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to refresh worklist');
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                    icon.classList.remove('fa-spin');
+                });
+        });
+
+        // Reset filters button handler
+        document.getElementById('reset-filters-btn').addEventListener('click', function() {
+            window.location.href = '{% url "worklist:dashboard" %}';
+        });
+
+        // Auto-refresh every 30 seconds
+        setInterval(function() {
+            fetch('/worklist/api/studies/')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        console.log('Worklist updated:', data.studies.length, 'studies');
+                    }
+                })
+                .catch(error => console.error('Auto-refresh error:', error));
+        }, 30000);
+    </script>
+</body>
+</html>
