@@ -32,3 +32,9 @@
 [INFO] 2025-09-06 13:42:32,993 django.server basehttp 4600 139696592123584 "GET / HTTP/1.1" 302 0
 [INFO] 2025-09-06 13:42:40,672 django.server basehttp 4600 139696592123584 "GET / HTTP/1.1" 302 0
 [INFO] 2025-09-06 13:42:46,523 django.server basehttp 4600 139696592123584 "HEAD / HTTP/1.1" 302 0
+[INFO] 2025-09-06 23:05:04,557 django.utils.autoreload autoreload 4122 139696632377600 Watching for file changes with StatReloader
+[INFO] 2025-09-06 23:05:07,208 django.server basehttp 4122 139696038475456 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-06 23:06:40,558 django.server basehttp 4122 139696038475456 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-06 23:08:02,293 django.server basehttp 4122 139696038475456 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-06 23:08:02,325 django.server basehttp 4122 139696038475456 "GET /login/ HTTP/1.1" 200 17452
+[INFO] 2025-09-06 23:08:02,467 django.server basehttp 4122 139695958783680 "GET /favicon.ico HTTP/1.1" 204 0
