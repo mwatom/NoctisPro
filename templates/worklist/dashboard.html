@@ -605,8 +605,8 @@
                 <div class="nav-tab active">WORKLIST</div>
                 <div class="nav-tab" onclick="window.location.href='{% url 'worklist:study_list' %}'">STUDIES</div>
                 <div class="nav-tab" onclick="window.location.href='{% url 'reports:report_list' %}'">REPORTS</div>
-                {% if user.role == 'admin' %}
-                <div class="nav-tab" onclick="window.location.href='{% url 'admin_panel:user_management' %}'"><i class="fas fa-user-cog"></i> MANAGE USERS</div>
+                {% if user.is_admin %}
+                <div class="nav-tab" onclick="window.location.href='{% url 'admin_panel:dashboard' %}'"><i class="fas fa-user-cog"></i> ADMIN PANEL</div>
                 {% endif %}
             </div>
             </div>
@@ -619,10 +619,10 @@
                     <div class="user-avatar">{{ user.get_full_name|default:user.username|slice:":2"|upper }}</div>
                     <div>
                         <div>{{ user.get_full_name|default:user.username }}</div>
-                        <div style="color: var(--text-muted); font-size: 10px;">{% if user.role == 'admin' %}Administrator{% elif user.role == 'radiologist' %}Radiologist{% else %}Facility User{% endif %}</div>
+                        <div style="color: var(--text-muted); font-size: 10px;">{% if user.is_admin %}Administrator{% elif user.is_radiologist %}Radiologist{% else %}Facility User{% endif %}</div>
                     </div>
                 </div>
-                {% if user.is_authenticated and user.role == 'admin' %}
+                {% if user.is_authenticated and user.is_admin %}
                 <button type="button" class="admin-btn" onclick="window.location.href='{% url 'admin_panel:dashboard' %}'" title="Administrator Dashboard">
                     <i class="fas fa-shield-alt"></i> ADMIN PANEL
                 </button>
@@ -702,11 +702,8 @@
             <button type="button" class="btn-dicom-viewer" onclick="launchDicomViewer()" title="Masterpiece DICOM Viewer" style="background: linear-gradient(135deg, #6b46c1, #553c9a); color: white; font-weight: bold;">
                 <i class="fas fa-cube"></i> DICOM VIEWER
             </button>
-            <button type="button" class="btn-control" onclick="loadFromDirectory()" title="Load DICOM from Directory/USB/Disc" style="background: linear-gradient(135deg, #059669, #047857); color: white; font-weight: bold;">
-                <i class="fas fa-folder-open"></i> LOAD DIRECTORY
-            </button>
-            <button type="button" class="btn-control" onclick="uploadStudies()" title="Upload Studies">
-                <i class="fas fa-upload"></i>
+            <button type="button" class="btn-control" onclick="uploadStudies()" title="Upload DICOM Studies (up to 5000 images)" style="background: linear-gradient(135deg, #059669, #047857); color: white; font-weight: bold;">
+                <i class="fas fa-upload"></i> UPLOAD DICOM
             </button>
         </div>
 
@@ -937,7 +934,7 @@
                                 {% if user.is_admin or user.is_radiologist %}<button type="button" class="btn-viewer" style="margin-left:6px" onclick="openReport('${study.id}'); event.stopPropagation();" title="Write/Edit report"><i class="fas fa-file-signature"></i> REPORT</button>{% endif %}
                                 {% if user.is_facility_user %}<button type="button" class="btn-viewer" style="margin-left:6px" onclick="printStudy('${study.id}'); event.stopPropagation();" title="Print"><i class="fas fa-print"></i> PRINT</button>{% endif %}
                                 <button type="button" class="btn-viewer" style="margin-left:6px" onclick="window.location.href='/worklist/study/${study.id}/upload/'; event.stopPropagation();" title="Attach files"><i class="fas fa-paperclip"></i> ATTACH</button>
-                                <button type="button" class="btn-viewer" style="margin-left:6px" onclick="window.location.href='/worklist/studies/'; event.stopPropagation();" title="View attachments list"><i class="fas fa-link"></i> ATTACHED</button>
+                                <button type="button" class="btn-viewer" style="margin-left:6px" onclick="window.location.href='/worklist/study/${study.id}/'; event.stopPropagation();" title="View study details"><i class="fas fa-folder-open"></i> DETAILS</button>
                                 {% if user.is_admin or user.is_radiologist %}<button type="button" class="btn-viewer" style="margin-left:6px;background:var(--danger-color)" onclick="deleteStudy('${study.id}','${study.accession_number}'); event.stopPropagation();" title="Delete study (admin/radiologist only)"><i class="fas fa-trash"></i> DELETE</button>{% endif %}
                                 ${isRecentUpload ? '<span style="color: var(--success-color); font-size: 10px; margin-left: 4px;">NEW</span>' : ''}
                             </div>
@@ -1165,10 +1162,7 @@
             window.location.href = '{% url 'worklist:upload_study' %}';
         }
 
-        function loadFromDirectory() {
-            window.location.href = '/dicom-viewer/load-directory/';
-            showToast('Opening directory loader...', 'success', 2000);
-        }
+        // Removed loadFromDirectory - consolidated with uploadStudies
 
         // Clean toast notification system
         function showToast(message, type = 'info', duration = 3000) {

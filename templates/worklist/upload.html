@@ -783,7 +783,10 @@
                     <i class="fas fa-file-medical" style="font-size: 3.5rem; margin-bottom: 1rem; color: var(--accent-color); text-shadow: 0 0 20px rgba(0, 212, 255, 0.5); animation: floatIcon 3s ease-in-out infinite alternate;"></i>
                 </div>
                 <h4 class="text-light mb-3" style="font-size: 1.4rem; font-weight: 600;">Drop DICOM files or folders here</h4>
-                <p class="text-secondary mb-4" style="font-size: 1.1rem; line-height: 1.6;">Files will be uploaded automatically once selected<br><strong style="color: var(--accent-color);">Supports large CT/MRI studies with multiple series in subfolders</strong></p>
+                <p class="text-secondary mb-3" style="font-size: 1.1rem; line-height: 1.6;">Files will be uploaded automatically once selected<br><strong style="color: var(--accent-color);">Supports large CT/MRI studies with multiple series in subfolders</strong></p>
+                <div style="background: rgba(0, 212, 255, 0.1); padding: 8px 16px; border-radius: 8px; font-size: 12px; color: var(--accent-color); border: 1px solid rgba(0, 212, 255, 0.3); margin-bottom: 1rem; display: inline-block;">
+                    <i class="fas fa-info-circle"></i> <strong>Enhanced Capacity:</strong> Up to 5,000 DICOM images (5GB total)
+                </div>
                 <button type="button" class="btn-control primary" id="chooseFilesBtn">
                     <i class="fas fa-folder-open me-2"></i>
                     Choose Files / Folder
@@ -1005,8 +1008,23 @@ document.addEventListener('DOMContentLoaded', function() {
             return file.size > 132; // don't over-restrict; backend will validate
         });
 
+        // Check file count limit (5000 images max)
+        const maxFiles = 5000;
+        if (dicomFiles.length > maxFiles) {
+            showNotification(`Too many files selected. Maximum allowed: ${maxFiles} DICOM images. You selected ${dicomFiles.length} files.`, 'error');
+            return;
+        }
+
         if (dicomFiles.length === 0) {
             showNotification('Please select DICOM files or folders. Files without .dcm are allowed; they will be validated during upload.', 'error');
+            return;
+        }
+
+        // Check total size limit (5GB max)
+        const totalSize = dicomFiles.reduce((sum, file) => sum + file.size, 0);
+        const maxSize = 5 * 1024 * 1024 * 1024; // 5GB
+        if (totalSize > maxSize) {
+            showNotification(`Total file size too large. Maximum allowed: 5GB. Your files: ${formatFileSize(totalSize)}`, 'error');
             return;
         }
 

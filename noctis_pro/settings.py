@@ -277,9 +277,10 @@ SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE = 86400  # 24 hours
 SESSION_SAVE_EVERY_REQUEST = True
 
-# File upload settings - 3GB for large DICOM files
-FILE_UPLOAD_MAX_MEMORY_SIZE = 3 * 1024 * 1024 * 1024  # 3GB
-DATA_UPLOAD_MAX_MEMORY_SIZE = 3 * 1024 * 1024 * 1024  # 3GB
+# File upload settings - Enhanced for up to 5000 DICOM images
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024 * 1024  # 5GB for large DICOM batches
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024 * 1024  # 5GB for large DICOM batches
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 15000  # Support for up to 5000 images with metadata
 
 # Security settings
 SECURE_BROWSER_XSS_FILTER = True
@@ -396,8 +397,7 @@ if not DEBUG:
 
 # Ngrok-specific settings for better performance
 if IS_NGROK:
-    # Increase timeouts for ngrok tunneling
-    DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
+    # Already set above for all environments
     # Disable some checks that can cause issues with ngrok
     USE_TZ = True
     
