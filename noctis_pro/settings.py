@@ -27,6 +27,10 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-7x!8k@m$z9h#4p&x3w2v6
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
+# Ngrok detection for automatic configuration
+NGROK_URL = os.environ.get('NGROK_URL', '')
+IS_NGROK = bool(NGROK_URL) or any('ngrok' in host for host in os.environ.get('ALLOWED_HOSTS', '').split(','))
+
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
 # Add ngrok and deployment specific hosts
@@ -43,6 +47,13 @@ ALLOWED_HOSTS.extend([
     '3.222.223.4',
     '172.30.0.2',
 ])
+
+# Add specific ngrok URL if provided
+if NGROK_URL:
+    # Extract domain from full URL
+    import re
+    ngrok_domain = re.sub(r'^https?://', '', NGROK_URL.strip('/'))
+    ALLOWED_HOSTS.append(ngrok_domain)
 
 # Remove duplicates and empty strings
 ALLOWED_HOSTS = list(filter(None, list(set(ALLOWED_HOSTS))))
@@ -212,8 +223,15 @@ CORS_ALLOWED_ORIGINS = [
     "https://127.0.0.1:8000",
 ]
 
+# Add specific ngrok URL to CORS if provided
+if NGROK_URL:
+    CORS_ALLOWED_ORIGINS.extend([
+        NGROK_URL,
+        NGROK_URL.replace('https://', 'http://') if NGROK_URL.startswith('https://') else NGROK_URL.replace('http://', 'https://')
+    ])
+
 # Add ngrok support dynamically
-CORS_ALLOW_ALL_ORIGINS = DEBUG  # Allow all origins in debug mode for development/ngrok
+CORS_ALLOW_ALL_ORIGINS = DEBUG or IS_NGROK  # Allow all origins in debug mode or when using ngrok
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -239,6 +257,13 @@ CSRF_TRUSTED_ORIGINS = [
     "http://*.duckdns.org",
 ]
 
+# Add specific ngrok URL to CSRF trusted origins if provided
+if NGROK_URL:
+    CSRF_TRUSTED_ORIGINS.extend([
+        NGROK_URL,
+        NGROK_URL.replace('https://', 'http://') if NGROK_URL.startswith('https://') else NGROK_URL.replace('http://', 'https://')
+    ])
+
 # Custom user model
 AUTH_USER_MODEL = 'accounts.User'
 
@@ -259,10 +284,22 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 3 * 1024 * 1024 * 1024  # 3GB
 # Security settings
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = 'SAMEORIGIN' if DEBUG else 'DENY'  # Allow embedding for ngrok in debug mode
+X_FRAME_OPTIONS = 'SAMEORIGIN' if DEBUG or IS_NGROK else 'DENY'  # Allow embedding for ngrok
 
-# Production security enhancements
-if not DEBUG:
+# Ngrok-specific security adjustments
+if IS_NGROK:
+    # Disable some security features that interfere with ngrok
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    # But keep others for security
+    SESSION_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    CSRF_COOKIE_SAMESITE = 'Lax'
+
+# Production security enhancements (only if not using ngrok)
+if not DEBUG and not IS_NGROK:
     SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False').lower() == 'true'
     SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000'))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
@@ -285,27 +322,89 @@ DATABASES = {
     }
 }
 
-# Logging
+# Logging configuration
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{levelname}] {asctime} {name} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '[{levelname}] {asctime} {message}',
+            'style': '{',
+        },
+    },
     'handlers': {
         'file': {
             'level': 'INFO',
-            'class': 'logging.FileHandler',
-            'filename': 'noctis_pro.log',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs', 'noctis_pro.log'),
+            'maxBytes': 10*1024*1024,  # 10MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+        'security': {
+            'level': 'WARNING',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs', 'security.log'),
+            'maxBytes': 5*1024*1024,  # 5MB
+            'backupCount': 3,
+            'formatter': 'verbose',
         },
     },
     'loggers': {
         'django': {
-            'handlers': ['file'],
+            'handlers': ['file', 'console'] if DEBUG else ['file'],
             'level': 'INFO',
             'propagate': True,
         },
+        'django.security': {
+            'handlers': ['security'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
         'noctis_pro': {
+            'handlers': ['file', 'console'] if DEBUG else ['file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'worklist': {
             'handlers': ['file'],
             'level': 'INFO',
             'propagate': True,
         },
     },
 }
+
+# Create logs directory if it doesn't exist
+os.makedirs(os.path.join(BASE_DIR, 'logs'), exist_ok=True)
+
+# Performance settings for production
+if not DEBUG:
+    # Database connection pooling
+    DATABASES['default']['CONN_MAX_AGE'] = 60
+    
+    # Cache static file serving
+    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
+
+# Ngrok-specific settings for better performance
+if IS_NGROK:
+    # Increase timeouts for ngrok tunneling
+    DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
+    # Disable some checks that can cause issues with ngrok
+    USE_TZ = True
+    
+print(f"🚀 Noctis Pro PACS Settings Loaded:")
+print(f"   • Debug Mode: {DEBUG}")
+print(f"   • Ngrok Mode: {IS_NGROK}")
+print(f"   • Ngrok URL: {NGROK_URL or 'Not set'}")
+print(f"   • Allowed Hosts: {len(ALLOWED_HOSTS)} configured")
+print(f"   • Database: {DATABASES['default']['ENGINE'].split('.')[-1]}")
+print(f"   • Security: {'Development' if DEBUG else 'Production'} profile")
