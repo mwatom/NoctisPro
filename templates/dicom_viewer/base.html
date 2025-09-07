@@ -2844,13 +2844,16 @@
                 files.forEach(file => {
                     formData.append('dicom_files', file);
                 });
+                formData.append('priority', 'normal');
+                formData.append('clinical_info', 'Uploaded via standalone viewer');
                 
-                const response = await fetch('/dicom-viewer/upload/', {
+                const response = await fetch('/worklist/upload/', {
                     method: 'POST',
                     body: formData,
                     headers: {
                         'X-CSRFToken': getCSRFToken()
-                    }
+                    },
+                    credentials: 'same-origin'
                 });
                 
                 const data = await response.json();
