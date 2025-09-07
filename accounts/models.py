@@ -44,6 +44,9 @@ class User(AbstractUser):
         return f"{self.username} ({self.get_role_display()})"
 
     def is_admin(self):
+        # Treat Django superusers and staff as admins for access control
+        if getattr(self, 'is_superuser', False) or getattr(self, 'is_staff', False):
+            return True
         return self.role == 'admin'
 
     def is_radiologist(self):
@@ -56,6 +59,9 @@ class User(AbstractUser):
         return self.role in ['admin', 'radiologist']
 
     def can_manage_users(self):
+        # Allow superusers/staff to manage users, in addition to role-based admin
+        if getattr(self, 'is_superuser', False) or getattr(self, 'is_staff', False):
+            return True
         return self.role == 'admin'
 
 class UserSession(models.Model):
