@@ -26,7 +26,7 @@ echo "[1/7] Installing base packages..."
 apt-get update -y
 apt-get install -y python3 python3-venv python3-dev build-essential \
     libpq-dev libjpeg-dev zlib1g-dev libopenjp2-7 libssl-dev libffi-dev \
-    git redis-server nginx curl
+    git redis-server nginx curl psmisc
 
 systemctl enable --now redis-server || true
 
@@ -98,6 +98,28 @@ systemctl enable --now noctis-celery.service 2>/dev/null || true
 systemctl enable --now noctis-dicom.service 2>/dev/null || true
 
 echo "[6/7] Configure Nginx for DuckDNS domain..."
+# Proactively free up HTTP(S) ports to avoid bind conflicts
+# 1) Stop common conflicting web servers if installed
+if command -v systemctl >/dev/null 2>&1; then
+    for svc in apache2 httpd caddy lighttpd haproxy; do
+        if systemctl list-unit-files | awk '{print $1}' | grep -qx "${svc}.service"; then
+            systemctl stop "$svc" 2>/dev/null || true
+            systemctl disable "$svc" 2>/dev/null || true
+            # Mask the service to prevent socket activation from re-binding 80/443
+            systemctl mask "$svc" 2>/dev/null || true
+        fi
+    done
+fi
+
+# 2) Stop any Docker containers publishing 80/443
+if command -v docker >/dev/null 2>&1; then
+    docker ps --format '{{.ID}} {{.Ports}}' | grep -E '(:80->|:443->)' | awk '{print $1}' | xargs -r docker stop || true
+fi
+
+# 3) Kill any remaining listeners on 80/443
+fuser -k 80/tcp 2>/dev/null || true
+fuser -k 443/tcp 2>/dev/null || true
+
 NGINX_SITE="/etc/nginx/sites-available/noctis"
 sed -e "s#{{SERVER_NAME}}#$SUBDOMAIN.duckdns.org#g" \
     -e "s#{{APP_DIR}}#$APP_DIR#g" \
