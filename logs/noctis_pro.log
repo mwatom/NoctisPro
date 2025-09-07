@@ -302,3 +302,11 @@ django.template.exceptions.TemplateSyntaxError: Could not parse the remainder: '
 [INFO] 2025-09-07 16:26:25,164 django.server basehttp 3084 140564338529984 "GET /dicom-viewer/api/series/123/mpr/ HTTP/1.1" 302 0
 [INFO] 2025-09-07 16:26:25,165 django.server basehttp 3084 140564347971264 "GET /dicom-viewer/api/series/123/mip/ HTTP/1.1" 302 0
 [INFO] 2025-09-07 16:26:25,167 django.server basehttp 3084 140564338529984 "GET /dicom-viewer/api/series/123/bone/ HTTP/1.1" 302 0
+[INFO] 2025-09-07 20:49:58,767 django.utils.autoreload autoreload 8140 139896209551616 Watching for file changes with StatReloader
+[INFO] 2025-09-07 20:52:15,927 django.utils.autoreload autoreload 8664 139706889052416 Watching for file changes with StatReloader
+[INFO] 2025-09-07 20:53:21,162 django.utils.autoreload autoreload 9161 140147403243776 Watching for file changes with StatReloader
+[INFO] 2025-09-07 20:53:21,640 django.server basehttp 9161 140146841867968 "GET /health/live/ HTTP/1.1" 200 5
+[INFO] 2025-09-07 20:53:21,647 django.server basehttp 9161 140146841867968 "GET /health/simple/ HTTP/1.1" 200 2
+[INFO] 2025-09-07 20:57:26,506 django.server basehttp 9161 140146841867968 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-07 20:57:26,653 django.server basehttp 9161 140146841867968 "GET /login/ HTTP/1.1" 200 17452
+[INFO] 2025-09-07 20:57:26,820 django.server basehttp 9161 140146841867968 "GET /favicon.ico HTTP/1.1" 200 68

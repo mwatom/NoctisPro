@@ -24,6 +24,7 @@ import base64
 from worklist import views as worklist_views  # ENABLED
 from django.views.generic.base import RedirectView
 from . import views
+from . import health as health_views
 
 def home_redirect(request):
     """Redirect home page to login or dashboard based on authentication"""
@@ -71,3 +72,11 @@ if settings.DEBUG or getattr(settings, 'SERVE_MEDIA_FILES', False):
     urlpatterns += [
         re_path(r'^static/(?P<path>.*)$', views.StaticFileView.as_view(), name='static_files'),
     ]
+
+# Health and readiness endpoints
+urlpatterns += [
+    path('health/', health_views.health_check, name='health'),
+    path('health/simple/', health_views.simple_health_check, name='health_simple'),
+    path('health/ready/', health_views.ready_check, name='health_ready'),
+    path('health/live/', health_views.live_check, name='health_live'),
+]
