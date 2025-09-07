@@ -20,7 +20,7 @@ NC='\033[0m' # No Color
 # Configuration
 NGROK_AUTH_TOKEN="32E2HmoUqzrZxaYRNT77wAI0HQs_5N5QNSrxU4Z7d4MFSRF4x"
 NGROK_STATIC_URL="mallard-shining-curiously.ngrok-free.app"
-DJANGO_PORT=8000
+DJANGO_PORT=8080
 # Determine project directory dynamically with fallback to /workspace
 if [[ -d "/workspace" ]]; then
     PROJECT_DIR="/workspace"
@@ -188,12 +188,14 @@ setup_django() {
     export DJANGO_SETTINGS_MODULE=noctis_pro.settings
     export DEBUG=False
     export NGROK_URL="https://$NGROK_STATIC_URL"
+    export STATIC_URL="https://$NGROK_STATIC_URL/static/"
     
     # Create .env file for production
     cat > .env << EOF
 DEBUG=False
 SECRET_KEY=$(python3 -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())')
 NGROK_URL=https://$NGROK_STATIC_URL
+STATIC_URL=https://$NGROK_STATIC_URL/static/
 ALLOWED_HOSTS=$NGROK_STATIC_URL,localhost,127.0.0.1,0.0.0.0
 DJANGO_SETTINGS_MODULE=noctis_pro.settings
 EOF
@@ -238,6 +240,7 @@ Environment=PATH=$VENV_DIR/bin
 Environment=DJANGO_SETTINGS_MODULE=noctis_pro.settings
 Environment=DEBUG=False
 Environment=NGROK_URL=https://$NGROK_STATIC_URL
+Environment=STATIC_URL=https://$NGROK_STATIC_URL/static/
 ExecStart=$VENV_DIR/bin/gunicorn --bind 0.0.0.0:$DJANGO_PORT --workers 3 --timeout 120 noctis_pro.wsgi:application
 Restart=always
 RestartSec=3
@@ -331,6 +334,13 @@ create_management_script() {
     cat > "$PROJECT_DIR/manage_noctispro.sh" << 'EOF'
 #!/bin/bash
 
+# Load .env if present
+if [ -f ./.env ]; then
+    set -a
+    . ./.env
+    set +a
+fi
+
 case "$1" in
     start)
         echo "Starting NoctisPro services..."
@@ -351,7 +361,11 @@ case "$1" in
         sudo journalctl -f -u noctispro -u noctispro-ngrok
         ;;
     url)
-        echo "https://mallard-shining-curiously.ngrok-free.app"
+        if [ -n "$NGROK_URL" ]; then
+            echo "$NGROK_URL"
+        else
+            echo "https://mallard-shining-curiously.ngrok-free.app"
+        fi
         ;;
     *)
         echo "Usage: $0 {start|stop|restart|status|logs|url}"
