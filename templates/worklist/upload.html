@@ -1128,6 +1128,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let errors = [];
         let studiesCreated = 0;
         let totalSeries = 0;
+        let totalImagesUploaded = 0;
 
         // Set uploading state
         isUploading = true;
@@ -1181,11 +1182,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                     uploadedCount += processed;
                                     studiesCreated += (data.studies_created || 0);
                                     totalSeries += (data.total_series || 0);
+                                    totalImagesUploaded += (data.total_images || 0);
                                     if (Array.isArray(data.created_study_ids)) {
                                         createdStudyIds.push(...data.created_study_ids);
                                     }
                                     const percentFiles = (uploadedCount / totalFiles) * 100;
-                                    updateProgress(Math.max(percentFiles, (uploadedBytes / Math.max(1, totalBytes)) * 100), `${uploadedCount} / ${totalFiles} files`, `Created ${studiesCreated} studies with ${totalSeries} series`);
+                                    updateProgress(Math.max(percentFiles, (uploadedBytes / Math.max(1, totalBytes)) * 100), `${uploadedCount} / ${totalFiles} files`, `Created ${studiesCreated} studies, ${totalSeries} series, ${totalImagesUploaded} images`);
                                     resolve({ ok: true });
                                 } else {
                                     errors.push((data && data.error) || 'Unknown error');
@@ -1243,13 +1245,17 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="stat-value">${totalSeries}</div>
                         <div class="stat-label">Series Processed</div>
                     </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${totalImagesUploaded}</div>
+                        <div class="stat-label">Images Processed</div>
+                    </div>
                 </div>
                 <div class="background-processing-info" style="margin-top: 15px; padding: 10px; background: var(--card-bg); border-radius: 6px; border-left: 3px solid var(--accent-color);">
                     <i class="fas fa-info-circle"></i> <strong>Background Processing:</strong> DICOM images are being processed in the background.
                 </div>
             `;
 
-            showNotification(`Successfully uploaded ${uploadedCount} files creating ${studiesCreated} studies with ${totalSeries} series!`, 'success');
+            showNotification(`Successfully uploaded ${uploadedCount} files creating ${studiesCreated} studies with ${totalSeries} series and ${totalImagesUploaded} images!`, 'success');
             try {
                 if (createdStudyIds.length > 0) {
                     const btn = document.createElement('button');
@@ -1257,7 +1263,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     btn.className = 'btn-control primary';
                     btn.style.marginTop = '10px';
                     btn.innerHTML = '<i class="fas fa-eye me-2"></i>Open in DICOM Viewer';
-                    btn.onclick = function(){ window.location.href = '/dicom-viewer/?study=' + createdStudyIds[0]; };
+                    btn.onclick = function(){ 
+                        // Add a small delay to ensure database consistency before opening viewer
+                        setTimeout(() => {
+                            window.location.href = '/dicom-viewer/?study=' + createdStudyIds[0];
+                        }, 1000);
+                    };
                     document.getElementById('uploadSuccess').appendChild(btn);
                 }
             } catch(_) {}
@@ -1284,7 +1295,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     window.redirectToDashboard = function() {
-        window.location.href = '{% url "worklist:dashboard" %}';
+        // Add a small delay to ensure database consistency before redirecting
+        setTimeout(() => {
+            window.location.href = '{% url "worklist:dashboard" %}';
+        }, 1500);
     };
 });
 </script>
