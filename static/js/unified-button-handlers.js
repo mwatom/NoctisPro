@@ -277,17 +277,28 @@ class NoctisProButtonManager {
 
         try {
             const response = await fetch(url, finalOptions);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+
+            const contentType = response.headers.get('content-type') || '';
+            let payload = null;
+            try {
+                if (contentType.includes('application/json')) {
+                    payload = await response.json();
+                } else {
+                    payload = await response.text();
+                }
+            } catch (e) {
+                // ignore parse errors; keep payload as null
             }
 
-            const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('application/json')) {
-                return await response.json();
-            } else {
-                return { success: true, data: await response.text() };
+            if (!response.ok) {
+                const detail = payload && typeof payload === 'object' ? (payload.error || JSON.stringify(payload)) : (payload || response.statusText);
+                throw new Error(`HTTP ${response.status}: ${detail}`);
             }
+
+            if (contentType.includes('application/json')) {
+                return payload;
+            }
+            return { success: true, data: payload };
         } catch (error) {
             console.error('API request failed:', error);
             throw error;
@@ -426,10 +437,32 @@ class NoctisProActions {
             if (data.success !== false) {
                 this.buttonManager.showToast(`Study ${accessionNumber} deleted successfully`, 'success');
                 setTimeout(() => window.location.reload(), 1000);
-            } else {
-                throw new Error(data.error || 'Failed to delete study');
+                return;
             }
+            throw new Error(data.error || 'Failed to delete study');
         } catch (error) {
+            // If DELETE failed due to method or CSRF issues, try POST fallback
+            const msg = String(error && error.message || '');
+            if (/HTTP\s*405|HTTP\s*403|method not allowed/i.test(msg)) {
+                try {
+                    const data = await this.buttonManager.apiRequest(`/worklist/api/study/${studyId}/delete/`, {
+                        method: 'POST',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    if (data.success !== false) {
+                        this.buttonManager.showToast(`Study ${accessionNumber} deleted successfully`, 'success');
+                        setTimeout(() => window.location.reload(), 1000);
+                        return;
+                    }
+                    throw new Error(data.error || 'Failed to delete study');
+                } catch (fallbackError) {
+                    if (buttonElement) {
+                        this.buttonManager.setButtonLoading(buttonElement, false);
+                    }
+                    this.buttonManager.showToast(`Delete failed: ${fallbackError.message}`, 'error');
+                    return;
+                }
+            }
             if (buttonElement) {
                 this.buttonManager.setButtonLoading(buttonElement, false);
             }
