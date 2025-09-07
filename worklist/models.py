@@ -82,10 +82,12 @@ class Study(models.Model):
         return f"{self.accession_number} - {self.patient.full_name} ({self.modality.code})"
 
     def get_series_count(self):
-        return self.series_set.count()
+        # Efficient and accurate count
+        return Series.objects.filter(study=self).count()
 
     def get_image_count(self):
-        return sum(series.images.count() for series in self.series_set.all())
+        # Avoid N+1 queries and ensure correctness
+        return DicomImage.objects.filter(series__study=self).count()
 
 class Series(models.Model):
     """DICOM Series model"""

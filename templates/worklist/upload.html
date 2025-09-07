@@ -132,19 +132,15 @@
         }
 
         .upload-card {
-            background: linear-gradient(145deg, var(--card-bg) 0%, #2a2a2a 50%, var(--card-bg) 100%);
-            border: 2px solid var(--border-color);
-            border-radius: 16px;
-            padding: 32px;
-            max-width: 950px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 640px;
             width: 100%;
-            box-shadow: 
-                0 8px 32px rgba(0, 0, 0, 0.3),
-                0 0 20px rgba(0, 212, 255, 0.1),
-                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
             position: relative;
             overflow: hidden;
-            backdrop-filter: blur(5px);
         }
 
         .upload-card::before {
@@ -160,39 +156,27 @@
 
     .upload-header { 
         text-align: center; 
-        margin-bottom: 2.5rem; 
+        margin-bottom: 1.5rem; 
         position: relative;
     }
     
     .upload-icon { 
-        background: linear-gradient(135deg, var(--accent-color) 0%, #00b8d4 50%, var(--success-color) 100%);
+        background: var(--accent-color);
         border-radius: 50%; 
-        width: 90px; 
-        height: 90px; 
+        width: 64px; 
+        height: 64px; 
         display: flex; 
         align-items: center; 
         justify-content: center; 
-        font-size: 2.2rem; 
-        color: white; 
-        margin: 0 auto 1.5rem; 
-        box-shadow: 
-            0 8px 24px rgba(0, 212, 255, 0.3),
-            0 0 20px rgba(0, 212, 255, 0.2),
-            inset 0 2px 0 rgba(255, 255, 255, 0.2);
+        font-size: 1.6rem; 
+        color: var(--primary-bg); 
+        margin: 0 auto 1rem; 
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
         position: relative;
-        animation: iconGlow 3s ease-in-out infinite alternate;
     }
 
-    .upload-capabilities {
-        display: flex;
-        justify-content: center;
-        gap: 2rem;
-        margin-top: 1.5rem;
-        padding: 1rem;
-        background: rgba(0, 212, 255, 0.05);
-        border-radius: 8px;
-        border: 1px solid rgba(0, 212, 255, 0.2);
-    }
+    /* compact helper text */
+    .helper-text { color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem; }
 
     .capability-item {
         display: flex;
@@ -235,65 +219,27 @@
     }
 
     .drop-zone { 
-        border: 3px dashed var(--border-color); 
-        border-radius: 16px; 
-        padding: 3.5rem 2.5rem; 
+        border: 2px dashed var(--border-color); 
+        border-radius: 12px; 
+        padding: 2rem; 
         text-align: center; 
         cursor: pointer; 
-        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); 
-        background: linear-gradient(135deg, 
-            rgba(0, 212, 255, 0.08) 0%, 
-            rgba(0, 255, 136, 0.05) 30%,
-            rgba(255, 170, 0, 0.03) 60%,
-            rgba(0, 212, 255, 0.05) 100%);
+        transition: border-color 0.2s ease, background 0.2s ease; 
+        background: var(--secondary-bg);
         position: relative;
         overflow: hidden;
-        box-shadow: 
-            inset 0 2px 8px rgba(0, 0, 0, 0.1),
-            0 4px 16px rgba(0, 0, 0, 0.1);
     }
     
-    .drop-zone::before {
-        content: '';
-        position: absolute;
-        top: -50%;
-        left: -50%;
-        width: 200%;
-        height: 200%;
-        background: radial-gradient(circle, 
-            var(--accent-color) 0%, 
-            rgba(0, 255, 136, 0.3) 30%,
-            rgba(255, 170, 0, 0.2) 60%,
-            transparent 70%);
-        opacity: 0;
-        transition: opacity 0.4s ease;
-        pointer-events: none;
-        animation: subtleRotate 20s linear infinite;
-    }
+    .drop-zone::before { display: none; }
     
     @keyframes subtleRotate {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
     }
     
-    .drop-zone:hover::before, .drop-zone.dragover::before { 
-        opacity: 0.1;
-    }
+    .drop-zone:hover, .drop-zone.dragover { background: #151515; }
     
-    .drop-zone:hover, .drop-zone.dragover { 
-        border-color: var(--accent-color); 
-        background: linear-gradient(135deg, 
-            rgba(0, 212, 255, 0.15) 0%, 
-            rgba(0, 255, 136, 0.1) 30%,
-            rgba(255, 170, 0, 0.08) 60%,
-            rgba(0, 212, 255, 0.12) 100%);
-        transform: scale(1.02) translateY(-2px);
-        box-shadow: 
-            0 16px 40px rgba(0, 212, 255, 0.25),
-            0 0 30px rgba(0, 212, 255, 0.2),
-            inset 0 2px 8px rgba(0, 0, 0, 0.1);
-        border-style: solid;
-    }
+    .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent-color); }
     
     .drop-zone.uploading { 
         cursor: not-allowed; 
@@ -702,16 +648,13 @@
     .btn-control.primary {
         background: linear-gradient(135deg, var(--accent-color) 0%, #00b8d4 100%);
         color: var(--primary-bg);
-        border: 2px solid var(--accent-color);
-        padding: 12px 24px;
-        font-size: 13px;
+        border: 1px solid var(--accent-color);
+        padding: 10px 18px;
+        font-size: 12px;
         font-weight: bold;
         border-radius: 8px;
         text-transform: uppercase;
-        letter-spacing: 0.8px;
-        box-shadow: 
-            0 4px 16px rgba(0, 212, 255, 0.3),
-            inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        letter-spacing: 0.6px;
         position: relative;
         overflow: hidden;
     }
@@ -746,30 +689,6 @@
 
 {% block content %}
 <div class="upload-container">
-    <!-- Top Navigation - matching admin panel -->
-    <nav class="top-navbar">
-        <div class="nav-left">
-            <div class="logo">
-                <i class="fas fa-upload"></i> Noctis Pro PACS - Upload
-            </div>
-            <div class="nav-tabs">
-                <a href="{% url 'worklist:dashboard' %}" class="nav-tab">DASHBOARD</a>
-                <div class="nav-tab active">UPLOAD</div>
-                {% if user.role == 'admin' %}
-                <a href="{% url 'admin_panel:dashboard' %}" class="nav-tab">ADMIN</a>
-                {% endif %}
-            </div>
-        </div>
-        <div class="nav-right">
-            <div class="user-info">
-                <div class="user-avatar">{{ user.get_full_name|default:user.username|slice:":2"|upper }}</div>
-                <div>
-                    <div style="font-weight: bold;">{{ user.get_full_name|default:user.username }}</div>
-                    <div>{{ user.get_role_display }}{% if user.facility %} - {{ user.facility.name }}{% endif %}</div>
-                </div>
-            </div>
-        </div>
-    </nav>
 
     <!-- Main Content -->
     <div class="main-content">
@@ -778,22 +697,8 @@
                 <div class="upload-icon">
                     <i class="fas fa-cloud-upload-alt"></i>
                 </div>
-                <h2 class="text-light">📁 Upload DICOM Studies</h2>
-                <p class="text-secondary">Professional medical imaging upload system supporting CT, MRI, X-Ray, and other DICOM modalities</p>
-                <div class="upload-capabilities">
-                    <div class="capability-item">
-                        <i class="fas fa-images text-accent"></i>
-                        <span>Up to 5,000 images</span>
-                    </div>
-                    <div class="capability-item">
-                        <i class="fas fa-hdd text-accent"></i>
-                        <span>5GB total capacity</span>
-                    </div>
-                    <div class="capability-item">
-                        <i class="fas fa-layer-group text-accent"></i>
-                        <span>Multi-series support</span>
-                    </div>
-                </div>
+                <h3 class="text-light" style="margin-bottom: 0.25rem;">Upload DICOM Studies</h3>
+                <div class="helper-text">Drag and drop DICOM files or choose a folder. Max 5,000 images (5GB).</div>
             </div>
 
         <form id="uploadForm" enctype="multipart/form-data">
@@ -830,13 +735,10 @@
             <!-- End metadata inputs -->
             <div class="drop-zone" id="dropZone">
                 <div class="drop-zone-icon">
-                    <i class="fas fa-file-medical" style="font-size: 3.5rem; margin-bottom: 1rem; color: var(--accent-color); text-shadow: 0 0 20px rgba(0, 212, 255, 0.5); animation: floatIcon 3s ease-in-out infinite alternate;"></i>
+                    <i class="fas fa-file-medical" style="font-size: 2.5rem; margin-bottom: 0.5rem; color: var(--accent-color);"></i>
                 </div>
-                <h4 class="text-light mb-3" style="font-size: 1.4rem; font-weight: 600;">Drop DICOM files or folders here</h4>
-                <p class="text-secondary mb-3" style="font-size: 1.1rem; line-height: 1.6;">Files will be uploaded automatically once selected<br><strong style="color: var(--accent-color);">Supports large CT/MRI studies with multiple series in subfolders</strong></p>
-                <div style="background: rgba(0, 212, 255, 0.1); padding: 8px 16px; border-radius: 8px; font-size: 12px; color: var(--accent-color); border: 1px solid rgba(0, 212, 255, 0.3); margin-bottom: 1rem; display: inline-block;">
-                    <i class="fas fa-info-circle"></i> <strong>Enhanced Capacity:</strong> Up to 5,000 DICOM images (5GB total)
-                </div>
+                <h4 class="text-light mb-2" style="font-size: 1.1rem; font-weight: 600;">Drop DICOM files or folders here</h4>
+                <p class="text-secondary mb-2" style="font-size: 0.95rem; line-height: 1.4;">Files upload automatically once selected.</p>
                 <button type="button" class="btn-control primary" id="chooseFilesBtn">
                     <i class="fas fa-folder-open me-2"></i>
                     Choose Files / Folder
@@ -897,7 +799,7 @@
             </div>
             
             <div class="progress-section" id="progressSection">
-                <h5 class="text-light mb-3">Upload Progress</h5>
+                <h5 class="text-light mb-2">Upload Progress</h5>
                 <div class="progress mb-2">
                     <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
                          role="progressbar" 
@@ -1214,11 +1116,15 @@ document.addEventListener('DOMContentLoaded', function() {
     async function uploadFilesInChunks() {
         const url = '{% url "worklist:upload_study" %}';
         const token = document.querySelector('[name=csrfmiddlewaretoken]').value;
-        const CHUNK_SIZE = 50; // Optimized chunk size for better performance
-        const MAX_PARALLEL = 3; // Increased parallel requests for better throughput
-
         const totalFiles = selectedFiles.length;
+        const totalBytes = selectedFiles.reduce((s, f) => s + (f.size || 0), 0);
+
+        // Adaptive tuning
+        let CHUNK_SIZE = totalFiles > 1000 ? 100 : 25;
+        let MAX_PARALLEL = totalFiles > 1000 ? 4 : 4;
+
         let uploadedCount = 0;
+        let uploadedBytes = 0;
         let errors = [];
         let studiesCreated = 0;
         let totalSeries = 0;
@@ -1239,71 +1145,89 @@ document.addEventListener('DOMContentLoaded', function() {
         progressSection.style.display = 'block';
         updateProgress(0, `0 / ${totalFiles} files`, 'Preparing upload...');
 
-        // Upload logic with enhanced progress tracking
-        let currentIndex = 0;
-        async function uploadChunk(chunk) {
-            const formData = new FormData();
-            chunk.forEach((file) => formData.append('dicom_files', file));
-            // New: include metadata fields
-            formData.append('priority', priorityInput.value || 'normal');
-            formData.append('clinical_info', clinicalInfoInput.value || '');
-            if (facilitySelect) { formData.append('facility_id', facilitySelect.value || ''); }
-            if (assignToMe) { formData.append('assign_to_me', assignToMe.checked ? '1' : '0'); }
-            try {
-                const res = await fetch(url, { method: 'POST', body: formData, headers: { 'X-CSRFToken': token } });
-                
-                if (!res.ok) {
-                    errors.push(`Upload failed with status ${res.status}: ${res.statusText}`);
-                    return;
-                }
-                
-                let data;
-                try {
-                    data = await res.json();
-                } catch (jsonErr) {
-                    errors.push(`JSON parsing error: ${jsonErr.message}. Server returned status ${res.status}`);
-                    return;
-                }
-                
-                if (data.success) {
-                    const processed = typeof data.processed_files === 'number' ? data.processed_files : chunk.length;
-                    uploadedCount += processed;
-                    studiesCreated += (data.studies_created || 0);
-                    totalSeries += (data.total_series || 0);
-                    if (Array.isArray(data.created_study_ids)) {
-                        createdStudyIds.push(...data.created_study_ids);
+        // Track per-chunk progress to aggregate bytes across parallel requests
+        const chunkByteProgress = new Array(chunks.length).fill(0);
+
+        function uploadChunkXHR(chunkIdx, chunk) {
+            return new Promise((resolve) => {
+                const formData = new FormData();
+                chunk.forEach((file) => formData.append('dicom_files', file));
+                formData.append('priority', priorityInput.value || 'normal');
+                formData.append('clinical_info', clinicalInfoInput.value || '');
+                if (facilitySelect) { formData.append('facility_id', facilitySelect.value || ''); }
+                if (assignToMe) { formData.append('assign_to_me', assignToMe.checked ? '1' : '0'); }
+
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', url, true);
+                xhr.setRequestHeader('X-CSRFToken', token);
+                xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+                xhr.upload.onprogress = function (e) {
+                    if (!e.lengthComputable) return;
+                    const delta = Math.max(0, e.loaded - chunkByteProgress[chunkIdx]);
+                    chunkByteProgress[chunkIdx] = e.loaded;
+                    uploadedBytes += delta;
+                    const percentBytes = totalBytes > 0 ? (uploadedBytes / totalBytes) * 100 : (uploadedCount / totalFiles) * 100;
+                    updateProgress(percentBytes, `${uploadedCount} / ${totalFiles} files`, `Transferring ${formatFileSize(uploadedBytes)} / ${formatFileSize(totalBytes)}`);
+                };
+
+                xhr.onreadystatechange = function () {
+                    if (xhr.readyState === 4) {
+                        try {
+                            if (xhr.status >= 200 && xhr.status < 300) {
+                                const data = JSON.parse(xhr.responseText);
+                                if (data && data.success) {
+                                    const processed = typeof data.processed_files === 'number' ? data.processed_files : chunk.length;
+                                    uploadedCount += processed;
+                                    studiesCreated += (data.studies_created || 0);
+                                    totalSeries += (data.total_series || 0);
+                                    if (Array.isArray(data.created_study_ids)) {
+                                        createdStudyIds.push(...data.created_study_ids);
+                                    }
+                                    const percentFiles = (uploadedCount / totalFiles) * 100;
+                                    updateProgress(Math.max(percentFiles, (uploadedBytes / Math.max(1, totalBytes)) * 100), `${uploadedCount} / ${totalFiles} files`, `Created ${studiesCreated} studies with ${totalSeries} series`);
+                                    resolve({ ok: true });
+                                } else {
+                                    errors.push((data && data.error) || 'Unknown error');
+                                    resolve({ ok: false });
+                                }
+                            } else {
+                                errors.push(`Upload failed with status ${xhr.status}: ${xhr.statusText}`);
+                                resolve({ ok: false });
+                            }
+                        } catch (e) {
+                            errors.push(`Response parsing error: ${e.message}`);
+                            resolve({ ok: false });
+                        }
                     }
-                    const percent = (uploadedCount / totalFiles) * 100;
-                    updateProgress(
-                        percent, 
-                        `${uploadedCount} / ${totalFiles} files`, 
-                        `Created ${studiesCreated} studies with ${totalSeries} series`
-                    );
-                } else {
-                    errors.push(data.error || 'Unknown error');
-                }
-            } catch (err) {
-                errors.push(`Network error: ${String(err)}`);
-            }
+                };
+
+                xhr.onerror = function () {
+                    errors.push('Network error during upload');
+                    resolve({ ok: false });
+                };
+
+                xhr.send(formData);
+            });
         }
 
+        let currentIndex = 0;
         const workers = Array.from({ length: Math.min(MAX_PARALLEL, chunks.length) }).map(async () => {
             while (true) {
                 let idx;
                 if (currentIndex >= chunks.length) break;
                 idx = currentIndex++;
-                await uploadChunk(chunks[idx]);
+                await uploadChunkXHR(idx, chunks[idx]);
             }
         });
 
         await Promise.all(workers);
 
         if (errors.length === 0) {
-            // Show success message
             progressSection.style.display = 'none';
             uploadActions.style.display = 'none';
             uploadSuccess.style.display = 'block';
-            
+
             const uploadSummary = document.getElementById('uploadSummary');
             uploadSummary.innerHTML = `
                 <div class="stats-grid">
@@ -1321,13 +1245,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </div>
                 <div class="background-processing-info" style="margin-top: 15px; padding: 10px; background: var(--card-bg); border-radius: 6px; border-left: 3px solid var(--accent-color);">
-                    <i class="fas fa-info-circle"></i> <strong>Background Processing:</strong> 
-                    DICOM images are being processed in the background. You can continue using the system while processing completes.
+                    <i class="fas fa-info-circle"></i> <strong>Background Processing:</strong> DICOM images are being processed in the background.
                 </div>
             `;
-            
-            showNotification(`Successfully uploaded ${uploadedCount} files creating ${studiesCreated} studies with ${totalSeries} series! Images are being processed in the background.`, 'success');
-            // Add quick-open button for DICOM viewer
+
+            showNotification(`Successfully uploaded ${uploadedCount} files creating ${studiesCreated} studies with ${totalSeries} series!`, 'success');
             try {
                 if (createdStudyIds.length > 0) {
                     const btn = document.createElement('button');
