@@ -23,6 +23,7 @@ django-cors-headers
 # DICOM processing (minimal)
 pydicom
 pynetdicom
+highdicom
 
 # Utilities
 python-magic
