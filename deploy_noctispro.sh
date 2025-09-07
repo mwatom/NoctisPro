@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # =============================================================================
-# NoctisPro PACS - Automated Deployment Script for Ubuntu Server 24.04
+# NoctisPro PACS - Automated Deployment Script for Linux Servers
+# Supports Ubuntu/Debian, RHEL/CentOS/Fedora, Arch, and SUSE (best-effort)
 # =============================================================================
 # This script automatically deploys the Django PACS system with ngrok
 # Author: AI Assistant
@@ -18,9 +19,9 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-NGROK_AUTH_TOKEN="32E2HmoUqzrZxaYRNT77wAI0HQs_5N5QNSrxU4Z7d4MFSRF4x"
-NGROK_STATIC_URL="mallard-shining-curiously.ngrok-free.app"
-DJANGO_PORT=8080
+NGROK_AUTH_TOKEN="${NGROK_AUTH_TOKEN:-}"
+NGROK_STATIC_URL="${NGROK_STATIC_URL:-mallard-shining-curiously.ngrok-free.app}"
+DJANGO_PORT=${DJANGO_PORT:-8080}
 # Determine project directory dynamically with fallback to /workspace
 if [[ -d "/workspace" ]]; then
     PROJECT_DIR="/workspace"
@@ -46,6 +47,41 @@ info() {
     echo -e "${BLUE}[INFO] $1${NC}"
 }
 
+# Detect package manager
+detect_package_manager() {
+    if command -v apt >/dev/null 2>&1; then
+        PKG_MGR="apt"
+    elif command -v dnf >/dev/null 2>&1; then
+        PKG_MGR="dnf"
+    elif command -v yum >/dev/null 2>&1; then
+        PKG_MGR="yum"
+    elif command -v zypper >/dev/null 2>&1; then
+        PKG_MGR="zypper"
+    elif command -v pacman >/dev/null 2>&1; then
+        PKG_MGR="pacman"
+    else
+        PKG_MGR="unknown"
+    fi
+    info "Detected package manager: $PKG_MGR"
+}
+
+# Detect a suitable Python interpreter (prefers 3.12 -> 3.11 -> 3.10 -> python3)
+detect_python() {
+    for candidate in python3.12 python3.11 python3.10 python3; do
+        if command -v "$candidate" >/dev/null 2>&1; then
+            PYTHON_BIN="$candidate"
+            break
+        fi
+    done
+
+    if [ -z "$PYTHON_BIN" ]; then
+        error "No suitable Python 3 interpreter found. Please install Python 3.10+ and rerun."
+        exit 1
+    fi
+
+    info "Using Python interpreter: $PYTHON_BIN"
+}
+
 # Function to check if running as root
 check_root() {
     if [[ $EUID -eq 0 ]]; then
@@ -55,51 +91,134 @@ check_root() {
     fi
 }
 
-# Function to check Ubuntu version
-check_ubuntu_version() {
-    if ! grep -q "Ubuntu 24.04" /etc/os-release; then
-        warn "This script is optimized for Ubuntu 24.04. Your version might work but is not tested."
-        read -p "Continue anyway? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            exit 1
-        fi
+# Function to print OS info (non-blocking)
+print_os_info() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        info "OS: ${PRETTY_NAME}"
+    else
+        warn "Unable to determine OS information. Proceeding best-effort."
     fi
 }
 
 # Function to install system dependencies
 install_system_dependencies() {
-    log "Installing system dependencies for Ubuntu 24.04..."
-    
-    sudo apt update
-    sudo apt install -y \
-        python3.12 \
-        python3.12-venv \
-        python3.12-dev \
-        python3-pip \
-        build-essential \
-        pkg-config \
-        libcups2-dev \
-        libcupsimage2-dev \
-        libffi-dev \
-        libssl-dev \
-        libjpeg-dev \
-        libpng-dev \
-        libtiff-dev \
-        libwebp-dev \
-        zlib1g-dev \
-        sqlite3 \
-        libsqlite3-dev \
-        curl \
-        wget \
-        git \
-        nginx \
-        supervisor \
-        htop \
-        tree \
-        unzip
-    
-    log "System dependencies installed successfully!"
+    log "Installing system dependencies..."
+
+    case "$PKG_MGR" in
+        apt)
+            sudo apt update
+            sudo apt install -y \
+                python3 \
+                python3-venv \
+                python3-dev \
+                python3-pip \
+                build-essential \
+                pkg-config \
+                libcups2-dev \
+                libcupsimage2-dev \
+                libffi-dev \
+                libssl-dev \
+                libjpeg-dev \
+                libpng-dev \
+                libtiff-dev \
+                libwebp-dev \
+                zlib1g-dev \
+                sqlite3 \
+                libsqlite3-dev \
+                curl \
+                wget \
+                git \
+                nginx \
+                supervisor \
+                htop \
+                tree \
+                unzip
+            ;;
+        dnf|yum)
+            sudo $PKG_MGR -y install \
+                python3 \
+                python3-virtualenv \
+                python3-devel \
+                python3-pip \
+                gcc gcc-c++ make \
+                cups-devel \
+                libffi-devel \
+                openssl-devel \
+                libjpeg-turbo-devel \
+                libpng-devel \
+                libtiff-devel \
+                libwebp-devel \
+                zlib-devel \
+                sqlite \
+                sqlite-devel \
+                curl \
+                wget \
+                git \
+                nginx \
+                supervisor \
+                htop \
+                tree \
+                unzip || true
+            ;;
+        zypper)
+            sudo zypper refresh
+            sudo zypper install -y \
+                python3 \
+                python3-venv \
+                python3-devel \
+                python3-pip \
+                gcc gcc-c++ make \
+                cups-devel \
+                libffi-devel \
+                libopenssl-devel \
+                libjpeg-turbo-devel \
+                libpng16-devel \
+                libtiff-devel \
+                libwebp-devel \
+                zlib-devel \
+                sqlite3 \
+                sqlite3-devel \
+                curl \
+                wget \
+                git \
+                nginx \
+                supervisor \
+                htop \
+                tree \
+                unzip || true
+            ;;
+        pacman)
+            sudo pacman -Syu --noconfirm
+            sudo pacman -S --noconfirm \
+                python \
+                python-virtualenv \
+                python-pip \
+                base-devel \
+                cups \
+                libffi \
+                openssl \
+                libjpeg-turbo \
+                libpng \
+                libtiff \
+                libwebp \
+                zlib \
+                sqlite \
+                curl \
+                wget \
+                git \
+                nginx \
+                supervisor \
+                htop \
+                tree \
+                unzip || true
+            ;;
+        *)
+            warn "Unsupported or unknown package manager. Please ensure required packages are installed."
+            ;;
+    esac
+
+    log "System dependencies installation step completed."
 }
 
 # Function to setup Python virtual environment
@@ -115,7 +234,7 @@ setup_virtual_environment() {
     fi
     
     # Create new virtual environment
-    python3.12 -m venv "$VENV_DIR"
+    "$PYTHON_BIN" -m venv "$VENV_DIR"
     source "$VENV_DIR/bin/activate"
     
     # Upgrade pip
@@ -168,8 +287,12 @@ setup_ngrok() {
         sudo ln -sf "$PROJECT_DIR/ngrok" /usr/local/bin/ngrok
     fi
     
-    # Configure ngrok auth token
-    "$PROJECT_DIR/ngrok" config add-authtoken "$NGROK_AUTH_TOKEN"
+    # Configure ngrok auth token if provided
+    if [ -n "$NGROK_AUTH_TOKEN" ]; then
+        "$PROJECT_DIR/ngrok" config add-authtoken "$NGROK_AUTH_TOKEN"
+    else
+        info "NGROK_AUTH_TOKEN not provided. Skipping token configuration."
+    fi
     
     log "Ngrok configured successfully!"
 }
@@ -226,6 +349,11 @@ else:
 create_systemd_service() {
     log "Creating systemd service for NoctisPro..."
     
+    if ! command -v systemctl >/dev/null 2>&1; then
+        warn "systemd not available on this system. Skipping service creation."
+        return 0
+    fi
+
     sudo tee /etc/systemd/system/noctispro.service > /dev/null << EOF
 [Unit]
 Description=NoctisPro PACS Django Application
@@ -261,6 +389,11 @@ EOF
 create_ngrok_service() {
     log "Creating systemd service for ngrok..."
     
+    if ! command -v systemctl >/dev/null 2>&1; then
+        warn "systemd not available on this system. Skipping ngrok service creation."
+        return 0
+    fi
+
     sudo tee /etc/systemd/system/noctispro-ngrok.service > /dev/null << EOF
 [Unit]
 Description=Ngrok tunnel for NoctisPro PACS
@@ -291,15 +424,19 @@ EOF
 start_services() {
     log "Starting NoctisPro services..."
     
-    # Start Django application
-    sudo systemctl start noctispro
-    sleep 5
-    
-    # Start ngrok tunnel
-    sudo systemctl start noctispro-ngrok
-    sleep 3
-    
-    log "Services started successfully!"
+    if command -v systemctl >/dev/null 2>&1; then
+        # Start Django application
+        sudo systemctl start noctispro || true
+        sleep 5
+        
+        # Start ngrok tunnel
+        sudo systemctl start noctispro-ngrok || true
+        sleep 3
+        
+        log "Services started successfully!"
+    else
+        warn "systemd not available. Start services manually using manage scripts or docker-compose."
+    fi
 }
 
 # Function to show status
@@ -307,9 +444,13 @@ show_status() {
     log "Deployment Status:"
     echo
     info "=== System Status ==="
-    sudo systemctl status noctispro --no-pager -l
-    echo
-    sudo systemctl status noctispro-ngrok --no-pager -l
+    if command -v systemctl >/dev/null 2>&1; then
+        sudo systemctl status noctispro --no-pager -l || true
+        echo
+        sudo systemctl status noctispro-ngrok --no-pager -l || true
+    else
+        warn "systemd not available. Skipping service status."
+    fi
     echo
     
     info "=== Access Information ==="
@@ -320,10 +461,16 @@ show_status() {
     echo
     
     info "=== Service Management ==="
-    echo "Start services:   sudo systemctl start noctispro noctispro-ngrok"
-    echo "Stop services:    sudo systemctl stop noctispro noctispro-ngrok"
-    echo "Restart services: sudo systemctl restart noctispro noctispro-ngrok"
-    echo "View logs:        sudo journalctl -f -u noctispro -u noctispro-ngrok"
+    if command -v systemctl >/dev/null 2>&1; then
+        echo "Start services:   sudo systemctl start noctispro noctispro-ngrok"
+        echo "Stop services:    sudo systemctl stop noctispro noctispro-ngrok"
+        echo "Restart services: sudo systemctl restart noctispro noctispro-ngrok"
+        echo "View logs:        sudo journalctl -f -u noctispro -u noctispro-ngrok"
+    else
+        echo "Start: $PROJECT_DIR/start_noctispro.sh"
+        echo "Stop:  $PROJECT_DIR/stop_noctispro.sh"
+        echo "Logs:  tail -f logs/web.log logs/dicom.log"
+    fi
     echo
 }
 
@@ -381,11 +528,13 @@ EOF
 
 # Main deployment function
 main() {
-    log "Starting NoctisPro PACS deployment for Ubuntu Server 24.04..."
+    log "Starting NoctisPro PACS deployment for Linux..."
     echo
     
     check_root
-    check_ubuntu_version
+    print_os_info
+    detect_package_manager
+    detect_python
     
     log "=== Phase 1: System Dependencies ==="
     install_system_dependencies

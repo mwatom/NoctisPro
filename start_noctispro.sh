@@ -10,14 +10,30 @@ cd "$PROJECT_DIR"
 echo "🚀 Starting NoctisPro PACS..."
 echo "================================"
 
-# Activate virtual environment (prefer venv, fallback to venv_optimized)
+# Activate or create virtual environment (auto-detect Python)
 if [ -f "venv/bin/activate" ]; then
     source venv/bin/activate
 elif [ -f "venv_optimized/bin/activate" ]; then
     source venv_optimized/bin/activate
 else
-    echo "❌ Virtual environment not found. Create one with: python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt"
-    exit 1
+    echo "ℹ️  Virtual environment not found. Creating one..."
+    PYTHON_BIN=""
+    for candidate in python3.12 python3.11 python3.10 python3; do
+        if command -v "$candidate" >/dev/null 2>&1; then
+            PYTHON_BIN="$candidate"
+            break
+        fi
+    done
+    if [ -z "$PYTHON_BIN" ]; then
+        echo "❌ No suitable Python 3 interpreter found. Please install Python 3.10+ and retry."
+        exit 1
+    fi
+    "$PYTHON_BIN" -m venv venv
+    source venv/bin/activate
+    pip install --upgrade pip setuptools wheel
+    if [ -f requirements.txt ]; then
+        pip install -r requirements.txt || true
+    fi
 fi
 
 # Load .env if present and set defaults
