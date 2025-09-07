@@ -904,35 +904,45 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const items = e.dataTransfer.items;
         if (items && items.length) {
-            // Enhanced folder traversal for CT/MRI studies with multiple series
-            const traverseEntry = async (entry) => {
-                if (entry.isFile) {
-                    return new Promise(resolve => entry.file(f => resolve([f])));
-                } else if (entry.isDirectory) {
-                    const reader = entry.createReader();
-                    const allEntries = [];
-                    async function readAll() {
-                        return new Promise(resolve => {
-                            reader.readEntries(async results => {
-                                if (!results.length) {
-                                    resolve(allEntries);
-                                } else {
-                                    allEntries.push(...results);
-                                    resolve(await readAll());
-                                }
+            // If browser supports directory entries, traverse; otherwise, fallback to files list
+            const firstItem = items[0];
+            const supportsEntries = firstItem && typeof firstItem.webkitGetAsEntry === 'function';
+            if (supportsEntries) {
+                // Enhanced folder traversal for CT/MRI studies with multiple series
+                const traverseEntry = async (entry) => {
+                    if (!entry) return [];
+                    if (entry.isFile) {
+                        return new Promise(resolve => entry.file(f => resolve([f])));
+                    } else if (entry.isDirectory) {
+                        const reader = entry.createReader();
+                        const allEntries = [];
+                        async function readAll() {
+                            return new Promise(resolve => {
+                                reader.readEntries(async results => {
+                                    if (!results.length) {
+                                        resolve(allEntries);
+                                    } else {
+                                        allEntries.push(...results);
+                                        resolve(await readAll());
+                                    }
+                                });
                             });
-                        });
+                        }
+                        const entries = await readAll();
+                        const nested = await Promise.all(entries.map(traverseEntry));
+                        return nested.flat();
                     }
-                    const entries = await readAll();
-                    const nested = await Promise.all(entries.map(traverseEntry));
-                    return nested.flat();
-                }
-                return [];
-            };
-            const filesArrays = await Promise.all(Array.from(items).map(i => traverseEntry(i.webkitGetAsEntry())));
-            handleFiles(filesArrays.flat());
+                    return [];
+                };
+                const filesArrays = await Promise
+                    .all(Array.from(items).map(i => traverseEntry(i.webkitGetAsEntry())));
+                handleFiles(filesArrays.flat());
+            } else {
+                // Fallback for browsers without webkitGetAsEntry (e.g., Firefox)
+                handleFiles(Array.from(e.dataTransfer.files || []));
+            }
         } else {
-            handleFiles(Array.from(e.dataTransfer.files));
+            handleFiles(Array.from(e.dataTransfer.files || []));
         }
     });
 

@@ -376,6 +376,11 @@ LOGGING = {
             'level': 'INFO',
             'propagate': True,
         },
+        'noctis_pro.upload': {
+            'handlers': ['file', 'console'] if DEBUG else ['file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
         'worklist': {
             'handlers': ['file'],
             'level': 'INFO',
