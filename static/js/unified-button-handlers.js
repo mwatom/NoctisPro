@@ -430,43 +430,44 @@ class NoctisProActions {
         }
 
         try {
-            const data = await this.buttonManager.apiRequest(`/worklist/api/study/${studyId}/delete/`, {
-                method: 'DELETE'
+            // Prefer POST first for broader proxy compatibility
+            const postData = await this.buttonManager.apiRequest(`/worklist/api/study/${studyId}/delete/`, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
             });
 
-            if (data.success !== false) {
+            if (postData && postData.success !== false) {
                 this.buttonManager.showToast(`Study ${accessionNumber} deleted successfully`, 'success');
                 setTimeout(() => window.location.reload(), 1000);
                 return;
             }
-            throw new Error(data.error || 'Failed to delete study');
-        } catch (error) {
-            // If DELETE failed due to method or CSRF issues, try POST fallback
-            const msg = String(error && error.message || '');
-            if (/HTTP\s*405|HTTP\s*403|method not allowed/i.test(msg)) {
+            throw new Error((postData && postData.error) || 'Failed to delete study');
+        } catch (postError) {
+            // Fallback to DELETE only if POST not allowed
+            const msg = String(postError && postError.message || '');
+            if (/HTTP\s*405|method not allowed/i.test(msg)) {
                 try {
-                    const data = await this.buttonManager.apiRequest(`/worklist/api/study/${studyId}/delete/`, {
-                        method: 'POST',
-                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    const delData = await this.buttonManager.apiRequest(`/worklist/api/study/${studyId}/delete/`, {
+                        method: 'DELETE',
                     });
-                    if (data.success !== false) {
+                    if (delData && delData.success !== false) {
                         this.buttonManager.showToast(`Study ${accessionNumber} deleted successfully`, 'success');
                         setTimeout(() => window.location.reload(), 1000);
                         return;
                     }
-                    throw new Error(data.error || 'Failed to delete study');
-                } catch (fallbackError) {
+                    throw new Error((delData && delData.error) || 'Failed to delete study');
+                } catch (delError) {
                     if (buttonElement) {
                         this.buttonManager.setButtonLoading(buttonElement, false);
                     }
-                    this.buttonManager.showToast(`Delete failed: ${fallbackError.message}`, 'error');
+                    this.buttonManager.showToast(`Delete failed: ${delError.message}`, 'error');
                     return;
                 }
             }
             if (buttonElement) {
                 this.buttonManager.setButtonLoading(buttonElement, false);
             }
-            this.buttonManager.showToast(`Delete failed: ${error.message}`, 'error');
+            this.buttonManager.showToast(`Delete failed: ${postError.message}`, 'error');
         }
     }
 
