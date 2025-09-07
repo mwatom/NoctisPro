@@ -607,6 +607,11 @@ SYSTEM_PROFILE=${SYSTEM_PROFILE}
 DEPLOYED_AT=$(date -Iseconds)
 EOF
     
+    # Append DuckDNS domain if configured earlier but env not created yet
+    if [[ -n "${PENDING_DUCKDNS_DOMAIN:-}" ]]; then
+        echo "DUCKDNS_DOMAIN=${PENDING_DUCKDNS_DOMAIN}" >> "${PROJECT_DIR}/.env"
+    fi
+
     success "Docker environment configured"
 }
 
@@ -908,6 +913,70 @@ setup_health_monitoring() {
 }
 
 # =============================================================================
+# DUCKDNS DOMAIN SETUP (OPTIONAL)
+# =============================================================================
+
+setup_duckdns() {
+    phase "DOMAIN_SETUP" "Configuring optional DuckDNS domain"
+
+    # Skip if already configured in this session
+    if [[ "${DUCKDNS_CONFIGURED:-false}" == "true" ]]; then
+        log "DuckDNS already configured in this session – skipping"
+        return
+    fi
+
+    # Check if helper script exists
+    local duckdns_script="${PROJECT_DIR}/scripts/setup_duckdns.sh"
+    if [[ ! -x "$duckdns_script" ]]; then
+        warn "DuckDNS setup script not found – skipping domain configuration"
+        return
+    fi
+
+    # Determine whether DuckDNS should be enabled
+    local enable_duckdns=""
+    if [[ -n "${DUCKDNS_TOKEN:-}" && -n "${DUCKDNS_SUBDOMAIN:-}" ]]; then
+        enable_duckdns="y"
+    else
+        echo -e "\nWould you like to configure a free DuckDNS domain? (y/N): "
+        read -r enable_duckdns
+    fi
+
+    if [[ ! "$enable_duckdns" =~ ^[Yy]$ ]]; then
+        log "DuckDNS configuration skipped by user"
+        return
+    fi
+
+    # Obtain token and subdomain if not already provided via env
+    if [[ -z "${DUCKDNS_TOKEN:-}" ]]; then
+        read -p "Enter your DuckDNS token: " -r DUCKDNS_TOKEN
+    fi
+    if [[ -z "${DUCKDNS_SUBDOMAIN:-}" ]]; then
+        read -p "Enter desired DuckDNS subdomain (without .duckdns.org): " -r DUCKDNS_SUBDOMAIN
+    fi
+
+    if [[ -z "$DUCKDNS_TOKEN" || -z "$DUCKDNS_SUBDOMAIN" ]]; then
+        warn "DuckDNS token or subdomain missing – skipping configuration"
+        return
+    fi
+
+    # Run helper script using sudo (required for systemd unit placement)
+    log "Running DuckDNS setup script…"
+    if sudo "$duckdns_script" "$DUCKDNS_TOKEN" "$DUCKDNS_SUBDOMAIN" >> "$LOG_FILE" 2>&1; then
+        success "DuckDNS configured – Domain: https://${DUCKDNS_SUBDOMAIN}.duckdns.org"
+        DUCKDNS_CONFIGURED=true
+
+        # Append to environment file if it already exists; otherwise defer until env creation
+        if [[ -f "${PROJECT_DIR}/.env" ]]; then
+            echo "DUCKDNS_DOMAIN=${DUCKDNS_SUBDOMAIN}.duckdns.org" >> "${PROJECT_DIR}/.env"
+        else
+            export PENDING_DUCKDNS_DOMAIN="${DUCKDNS_SUBDOMAIN}.duckdns.org"
+        fi
+    else
+        warn "DuckDNS setup failed – check logs for details"
+    fi
+}
+
+# =============================================================================
 # DEPLOYMENT SUMMARY AND REPORTING
 # =============================================================================
 
@@ -1089,6 +1158,9 @@ main() {
     
     # Phase 2: Pre-deployment Validation
     run_pre_deployment_validation
+
+    # Optional Domain Setup (DuckDNS)
+    setup_duckdns
     
     # Phase 3: Backup Creation
     create_deployment_backup
