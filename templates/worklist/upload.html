@@ -1129,10 +1129,25 @@ document.addEventListener('DOMContentLoaded', function() {
         const totalFiles = selectedFiles.length;
         const totalBytes = selectedFiles.reduce((s, f) => s + (f.size || 0), 0);
 
-        // Adaptive tuning
-        // Smaller chunks and parallelism to avoid upstream (ngrok/proxy) timeouts
-        let CHUNK_SIZE = totalFiles > 1000 ? 50 : 10;
-        let MAX_PARALLEL = totalFiles > 1000 ? 3 : 2;
+        // Build chunks by total bytes to respect reverse-proxy limits (e.g., 100MB)
+        const MAX_CHUNK_BYTES = 80 * 1024 * 1024; // 80MB safety margin
+        let chunks = [];
+        let currentChunk = [];
+        let currentBytes = 0;
+        for (const file of selectedFiles) {
+            const fsize = file.size || 0;
+            if (currentChunk.length && (currentBytes + fsize) > MAX_CHUNK_BYTES) {
+                chunks.push(currentChunk);
+                currentChunk = [];
+                currentBytes = 0;
+            }
+            currentChunk.push(file);
+            currentBytes += fsize;
+        }
+        if (currentChunk.length) chunks.push(currentChunk);
+
+        // Limit parallel uploads to reduce server pressure
+        let MAX_PARALLEL = chunks.length > 10 ? 2 : 2;
 
         let uploadedCount = 0;
         let uploadedBytes = 0;
@@ -1146,12 +1161,6 @@ document.addEventListener('DOMContentLoaded', function() {
         dropZone.classList.add('uploading');
         uploadBtn.disabled = true;
         uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Uploading...';
-
-        // Build chunks
-        const chunks = [];
-        for (let i = 0; i < selectedFiles.length; i += CHUNK_SIZE) {
-            chunks.push(selectedFiles.slice(i, i + CHUNK_SIZE));
-        }
 
         // UI state
         progressSection.style.display = 'block';
@@ -1171,7 +1180,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const xhr = new XMLHttpRequest();
                 xhr.open('POST', url, true);
-                xhr.timeout = 120000; // 120s per chunk
+                xhr.timeout = 300000; // 300s per chunk for large uploads
                 xhr.setRequestHeader('X-CSRFToken', token);
                 xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 
