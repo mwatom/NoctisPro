@@ -1,9 +1,7 @@
 #!/bin/bash
 # Simple service starter for NoctisPro PACS
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="${PROJECT_DIR:-$SCRIPT_DIR}"
-cd "$PROJECT_DIR"
+cd "/workspace"
 source venv_optimized/bin/activate
 
 echo "Starting NoctisPro PACS services..."

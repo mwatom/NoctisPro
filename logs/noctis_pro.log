@@ -310,3 +310,16 @@ django.template.exceptions.TemplateSyntaxError: Could not parse the remainder: '
 [INFO] 2025-09-07 20:57:26,506 django.server basehttp 9161 140146841867968 "GET / HTTP/1.1" 302 0
 [INFO] 2025-09-07 20:57:26,653 django.server basehttp 9161 140146841867968 "GET /login/ HTTP/1.1" 200 17452
 [INFO] 2025-09-07 20:57:26,820 django.server basehttp 9161 140146841867968 "GET /favicon.ico HTTP/1.1" 200 68
+[INFO] 2025-09-07 21:34:36,844 django.utils.autoreload autoreload 7862 140696875561216 Watching for file changes with StatReloader
+[INFO] 2025-09-07 21:34:46,483 django.server basehttp 7862 140696282461888 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-07 21:35:07,004 django.server basehttp 7862 140696282461888 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-07 21:35:45,217 django.server basehttp 7862 140696282461888 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-07 21:37:12,402 django.server basehttp 7862 140696282461888 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-07 21:37:12,512 django.server basehttp 7862 140696282461888 "GET /login/ HTTP/1.1" 200 17452
+[INFO] 2025-09-07 21:37:12,737 django.server basehttp 7862 140696282461888 "GET /favicon.ico HTTP/1.1" 200 68
+[INFO] 2025-09-07 21:39:57,481 django.utils.autoreload autoreload 7862 140696875561216 /workspace/admin_panel/migrations/0001_initial.py changed, reloading.
+[INFO] 2025-09-07 21:39:57,776 django.utils.autoreload autoreload 9620 139706309886208 Watching for file changes with StatReloader
+[INFO] 2025-09-07 21:47:12,479 django.server basehttp 9620 139705712985792 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-07 21:47:38,214 django.server basehttp 9620 139705712985792 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-07 21:47:54,214 django.utils.autoreload autoreload 15096 139751050379520 Watching for file changes with StatReloader
+[INFO] 2025-09-07 21:48:02,942 django.server basehttp 9620 139705712985792 "GET / HTTP/1.1" 302 0

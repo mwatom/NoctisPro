@@ -301,3 +301,63 @@ OSError: [Errno 98] Address already in use
 2025-09-06 22:26:40,662 - dicom_receiver - INFO - [start:757] -   Success rate: 0.0%
 2025-09-06 22:26:40,662 - dicom_receiver - INFO - [start:759] -   Runtime: 0 seconds
 2025-09-06 22:26:40,662 - dicom_receiver - INFO - [stop:763] - Stopping DICOM receiver...
+2025-09-07 21:34:36,784 - dicom_receiver - INFO - [__init__:285] - DICOM Receiver initialized - AET: NOCTIS_SCP, Port: 11112, Max PDU: 16384
+2025-09-07 21:34:36,785 - dicom_receiver - INFO - [start:721] - Starting DICOM receiver on port 11112
+2025-09-07 21:34:36,792 - dicom_receiver - INFO - [setup_ae:312] - Application Entity configured successfully
+2025-09-07 21:34:36,792 - dicom_receiver - INFO - [start:729] - ============================================================
+2025-09-07 21:34:36,792 - dicom_receiver - INFO - [start:730] - NOCTIS PRO DICOM RECEIVER SERVICE
+2025-09-07 21:34:36,792 - dicom_receiver - INFO - [start:731] - ============================================================
+2025-09-07 21:34:36,792 - dicom_receiver - INFO - [start:732] - Application Entity Title: NOCTIS_SCP
+2025-09-07 21:34:36,792 - dicom_receiver - INFO - [start:733] - Listening on port: 11112
+2025-09-07 21:34:36,792 - dicom_receiver - INFO - [start:734] - Maximum PDU size: 16384
+2025-09-07 21:34:36,792 - dicom_receiver - INFO - [start:735] - Storage directory: /workspace/media/dicom/received
+2025-09-07 21:34:36,792 - dicom_receiver - INFO - [start:736] - Waiting for DICOM connections...
+2025-09-07 21:34:36,792 - dicom_receiver - INFO - [start:737] - ============================================================
+2025-09-07 21:46:01,297 - dicom_receiver - INFO - [__init__:285] - DICOM Receiver initialized - AET: NOCTIS_SCP, Port: 11112, Max PDU: 16384
+2025-09-07 21:46:01,297 - dicom_receiver - INFO - [start:721] - Starting DICOM receiver on port 11112
+2025-09-07 21:46:01,304 - dicom_receiver - INFO - [setup_ae:312] - Application Entity configured successfully
+2025-09-07 21:46:01,304 - dicom_receiver - INFO - [start:729] - ============================================================
+2025-09-07 21:46:01,304 - dicom_receiver - INFO - [start:730] - NOCTIS PRO DICOM RECEIVER SERVICE
+2025-09-07 21:46:01,304 - dicom_receiver - INFO - [start:731] - ============================================================
+2025-09-07 21:46:01,304 - dicom_receiver - INFO - [start:732] - Application Entity Title: NOCTIS_SCP
+2025-09-07 21:46:01,304 - dicom_receiver - INFO - [start:733] - Listening on port: 11112
+2025-09-07 21:46:01,304 - dicom_receiver - INFO - [start:734] - Maximum PDU size: 16384
+2025-09-07 21:46:01,304 - dicom_receiver - INFO - [start:735] - Storage directory: /workspace/media/dicom/received
+2025-09-07 21:46:01,304 - dicom_receiver - INFO - [start:736] - Waiting for DICOM connections...
+2025-09-07 21:46:01,304 - dicom_receiver - INFO - [start:737] - ============================================================
+2025-09-07 21:46:01,304 - dicom_receiver - ERROR - [start:745] - Error starting DICOM receiver: [Errno 98] Address already in use
+2025-09-07 21:46:01,306 - dicom_receiver - ERROR - [start:746] - Traceback: Traceback (most recent call last):
+  File "/workspace/dicom_receiver.py", line 740, in start
+    self.ae.start_server(('', self.port), block=True)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/venv_optimized/lib/python3.13/site-packages/pynetdicom/ae.py", line 1431, in start_server
+    server = self.make_server(
+        address,
+    ...<3 lines>...
+        evt_handlers=evt_handlers,
+    )
+  File "/workspace/venv_optimized/lib/python3.13/site-packages/pynetdicom/ae.py", line 879, in make_server
+    return server_class(  # type: ignore
+        self,
+    ...<5 lines>...
+        **kwargs,
+    )
+  File "/workspace/venv_optimized/lib/python3.13/site-packages/pynetdicom/transport.py", line 860, in __init__
+    super().__init__(address, request_handler, bind_and_activate=True)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/socketserver.py", line 457, in __init__
+    self.server_bind()
+    ~~~~~~~~~~~~~~~~^^
+  File "/workspace/venv_optimized/lib/python3.13/site-packages/pynetdicom/transport.py", line 1007, in server_bind
+    self.socket.bind(self.server_address)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+OSError: [Errno 98] Address already in use
+
+2025-09-07 21:46:01,307 - dicom_receiver - INFO - [start:749] - DICOM receiver service stopped
+2025-09-07 21:46:01,307 - dicom_receiver - INFO - [start:753] - Final Statistics:
+2025-09-07 21:46:01,307 - dicom_receiver - INFO - [start:754] -   Total received: 0
+2025-09-07 21:46:01,307 - dicom_receiver - INFO - [start:755] -   Total stored: 0
+2025-09-07 21:46:01,307 - dicom_receiver - INFO - [start:756] -   Total errors: 0
+2025-09-07 21:46:01,307 - dicom_receiver - INFO - [start:757] -   Success rate: 0.0%
+2025-09-07 21:46:01,307 - dicom_receiver - INFO - [start:759] -   Runtime: 0 seconds
+2025-09-07 21:46:01,307 - dicom_receiver - INFO - [stop:763] - Stopping DICOM receiver...
