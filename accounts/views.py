@@ -24,7 +24,8 @@ def login_view(request):
         password = request.POST.get('password')
         
         user = authenticate(request, username=username, password=password)
-        if user and user.is_active and user.is_verified:
+        # Allow superusers/staff to bypass verification to prevent lockout on fresh setups
+        if user and user.is_active and (user.is_verified or getattr(user, 'is_superuser', False) or getattr(user, 'is_staff', False)):
             # Track login session
             login(request, user)
             
