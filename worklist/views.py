@@ -409,7 +409,8 @@ def upload_study(request):
 				else:
 					logger.debug(f"Existing study found: {study.accession_number}")
 				
-				created_studies.append(study)
+				# Track by id to keep response consistent
+				created_studies.append(study.id)
 				
 				# Professional series processing with medical imaging intelligence
 				for series_key, items in series_map.items():
@@ -456,7 +457,7 @@ def upload_study(request):
 					
 					total_series_processed += 1
 					# If study existed, update clinical info/priority once
-					if not created:
+					if not study_created:
 						updated = False
 						new_priority = request.POST.get('priority')
 						new_clin = request.POST.get('clinical_info')
@@ -535,9 +536,8 @@ def upload_study(request):
 					series_processing_time = (time.time() - series_start_time) * 1000
 					logger.info(f"Professional series completed: {series_desc} - {images_processed} images in {series_processing_time:.1f}ms")
 					
-					total_series_processed += 1
 				
-				created_studies.append(study.id)
+				# already tracked above
 				
 				# Enhanced notifications for new study upload
 				try:
@@ -583,10 +583,14 @@ def upload_study(request):
 				'success': True,
 				'message': f'🏥 Professional DICOM upload completed successfully',
 				'details': f'Processed {processed_files} DICOM files across {upload_stats["created_studies"]} studies with {upload_stats["created_series"]} series',
+				# Top-level keys used by frontend progress UI
+				'processed_files': processed_files,
+				'studies_created': upload_stats['created_studies'],
+				'total_series': total_series_processed,
 				'statistics': upload_stats,
 				'created_study_ids': created_studies,
 				'medical_summary': {
-					'patients_affected': len(set(study.patient_id for study in Study.objects.filter(id__in=created_studies))),
+					'patients_affected': len({s.patient_id for s in Study.objects.filter(id__in=created_studies)}),
 					'modalities_processed': list(set(series_key.split('_')[1] for series_map in studies_map.values() for series_key in series_map.keys())),
 					'facilities_involved': [facility.name] if facility else [],
 					'upload_quality': 'EXCELLENT' if invalid_files == 0 else 'GOOD' if invalid_files < total_files * 0.1 else 'ACCEPTABLE',
