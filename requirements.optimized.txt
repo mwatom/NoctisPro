@@ -24,6 +24,7 @@ requests
 # DICOM processing
 pydicom
 pynetdicom
+highdicom
 
 # Background tasks (requires more memory)
 celery

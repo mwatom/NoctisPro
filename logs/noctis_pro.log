@@ -282,3 +282,6 @@ django.template.exceptions.TemplateSyntaxError: Could not parse the remainder: '
 [WARNING] 2025-09-07 15:49:30,595 django.request log 38260 139644297699584 Not Found: /dicom_viewer/api/series/3/bone/
 [WARNING] 2025-09-07 15:49:30,599 django.request log 38260 139644297699584 Bad Request: /dicom-viewer/api/series/3/bone/
 [WARNING] 2025-09-07 15:51:17,705 django.request log 39042 140008458817792 Bad Request: /dicom-viewer/api/series/3/mpr/
+[INFO] 2025-09-07 16:21:47,384 django.utils.autoreload autoreload 2901 140328814866688 Watching for file changes with StatReloader
+[INFO] 2025-09-07 16:21:50,951 django.server basehttp 2901 140328220751552 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-07 16:23:47,893 django.server basehttp 2901 140328220751552 "GET /dicom-viewer/api/series/1/mpr/ HTTP/1.1" 302 0
