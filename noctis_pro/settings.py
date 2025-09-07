@@ -410,24 +410,8 @@ print(f"   • Database: {DATABASES['default']['ENGINE'].split('.')[-1]}")
 print(f"   • Security: {'Development' if DEBUG else 'Production'} profile")
 
 
-# Masterpiece Auto-Deploy Optimizations
-ALLOWED_HOSTS = ['mallard-shining-curiously.ngrok-free.app', 'localhost', '127.0.0.1', '0.0.0.0']
+# Masterpiece overrides removed to allow dynamic configuration via environment and NGROK_URL
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_SSL_REDIRECT = False  # ngrok handles SSL
-
-# CSRF trusted origins for ngrok
-CSRF_TRUSTED_ORIGINS = [
-    'https://mallard-shining-curiously.ngrok-free.app',
-    'http://localhost:8000',
-    'http://127.0.0.1:8000'
-]
-
-# Session security for ngrok
-SESSION_COOKIE_SECURE = False  # ngrok handles SSL
-CSRF_COOKIE_SECURE = False     # ngrok handles SSL
-
-# Static files optimization
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # DICOM viewer masterpiece settings
 DICOM_VIEWER_SETTINGS = {
