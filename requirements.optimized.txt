@@ -25,6 +25,7 @@ requests
 pydicom
 pynetdicom
 highdicom
+numpy
 
 # Background tasks (requires more memory)
 celery
@@ -35,7 +36,6 @@ scikit-image
 matplotlib
 
 # AI and machine learning (high memory requirement)
-numpy
 scipy
 pandas
 torch
