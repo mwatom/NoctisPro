@@ -39,6 +39,12 @@ declare -g USE_NGINX=false
 declare -g USE_SSL=false
 declare -g INTERNET_ACCESS=false
 
+# DuckDNS Configuration
+declare -g DUCKDNS_ENABLED=false
+declare -g DUCKDNS_SUBDOMAIN=""
+declare -g DUCKDNS_TOKEN=""
+declare -g DUCKDNS_DOMAIN=""
+
 # Configuration
 # Only declare PROJECT_DIR if not already set (to avoid readonly conflicts)
 if [[ -z "${PROJECT_DIR:-}" ]]; then
@@ -303,8 +309,11 @@ determine_deployment_mode() {
         info "Selected deployment mode: Install dependencies first"
     fi
     
+    # Check for DuckDNS configuration
+    check_duckdns_configuration
+    
     # Determine if SSL should be used
-    if [[ "${INTERNET_ACCESS}" == true ]] && [[ "${HAS_NGINX}" == true || "${DEPLOYMENT_MODE}" == "docker_full" ]]; then
+    if [[ "${INTERNET_ACCESS}" == true ]] && [[ "${HAS_NGINX}" == true || "${DEPLOYMENT_MODE}" == "docker_full" || "${DUCKDNS_ENABLED}" == "true" ]]; then
         USE_SSL=true
         info "SSL/TLS will be configured"
     fi
@@ -314,6 +323,204 @@ determine_deployment_mode() {
     info "  Workers: ${OPTIMAL_WORKERS}"
     info "  Nginx: ${USE_NGINX}"
     info "  SSL: ${USE_SSL}"
+}
+
+# =============================================================================
+# DUCKDNS CONFIGURATION FUNCTIONS
+# =============================================================================
+
+check_duckdns_configuration() {
+    log "Checking for DuckDNS configuration..."
+    
+    # Check environment variables
+    if [[ -n "${DUCKDNS_SUBDOMAIN:-}" && -n "${DUCKDNS_TOKEN:-}" ]]; then
+        DUCKDNS_ENABLED=true
+        DUCKDNS_DOMAIN="${DUCKDNS_SUBDOMAIN}.duckdns.org"
+        info "DuckDNS configuration found: ${DUCKDNS_DOMAIN}"
+        return 0
+    fi
+    
+    # Check existing configuration files
+    if [[ -f "/etc/noctis/duckdns.env" ]]; then
+        source /etc/noctis/duckdns.env
+        if [[ -n "${DUCKDNS_SUBDOMAIN:-}" && -n "${DUCKDNS_TOKEN:-}" ]]; then
+            DUCKDNS_ENABLED=true
+            DUCKDNS_DOMAIN="${DUCKDNS_SUBDOMAIN}.duckdns.org"
+            info "DuckDNS configuration loaded from /etc/noctis/duckdns.env"
+            return 0
+        fi
+    fi
+    
+    # Check project-specific configuration
+    if [[ -f "${PROJECT_DIR}/.duckdns_config" ]]; then
+        source "${PROJECT_DIR}/.duckdns_config"
+        if [[ -n "${DUCKDNS_DOMAIN:-}" && -n "${DUCKDNS_TOKEN:-}" ]]; then
+            # Extract subdomain from domain
+            DUCKDNS_SUBDOMAIN="${DUCKDNS_DOMAIN%.duckdns.org}"
+            DUCKDNS_ENABLED=true
+            info "DuckDNS configuration loaded from project config"
+            return 0
+        fi
+    fi
+    
+    info "No existing DuckDNS configuration found"
+}
+
+setup_duckdns() {
+    log "Setting up DuckDNS dynamic DNS..."
+    
+    if [[ "${DUCKDNS_ENABLED}" != "true" ]]; then
+        warn "DuckDNS not configured - skipping setup"
+        return 0
+    fi
+    
+    # Create DuckDNS configuration directory
+    sudo mkdir -p /etc/noctis
+    
+    # Create DuckDNS environment file
+    sudo tee /etc/noctis/duckdns.env > /dev/null << EOF
+DUCKDNS_SUBDOMAIN=${DUCKDNS_SUBDOMAIN}
+DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
+EOF
+    
+    # Install or update DuckDNS update script
+    if [[ -f "${PROJECT_DIR}/ops/duckdns-update.sh" ]]; then
+        sudo cp "${PROJECT_DIR}/ops/duckdns-update.sh" /usr/local/bin/duckdns-update.sh
+    else
+        # Create a basic DuckDNS update script
+        sudo tee /usr/local/bin/duckdns-update.sh > /dev/null << 'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+ENV_FILE="/etc/noctis/duckdns.env"
+[ -f "$ENV_FILE" ] && source "$ENV_FILE"
+
+if [ -z "${DUCKDNS_SUBDOMAIN:-}" ] || [ -z "${DUCKDNS_TOKEN:-}" ]; then
+    echo "DuckDNS not configured; missing DUCKDNS_SUBDOMAIN or DUCKDNS_TOKEN" >&2
+    exit 0
+fi
+
+# Update DuckDNS (ip blank lets DuckDNS auto-detect)
+UPDATE_URL="https://www.duckdns.org/update?domains=${DUCKDNS_SUBDOMAIN}&token=${DUCKDNS_TOKEN}"
+RESPONSE=$(curl -fsS "$UPDATE_URL" 2>/dev/null || echo "FAIL")
+if [[ "$RESPONSE" == "OK" ]]; then
+    echo "$(date): DuckDNS updated successfully for ${DUCKDNS_SUBDOMAIN}.duckdns.org"
+else
+    echo "$(date): DuckDNS update failed: $RESPONSE" >&2
+fi
+EOF
+    fi
+    
+    sudo chmod +x /usr/local/bin/duckdns-update.sh
+    
+    # Create systemd service and timer if systemd is available
+    if [[ "${HAS_SYSTEMD}" == "true" ]]; then
+        create_duckdns_systemd_service
+    fi
+    
+    # Perform initial DuckDNS update
+    log "Performing initial DuckDNS update..."
+    if sudo /usr/local/bin/duckdns-update.sh; then
+        success "DuckDNS setup completed successfully"
+    else
+        warn "DuckDNS initial update failed - check configuration"
+    fi
+}
+
+create_duckdns_systemd_service() {
+    log "Creating DuckDNS systemd service..."
+    
+    # Create systemd service
+    sudo tee /etc/systemd/system/duckdns-update.service > /dev/null << EOF
+[Unit]
+Description=DuckDNS IP Updater for NoctisPro
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=/etc/noctis/duckdns.env
+ExecStart=/usr/local/bin/duckdns-update.sh
+EOF
+    
+    # Create systemd timer
+    sudo tee /etc/systemd/system/duckdns-update.timer > /dev/null << EOF
+[Unit]
+Description=Run DuckDNS updater every 5 minutes
+Requires=duckdns-update.service
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=duckdns-update.service
+
+[Install]
+WantedBy=timers.target
+EOF
+    
+    # Enable and start the timer
+    sudo systemctl daemon-reload
+    sudo systemctl enable duckdns-update.timer
+    sudo systemctl start duckdns-update.timer
+    
+    log "DuckDNS systemd service and timer created and started"
+}
+
+setup_ssl_certificates() {
+    if [[ "${DUCKDNS_ENABLED}" != "true" ]]; then
+        return 0
+    fi
+    
+    log "Setting up SSL certificates for DuckDNS domain..."
+    
+    # Install certbot if not available
+    if ! command -v certbot >/dev/null 2>&1; then
+        log "Installing certbot for SSL certificates..."
+        case "${DETECTED_OS}" in
+            ubuntu|debian)
+                sudo apt update
+                sudo apt install -y certbot python3-certbot-nginx
+                ;;
+            centos|rhel|rocky|almalinux)
+                if command -v dnf >/dev/null 2>&1; then
+                    sudo dnf install -y certbot python3-certbot-nginx
+                else
+                    sudo yum install -y certbot python3-certbot-nginx
+                fi
+                ;;
+            fedora)
+                sudo dnf install -y certbot python3-certbot-nginx
+                ;;
+            *)
+                warn "Certbot installation not automated for ${DETECTED_OS}"
+                return 0
+                ;;
+        esac
+    fi
+    
+    # Only attempt SSL if nginx is being used
+    if [[ "${USE_NGINX}" == "true" ]]; then
+        log "Waiting for DNS propagation..."
+        sleep 15
+        
+        log "Attempting to obtain SSL certificate for ${DUCKDNS_DOMAIN}..."
+        
+        # Attempt to get SSL certificate
+        if sudo certbot --nginx -d "${DUCKDNS_DOMAIN}" --non-interactive --agree-tos --email "admin@${DUCKDNS_DOMAIN}" --redirect --quiet; then
+            success "SSL certificate obtained for ${DUCKDNS_DOMAIN}"
+            
+            # Setup automatic renewal
+            if ! sudo crontab -l 2>/dev/null | grep -q "certbot renew"; then
+                (sudo crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet") | sudo crontab -
+                log "SSL certificate auto-renewal configured"
+            fi
+        else
+            warn "SSL certificate setup failed - continuing with HTTP"
+            warn "You can manually run: sudo certbot --nginx -d ${DUCKDNS_DOMAIN}"
+        fi
+    fi
 }
 
 # =============================================================================
@@ -571,8 +778,14 @@ execute_docker_deployment() {
     # Wait for services to be ready
     wait_for_services_docker
     
+    # Setup DuckDNS if configured
+    setup_duckdns
+    
     # Run initial setup
     setup_django_docker
+    
+    # Setup SSL certificates
+    setup_ssl_certificates
 }
 
 execute_native_deployment() {
@@ -589,6 +802,9 @@ execute_native_deployment() {
     # Setup Django
     setup_django_native
     
+    # Setup DuckDNS if configured
+    setup_duckdns
+    
     # Create services based on capabilities
     if [[ "${HAS_SYSTEMD}" == true ]]; then
         create_systemd_services
@@ -598,6 +814,9 @@ execute_native_deployment() {
     
     # Start services
     start_native_services
+    
+    # Setup SSL certificates
+    setup_ssl_certificates
 }
 
 create_optimized_docker_compose() {
@@ -768,6 +987,12 @@ DJANGO_SETTINGS_MODULE=noctis_pro.settings
 
 # Database Configuration
 POSTGRES_PASSWORD=$(openssl rand -base64 32)
+
+# DuckDNS Configuration
+DUCKDNS_ENABLED=${DUCKDNS_ENABLED}
+DUCKDNS_DOMAIN=${DUCKDNS_DOMAIN}
+DUCKDNS_SUBDOMAIN=${DUCKDNS_SUBDOMAIN}
+ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0$(if [[ "${DUCKDNS_ENABLED}" == "true" ]]; then echo ",${DUCKDNS_DOMAIN}"; fi)
 
 # System Optimization
 WORKERS=${OPTIMAL_WORKERS}
@@ -1417,9 +1642,20 @@ display_deployment_summary() {
     echo "  SSL: ${USE_SSL}"
     echo ""
     echo "🌐 Access Information:"
-    echo "  Web Interface: http://localhost:8000"
-    echo "  Admin Panel: http://localhost:8000/admin/"
-    echo "  DICOM Port: localhost:11112"
+    if [[ "${DUCKDNS_ENABLED}" == "true" ]]; then
+        local protocol="https"
+        if [[ "${USE_SSL}" != "true" ]]; then
+            protocol="http"
+        fi
+        echo "  Web Interface: ${protocol}://${DUCKDNS_DOMAIN}"
+        echo "  Admin Panel: ${protocol}://${DUCKDNS_DOMAIN}/admin/"
+        echo "  DICOM Port: ${DUCKDNS_DOMAIN}:11112"
+        echo "  DuckDNS Domain: ${DUCKDNS_DOMAIN}"
+    else
+        echo "  Web Interface: http://localhost:8000"
+        echo "  Admin Panel: http://localhost:8000/admin/"
+        echo "  DICOM Port: localhost:11112"
+    fi
     echo "  Default Login: admin / admin123"
     echo ""
     echo "🔧 Management:"
@@ -1490,7 +1726,16 @@ main() {
     display_deployment_summary
     
     success "🎉 NoctisPro PACS has been successfully deployed with intelligent optimization!"
-    success "🔗 Access your application at: http://localhost:8000"
+    if [[ "${DUCKDNS_ENABLED}" == "true" ]]; then
+        local protocol="https"
+        if [[ "${USE_SSL}" != "true" ]]; then
+            protocol="http"
+        fi
+        success "🔗 Access your application at: ${protocol}://${DUCKDNS_DOMAIN}"
+        success "🦆 DuckDNS domain configured with automatic IP updates"
+    else
+        success "🔗 Access your application at: http://localhost:8000"
+    fi
     
     # Mark todo as completed
     log "Deployment completed successfully. Check the management script for ongoing operations."

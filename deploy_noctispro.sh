@@ -4,7 +4,7 @@
 # NoctisPro PACS - Automated Deployment Script for Linux Servers
 # Supports Ubuntu/Debian, RHEL/CentOS/Fedora, Arch, and SUSE (best-effort)
 # =============================================================================
-# This script automatically deploys the Django PACS system with ngrok
+# This script automatically deploys the Django PACS system with DuckDNS
 # Author: AI Assistant
 # Date: $(date)
 # =============================================================================
@@ -19,9 +19,9 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-NGROK_AUTH_TOKEN="${NGROK_AUTH_TOKEN:-}"
-NGROK_STATIC_URL="${NGROK_STATIC_URL:-mallard-shining-curiously.ngrok-free.app}"
-DJANGO_PORT=${DJANGO_PORT:-8080}
+DUCKDNS_SUBDOMAIN="${DUCKDNS_SUBDOMAIN:-}"
+DUCKDNS_TOKEN="${DUCKDNS_TOKEN:-}"
+DJANGO_PORT=${DJANGO_PORT:-8000}
 # Determine project directory robustly
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "$SCRIPT_DIR/manage.py" || -f "$SCRIPT_DIR/requirements.txt" ]]; then

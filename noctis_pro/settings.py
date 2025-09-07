@@ -27,9 +27,14 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-7x!8k@m$z9h#4p&x3w2v6
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
-# Ngrok detection for automatic configuration
+# Dynamic DNS detection for automatic configuration
 NGROK_URL = os.environ.get('NGROK_URL', '')
 IS_NGROK = bool(NGROK_URL) or any('ngrok' in host for host in os.environ.get('ALLOWED_HOSTS', '').split(','))
+
+# DuckDNS detection for automatic configuration
+DUCKDNS_DOMAIN = os.environ.get('DUCKDNS_DOMAIN', '')
+DUCKDNS_ENABLED = os.environ.get('DUCKDNS_ENABLED', 'false').lower() == 'true'
+IS_DUCKDNS = DUCKDNS_ENABLED and bool(DUCKDNS_DOMAIN)
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
@@ -54,6 +59,10 @@ if NGROK_URL:
     import re
     ngrok_domain = re.sub(r'^https?://', '', NGROK_URL.strip('/'))
     ALLOWED_HOSTS.append(ngrok_domain)
+
+# Add specific DuckDNS domain if provided
+if IS_DUCKDNS and DUCKDNS_DOMAIN:
+    ALLOWED_HOSTS.append(DUCKDNS_DOMAIN)
 
 # Remove duplicates and empty strings
 ALLOWED_HOSTS = list(filter(None, list(set(ALLOWED_HOSTS))))
@@ -230,8 +239,15 @@ if NGROK_URL:
         NGROK_URL.replace('https://', 'http://') if NGROK_URL.startswith('https://') else NGROK_URL.replace('http://', 'https://')
     ])
 
-# Add ngrok support dynamically
-CORS_ALLOW_ALL_ORIGINS = DEBUG or IS_NGROK  # Allow all origins in debug mode or when using ngrok
+# Add specific DuckDNS domain to CORS if provided
+if IS_DUCKDNS and DUCKDNS_DOMAIN:
+    CORS_ALLOWED_ORIGINS.extend([
+        f"https://{DUCKDNS_DOMAIN}",
+        f"http://{DUCKDNS_DOMAIN}"
+    ])
+
+# Add dynamic DNS support
+CORS_ALLOW_ALL_ORIGINS = DEBUG or IS_NGROK or IS_DUCKDNS  # Allow all origins in debug mode or when using dynamic DNS
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -262,6 +278,13 @@ if NGROK_URL:
     CSRF_TRUSTED_ORIGINS.extend([
         NGROK_URL,
         NGROK_URL.replace('https://', 'http://') if NGROK_URL.startswith('https://') else NGROK_URL.replace('http://', 'https://')
+    ])
+
+# Add specific DuckDNS domain to CSRF trusted origins if provided
+if IS_DUCKDNS and DUCKDNS_DOMAIN:
+    CSRF_TRUSTED_ORIGINS.extend([
+        f"https://{DUCKDNS_DOMAIN}",
+        f"http://{DUCKDNS_DOMAIN}"
     ])
 
 # Custom user model
@@ -303,8 +326,8 @@ if IS_NGROK:
     SESSION_COOKIE_SAMESITE = 'Lax'
     CSRF_COOKIE_SAMESITE = 'Lax'
 
-# Production security enhancements (only if not using ngrok)
-if not DEBUG and not IS_NGROK:
+# Production security enhancements (only if not using dynamic DNS)
+if not DEBUG and not IS_NGROK and not IS_DUCKDNS:
     SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False').lower() == 'true'
     SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000'))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
