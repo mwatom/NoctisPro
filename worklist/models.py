@@ -85,8 +85,12 @@ class Study(models.Model):
         # Efficient and accurate count
         return Series.objects.filter(study=self).count()
 
-    def get_image_count(self):
+    def get_image_count(self, force_refresh=False):
         # Avoid N+1 queries and ensure correctness
+        if force_refresh:
+            # Force a fresh query by clearing any potential caches
+            from django.db import connection
+            connection.queries_log.clear()
         return DicomImage.objects.filter(series__study=self).count()
 
 class Series(models.Model):

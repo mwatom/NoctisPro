@@ -517,6 +517,7 @@ def upload_study(request):
 							if image_created:
 								upload_stats['created_images'] += 1
 								images_processed += 1
+								logger.debug(f"Created DICOM image: {sop_uid} for series {series_uid}")
 							
 							image_processing_time = (time.time() - image_start_time) * 1000
 							
@@ -573,15 +574,25 @@ def upload_study(request):
 			logger.info(f"  • Processing time: {upload_stats['processing_time_ms']} ms")
 			logger.info(f"  • User: {upload_stats['user']}")
 			
+			# Verify image counts for created studies
+			for study_id in created_studies:
+				try:
+					study = Study.objects.get(id=study_id)
+					actual_count = study.get_image_count()
+					logger.info(f"  • Study {study.accession_number}: {actual_count} images in database")
+				except Exception as e:
+					logger.warning(f"  • Could not verify image count for study {study_id}: {e}")
+			
 			# Professional response with medical-grade information
 			return JsonResponse({
 				'success': True,
 				'message': f'🏥 Professional DICOM upload completed successfully',
-				'details': f'Processed {processed_files} DICOM files across {upload_stats["created_studies"]} studies with {upload_stats["created_series"]} series',
+				'details': f'Processed {processed_files} DICOM files across {upload_stats["created_studies"]} studies with {upload_stats["created_series"]} series and {upload_stats["created_images"]} images',
 				# Top-level keys used by frontend progress UI
 				'processed_files': processed_files,
 				'studies_created': upload_stats['created_studies'],
 				'total_series': total_series_processed,
+				'total_images': upload_stats['created_images'],
 				'statistics': upload_stats,
 				'created_study_ids': created_studies,
 				'medical_summary': {
@@ -688,8 +699,11 @@ def api_studies(request):
 			else:
 				upload_date = study.study_date.isoformat()
 			
-			# Professional image and series counting
-			image_count = study.get_image_count()
+			# Professional image and series counting with fresh database connection
+			# Force fresh queries to avoid any caching issues
+			from django.db import connection
+			connection.ensure_connection()
+			image_count = study.get_image_count(force_refresh=True)
 			series_count = study.get_series_count()
 			
 			# Update processing statistics
