@@ -146,7 +146,17 @@ class NoctisProButtonManager {
         
         button.classList.add('noctispro-button-enhanced');
         
-        // Removed click ripple effect
+        // Add click ripple effect with safe handler
+        button.addEventListener('mousedown', (e) => {
+            try {
+                // Prefer built-in method if present
+                if (typeof this.createRipple === 'function') {
+                    this.createRipple(e);
+                } else if (window.ProfessionalButtons && typeof window.ProfessionalButtons.createRipple === 'function') {
+                    window.ProfessionalButtons.createRipple(e);
+                }
+            } catch (_) {}
+        });
         
         // Wrap existing onclick handlers with error handling
         if (button.onclick) {
@@ -163,7 +173,27 @@ class NoctisProButtonManager {
         }
     }
 
-    
+    createRipple(e) {
+        const button = e.currentTarget || e.target;
+        if (!button || button.disabled) return;
+        const rect = button.getBoundingClientRect();
+        const size = Math.max(rect.width, rect.height);
+        const x = (e.clientX ?? (rect.left + rect.width / 2)) - rect.left - size / 2;
+        const y = (e.clientY ?? (rect.top + rect.height / 2)) - rect.top - size / 2;
+        const ripple = document.createElement('span');
+        ripple.className = 'noctispro-ripple';
+        ripple.style.cssText = `
+            width: ${size}px;
+            height: ${size}px;
+            left: ${x}px;
+            top: ${y}px;
+        `;
+        // Ensure container clips
+        button.style.position = button.style.position || 'relative';
+        button.style.overflow = 'hidden';
+        button.appendChild(ripple);
+        setTimeout(() => ripple.remove(), 600);
+    }
 
     setupEventListeners() {
         // Add global error handler for button clicks

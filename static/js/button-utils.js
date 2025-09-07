@@ -29,6 +29,10 @@ class ProfessionalButtons {
         button.addEventListener('mouseleave', this.handleButtonLeave.bind(this));
         button.addEventListener('mousedown', this.handleButtonPress.bind(this));
         button.addEventListener('mouseup', this.handleButtonRelease.bind(this));
+        
+        // Enable ripple containment
+        button.style.position = 'relative';
+        button.style.overflow = 'hidden';
     }
 
     handleButtonHover(e) {
@@ -49,6 +53,9 @@ class ProfessionalButtons {
         const btn = e.currentTarget || e.target;
         if (btn && btn.disabled) return;
 
+        // Trigger ripple with safe static method
+        ProfessionalButtons.createRipple(e);
+
         if (btn) {
             btn.style.transform = 'translateY(0)';
         }
@@ -60,6 +67,32 @@ class ProfessionalButtons {
         setTimeout(() => {
             e.target.style.transform = 'translateY(-1px)';
         }, 100);
+    }
+
+    // Robust static ripple to avoid context issues
+    static createRipple(e) {
+        const button = (e && (e.currentTarget || e.target)) || null;
+        if (!button) return;
+        if (button.disabled) return;
+        const rect = button.getBoundingClientRect();
+        const size = Math.max(rect.width, rect.height);
+        const x = (e.clientX ?? (rect.left + rect.width / 2)) - rect.left - size / 2;
+        const y = (e.clientY ?? (rect.top + rect.height / 2)) - rect.top - size / 2;
+        const ripple = document.createElement('span');
+        ripple.style.cssText = `
+            position: absolute;
+            width: ${size}px;
+            height: ${size}px;
+            left: ${x}px;
+            top: ${y}px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: scale(0);
+            animation: ripple 0.6s ease-out;
+            pointer-events: none;
+        `;
+        button.appendChild(ripple);
+        setTimeout(() => ripple.remove(), 600);
     }
 
     
