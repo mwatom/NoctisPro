@@ -1246,12 +1246,15 @@ def api_delete_study(request, study_id):
         # Collect all DICOM file paths
         for series in study.series_set.all():
             for image in series.images.all():
-                if image.file and hasattr(image.file, 'path'):
+                # Support both legacy `file` and current `file_path` fields
+                file_field = getattr(image, 'file', None) or getattr(image, 'file_path', None)
+                if file_field and hasattr(file_field, 'path'):
                     try:
-                        if os.path.exists(image.file.path):
-                            file_paths_to_delete.append(image.file.path)
+                        if os.path.exists(file_field.path):
+                            file_paths_to_delete.append(file_field.path)
                     except (ValueError, AttributeError):
-                        pass  # Skip if file path is invalid
+                        # Skip if file path is invalid
+                        pass
         
         # Collect attachment file paths
         for attachment in study.attachments.all():
