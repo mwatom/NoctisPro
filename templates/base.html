@@ -695,6 +695,39 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
     (function(){
+        // Enforce logout on idle after 30 minutes (client-side safety net)
+        try {
+            var IDLE_LIMIT_MS = 30 * 60 * 1000;
+            var idleTimer;
+            function resetIdleTimer(){
+                clearTimeout(idleTimer);
+                idleTimer = setTimeout(function(){
+                    // Only attempt logout if user is authenticated (heuristic: presence of logout button)
+                    var logoutBtn = document.querySelector(".btn-control[onclick*='accounts:logout']");
+                    if (logoutBtn) {
+                        window.location.href = '{% url "accounts:logout" %}';
+                    }
+                }, IDLE_LIMIT_MS);
+            }
+            ['load','mousemove','keydown','scroll','click','touchstart','visibilitychange'].forEach(function(evt){
+                window.addEventListener(evt, resetIdleTimer, { passive: true });
+            });
+            resetIdleTimer();
+        } catch(e) {}
+
+        // Ensure a fresh session when opening a brand-new window/tab
+        // If there is no page referrer and user appears authenticated, force a soft redirect to login
+        try {
+            var isNewEntry = document.referrer === '' && window.performance && performance.navigation && performance.navigation.type === performance.navigation.TYPE_NAVIGATE;
+            // Heuristic: if top navbar is present and logout button exists, user is logged in
+            var loggedInHeuristic = !!document.querySelector(".btn-control[onclick*='accounts:logout']");
+            if (isNewEntry && loggedInHeuristic && sessionStorage.getItem('noctis_fresh_window') !== 'ok'){
+                sessionStorage.setItem('noctis_fresh_window', 'ok');
+                // Redirect to login to avoid resuming prior session state
+                window.location.replace('{% url "accounts:logout" %}');
+            }
+        } catch(e) {}
+
         async function updateUnread(){
             try {
                 const res = await fetch('{% url "notifications:api_unread_count" %}', { credentials: 'same-origin' });

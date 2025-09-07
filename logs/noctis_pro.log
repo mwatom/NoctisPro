@@ -42,3 +42,4 @@
 [INFO] 2025-09-07 14:11:04,735 noctis_pro.api views 2359 139987764252928 Professional studies API request from admin (Administrator)
 [INFO] 2025-09-07 14:11:04,740 noctis_pro.api views 2359 139987764252928 Professional studies API completed: 1 studies in 5.3ms
 [WARNING] 2025-09-07 14:11:11,468 noctis_pro.user_management views 2401 139931195117824 User creation form validation failed for admin
+[WARNING] 2025-09-07 14:21:47,035 noctis_pro.user_management views 5087 140366552609024 User creation form validation failed for admin
