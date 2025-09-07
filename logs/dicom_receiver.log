@@ -361,3 +361,16 @@ OSError: [Errno 98] Address already in use
 2025-09-07 21:46:01,307 - dicom_receiver - INFO - [start:757] -   Success rate: 0.0%
 2025-09-07 21:46:01,307 - dicom_receiver - INFO - [start:759] -   Runtime: 0 seconds
 2025-09-07 21:46:01,307 - dicom_receiver - INFO - [stop:763] - Stopping DICOM receiver...
+2025-09-07 22:06:47,352 - dicom_receiver - INFO - [__init__:285] - DICOM Receiver initialized - AET: NOCTIS_SCP, Port: 11112, Max PDU: 16384
+2025-09-07 22:06:47,352 - dicom_receiver - INFO - [start:721] - Starting DICOM receiver on port 11112
+2025-09-07 22:06:47,359 - dicom_receiver - INFO - [setup_ae:312] - Application Entity configured successfully
+2025-09-07 22:06:47,359 - dicom_receiver - INFO - [start:729] - ============================================================
+2025-09-07 22:06:47,359 - dicom_receiver - INFO - [start:730] - NOCTIS PRO DICOM RECEIVER SERVICE
+2025-09-07 22:06:47,359 - dicom_receiver - INFO - [start:731] - ============================================================
+2025-09-07 22:06:47,359 - dicom_receiver - INFO - [start:732] - Application Entity Title: NOCTIS_SCP
+2025-09-07 22:06:47,359 - dicom_receiver - INFO - [start:733] - Listening on port: 11112
+2025-09-07 22:06:47,359 - dicom_receiver - INFO - [start:734] - Maximum PDU size: 16384
+2025-09-07 22:06:47,359 - dicom_receiver - INFO - [start:735] - Storage directory: /workspace/media/dicom/received
+2025-09-07 22:06:47,359 - dicom_receiver - INFO - [start:736] - Waiting for DICOM connections...
+2025-09-07 22:06:47,359 - dicom_receiver - INFO - [start:737] - ============================================================
+2025-09-07 22:06:52,026 - dicom_receiver - INFO - [signal_handler:772] - Received signal 15, shutting down gracefully...
