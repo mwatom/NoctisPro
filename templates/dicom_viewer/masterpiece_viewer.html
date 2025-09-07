@@ -10,6 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     {% load static %}
     <script src="{% static 'js/masterpiece_3d_reconstruction.js' %}"></script>
+    <script src="{% static 'js/dicom-viewer-enhanced.js' %}"></script>
     <style>
         :root {
             --primary-bg: #0a0a0a;
@@ -801,10 +802,10 @@
                     Noctis Pro DICOM Viewer
                 </div>
                 
-                <button class="btn" onclick="showDirectoryLoader()">
-                    <i class="fas fa-folder-open"></i> Load Directory
+                <button class="btn" onclick="window.loadFromLocalFiles()">
+                    <i class="fas fa-folder-open"></i> Load Local DICOM
                 </button>
-                
+
                 <button class="btn" onclick="loadStudies()">
                     <i class="fas fa-list"></i> Load Studies
                 </button>
@@ -819,6 +820,9 @@
 
                 <button class="btn" onclick="window.location.href='{% url 'worklist:dashboard' %}'" title="Back to Dashboard">
                     <i class="fas fa-arrow-left"></i> Dashboard
+                </button>
+                <button class="btn" onclick="toggleUI()" title="Toggle UI Auto Hide">
+                    <i class="fas fa-eye-slash"></i> UI
                 </button>
             </div>
 
@@ -1143,7 +1147,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             initializeViewer();
             setupEventListeners();
-            setupUIAutoHide();
+            // Auto-hide disabled by default; user can manually toggle UI
             
             // Check if study ID is provided in URL
             const urlParams = new URLSearchParams(window.location.search);
