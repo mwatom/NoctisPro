@@ -1,0 +1,7 @@
+nohup: ignoring input
+Usage: celery [OPTIONS] COMMAND [ARGS]...
+Try 'celery --help' for help.
+
+Error: 
+Unable to load celery application.
+Module 'noctis_pro' has no attribute 'celery'

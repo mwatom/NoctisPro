@@ -319,3 +319,7 @@ django.template.exceptions.TemplateSyntaxError: Could not parse the remainder: '
 [INFO] 2025-09-07 21:37:12,737 django.server basehttp 7862 140696282461888 "GET /favicon.ico HTTP/1.1" 200 68
 [INFO] 2025-09-07 21:39:57,481 django.utils.autoreload autoreload 7862 140696875561216 /workspace/admin_panel/migrations/0001_initial.py changed, reloading.
 [INFO] 2025-09-07 21:39:57,776 django.utils.autoreload autoreload 9620 139706309886208 Watching for file changes with StatReloader
+[INFO] 2025-09-07 21:47:12,479 django.server basehttp 9620 139705712985792 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-07 21:47:38,214 django.server basehttp 9620 139705712985792 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-07 21:47:54,214 django.utils.autoreload autoreload 15096 139751050379520 Watching for file changes with StatReloader
+[INFO] 2025-09-07 21:48:02,942 django.server basehttp 9620 139705712985792 "GET / HTTP/1.1" 302 0

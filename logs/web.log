@@ -1,15 +1,13 @@
-🚀 Noctis Pro PACS Settings Loaded:
-   • Debug Mode: False
-   • Ngrok Mode: False
-   • Ngrok URL: Not set
-   • Allowed Hosts: 12 configured
-   • Database: sqlite3
-   • Security: Production profile
-Performing system checks...
-
-System check identified no issues (0 silenced).
-September 07, 2025 - 21:34:37
-Django version 4.2.24, using settings 'noctis_pro.settings'
-Starting development server at http://0.0.0.0:8000/
-Quit the server with CONTROL-C.
-
+nohup: ignoring input
+[2025-09-07 21:45:55 +0000] [14199] [INFO] Starting gunicorn 23.0.0
+[2025-09-07 21:45:55 +0000] [14199] [ERROR] Connection in use: ('0.0.0.0', 8000)
+[2025-09-07 21:45:55 +0000] [14199] [ERROR] connection to ('0.0.0.0', 8000) failed: [Errno 98] Address already in use
+[2025-09-07 21:45:56 +0000] [14199] [ERROR] Connection in use: ('0.0.0.0', 8000)
+[2025-09-07 21:45:56 +0000] [14199] [ERROR] connection to ('0.0.0.0', 8000) failed: [Errno 98] Address already in use
+[2025-09-07 21:45:57 +0000] [14199] [ERROR] Connection in use: ('0.0.0.0', 8000)
+[2025-09-07 21:45:57 +0000] [14199] [ERROR] connection to ('0.0.0.0', 8000) failed: [Errno 98] Address already in use
+[2025-09-07 21:45:58 +0000] [14199] [ERROR] Connection in use: ('0.0.0.0', 8000)
+[2025-09-07 21:45:58 +0000] [14199] [ERROR] connection to ('0.0.0.0', 8000) failed: [Errno 98] Address already in use
+[2025-09-07 21:45:59 +0000] [14199] [ERROR] Connection in use: ('0.0.0.0', 8000)
+[2025-09-07 21:45:59 +0000] [14199] [ERROR] connection to ('0.0.0.0', 8000) failed: [Errno 98] Address already in use
+[2025-09-07 21:46:00 +0000] [14199] [ERROR] Can't connect to ('0.0.0.0', 8000)
