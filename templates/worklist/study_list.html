@@ -433,7 +433,7 @@
 						<a class="btn-control" href="{% url 'worklist:study_detail' s.id %}" title="Open"><i class="fas fa-folder-open"></i></a>
 						
 						<!-- DICOM Viewer - All authenticated users -->
-						<a class="btn-dicom-viewer btn-sm" href="{% url 'dicom_viewer:viewer' %}?study={{ s.id }}" title="View in DICOM Viewer"><i class="fas fa-eye"></i></a>
+						<a class="btn-dicom-viewer btn-sm" href="{% url 'dicom_viewer:viewer' %}?study={{ s.id }}" onclick="openStudyInViewer('{{ s.id }}', event); return false;" title="View in DICOM Viewer"><i class="fas fa-eye"></i></a>
 						
 						<!-- Report Writing - Only admin and radiologist -->
 						{% if user.is_admin or user.is_radiologist %}

@@ -6,6 +6,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q, Count
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from django.db import transaction
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 import os
@@ -145,6 +146,7 @@ def study_detail(request, study_id):
 
 @login_required
 @csrf_exempt
+@transaction.atomic
 def upload_study(request):
 	"""
 	Professional DICOM Upload Backend - Medical Imaging Excellence

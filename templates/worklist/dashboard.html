@@ -928,7 +928,7 @@
                         <td title="Uploaded: ${uploadTime} by ${study.uploaded_by || 'Unknown'}">${study.uploaded_by || '-'}</td>
                         <td>
                             <div class="viewer-buttons">
-                                <button type="button" class="btn-dicom-viewer btn-sm" onclick="openStudyInViewer('${study.id}'); event.stopPropagation();" title="Open study in DICOM viewer">
+                                <button type="button" class="btn-dicom-viewer btn-sm" onclick="openStudyInViewer('${study.id}', event); event.stopPropagation();" title="Open study in DICOM viewer">
                                     <i class="fas fa-eye"></i> VIEW
                                 </button>
                                 {% if user.is_admin or user.is_radiologist %}<button type="button" class="btn-viewer" style="margin-left:6px" onclick="openReport('${study.id}'); event.stopPropagation();" title="Write/Edit report"><i class="fas fa-file-signature"></i> REPORT</button>{% endif %}
@@ -1295,6 +1295,7 @@
             let lastStudyCount = 0;
             let lastUploadTime = null;
             
+            // Increase inactivity timeout refresh to 20 minutes (1200000ms)
             setInterval(async () => {
                 try {
                     // Check for new studies
@@ -1332,7 +1333,7 @@
                 } catch (error) {
                     console.error('Auto-refresh error:', error);
                 }
-            }, 30000); // Refresh every 30 seconds
+            }, 1200000); // Refresh every 20 minutes
 
             // Notifications unread count badge
             fetch('/notifications/api/unread-count/')

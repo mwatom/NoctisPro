@@ -569,11 +569,11 @@
 {% block extra_js %}
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-    const roleSelect = document.getElementById('role');
-    const facilitySelect = document.getElementById('facility');
+    const roleSelect = document.getElementById('id_role') || document.getElementById('role');
+    const facilitySelect = document.getElementById('id_facility') || document.getElementById('facility');
     const facilityHelp = document.getElementById('facilityHelp');
-    const password = document.getElementById('password');
-    const passwordConfirm = document.getElementById('password_confirm');
+    const password = document.getElementById('id_password1') || document.getElementById('password');
+    const passwordConfirm = document.getElementById('id_password2') || document.getElementById('password_confirm');
     const refreshFacilitiesBtn = document.getElementById('refreshFacilities');
     
     // Multi-step form elements
@@ -794,9 +794,9 @@
     }
 
     // Event listeners
-    roleSelect.addEventListener('change', updateFacilityRequirement);
-    password.addEventListener('input', validatePasswordMatch);
-    passwordConfirm.addEventListener('input', validatePasswordMatch);
+    if (roleSelect) roleSelect.addEventListener('change', updateFacilityRequirement);
+    if (password) password.addEventListener('input', validatePasswordMatch);
+    if (passwordConfirm) passwordConfirm.addEventListener('input', validatePasswordMatch);
     refreshFacilitiesBtn.addEventListener('click', refreshFacilities);
 
     nextBtn.addEventListener('click', function(e) {
@@ -854,11 +854,11 @@
     });
 
     // Initialize
-    updateFacilityRequirement();
+    if (roleSelect && facilitySelect) updateFacilityRequirement();
     showStep(currentStep);
     
     // Show default role description if a role is pre-selected
-    if (roleSelect.value) {
+    if (roleSelect && roleSelect.value) {
       const activeDesc = document.querySelector(`.role-desc[data-role="${roleSelect.value}"]`);
       if (activeDesc) {
         activeDesc.classList.add('active');
