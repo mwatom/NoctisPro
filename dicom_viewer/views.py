@@ -429,6 +429,12 @@ def api_mpr_reconstruction(request, series_id):
             }
         })
 
+    except ValueError as e:
+        # Common case: not enough images for MPR; treat as client error, not server error
+        if 'Not enough images' in str(e):
+            return JsonResponse({'error': str(e)}, status=400)
+        logger.error(f"MPR reconstruction failed for series {series_id}: {str(e)}")
+        return JsonResponse({'error': f'Error generating MPR: {str(e)}'}, status=500)
     except Exception as e:
         logger.error(f"MPR reconstruction failed for series {series_id}: {str(e)}")
         import traceback
