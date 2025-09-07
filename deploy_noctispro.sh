@@ -22,11 +22,15 @@ NC='\033[0m' # No Color
 NGROK_AUTH_TOKEN="${NGROK_AUTH_TOKEN:-}"
 NGROK_STATIC_URL="${NGROK_STATIC_URL:-mallard-shining-curiously.ngrok-free.app}"
 DJANGO_PORT=${DJANGO_PORT:-8080}
-# Determine project directory dynamically with fallback to /workspace
-if [[ -d "/workspace" ]]; then
+# Determine project directory robustly
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SCRIPT_DIR/manage.py" || -f "$SCRIPT_DIR/requirements.txt" ]]; then
+    PROJECT_DIR="$SCRIPT_DIR"
+elif [[ -d "/workspace" && ( -f "/workspace/manage.py" || -f "/workspace/requirements.txt" ) ]]; then
     PROJECT_DIR="/workspace"
 else
-    PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    PROJECT_DIR="$SCRIPT_DIR"
+    echo -e "${YELLOW}[WARNING] Could not find project indicators in /workspace; using $PROJECT_DIR${NC}"
 fi
 VENV_DIR="$PROJECT_DIR/venv"
 
@@ -250,26 +254,48 @@ install_python_requirements() {
     source "$VENV_DIR/bin/activate"
     cd "$PROJECT_DIR"
     
-    # Install requirements with error handling for problematic packages
-    if ! pip install -r requirements.txt; then
-        warn "Some packages failed to install. Trying alternative approach..."
-        
-        # Install packages one by one, skipping problematic ones
-        while IFS= read -r package; do
-            if [[ $package =~ ^#.*$ ]] || [[ -z "$package" ]]; then
-                continue
-            fi
+    # Choose the best available requirements file
+    local REQUIREMENTS_FILE=""
+    local CANDIDATES=(
+        "requirements.active.txt"
+        "requirements.txt"
+        "requirements.optimized.txt"
+        "requirements.minimal.txt"
+        "requirements_security.txt"
+    )
+    for candidate in "${CANDIDATES[@]}"; do
+        if [[ -f "$candidate" ]]; then
+            REQUIREMENTS_FILE="$candidate"
+            break
+        fi
+    done
+
+    if [[ -n "$REQUIREMENTS_FILE" ]]; then
+        info "Using requirements file: $REQUIREMENTS_FILE"
+        # Install requirements with error handling for problematic packages
+        if ! pip install -r "$REQUIREMENTS_FILE"; then
+            warn "Some packages failed to install from $REQUIREMENTS_FILE. Trying per-package fallback..."
             
-            if [[ $package == "pycups" ]]; then
-                warn "Skipping pycups (printing functionality will be limited)"
-                continue
-            fi
-            
-            echo "Installing $package..."
-            if ! pip install "$package"; then
-                warn "Failed to install $package, continuing..."
-            fi
-        done < requirements.txt
+            # Install packages one by one, skipping problematic ones
+            while IFS= read -r package; do
+                if [[ $package =~ ^#.*$ ]] || [[ -z "$package" ]]; then
+                    continue
+                fi
+                
+                if [[ $package == "pycups" ]]; then
+                    warn "Skipping pycups (printing functionality will be limited)"
+                    continue
+                fi
+                
+                echo "Installing $package..."
+                if ! pip install "$package"; then
+                    warn "Failed to install $package, continuing..."
+                fi
+            done < "$REQUIREMENTS_FILE"
+        fi
+    else
+        warn "No requirements file found. Installing a minimal set of core packages..."
+        pip install django pillow pydicom numpy gunicorn psycopg2-binary || true
     fi
     
     log "Python requirements installed successfully!"
