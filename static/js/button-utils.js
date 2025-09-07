@@ -25,10 +25,10 @@ class ProfessionalButtons {
 
     enhanceButton(button) {
         // Add professional hover and click effects
-        button.addEventListener('mouseenter', this.handleButtonHover);
-        button.addEventListener('mouseleave', this.handleButtonLeave);
-        button.addEventListener('mousedown', this.handleButtonPress);
-        button.addEventListener('mouseup', this.handleButtonRelease);
+        button.addEventListener('mouseenter', this.handleButtonHover.bind(this));
+        button.addEventListener('mouseleave', this.handleButtonLeave.bind(this));
+        button.addEventListener('mousedown', this.handleButtonPress.bind(this));
+        button.addEventListener('mouseup', this.handleButtonRelease.bind(this));
         
         // Add ripple effect capability
         button.style.position = 'relative';
