@@ -924,11 +924,11 @@ def view_attachment(request, attachment_id):
     # Handle DICOM files
     if attachment.is_dicom_file():
         if attachment.attached_study:
-            # Launch desktop viewer for attached study
-            return redirect('dicom_viewer:launch_study_in_desktop_viewer', study_id=attachment.attached_study.id)
+            # Redirect to web viewer with study param
+            return redirect(f'/dicom-viewer/?study={attachment.attached_study.id}')
         else:
-            # Launch desktop viewer without study context
-            return redirect('dicom_viewer:launch_standalone_viewer')
+            # Open main web viewer
+            return redirect('/dicom-viewer/')
     
     # Handle viewable files (PDF, images)
     if attachment.is_viewable_in_browser():
