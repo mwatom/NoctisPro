@@ -251,3 +251,33 @@ Traceback (most recent call last):
     ...<2 lines>...
     )
 django.template.exceptions.TemplateSyntaxError: Could not parse the remainder: '(user.role' from '(user.role'
+[INFO] 2025-09-07 15:47:57,379 noctis_pro.upload views 37909 139624126783744 Professional DICOM upload started: 1 files by smoke_rad
+[INFO] 2025-09-07 15:47:57,379 noctis_pro.upload views 37909 139624126783744 Starting professional DICOM metadata extraction and validation
+[INFO] 2025-09-07 15:47:57,380 noctis_pro.upload views 37909 139624126783744 Processing study: 1.2.826.0.1.3680043.8.498.19055967371291569889639056796047638857
+[INFO] 2025-09-07 15:47:57,381 noctis_pro.upload views 37909 139624126783744 New patient created: TEST PATIENT (ID: TP12345)
+[INFO] 2025-09-07 15:47:57,383 noctis_pro.upload views 37909 139624126783744 Professional study created: NOCTIS_CR_1757260077 - CR Study - Professional Upload
+[ERROR] 2025-09-07 15:47:57,384 noctis_pro.upload views 37909 139624126783744 Professional DICOM upload failed: Invalid field name(s) for model Series: 'acquisition_time', 'contrast_agent', 'protocol_name'.
+[ERROR] 2025-09-07 15:47:57,384 noctis_pro.upload views 37909 139624126783744 Upload attempt by: smoke_rad
+[ERROR] 2025-09-07 15:47:57,384 noctis_pro.upload views 37909 139624126783744 Files attempted: 1
+[INFO] 2025-09-07 15:49:08,250 noctis_pro.upload views 38184 140294103363840 Professional DICOM upload started: 1 files by smoke_rad
+[INFO] 2025-09-07 15:49:08,250 noctis_pro.upload views 38184 140294103363840 Starting professional DICOM metadata extraction and validation
+[INFO] 2025-09-07 15:49:08,250 noctis_pro.upload views 38184 140294103363840 Processing study: 1.2.826.0.1.3680043.8.498.58715617812352832195764850729613438189
+[INFO] 2025-09-07 15:49:08,253 noctis_pro.upload views 38184 140294103363840 Professional study created: NOCTIS_CR_1757260148 - CR Study - Professional Upload
+[INFO] 2025-09-07 15:49:08,254 noctis_pro.upload views 38184 140294103363840 Professional series created: CR Series 1 (1 images)
+[INFO] 2025-09-07 15:49:08,256 noctis_pro.upload views 38184 140294103363840 Professional series completed: CR Series 1 - 1 images in 2.8ms
+[INFO] 2025-09-07 15:49:08,259 noctis_pro.upload views 38184 140294103363840 Professional DICOM upload completed successfully:
+[INFO] 2025-09-07 15:49:08,259 noctis_pro.upload views 38184 140294103363840   • Total files: 1
+[INFO] 2025-09-07 15:49:08,259 noctis_pro.upload views 38184 140294103363840   • Processed: 1
+[INFO] 2025-09-07 15:49:08,259 noctis_pro.upload views 38184 140294103363840   • Invalid: 0
+[INFO] 2025-09-07 15:49:08,259 noctis_pro.upload views 38184 140294103363840   • Studies created: 1
+[INFO] 2025-09-07 15:49:08,259 noctis_pro.upload views 38184 140294103363840   • Series created: 1
+[INFO] 2025-09-07 15:49:08,259 noctis_pro.upload views 38184 140294103363840   • Images created: 1
+[INFO] 2025-09-07 15:49:08,259 noctis_pro.upload views 38184 140294103363840   • Total size: 0.0 MB
+[INFO] 2025-09-07 15:49:08,259 noctis_pro.upload views 38184 140294103363840   • Processing time: 9.2 ms
+[INFO] 2025-09-07 15:49:08,259 noctis_pro.upload views 38184 140294103363840   • User: smoke_rad
+[INFO] 2025-09-07 15:49:08,260 noctis_pro.upload views 38184 140294103363840   • Study NOCTIS_CR_1757260148: 1 images in database
+[WARNING] 2025-09-07 15:49:08,355 django.request log 38184 140294103363840 Method Not Allowed: /dicom-viewer/api/auto-window/11/
+[ERROR] 2025-09-07 15:49:30,582 django.request log 38260 139644297699584 Internal Server Error: /dicom-viewer/api/series/3/mpr/
+[WARNING] 2025-09-07 15:49:30,587 django.request log 38260 139644297699584 Bad Request: /dicom-viewer/api/series/3/mip/
+[WARNING] 2025-09-07 15:49:30,595 django.request log 38260 139644297699584 Not Found: /dicom_viewer/api/series/3/bone/
+[WARNING] 2025-09-07 15:49:30,599 django.request log 38260 139644297699584 Bad Request: /dicom-viewer/api/series/3/bone/

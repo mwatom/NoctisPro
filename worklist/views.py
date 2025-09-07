@@ -434,9 +434,6 @@ def upload_study(request):
 					
 					# Enhanced medical imaging metadata for professional standards
 					body_part = getattr(ds0, 'BodyPartExamined', '').upper()
-					protocol_name = getattr(ds0, 'ProtocolName', '')
-					contrast_bolus_agent = getattr(ds0, 'ContrastBolusAgent', '')
-					acquisition_time = getattr(ds0, 'AcquisitionTime', '')
 					
 					# Professional series creation with comprehensive metadata
 					series, series_created = Series.objects.get_or_create(
@@ -450,9 +447,6 @@ def upload_study(request):
 							'slice_thickness': slice_thickness if slice_thickness is not None else None,
 							'pixel_spacing': pixel_spacing,
 							'image_orientation': image_orientation,
-							'protocol_name': protocol_name,
-							'contrast_agent': contrast_bolus_agent,
-							'acquisition_time': acquisition_time,
 						}
 					)
 					
