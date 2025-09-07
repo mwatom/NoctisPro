@@ -25,10 +25,10 @@ class ProfessionalButtons {
 
     enhanceButton(button) {
         // Add professional hover and click effects
-        button.addEventListener('mouseenter', this.handleButtonHover);
-        button.addEventListener('mouseleave', this.handleButtonLeave);
-        button.addEventListener('mousedown', this.handleButtonPress);
-        button.addEventListener('mouseup', this.handleButtonRelease);
+        button.addEventListener('mouseenter', (e) => this.handleButtonHover(e));
+        button.addEventListener('mouseleave', (e) => this.handleButtonLeave(e));
+        button.addEventListener('mousedown', (e) => this.handleButtonPress(e));
+        button.addEventListener('mouseup', (e) => this.handleButtonRelease(e));
         
         // Add ripple effect capability
         button.style.position = 'relative';
@@ -67,7 +67,7 @@ class ProfessionalButtons {
     }
 
     createRipple(e) {
-        const button = e.target;
+        const button = e.currentTarget || e.target;
         const rect = button.getBoundingClientRect();
         const size = Math.max(rect.width, rect.height);
         const x = e.clientX - rect.left - size / 2;
