@@ -93,6 +93,9 @@ def analyze_study(request, study_id):
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
     if request.method == 'POST':
+        # Only administrators or radiologists can initiate new AI analyses
+        if not is_admin_or_radiologist(user):
+            return JsonResponse({'error': 'Only administrators or radiologists can start AI analyses'}, status=403)
         try:
             # Get selected AI models
             model_ids = request.POST.getlist('ai_models')
@@ -143,10 +146,12 @@ def analyze_study(request, study_id):
             return JsonResponse({'error': str(e)}, status=500)
     
     # GET request - show analysis form
-    available_models = AIModel.objects.filter(
-        is_active=True,
-        modality__in=[study.modality.code, 'ALL']
-    )
+    available_models = []
+    if is_admin_or_radiologist(user):
+        available_models = AIModel.objects.filter(
+            is_active=True,
+            modality__in=[study.modality.code, 'ALL']
+        )
     
     # Get existing analyses
     existing_analyses = AIAnalysis.objects.filter(
@@ -204,13 +209,14 @@ def api_analysis_status(request, analysis_id):
     return JsonResponse(data)
 
 @login_required
+@user_passes_test(is_admin_or_radiologist)
 @csrf_exempt
 def generate_auto_report(request, study_id):
     """Generate automatic report from AI analysis"""
     study = get_object_or_404(Study, id=study_id)
     user = request.user
     
-    # Check permissions
+    # Check facility permissions
     if user.is_facility_user() and study.facility != user.facility:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
