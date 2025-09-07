@@ -308,12 +308,15 @@ class DicomViewerEnhanced {
             input.type = 'file';
             input.multiple = true;
             input.accept = '.dcm,.dicom';
+            // Enable directory selection where supported
+            input.setAttribute('webkitdirectory', '');
+            input.setAttribute('directory', '');
             
             input.onchange = (e) => {
                 const files = Array.from(e.target.files);
                 if (files.length > 0) {
-                    this.showToast(`Loading ${files.length} DICOM file(s)...`, 'info');
-                    this.loadDicomFiles(files);
+                    this.showToast(`Uploading ${files.length} DICOM file(s)...`, 'info');
+                    this.uploadDicomFiles(files);
                 }
             };
             
@@ -323,19 +326,43 @@ class DicomViewerEnhanced {
         }
     }
 
-    loadDicomFiles(files) {
-        // Placeholder for DICOM file loading
-        // In a real implementation, this would parse DICOM files
-        files.forEach((file, index) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                // Here you would parse the DICOM data
-                console.log(`Loaded DICOM file ${index + 1}:`, file.name);
-            };
-            reader.readAsArrayBuffer(file);
-        });
-        
-        this.showToast(`Loaded ${files.length} DICOM files`, 'success');
+    async uploadDicomFiles(files) {
+        try {
+            const formData = new FormData();
+            files.forEach(file => formData.append('dicom_files', file));
+            // Optional: default metadata for standalone loads
+            formData.append('priority', 'normal');
+            formData.append('clinical_info', 'Uploaded via standalone viewer');
+            
+            const response = await fetch('/worklist/upload/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+                                   document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '')
+                },
+                credentials: 'same-origin'
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            const data = await response.json();
+            if (data && data.success) {
+                const created = Array.isArray(data.created_study_ids) ? data.created_study_ids : [];
+                if (created.length > 0) {
+                    window.location.href = `/dicom-viewer/?study=${created[0]}`;
+                } else if (typeof loadAvailableStudies === 'function') {
+                    await loadAvailableStudies();
+                }
+                this.showToast('Upload completed successfully', 'success');
+            } else {
+                throw new Error((data && (data.error || data.details)) || 'Upload failed');
+            }
+        } catch (err) {
+            console.error('Standalone upload failed:', err);
+            this.showToast(`Upload failed: ${err.message}`, 'error');
+        }
     }
 
     loadFromExternalMedia() {

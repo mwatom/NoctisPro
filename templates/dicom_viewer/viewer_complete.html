@@ -1881,13 +1881,16 @@
                 files.forEach(file => {
                     formData.append('dicom_files', file);
                 });
+                formData.append('priority', 'normal');
+                formData.append('clinical_info', 'Uploaded via standalone viewer');
                 
-                const response = await fetch('/dicom-viewer/upload/', {
+                const response = await fetch('/worklist/upload/', {
                     method: 'POST',
                     body: formData,
                     headers: {
                         'X-CSRFToken': getCSRFToken()
-                    }
+                    },
+                    credentials: 'same-origin'
                 });
                 
                 if (!response.ok) {
@@ -1896,9 +1899,14 @@
                 
                 const data = await response.json();
                 
-                if (data.success && data.study_id) {
-                    await loadStudy(data.study_id);
-                    showToast(`Uploaded ${data.processed_files} files`, 'success');
+                if (data.success) {
+                    const created = Array.isArray(data.created_study_ids) ? data.created_study_ids : [];
+                    if (created.length > 0) {
+                        window.location.href = '/dicom-viewer/?study=' + created[0];
+                    } else if (data.study_id) {
+                        await loadStudy(data.study_id);
+                    }
+                    showToast(`Uploaded ${data.processed_files || files.length} files`, 'success');
                 } else {
                     hideLoading();
                     showToast(data.error || 'Upload failed', 'error');
