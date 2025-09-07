@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import views_permissions
 
 app_name = 'admin_panel'
 
@@ -24,4 +25,8 @@ urlpatterns = [
     path('logs/', views.system_logs, name='system_logs'),
     path('settings/', views.settings_view, name='settings'),
     path('upload-facilities/', views.upload_facilities, name='upload_facilities'),
+
+    # Permissions and capabilities management
+    path('permissions/', views_permissions.permissions_dashboard, name='permissions_dashboard'),
+    path('permissions/user/<str:username>/', views_permissions.edit_user_permissions, name='edit_user_permissions'),
 ]

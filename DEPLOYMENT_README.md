@@ -79,6 +79,21 @@ cd NoctisPro
 ./deploy_master.sh --test-only
 ```
 
+## 🌐 Internet Access Options
+
+- Ngrok (preconfigured in scripts)
+  - Use a single agent with multiple tunnels to avoid session limits:
+    ```bash
+    sudo ./scripts/configure_ngrok_multi.sh <NGROK_AUTHTOKEN> /etc/ngrok.yml
+    sudo ngrok start --all --config /etc/ngrok.yml
+    ```
+- DuckDNS (optional, additive)
+  - Setup and auto-refresh public IP:
+    ```bash
+    sudo ./scripts/setup_duckdns.sh <DUCKDNS_TOKEN> <SUBDOMAIN>
+    # Access at: https://<SUBDOMAIN>.duckdns.org
+    ```
+
 ## 📊 Deployment Components
 
 ### Core Scripts

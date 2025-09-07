@@ -274,8 +274,12 @@ LOGOUT_REDIRECT_URL = '/login/'
 
 # Session configuration - Use database sessions instead of Redis
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
-SESSION_COOKIE_AGE = 86400  # 24 hours
+# 30 minutes inactivity timeout
+SESSION_COOKIE_AGE = 1800
+# Refresh expiry on each request to implement inactivity-based expiry
 SESSION_SAVE_EVERY_REQUEST = True
+# Expire session at browser close to require fresh login on new window
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
 # File upload settings - Enhanced for up to 5000 DICOM images
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024 * 1024  # 5GB for large DICOM batches

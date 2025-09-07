@@ -6,6 +6,7 @@
     <title>Noctis Pro PACS - Worklist Dashboard</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     {% load static %}
+    {% load dicts %}
     <link rel="icon" href="{% static 'favicon.ico' %}" type="image/x-icon">
     <link href="{% static 'css/dicom-viewer-buttons.css' %}" rel="stylesheet">
     <script src="{% static 'js/worklist-button-handlers.js' %}" defer></script>
@@ -606,6 +607,10 @@
                 <div class="nav-tab active">WORKLIST</div>
                 <div class="nav-tab" onclick="window.location.href='{% url 'worklist:study_list' %}'">STUDIES</div>
                 <div class="nav-tab" onclick="window.location.href='{% url 'reports:report_list' %}'">REPORTS</div>
+                {% user_caps as caps %}
+                {% if (user.is_admin or user.is_radiologist) and caps.ai_visible %}
+                <div class="nav-tab" onclick="window.location.href='{% url 'ai_analysis:ai_dashboard' %}'"><i class="fas fa-robot"></i> AI</div>
+                {% endif %}
                 {% if user.is_admin %}
                 <div class="nav-tab" onclick="window.location.href='{% url 'admin_panel:dashboard' %}'"><i class="fas fa-user-cog"></i> ADMIN PANEL</div>
                 {% endif %}
@@ -616,6 +621,16 @@
                     <div class="status-dot"></div>
                     <span>ONLINE</span>
                 </div>
+                {% user_caps as caps %}
+                {% if user.is_admin or user.is_radiologist %}
+                <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,212,255,0.12);border:1px solid var(--accent-color);color:var(--accent-color);padding:2px 6px;border-radius:10px;font-size:10px;">
+                    <i class="fas fa-robot"></i> AI
+                </span>
+                {% elif caps.ai_visible %}
+                <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.06);border:1px solid var(--border-color);color:var(--text-secondary);padding:2px 6px;border-radius:10px;font-size:10px;">
+                    <i class="fas fa-robot"></i> AI
+                </span>
+                {% endif %}
                 <div class="user-info">
                     <div class="user-avatar">{{ user.get_full_name|default:user.username|slice:":2"|upper }}</div>
                     <div>
@@ -623,19 +638,28 @@
                         <div style="color: var(--text-muted); font-size: 10px;">{% if user.is_admin %}Administrator{% elif user.is_radiologist %}Radiologist{% else %}Facility User{% endif %}</div>
                     </div>
                 </div>
-                {% if user.is_authenticated and user.is_admin %}
+                {% if user.is_authenticated %}
+                {% user_caps as caps %}
+                {% if user.is_admin or caps.manage_settings %}
                 <button type="button" class="admin-btn" onclick="window.location.href='{% url 'admin_panel:dashboard' %}'" title="Administrator Dashboard">
                     <i class="fas fa-shield-alt"></i> ADMIN PANEL
                 </button>
+                {% endif %}
+                {% if user.is_admin or caps.manage_users %}
                 <button type="button" class="btn-control" onclick="window.location.href='{% url 'admin_panel:user_create' %}'" title="Create New User">
                     <i class="fas fa-user-plus"></i>
                 </button>
+                {% endif %}
+                {% if user.is_admin or caps.manage_facilities %}
                 <button type="button" class="btn-control" onclick="window.location.href='{% url 'admin_panel:facility_create' %}'" title="Create New Facility">
                     <i class="fas fa-hospital"></i>
                 </button>
+                {% endif %}
+                {% if user.is_admin or caps.manage_users %}
                 <button type="button" class="btn-control" onclick="window.location.href='{% url 'admin_panel:user_management' %}'" title="Manage All Users">
                     <i class="fas fa-users-cog"></i>
                 </button>
+                {% endif %}
                 {% endif %}
                 <button type="button" class="btn-control" onclick="window.location.href='{% url 'notifications:notification_list' %}'" title="Notifications">
                     <i class="fas fa-bell"></i><span id="notifBadge" class="study-count" style="display:none">0</span>
