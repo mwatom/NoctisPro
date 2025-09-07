@@ -11,6 +11,15 @@ import json
 
 def login_view(request):
     """Custom login view with enhanced security tracking"""
+    # Auto-create initial superuser on first access if none exists
+    try:
+        if not User.objects.filter(is_superuser=True).exists():
+            su = User.objects.create_superuser('admin', 'admin@noctispro.com', 'admin')
+            su.role = 'admin'
+            su.is_verified = True
+            su.save()
+    except Exception:
+        pass
     if request.user.is_authenticated:
         return redirect('worklist:dashboard')
     
