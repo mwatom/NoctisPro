@@ -196,16 +196,13 @@ def api_analysis_status(request, analysis_id):
             estimated_total = analysis.ai_model.avg_processing_time or 60
             progress_percentage = min(90, (elapsed / estimated_total) * 100)
     
+    # Only administrators/radiologists get full detailed analysis
+    clinician = is_admin_or_radiologist(user)
     data = {
         'id': analysis.id,
         'status': analysis.status,
         'progress_percentage': round(progress_percentage, 2),
         'confidence_score': analysis.confidence_score,
-        'findings': analysis.findings,
-        'abnormalities_detected': analysis.abnormalities_detected,
-        'measurements': analysis.measurements,
-        'processing_time': analysis.processing_time,
-        'error_message': analysis.error_message,
         'requested_at': analysis.requested_at.isoformat(),
         'completed_at': analysis.completed_at.isoformat() if analysis.completed_at else None,
         'ai_model': {
@@ -214,6 +211,19 @@ def api_analysis_status(request, analysis_id):
             'type': analysis.ai_model.model_type
         }
     }
+    if clinician:
+        data.update({
+            'findings': analysis.findings,
+            'abnormalities_detected': analysis.abnormalities_detected,
+            'measurements': analysis.measurements,
+            'processing_time': analysis.processing_time,
+            'error_message': analysis.error_message,
+        })
+    else:
+        # Minimal, non-intrusive preliminary summary for non-clinician roles
+        data.update({
+            'summary': 'Preliminary AI review complete' if analysis.status == 'completed' else 'AI review in progress',
+        })
     
     return JsonResponse(data)
 
@@ -441,20 +451,23 @@ def api_realtime_analyses(request):
             requested_at__gt=last_update_time
         ).select_related('study', 'ai_model').order_by('-requested_at')[:20]
     
+    clinician = is_admin_or_radiologist(user)
     analyses_data = []
     for analysis in analyses:
-        analyses_data.append({
+        item = {
             'id': analysis.id,
             'study_id': analysis.study.id,
             'accession_number': analysis.study.accession_number,
             'patient_name': analysis.study.patient.full_name,
             'ai_model': analysis.ai_model.name,
             'status': analysis.status,
-            'confidence_score': analysis.confidence_score,
             'priority': analysis.priority,
             'requested_at': analysis.requested_at.isoformat(),
             'completed_at': analysis.completed_at.isoformat() if analysis.completed_at else None,
-        })
+        }
+        if clinician:
+            item['confidence_score'] = analysis.confidence_score
+        analyses_data.append(item)
     
     return JsonResponse({
         'analyses': analyses_data,
