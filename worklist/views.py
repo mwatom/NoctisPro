@@ -17,7 +17,7 @@ import pydicom
 from PIL import Image
 from io import BytesIO
 import logging
-
+from django.conf import settings
 from .models import (
     Study, Patient, Modality, Series, DicomImage, StudyAttachment, 
     AttachmentComment, AttachmentVersion
@@ -1172,14 +1172,14 @@ def api_study_detail(request, study_id):
             'id': study.id,
             'accession_number': study.accession_number,
             'study_date': study.study_date.isoformat() if study.study_date else None,
-            'study_time': study.study_time.isoformat() if study.study_time else None,
+            'study_time': study.study_date.isoformat() if study.study_date else None,
             'modality': study.modality.name if study.modality else None,
             'study_description': study.study_description,
             'patient': {
                 'name': study.patient.full_name if study.patient else 'Unknown',
                 'id': study.patient.patient_id if study.patient else None,
-                'birth_date': study.patient.birth_date.isoformat() if study.patient and study.patient.birth_date else None,
-                'sex': study.patient.sex if study.patient else None
+                'birth_date': study.patient.date_of_birth.isoformat() if study.patient and study.patient.date_of_birth else None,
+                'sex': study.patient.gender if study.patient else None
             },
             'status': study.status,
             'priority': study.priority,
@@ -1229,7 +1229,7 @@ def api_delete_study(request, study_id):
             'patient_name': study.patient.full_name if study.patient else 'Unknown',
             'deleted_by': request.user.username,
             'study_date': study.study_date.isoformat() if study.study_date else None,
-            'modality': study.modality
+            'modality': study.modality.code if study.modality else None
         }
         
         # Get related objects count for logging
