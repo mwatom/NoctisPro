@@ -1120,8 +1120,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const totalBytes = selectedFiles.reduce((s, f) => s + (f.size || 0), 0);
 
         // Adaptive tuning
-        let CHUNK_SIZE = totalFiles > 1000 ? 100 : 25;
-        let MAX_PARALLEL = totalFiles > 1000 ? 4 : 4;
+        // Smaller chunks and parallelism to avoid upstream (ngrok/proxy) timeouts
+        let CHUNK_SIZE = totalFiles > 1000 ? 50 : 10;
+        let MAX_PARALLEL = totalFiles > 1000 ? 3 : 2;
 
         let uploadedCount = 0;
         let uploadedBytes = 0;
@@ -1149,7 +1150,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Track per-chunk progress to aggregate bytes across parallel requests
         const chunkByteProgress = new Array(chunks.length).fill(0);
 
-        function uploadChunkXHR(chunkIdx, chunk) {
+        function uploadChunkXHR(chunkIdx, chunk, attempt = 1) {
             return new Promise((resolve) => {
                 const formData = new FormData();
                 chunk.forEach((file) => formData.append('dicom_files', file));
@@ -1160,6 +1161,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const xhr = new XMLHttpRequest();
                 xhr.open('POST', url, true);
+                xhr.timeout = 120000; // 120s per chunk
                 xhr.setRequestHeader('X-CSRFToken', token);
                 xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 
@@ -1172,11 +1174,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     updateProgress(percentBytes, `${uploadedCount} / ${totalFiles} files`, `Transferring ${formatFileSize(uploadedBytes)} / ${formatFileSize(totalBytes)}`);
                 };
 
+                const handleFailure = (reason) => {
+                    const maxAttempts = 4;
+                    if (attempt < maxAttempts) {
+                        const backoffMs = Math.min(30000, Math.pow(2, attempt) * 1000) + Math.floor(Math.random() * 500);
+                        setTimeout(() => {
+                            uploadChunkXHR(chunkIdx, chunk, attempt + 1).then(resolve);
+                        }, backoffMs);
+                    } else {
+                        errors.push(reason || `Upload failed after ${maxAttempts} attempts`);
+                        resolve({ ok: false });
+                    }
+                };
+
                 xhr.onreadystatechange = function () {
                     if (xhr.readyState === 4) {
                         try {
                             if (xhr.status >= 200 && xhr.status < 300) {
-                                const data = JSON.parse(xhr.responseText);
+                                const data = JSON.parse(xhr.responseText || '{}');
                                 if (data && data.success) {
                                     const processed = typeof data.processed_files === 'number' ? data.processed_files : chunk.length;
                                     uploadedCount += processed;
@@ -1190,23 +1205,23 @@ document.addEventListener('DOMContentLoaded', function() {
                                     updateProgress(Math.max(percentFiles, (uploadedBytes / Math.max(1, totalBytes)) * 100), `${uploadedCount} / ${totalFiles} files`, `Created ${studiesCreated} studies, ${totalSeries} series, ${totalImagesUploaded} images`);
                                     resolve({ ok: true });
                                 } else {
-                                    errors.push((data && data.error) || 'Unknown error');
-                                    resolve({ ok: false });
+                                    handleFailure((data && data.error) || 'Unknown error');
                                 }
                             } else {
-                                errors.push(`Upload failed with status ${xhr.status}: ${xhr.statusText}`);
-                                resolve({ ok: false });
+                                handleFailure(`HTTP ${xhr.status}: ${xhr.statusText || 'Request failed'}`);
                             }
                         } catch (e) {
-                            errors.push(`Response parsing error: ${e.message}`);
-                            resolve({ ok: false });
+                            handleFailure(`Response parsing error: ${e.message}`);
                         }
                     }
                 };
 
+                xhr.ontimeout = function () {
+                    handleFailure('Request timeout');
+                };
+
                 xhr.onerror = function () {
-                    errors.push('Network error during upload');
-                    resolve({ ok: false });
+                    handleFailure('Network error during upload');
                 };
 
                 xhr.send(formData);
