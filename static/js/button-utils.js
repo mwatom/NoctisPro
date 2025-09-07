@@ -50,12 +50,15 @@ class ProfessionalButtons {
     }
 
     handleButtonPress(e) {
-        if (e.target.disabled) return;
+        const btn = e.currentTarget || e.target;
+        if (btn && btn.disabled) return;
         
-        // Create ripple effect
-        this.createRipple(e);
+        // Create ripple effect (static to avoid context issues)
+        ProfessionalButtons.createRipple(e);
         
-        e.target.style.transform = 'translateY(0)';
+        if (btn) {
+            btn.style.transform = 'translateY(0)';
+        }
     }
 
     handleButtonRelease(e) {
@@ -67,7 +70,7 @@ class ProfessionalButtons {
     }
 
     createRipple(e) {
-        const button = e.target;
+        const button = e.currentTarget || e.target;
         const rect = button.getBoundingClientRect();
         const size = Math.max(rect.width, rect.height);
         const x = e.clientX - rect.left - size / 2;
@@ -92,6 +95,31 @@ class ProfessionalButtons {
         setTimeout(() => {
             ripple.remove();
         }, 600);
+    }
+
+    // Static variant to ensure availability when handler context is altered
+    static createRipple(e) {
+        const button = (e && (e.currentTarget || e.target)) || null;
+        if (!button) return;
+        const rect = button.getBoundingClientRect();
+        const size = Math.max(rect.width, rect.height);
+        const x = e.clientX - rect.left - size / 2;
+        const y = e.clientY - rect.top - size / 2;
+        const ripple = document.createElement('span');
+        ripple.style.cssText = `
+            position: absolute;
+            width: ${size}px;
+            height: ${size}px;
+            left: ${x}px;
+            top: ${y}px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: scale(0);
+            animation: ripple 0.6s ease-out;
+            pointer-events: none;
+        `;
+        button.appendChild(ripple);
+        setTimeout(() => ripple.remove(), 600);
     }
 
     setupGlobalEventListeners() {

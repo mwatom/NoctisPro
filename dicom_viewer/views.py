@@ -1884,9 +1884,18 @@ def upload_dicom(request):
                     ds = pydicom.dcmread(in_file, force=True)
                     study_uid = getattr(ds, 'StudyInstanceUID', None)
                     series_uid = getattr(ds, 'SeriesInstanceUID', None)
-                    if not study_uid or not series_uid:
-                        invalid_files += 1
-                        continue
+                    sop_uid = getattr(ds, 'SOPInstanceUID', None)
+                    # Relaxed validation: synthesize missing values
+                    if not study_uid:
+                        import uuid as _uuid
+                        study_uid = f"SYN-{_uuid.uuid4()}"
+                    if not series_uid:
+                        import uuid as _uuid
+                        series_uid = f"SYN-SER-{_uuid.uuid4()}"
+                    if not sop_uid:
+                        import uuid as _uuid
+                        sop_uid = f"SYN-SOP-{_uuid.uuid4()}"
+                        setattr(ds, 'SOPInstanceUID', sop_uid)
                     if rep_ds is None:
                         rep_ds = ds
                     if study_uid not in studies_map:
@@ -2005,7 +2014,11 @@ def upload_dicom(request):
 
                 for ds, fobj in items:
                     try:
-                        sop_uid = getattr(ds, 'SOPInstanceUID')
+                        sop_uid = getattr(ds, 'SOPInstanceUID', None)
+                        if not sop_uid:
+                            import uuid as _uuid
+                            sop_uid = f"SYN-SOP-{_uuid.uuid4()}"
+                            setattr(ds, 'SOPInstanceUID', sop_uid)
                         instance_number = getattr(ds, 'InstanceNumber', 1) or 1
                         rel_path = f"dicom/images/{study_uid}/{series_uid}/{sop_uid}.dcm"
                         # Ensure we read from start
