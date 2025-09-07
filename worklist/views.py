@@ -16,6 +16,7 @@ from pathlib import Path
 import pydicom
 from PIL import Image
 from io import BytesIO
+import logging
 
 from .models import (
     Study, Patient, Modality, Series, DicomImage, StudyAttachment, 
@@ -24,6 +25,9 @@ from .models import (
 from accounts.models import User, Facility
 from notifications.models import Notification, NotificationType
 from reports.models import Report
+
+# Module logger for robust error reporting
+logger = logging.getLogger('noctis_pro.worklist')
 
 @login_required
 def dashboard(request):
@@ -911,7 +915,11 @@ def view_attachment(request, attachment_id):
             return redirect('worklist:study_list')
     
     # Increment access count
-    attachment.increment_access_count()
+    try:
+        attachment.increment_access_count()
+    except Exception as e:
+        # Do not fail viewing due to metrics error
+        logger.warning(f"Failed to increment access count for attachment {attachment.id}: {e}")
     
     # Handle DICOM files
     if attachment.is_dicom_file():
@@ -925,30 +933,33 @@ def view_attachment(request, attachment_id):
     # Handle viewable files (PDF, images)
     if attachment.is_viewable_in_browser():
         action = request.GET.get('action', 'view')
-        
+        # Ensure file exists before attempting to open
+        try:
+            if not attachment.file or not default_storage.exists(attachment.file.name):
+                raise FileNotFoundError('Attachment file missing from storage')
+            file_handle = attachment.file.open('rb')
+        except Exception as e:
+            logger.error(f"Attachment open failed (id={attachment.id}): {e}")
+            messages.error(request, 'Attachment file is missing or cannot be opened.')
+            return redirect('worklist:study_detail', study_id=attachment.study.id)
+
         if action == 'download':
             # Force download
-            response = FileResponse(
-                attachment.file.open('rb'),
-                as_attachment=True,
-                filename=attachment.name
-            )
-            return response
+            return FileResponse(file_handle, as_attachment=True, filename=attachment.name)
         else:
             # View in browser
-            response = FileResponse(
-                attachment.file.open('rb'),
-                content_type=attachment.mime_type
-            )
-            return response
+            return FileResponse(file_handle, content_type=attachment.mime_type or 'application/octet-stream')
     
     # For non-viewable files, force download
-    response = FileResponse(
-        attachment.file.open('rb'),
-        as_attachment=True,
-        filename=attachment.name
-    )
-    return response
+    try:
+        if not attachment.file or not default_storage.exists(attachment.file.name):
+            raise FileNotFoundError('Attachment file missing from storage')
+        file_handle = attachment.file.open('rb')
+        return FileResponse(file_handle, as_attachment=True, filename=attachment.name)
+    except Exception as e:
+        logger.error(f"Attachment download failed (id={attachment.id}): {e}")
+        messages.error(request, 'Attachment file is missing or cannot be downloaded.')
+        return redirect('worklist:study_detail', study_id=attachment.study.id)
 
 @login_required
 @csrf_exempt
@@ -1017,30 +1028,37 @@ def delete_attachment(request, attachment_id):
         return JsonResponse({'error': 'Permission denied. Only administrators, radiologists, or facility users can delete attachments.'}, status=403)
     
     if request.method == 'POST':
+        wants_json = 'application/json' in (request.headers.get('Accept') or '') or (request.headers.get('X-Requested-With') == 'XMLHttpRequest')
+        study_id = attachment.study.id
+        attachment_name = attachment.name
         try:
-            study_id = attachment.study.id
-            attachment_name = attachment.name
+            # Delete file from storage (ignore if missing)
+            try:
+                if attachment.file:
+                    attachment.file.delete(save=False)
+            except Exception as e:
+                logger.warning(f"Failed to delete attachment file (id={attachment.id}): {e}")
             
-            # Delete file from storage
-            if attachment.file:
-                attachment.file.delete()
-            
-            # Delete thumbnail if exists
-            if attachment.thumbnail:
-                attachment.thumbnail.delete()
+            # Delete thumbnail if exists (ignore if missing)
+            try:
+                if attachment.thumbnail:
+                    attachment.thumbnail.delete(save=False)
+            except Exception as e:
+                logger.warning(f"Failed to delete attachment thumbnail (id={attachment.id}): {e}")
             
             # Delete attachment record
             attachment.delete()
             
             messages.success(request, f'Attachment "{attachment_name}" deleted successfully')
-            
-            return JsonResponse({
-                'success': True,
-                'message': f'Attachment "{attachment_name}" deleted successfully'
-            })
-            
+            if wants_json:
+                return JsonResponse({'success': True, 'message': f'Attachment "{attachment_name}" deleted successfully'})
+            return redirect('worklist:study_detail', study_id=study_id)
         except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
+            logger.error(f"Attachment delete failed (id={attachment.id}): {e}")
+            if wants_json:
+                return JsonResponse({'error': str(e)}, status=500)
+            messages.error(request, f'Failed to delete attachment: {e}')
+            return redirect('worklist:study_detail', study_id=study_id)
     
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
@@ -1191,11 +1209,14 @@ def api_delete_study(request, study_id):
     # Check if user is admin or superuser
     try:
         is_admin = hasattr(request.user, 'is_admin') and request.user.is_admin()
-        is_superuser = request.user.is_superuser
+        is_superuser = getattr(request.user, 'is_superuser', False)
         if not (is_admin or is_superuser):
             return JsonResponse({'error': 'Permission denied. Only administrators can delete studies.'}, status=403)
     except Exception as e:
-        logger.error(f"Error checking user permissions: {str(e)}")
+        try:
+            logger.error(f"Error checking user permissions: {str(e)}")
+        except Exception:
+            pass
         return JsonResponse({'error': 'Permission error'}, status=403)
     
     try:
