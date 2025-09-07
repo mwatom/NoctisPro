@@ -225,19 +225,20 @@ def upload_study(request):
 					sop_uid = getattr(ds, 'SOPInstanceUID', None)
 					modality = getattr(ds, 'Modality', 'OT')
 					
-					# Professional validation with detailed logging
+					# Relaxed validation: synthesize missing UIDs for valid files
 					if not study_uid:
-						logger.warning(f"File {file_index + 1}: Missing StudyInstanceUID")
-						invalid_files += 1
-						continue
+						import uuid as _uuid
+						study_uid = f"SYN-{_uuid.uuid4()}"
+						logger.warning(f"File {file_index + 1}: Missing StudyInstanceUID, synthesized {study_uid}")
 					if not series_uid:
-						logger.warning(f"File {file_index + 1}: Missing SeriesInstanceUID")
-						invalid_files += 1
-						continue
+						import uuid as _uuid
+						series_uid = f"SYN-SER-{_uuid.uuid4()}"
+						logger.warning(f"File {file_index + 1}: Missing SeriesInstanceUID, synthesized {series_uid}")
 					if not sop_uid:
-						logger.warning(f"File {file_index + 1}: Missing SOPInstanceUID")
-						invalid_files += 1
-						continue
+						import uuid as _uuid
+						sop_uid = f"SYN-SOP-{_uuid.uuid4()}"
+						logger.warning(f"File {file_index + 1}: Missing SOPInstanceUID, synthesized {sop_uid}")
+						setattr(ds, 'SOPInstanceUID', sop_uid)
 					
 					# Enhanced series grouping with medical imaging intelligence
 					series_key = f"{series_uid}_{modality}"
