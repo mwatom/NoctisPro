@@ -3,7 +3,7 @@
 # NoctisPro Optimized Management Script
 
 DEPLOYMENT_MODE="native_simple"
-PROJECT_DIR="/workspace"
+PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 
 case "$1" in
     start)
