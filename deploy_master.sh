@@ -38,6 +38,13 @@ declare -g SYSTEM_PROFILE=""
 declare -g VALIDATION_PASSED=false
 declare -g ROLLBACK_AVAILABLE=false
 
+# DuckDNS configuration
+declare -g DUCKDNS_ENABLED=false
+declare -g DUCKDNS_TOKEN=""
+declare -g DUCKDNS_SUBDOMAIN=""
+declare -g DUCKDNS_DOMAIN=""
+declare -g PUBLIC_IP=""
+
 # =============================================================================
 # ENHANCED LOGGING SYSTEM
 # =============================================================================
@@ -102,6 +109,267 @@ phase() {
 }
 
 # =============================================================================
+# DUCKDNS CONFIGURATION AND MANAGEMENT
+# =============================================================================
+
+detect_duckdns_configuration() {
+    phase "DUCKDNS_DETECTION" "Detecting DuckDNS configuration"
+    
+    # Check for existing DuckDNS configuration
+    local config_sources=(
+        "/workspace/.duckdns_config"
+        "/etc/noctis/duckdns.env"
+        "/etc/noctis/noctis.env"
+        "${PROJECT_DIR}/.env"
+        "${PROJECT_DIR}/.env.optimized"
+    )
+    
+    local found_config=false
+    
+    for config_file in "${config_sources[@]}"; do
+        if [[ -f "$config_file" ]]; then
+            log "Found configuration file: $config_file"
+            source "$config_file"
+            found_config=true
+        fi
+    done
+    
+    # Check environment variables
+    if [[ -n "${DUCKDNS_TOKEN:-}" ]] && [[ -n "${DUCKDNS_SUBDOMAIN:-}" ]]; then
+        DUCKDNS_ENABLED=true
+        DUCKDNS_TOKEN="${DUCKDNS_TOKEN}"
+        DUCKDNS_SUBDOMAIN="${DUCKDNS_SUBDOMAIN}"
+        DUCKDNS_DOMAIN="${DUCKDNS_SUBDOMAIN}.duckdns.org"
+        log "DuckDNS configuration found in environment variables"
+    elif [[ -n "${DUCKDNS_DOMAIN:-}" ]] && [[ -n "${DUCKDNS_TOKEN:-}" ]]; then
+        DUCKDNS_ENABLED=true
+        DUCKDNS_TOKEN="${DUCKDNS_TOKEN}"
+        DUCKDNS_SUBDOMAIN="${DUCKDNS_DOMAIN%.duckdns.org}"
+        DUCKDNS_DOMAIN="${DUCKDNS_DOMAIN}"
+        log "DuckDNS configuration found with full domain"
+    else
+        # Try to detect from existing configuration
+        if [[ -f "/workspace/.duckdns_config" ]]; then
+            source "/workspace/.duckdns_config"
+            if [[ -n "${DUCKDNS_DOMAIN:-}" ]] && [[ -n "${DUCKDNS_TOKEN:-}" ]]; then
+                DUCKDNS_ENABLED=true
+                DUCKDNS_TOKEN="${DUCKDNS_TOKEN}"
+                DUCKDNS_SUBDOMAIN="${DUCKDNS_DOMAIN%.duckdns.org}"
+                DUCKDNS_DOMAIN="${DUCKDNS_DOMAIN}"
+                log "DuckDNS configuration loaded from existing config file"
+            fi
+        fi
+    fi
+    
+    if [[ "${DUCKDNS_ENABLED}" == "true" ]]; then
+        success "DuckDNS configuration detected: ${DUCKDNS_DOMAIN}"
+        
+        # Detect public IP
+        detect_public_ip
+        
+        # Test DuckDNS connectivity
+        test_duckdns_connectivity
+    else
+        info "DuckDNS not configured - will skip external domain setup"
+        info "You can configure DuckDNS later by setting DUCKDNS_TOKEN and DUCKDNS_SUBDOMAIN environment variables"
+    fi
+}
+
+detect_public_ip() {
+    log "Detecting public IP address..."
+    
+    local ip_services=(
+        "https://ifconfig.me"
+        "https://api.ipify.org"
+        "https://ipinfo.io/ip"
+        "https://checkip.amazonaws.com"
+        "https://icanhazip.com"
+    )
+    
+    for service in "${ip_services[@]}"; do
+        log "Trying IP detection service: $service"
+        PUBLIC_IP=$(curl -s --connect-timeout 10 --max-time 15 "$service" 2>/dev/null | tr -d '\n\r' | grep -oE '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$' || true)
+        
+        if [[ -n "$PUBLIC_IP" ]] && [[ "$PUBLIC_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            success "Public IP detected: $PUBLIC_IP"
+            return 0
+        fi
+    done
+    
+    warn "Could not detect public IP - DuckDNS will use auto-detection"
+    PUBLIC_IP=""
+}
+
+test_duckdns_connectivity() {
+    log "Testing DuckDNS connectivity..."
+    
+    local update_url="https://www.duckdns.org/update?domains=${DUCKDNS_SUBDOMAIN}&token=${DUCKDNS_TOKEN}"
+    if [[ -n "$PUBLIC_IP" ]]; then
+        update_url+="&ip=${PUBLIC_IP}"
+    fi
+    
+    local response=$(curl -s --connect-timeout 30 --max-time 45 "$update_url" 2>/dev/null || echo "ERROR")
+    
+    if [[ "$response" == "OK" ]]; then
+        success "DuckDNS connectivity test successful"
+        log "Domain ${DUCKDNS_DOMAIN} updated successfully"
+    else
+        warn "DuckDNS connectivity test failed: $response"
+        warn "This may be due to network issues or invalid credentials"
+    fi
+}
+
+setup_duckdns_service() {
+    if [[ "${DUCKDNS_ENABLED}" != "true" ]]; then
+        return 0
+    fi
+    
+    phase "DUCKDNS_SERVICE" "Setting up DuckDNS service"
+    
+    log "Creating DuckDNS systemd service..."
+    
+    # Create DuckDNS update script
+    local update_script="/usr/local/bin/duckdns-update"
+    
+    sudo tee "$update_script" > /dev/null << EOF
+#!/bin/bash
+# DuckDNS IP Update Script for NoctisPro PACS
+# Generated by Master Deployment Script
+
+set -euo pipefail
+
+# Configuration
+DUCKDNS_TOKEN="${DUCKDNS_TOKEN}"
+DUCKDNS_SUBDOMAIN="${DUCKDNS_SUBDOMAIN}"
+LOG_FILE="/var/log/duckdns-update.log"
+
+# Get current public IP with fallback methods
+PUBLIC_IP=""
+for service in "https://ifconfig.me" "https://api.ipify.org" "https://ipinfo.io/ip" "https://checkip.amazonaws.com"; do
+    PUBLIC_IP=\$(curl -s --connect-timeout 10 --max-time 15 "\$service" 2>/dev/null | tr -d '\n\r' | grep -oE '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\$' || true)
+    if [[ -n "\$PUBLIC_IP" ]] && [[ "\$PUBLIC_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\$ ]]; then
+        break
+    fi
+    PUBLIC_IP=""
+done
+
+# Update DuckDNS
+UPDATE_URL="https://www.duckdns.org/update?domains=\${DUCKDNS_SUBDOMAIN}&token=\${DUCKDNS_TOKEN}"
+if [[ -n "\$PUBLIC_IP" ]]; then
+    UPDATE_URL+="&ip=\${PUBLIC_IP}"
+fi
+
+RESPONSE=\$(curl -s --connect-timeout 30 --max-time 45 "\$UPDATE_URL" 2>/dev/null || echo "ERROR")
+
+if [[ "\$RESPONSE" == "OK" ]]; then
+    if [[ -n "\$PUBLIC_IP" ]]; then
+        echo "\$(date): SUCCESS: Updated \${DUCKDNS_SUBDOMAIN}.duckdns.org to \$PUBLIC_IP" >> "\$LOG_FILE"
+    else
+        echo "\$(date): SUCCESS: Updated \${DUCKDNS_SUBDOMAIN}.duckdns.org (auto-detected IP)" >> "\$LOG_FILE"
+    fi
+else
+    echo "\$(date): ERROR: Failed to update DNS. Response: \$RESPONSE" >> "\$LOG_FILE"
+fi
+EOF
+
+    sudo chmod +x "$update_script"
+    
+    # Create systemd service
+    sudo tee /etc/systemd/system/duckdns-update.service > /dev/null << EOF
+[Unit]
+Description=DuckDNS IP Updater for NoctisPro PACS
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=$update_script
+User=root
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # Create systemd timer
+    sudo tee /etc/systemd/system/duckdns-update.timer > /dev/null << EOF
+[Unit]
+Description=Run DuckDNS updater every 5 minutes
+Requires=duckdns-update.service
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=duckdns-update.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
+    # Enable and start the timer
+    sudo systemctl daemon-reload
+    sudo systemctl enable duckdns-update.timer
+    sudo systemctl start duckdns-update.timer
+    
+    # Run initial update
+    sudo systemctl start duckdns-update.service
+    
+    success "DuckDNS service configured and started"
+    log "DuckDNS will update every 5 minutes automatically"
+    log "Domain: ${DUCKDNS_DOMAIN}"
+    log "Log file: /var/log/duckdns-update.log"
+}
+
+configure_nginx_for_duckdns() {
+    if [[ "${DUCKDNS_ENABLED}" != "true" ]] || [[ "${USE_NGINX}" != "true" ]]; then
+        return 0
+    fi
+    
+    log "Configuring Nginx for DuckDNS domain..."
+    
+    # This would be called from the nginx configuration generation
+    # The actual nginx config will be updated in the deployment configurator
+    log "Nginx will be configured to serve ${DUCKDNS_DOMAIN}"
+}
+
+save_duckdns_configuration() {
+    if [[ "${DUCKDNS_ENABLED}" != "true" ]]; then
+        return 0
+    fi
+    
+    log "Saving DuckDNS configuration..."
+    
+    # Save to project directory
+    cat > "${PROJECT_DIR}/.duckdns_config" << EOF
+# DuckDNS Configuration for NoctisPro PACS
+# Generated by Master Deployment Script on $(date)
+
+DUCKDNS_TOKEN="${DUCKDNS_TOKEN}"
+DUCKDNS_SUBDOMAIN="${DUCKDNS_SUBDOMAIN}"
+DUCKDNS_DOMAIN="${DUCKDNS_DOMAIN}"
+PUBLIC_IP="${PUBLIC_IP}"
+DUCKDNS_ENABLED=true
+EOF
+
+    chmod 600 "${PROJECT_DIR}/.duckdns_config"
+    
+    # Also save to system-wide location
+    sudo mkdir -p /etc/noctis
+    sudo tee /etc/noctis/duckdns.env > /dev/null << EOF
+DUCKDNS_TOKEN="${DUCKDNS_TOKEN}"
+DUCKDNS_SUBDOMAIN="${DUCKDNS_SUBDOMAIN}"
+DUCKDNS_DOMAIN="${DUCKDNS_DOMAIN}"
+PUBLIC_IP="${PUBLIC_IP}"
+DUCKDNS_ENABLED=true
+EOF
+
+    sudo chmod 600 /etc/noctis/duckdns.env
+    
+    success "DuckDNS configuration saved"
+}
+
+# =============================================================================
 # SYSTEM PROFILING AND DETECTION
 # =============================================================================
 
@@ -147,7 +415,13 @@ create_system_profile() {
   },
   "optimal_workers": ${OPTIMAL_WORKERS},
   "use_nginx": ${USE_NGINX},
-  "use_ssl": ${USE_SSL}
+  "use_ssl": ${USE_SSL},
+  "duckdns": {
+    "enabled": ${DUCKDNS_ENABLED},
+    "domain": "${DUCKDNS_DOMAIN:-}",
+    "subdomain": "${DUCKDNS_SUBDOMAIN:-}",
+    "public_ip": "${PUBLIC_IP:-}"
+  }
 }
 EOF
     
@@ -953,229 +1227,3 @@ generate_deployment_report() {
 - **Admin Panel:** http://localhost:8000/admin/
 - **DICOM Port:** localhost:11112
 - **Default Admin:** admin / admin123
-
-## Management
-
-- **Management Script:** ${PROJECT_DIR}/manage_noctis.sh
-- **System Profile:** ${PROJECT_DIR}/system_profile.json
-- **Deployment Log:** ${LOG_FILE}
-
-## Quick Commands
-
-\`\`\`bash
-# Start services
-${PROJECT_DIR}/manage_noctis.sh start
-
-# Check status
-${PROJECT_DIR}/manage_noctis.sh status
-
-# View logs
-${PROJECT_DIR}/manage_noctis.sh logs
-
-# Health check
-${PROJECT_DIR}/manage_noctis.sh health
-
-# Stop services
-${PROJECT_DIR}/manage_noctis.sh stop
-\`\`\`
-
-## Files Generated
-
-- Configuration Directory: ${PROJECT_DIR}/deployment_configs/
-- Management Script: ${PROJECT_DIR}/manage_noctis.sh
-- System Profile: ${PROJECT_DIR}/system_profile.json
-- Environment File: ${PROJECT_DIR}/.env
-- This Report: ${report_file}
-
-## Support
-
-- **Log Files:** Check ${LOG_FILE} for detailed deployment logs
-- **Health Monitoring:** Automated health checks run every 15 minutes
-- **Backup Available:** ${ROLLBACK_AVAILABLE} (Location: ${BACKUP_DIR})
-
----
-
-*Generated by NoctisPro PACS Master Deployment Script v${SCRIPT_VERSION}*
-EOF
-    
-    success "Deployment report generated: $report_file"
-}
-
-display_deployment_summary() {
-    echo ""
-    echo "=============================================="
-    echo "🎉 NoctisPro PACS - Deployment Complete!"
-    echo "=============================================="
-    echo ""
-    echo "📊 Deployment Summary:"
-    echo "  System Profile: ${SYSTEM_PROFILE}"
-    echo "  Deployment Mode: ${DEPLOYMENT_MODE}"
-    echo "  Validation: ${VALIDATION_PASSED}"
-    echo "  Rollback Available: ${ROLLBACK_AVAILABLE}"
-    echo ""
-    echo "🌐 Access Information:"
-    echo "  Web Interface: ${GREEN}http://localhost:8000${NC}"
-    echo "  Admin Panel: ${GREEN}http://localhost:8000/admin/${NC}"
-    echo "  DICOM Port: ${GREEN}localhost:11112${NC}"
-    echo "  Default Login: ${GREEN}admin / admin123${NC}"
-    echo ""
-    echo "🔧 Management:"
-    echo "  Management Script: ${CYAN}${PROJECT_DIR}/manage_noctis.sh${NC}"
-    echo "  Health Check: ${CYAN}${PROJECT_DIR}/manage_noctis.sh health${NC}"
-    echo "  View Logs: ${CYAN}${PROJECT_DIR}/manage_noctis.sh logs${NC}"
-    echo ""
-    echo "📁 Important Files:"
-    echo "  Deployment Log: ${LOG_FILE}"
-    echo "  System Profile: ${PROJECT_DIR}/system_profile.json"
-    echo "  Configurations: ${PROJECT_DIR}/deployment_configs/"
-    if [[ "${ROLLBACK_AVAILABLE}" == "true" ]]; then
-        echo "  Backup Location: ${BACKUP_DIR}"
-    fi
-    echo ""
-    
-    if [[ "${VALIDATION_PASSED}" == "true" ]]; then
-        success "🎉 Deployment completed successfully!"
-        success "🔗 Access your NoctisPro PACS system at: http://localhost:8000"
-    else
-        warn "⚠️  Deployment completed with warnings. Please check the logs."
-    fi
-}
-
-# =============================================================================
-# ERROR HANDLING AND CLEANUP
-# =============================================================================
-
-cleanup_on_exit() {
-    local exit_code=$?
-    
-    if [[ $exit_code -ne 0 ]]; then
-        error "Deployment failed with exit code $exit_code"
-        
-        if [[ "${ROLLBACK_AVAILABLE}" == "true" ]]; then
-            echo ""
-            warn "A backup is available for rollback"
-            read -p "Would you like to rollback? (y/N): " -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                rollback_deployment
-            fi
-        fi
-    fi
-    
-    log "Deployment script finished with exit code $exit_code"
-}
-
-# =============================================================================
-# MAIN ORCHESTRATION
-# =============================================================================
-
-main() {
-    local start_time=$(date +%s)
-    
-    echo ""
-    echo "${BOLD}${CYAN}🚀 NoctisPro PACS - Master Intelligent Deployment${NC}"
-    echo "${BOLD}${CYAN}===============================================${NC}"
-    echo ""
-    echo "Version: ${SCRIPT_VERSION}"
-    echo "Author: ${SCRIPT_AUTHOR}"
-    echo "Date: ${SCRIPT_DATE}"
-    echo ""
-    
-    log "Starting master deployment orchestration..."
-    log "Deployment log: ${LOG_FILE}"
-    
-    # Phase 1: System Analysis
-    create_system_profile
-    
-    # Phase 2: Pre-deployment Validation
-    run_pre_deployment_validation
-    
-    # Phase 3: Backup Creation
-    create_deployment_backup
-    
-    # Phase 4: Dependency Optimization
-    optimize_dependencies
-    
-    # Phase 5: Configuration Generation
-    generate_deployment_configurations
-    
-    # Phase 6: Deployment Execution
-    execute_deployment
-    
-    # Phase 7: Post-deployment Validation
-    validate_deployment
-    
-    # Phase 8: Monitoring Setup
-    setup_monitoring
-    
-    # Phase 9: Reporting
-    generate_deployment_report
-    
-    # Phase 10: Summary
-    local end_time=$(date +%s)
-    local duration=$((end_time - start_time))
-    
-    log "Total deployment time: ${duration} seconds"
-    
-    display_deployment_summary
-    
-    success "🎉 NoctisPro PACS deployment orchestration complete!"
-}
-
-# =============================================================================
-# SCRIPT ENTRY POINT
-# =============================================================================
-
-# Handle command line arguments
-case "${1:-}" in
-    --help|-h)
-        echo "NoctisPro PACS Master Deployment Script v${SCRIPT_VERSION}"
-        echo ""
-        echo "Usage: $0 [options]"
-        echo ""
-        echo "Options:"
-        echo "  --help, -h          Show this help message"
-        echo "  --version, -v       Show version information"
-        echo "  --test-only         Run validation tests only"
-        echo "  --update-only       Update existing deployment"
-        echo "  --rollback          Rollback to previous deployment"
-        echo ""
-        echo "This script automatically detects your system capabilities and"
-        echo "deploys NoctisPro PACS using the optimal configuration."
-        exit 0
-        ;;
-    --version|-v)
-        echo "NoctisPro PACS Master Deployment Script"
-        echo "Version: ${SCRIPT_VERSION}"
-        echo "Author: ${SCRIPT_AUTHOR}"
-        echo "Date: ${SCRIPT_DATE}"
-        exit 0
-        ;;
-    --test-only)
-        echo "Running validation tests only..."
-        "${PROJECT_DIR}/test_deployment.sh"
-        exit $?
-        ;;
-    --update-only)
-        echo "Update mode not yet implemented"
-        exit 1
-        ;;
-    --rollback)
-        echo "Rollback mode not yet implemented"
-        exit 1
-        ;;
-esac
-
-# Set up error handling
-trap cleanup_on_exit EXIT
-trap 'error "Script interrupted"; exit 1' INT TERM
-
-# Check if running as root
-if [[ $EUID -eq 0 ]]; then
-    error "This script should not be run as root for security reasons."
-    error "Please run as a regular user with sudo privileges."
-    exit 1
-fi
-
-# Run main orchestration
-main "$@"

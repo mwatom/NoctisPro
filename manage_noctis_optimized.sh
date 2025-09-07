@@ -68,6 +68,12 @@ case "$1" in
         # Resource usage
         echo "📊 Memory usage: $(free | grep '^Mem:' | awk '{print int($3/$2 * 100)}')%"
         echo "📊 Disk usage: $(df "${PROJECT_DIR}" | tail -1 | awk '{print int($3/$2 * 100)}')%"
+        
+        # DuckDNS status
+        if [[ -f "${PROJECT_DIR}/.duckdns_config" ]]; then
+            source "${PROJECT_DIR}/.duckdns_config"
+            echo "🦆 DuckDNS: ${DUCKDNS_DOMAIN:-Not configured}"
+        fi
         ;;
     update)
         echo "Updating NoctisPro..."
