@@ -482,6 +482,10 @@ def upload_study(request):
 						try:
 							sop_uid = getattr(ds, 'SOPInstanceUID')
 							instance_number = getattr(ds, 'InstanceNumber', 1) or 1
+							# Skip duplicates by SOPInstanceUID to avoid re-uploading the same image
+							if DicomImage.objects.filter(sop_instance_uid=sop_uid).exists():
+								logger.debug(f"Duplicate SOPInstanceUID detected, skipping: {sop_uid}")
+								continue
 							
 							# Professional file organization with medical standards
 							rel_path = f"dicom/professional/{study_uid}/{series_uid}/{sop_uid}.dcm"
