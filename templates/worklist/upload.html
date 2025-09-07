@@ -1160,7 +1160,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Track per-chunk progress to aggregate bytes across parallel requests
         const chunkByteProgress = new Array(chunks.length).fill(0);
 
-        function uploadChunkXHR(chunkIdx, chunk, attempt = 1) {
+        function uploadChunkXHR(chunkIdx, chunk) {
             return new Promise((resolve) => {
                 const formData = new FormData();
                 chunk.forEach((file) => formData.append('dicom_files', file));
@@ -1185,16 +1185,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
 
                 const handleFailure = (reason) => {
-                    const maxAttempts = 4;
-                    if (attempt < maxAttempts) {
-                        const backoffMs = Math.min(30000, Math.pow(2, attempt) * 1000) + Math.floor(Math.random() * 500);
-                        setTimeout(() => {
-                            uploadChunkXHR(chunkIdx, chunk, attempt + 1).then(resolve);
-                        }, backoffMs);
-                    } else {
-                        errors.push(reason || `Upload failed after ${maxAttempts} attempts`);
-                        resolve({ ok: false });
-                    }
+                    errors.push(reason || 'Upload failed');
+                    resolve({ ok: false });
                 };
 
                 xhr.onreadystatechange = function () {
@@ -1226,13 +1218,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 };
 
-                xhr.ontimeout = function () {
-                    handleFailure('Request timeout');
-                };
+                xhr.ontimeout = function () { handleFailure('Request timeout'); };
 
-                xhr.onerror = function () {
-                    handleFailure('Network error during upload');
-                };
+                xhr.onerror = function () { handleFailure('Network error during upload'); };
 
                 xhr.send(formData);
             });
