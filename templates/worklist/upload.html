@@ -1120,8 +1120,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const totalBytes = selectedFiles.reduce((s, f) => s + (f.size || 0), 0);
 
         // Adaptive tuning
-        let CHUNK_SIZE = totalFiles > 1000 ? 100 : 25;
-        let MAX_PARALLEL = totalFiles > 1000 ? 4 : 4;
+        // Smaller chunks and parallelism to avoid upstream (ngrok/proxy) timeouts
+        let CHUNK_SIZE = totalFiles > 1000 ? 50 : 10;
+        let MAX_PARALLEL = totalFiles > 1000 ? 3 : 2;
 
         let uploadedCount = 0;
         let uploadedBytes = 0;

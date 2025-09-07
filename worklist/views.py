@@ -217,7 +217,11 @@ def upload_study(request):
 				file_size_total += file_size_mb
 				try:
 					# Professional DICOM reading with comprehensive error handling
-					ds = pydicom.dcmread(in_file, force=True)
+					# Prefer fast header read to avoid loading pixel data during request
+					try:
+						ds = pydicom.dcmread(in_file, stop_before_pixels=True, force=True)
+					except Exception:
+						ds = pydicom.dcmread(in_file, force=True)
 					
 					# Medical-grade metadata extraction and validation
 					study_uid = getattr(ds, 'StudyInstanceUID', None)
