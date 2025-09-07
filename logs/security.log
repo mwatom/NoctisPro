@@ -1,0 +1,1 @@
+[WARNING] 2025-09-07 16:23:40,812 django.security.csrf log 3766 140142845494976 Forbidden (CSRF cookie not set.): /dicom-viewer/api/study/1/export-sr/
