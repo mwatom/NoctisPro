@@ -315,8 +315,8 @@ class DicomViewerEnhanced {
             input.onchange = (e) => {
                 const files = Array.from(e.target.files);
                 if (files.length > 0) {
-                    this.showToast(`Uploading ${files.length} DICOM file(s)...`, 'info');
-                    this.uploadDicomFiles(files);
+                    this.showToast(`Opening ${files.length} local DICOM file(s)...`, 'info');
+                    this.displayLocalDicom(files);
                 }
             };
             
@@ -326,42 +326,94 @@ class DicomViewerEnhanced {
         }
     }
 
-    async uploadDicomFiles(files) {
+    async displayLocalDicom(files) {
         try {
-            const formData = new FormData();
-            files.forEach(file => formData.append('dicom_files', file));
-            // Optional: default metadata for standalone loads
-            formData.append('priority', 'normal');
-            formData.append('clinical_info', 'Uploaded via standalone viewer');
-            
-            const response = await fetch('/worklist/upload/', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
-                                   document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '')
-                },
-                credentials: 'same-origin'
-            });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            // Use the first file for a quick open; future enhancement: build a series
+            const first = files[0];
+            const buffer = await first.arrayBuffer();
+            const byteArray = new Uint8Array(buffer);
+            if (typeof dicomParser === 'undefined') {
+                this.showToast('DICOM parser not available', 'error');
+                return;
             }
-            const data = await response.json();
-            if (data && data.success) {
-                const created = Array.isArray(data.created_study_ids) ? data.created_study_ids : [];
-                if (created.length > 0) {
-                    window.location.href = `/dicom-viewer/?study=${created[0]}`;
-                } else if (typeof loadAvailableStudies === 'function') {
-                    await loadAvailableStudies();
+            const dataSet = dicomParser.parseDicom(byteArray);
+            const rows = dataSet.uint16('x00280010') || 0;
+            const cols = dataSet.uint16('x00280011') || 0;
+            const bitsAllocated = dataSet.uint16('x00280100') || 16;
+            const pixelRep = dataSet.uint16('x00280103') || 0; // 0 = unsigned
+            const samplesPerPixel = dataSet.uint16('x00280002') || 1;
+            const pixelElement = dataSet.elements.x7fe00010;
+            if (!pixelElement || samplesPerPixel !== 1 || !rows || !cols) {
+                this.showToast('Unsupported DICOM pixel data', 'error');
+                return;
+            }
+            const pixelData = new Uint8Array(dataSet.byteArray.buffer, pixelElement.dataOffset, pixelElement.length);
+            let pixels;
+            if (bitsAllocated === 8) {
+                pixels = new Uint8Array(pixelData);
+            } else if (bitsAllocated === 16) {
+                const view = new DataView(pixelData.buffer, pixelData.byteOffset, pixelData.byteLength);
+                const len = pixelData.byteLength / 2;
+                pixels = new Float32Array(len);
+                for (let i = 0; i < len; i++) {
+                    const val = pixelRep === 1 ? view.getInt16(i * 2, true) : view.getUint16(i * 2, true);
+                    pixels[i] = val;
                 }
-                this.showToast('Upload completed successfully', 'success');
             } else {
-                throw new Error((data && (data.error || data.details)) || 'Upload failed');
+                this.showToast('Unsupported BitsAllocated', 'error');
+                return;
             }
-        } catch (err) {
-            console.error('Standalone upload failed:', err);
-            this.showToast(`Upload failed: ${err.message}`, 'error');
+            // Windowing
+            let ww = (dataSet.intString && dataSet.intString('x00281051')) || null;
+            let wl = (dataSet.intString && dataSet.intString('x00281050')) || null;
+            // Compute min/max if WW/WL missing
+            let min = Infinity, max = -Infinity;
+            if (pixels instanceof Float32Array) {
+                for (let i = 0; i < pixels.length; i++) { const v = pixels[i]; if (v < min) min = v; if (v > max) max = v; }
+            } else {
+                for (let i = 0; i < pixels.length; i++) { const v = pixels[i]; if (v < min) min = v; if (v > max) max = v; }
+            }
+            if (!ww || !wl) {
+                ww = Math.max(1, (max - min));
+                wl = Math.round(min + ww / 2);
+            }
+            // Build 8-bit RGBA image
+            const canvas = document.getElementById('dicomCanvas') || document.querySelector('canvas.dicom-canvas');
+            const imgEl = document.getElementById('dicomImage');
+            const W = cols, H = rows;
+            const tmpCanvas = canvas || document.createElement('canvas');
+            tmpCanvas.width = W;
+            tmpCanvas.height = H;
+            const ctx = tmpCanvas.getContext('2d');
+            const imageData = ctx.createImageData(W, H);
+            const out = imageData.data;
+            const low = wl - ww / 2;
+            const high = wl + ww / 2;
+            for (let i = 0; i < W * H; i++) {
+                const v = pixels instanceof Float32Array ? pixels[i] : pixels[i];
+                let g = Math.round(((v - low) / (high - low)) * 255);
+                if (isNaN(g)) g = 0;
+                if (g < 0) g = 0; if (g > 255) g = 255;
+                const j = i * 4;
+                out[j] = g; out[j + 1] = g; out[j + 2] = g; out[j + 3] = 255;
+            }
+            ctx.putImageData(imageData, 0, 0);
+            if (canvas) {
+                // Scale to canvas display size via CSS/responsive layout
+                // Copy to on-page canvas if tmpCanvas is off-DOM
+                if (tmpCanvas !== canvas) {
+                    const ctx2 = canvas.getContext('2d');
+                    canvas.width = W; canvas.height = H;
+                    ctx2.drawImage(tmpCanvas, 0, 0);
+                }
+            } else if (imgEl) {
+                imgEl.src = tmpCanvas.toDataURL('image/png');
+                imgEl.style.display = 'block';
+            }
+            this.showToast('Local DICOM opened', 'success');
+        } catch (e) {
+            console.error(e);
+            this.showToast('Failed to open local DICOM', 'error');
         }
     }
 
