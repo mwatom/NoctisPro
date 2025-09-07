@@ -20,6 +20,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.http import HttpResponse
+import base64
 from worklist import views as worklist_views  # ENABLED
 from django.views.generic.base import RedirectView
 from . import views
@@ -32,8 +33,15 @@ def home_redirect(request):
     return redirect('accounts:login')
 
 def favicon_view(request):
-    """Return an empty response for favicon requests to avoid 404 errors"""
-    return HttpResponse(status=204)  # No content
+    """Serve a minimal PNG favicon to avoid 404s across environments"""
+    # 1x1 transparent PNG
+    png_b64 = (
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8zwAAAgEBAHBhFJQAAAAASUVORK5CYII="
+    )
+    png_bytes = base64.b64decode(png_b64)
+    response = HttpResponse(png_bytes, content_type='image/png')
+    response['Cache-Control'] = 'public, max-age=86400'
+    return response
 
 urlpatterns = [
     # Redirect legacy /admin/ to the worklist dashboard to avoid confusion

@@ -1236,55 +1236,62 @@ def api_delete_study(request, study_id):
         series_count = study.series_set.count()
         images_count = sum(series.images.count() for series in study.series_set.all())
         
-        # Import required modules for file cleanup
-        import os
-        from django.conf import settings
-        
-        # Clean up associated files before deletion
-        file_paths_to_delete = []
-        
-        # Collect all DICOM file paths
-        for series in study.series_set.all():
-            for image in series.images.all():
-                # Support both legacy `file` and current `file_path` fields
-                file_field = getattr(image, 'file', None) or getattr(image, 'file_path', None)
-                if file_field and hasattr(file_field, 'path'):
+        # Clean up associated files BEFORE deletion using storage APIs
+        # This avoids reliance on local filesystem paths (works with S3, etc.)
+        files_deleted = 0
+        try:
+            for series in study.series_set.all():
+                for image in series.images.all():
                     try:
-                        if os.path.exists(file_field.path):
-                            file_paths_to_delete.append(file_field.path)
-                    except (ValueError, AttributeError):
-                        # Skip if file path is invalid
+                        # Delete image thumbnail if present
+                        if getattr(image, 'thumbnail', None):
+                            image.thumbnail.delete(save=False)
+                            files_deleted += 1
+                    except Exception as e:
+                        try:
+                            logger.warning(f"Failed to delete image thumbnail (sop={getattr(image, 'sop_instance_uid', 'unknown')}): {e}")
+                        except Exception:
+                            pass
+                    try:
+                        # Support legacy `file` and current `file_path`
+                        storage_field = getattr(image, 'file', None) or getattr(image, 'file_path', None)
+                        if storage_field:
+                            storage_field.delete(save=False)
+                            files_deleted += 1
+                    except Exception as e:
+                        try:
+                            logger.warning(f"Failed to delete image file (sop={getattr(image, 'sop_instance_uid', 'unknown')}): {e}")
+                        except Exception:
+                            pass
+        except Exception:
+            # Do not block deletion if cleanup iteration fails
+            pass
+
+        try:
+            for attachment in study.attachments.all():
+                try:
+                    if attachment.thumbnail:
+                        attachment.thumbnail.delete(save=False)
+                        files_deleted += 1
+                except Exception as e:
+                    try:
+                        logger.warning(f"Failed to delete attachment thumbnail (id={attachment.id}): {e}")
+                    except Exception:
                         pass
-        
-        # Collect attachment file paths
-        for attachment in study.attachments.all():
-            if attachment.file and hasattr(attachment.file, 'path'):
                 try:
-                    if os.path.exists(attachment.file.path):
-                        file_paths_to_delete.append(attachment.file.path)
-                except (ValueError, AttributeError):
-                    pass
-                    
-            # Also collect thumbnail paths
-            if attachment.thumbnail and hasattr(attachment.thumbnail, 'path'):
-                try:
-                    if os.path.exists(attachment.thumbnail.path):
-                        file_paths_to_delete.append(attachment.thumbnail.path)
-                except (ValueError, AttributeError):
-                    pass
-        
+                    if attachment.file:
+                        attachment.file.delete(save=False)
+                        files_deleted += 1
+                except Exception as e:
+                    try:
+                        logger.warning(f"Failed to delete attachment file (id={attachment.id}): {e}")
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
         # Delete the study (this will cascade to related objects)
         study.delete()
-        
-        # Clean up files after successful database deletion
-        files_deleted = 0
-        for file_path in file_paths_to_delete:
-            try:
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                    files_deleted += 1
-            except OSError as e:
-                print(f"Warning: Could not delete file {file_path}: {e}")
         
         return JsonResponse({
             'success': True,
