@@ -1,0 +1,27 @@
+[INFO] 2025-09-07 16:23:00,536 Watching for file changes with StatReloader
+[INFO] 2025-09-07 16:23:06,423 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-07 16:24:03,410 "POST /worklist/upload/ HTTP/1.1" 302 0
+[WARNING] 2025-09-07 16:24:10,366 Not Found: /accounts/login/
+[WARNING] 2025-09-07 16:24:10,367 "GET /accounts/login/ HTTP/1.1" 404 5876
+[INFO] 2025-09-07 16:24:21,446 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-07 16:24:22,327 "GET /worklist/ HTTP/1.1" 302 0
+[WARNING] 2025-09-07 16:24:23,241 Not Found: /dicom-viewer/api/studies/
+[WARNING] 2025-09-07 16:24:23,241 "GET /dicom-viewer/api/studies/ HTTP/1.1" 404 23568
+[INFO] 2025-09-07 16:24:35,541 "GET /dicom-viewer/api/series/123/mpr/ HTTP/1.1" 302 0
+[INFO] 2025-09-07 16:24:37,841 "GET /dicom-viewer/api/series/123/mip/ HTTP/1.1" 302 0
+[INFO] 2025-09-07 16:24:38,399 "GET /dicom-viewer/api/series/123/bone/ HTTP/1.1" 302 0
+[WARNING] 2025-09-07 16:24:46,722 Not Found: /dicom-viewer/api/series/123/sr-export/
+[WARNING] 2025-09-07 16:24:46,722 "GET /dicom-viewer/api/series/123/sr-export/ HTTP/1.1" 404 23607
+[INFO] 2025-09-07 16:26:25,157 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-07 16:26:25,160 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-07 16:26:25,162 "GET /worklist/ HTTP/1.1" 302 0
+[INFO] 2025-09-07 16:26:25,164 "GET /dicom-viewer/api/series/123/mpr/ HTTP/1.1" 302 0
+[INFO] 2025-09-07 16:26:25,165 "GET /dicom-viewer/api/series/123/mip/ HTTP/1.1" 302 0
+[INFO] 2025-09-07 16:26:25,167 "GET /dicom-viewer/api/series/123/bone/ HTTP/1.1" 302 0
+🚀 Noctis Pro PACS Settings Loaded:
+   • Debug Mode: True
+   • Ngrok Mode: False
+   • Ngrok URL: Not set
+   • Allowed Hosts: 12 configured
+   • Database: sqlite3
+   • Security: Development profile
