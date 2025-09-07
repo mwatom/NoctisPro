@@ -91,17 +91,21 @@
                 <i class="fas fa-arrow-left"></i> Back to Dashboard
             </a>
             
-            <button class="btn" onclick="alert('User management functionality available')">
+            <a href="{% url 'admin_panel:user_management' %}" class="btn">
                 <i class="fas fa-users"></i> User Management
-            </button>
+            </a>
             
-            <button class="btn" onclick="alert('Facility management functionality available')">
+            <a href="{% url 'admin_panel:facility_management' %}" class="btn">
                 <i class="fas fa-building"></i> Facility Management
-            </button>
+            </a>
             
-            <button class="btn" onclick="alert('System settings functionality available')">
+            <a href="{% url 'admin_panel:settings' %}" class="btn">
                 <i class="fas fa-cog"></i> System Settings
-            </button>
+            </a>
+            
+            <a href="{% url 'admin_panel:permissions_dashboard' %}" class="btn">
+                <i class="fas fa-user-shield"></i> Permissions
+            </a>
         </div>
 
         {% if recent_studies %}
