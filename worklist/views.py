@@ -511,11 +511,6 @@ def upload_study(request):
 									'file_path': saved_path,
 									'file_size': file_size,
 									'processed': False,
-									'window_center': window_center,
-									'window_width': window_width,
-									'acquisition_number': acquisition_number,
-									'temporal_position': temporal_position,
-									'upload_timestamp': timezone.now(),
 								}
 							)
 							
