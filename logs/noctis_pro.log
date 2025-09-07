@@ -39,3 +39,6 @@
 [INFO] 2025-09-06 23:08:02,325 django.server basehttp 4122 139696038475456 "GET /login/ HTTP/1.1" 200 17452
 [INFO] 2025-09-06 23:08:02,467 django.server basehttp 4122 139695958783680 "GET /favicon.ico HTTP/1.1" 204 0
 [INFO] 2025-09-07 00:28:42,546 django.server basehttp 4122 139695958783680 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-07 14:11:04,735 noctis_pro.api views 2359 139987764252928 Professional studies API request from admin (Administrator)
+[INFO] 2025-09-07 14:11:04,740 noctis_pro.api views 2359 139987764252928 Professional studies API completed: 1 studies in 5.3ms
+[WARNING] 2025-09-07 14:11:11,468 noctis_pro.user_management views 2401 139931195117824 User creation form validation failed for admin
