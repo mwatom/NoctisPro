@@ -1,0 +1,15 @@
+🚀 Noctis Pro PACS Settings Loaded:
+   • Debug Mode: False
+   • Ngrok Mode: False
+   • Ngrok URL: Not set
+   • Allowed Hosts: 12 configured
+   • Database: sqlite3
+   • Security: Production profile
+Performing system checks...
+
+System check identified no issues (0 silenced).
+September 07, 2025 - 21:34:37
+Django version 4.2.24, using settings 'noctis_pro.settings'
+Starting development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+
