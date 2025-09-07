@@ -863,6 +863,7 @@ requests
 # DICOM processing
 pydicom
 pynetdicom
+highdicom
 numpy
 EOF
 

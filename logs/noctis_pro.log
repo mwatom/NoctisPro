@@ -282,3 +282,23 @@ django.template.exceptions.TemplateSyntaxError: Could not parse the remainder: '
 [WARNING] 2025-09-07 15:49:30,595 django.request log 38260 139644297699584 Not Found: /dicom_viewer/api/series/3/bone/
 [WARNING] 2025-09-07 15:49:30,599 django.request log 38260 139644297699584 Bad Request: /dicom-viewer/api/series/3/bone/
 [WARNING] 2025-09-07 15:51:17,705 django.request log 39042 140008458817792 Bad Request: /dicom-viewer/api/series/3/mpr/
+[INFO] 2025-09-07 16:23:00,536 django.utils.autoreload autoreload 3084 140564935037184 Watching for file changes with StatReloader
+[INFO] 2025-09-07 16:23:06,423 django.server basehttp 3084 140564347971264 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-07 16:24:03,410 django.server basehttp 3084 140564347971264 "POST /worklist/upload/ HTTP/1.1" 302 0
+[WARNING] 2025-09-07 16:24:10,366 django.request log 3084 140564347971264 Not Found: /accounts/login/
+[WARNING] 2025-09-07 16:24:10,367 django.server basehttp 3084 140564347971264 "GET /accounts/login/ HTTP/1.1" 404 5876
+[INFO] 2025-09-07 16:24:21,446 django.server basehttp 3084 140564347971264 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-07 16:24:22,327 django.server basehttp 3084 140564347971264 "GET /worklist/ HTTP/1.1" 302 0
+[WARNING] 2025-09-07 16:24:23,241 django.request log 3084 140564347971264 Not Found: /dicom-viewer/api/studies/
+[WARNING] 2025-09-07 16:24:23,241 django.server basehttp 3084 140564347971264 "GET /dicom-viewer/api/studies/ HTTP/1.1" 404 23568
+[INFO] 2025-09-07 16:24:35,541 django.server basehttp 3084 140564347971264 "GET /dicom-viewer/api/series/123/mpr/ HTTP/1.1" 302 0
+[INFO] 2025-09-07 16:24:37,841 django.server basehttp 3084 140564347971264 "GET /dicom-viewer/api/series/123/mip/ HTTP/1.1" 302 0
+[INFO] 2025-09-07 16:24:38,399 django.server basehttp 3084 140564347971264 "GET /dicom-viewer/api/series/123/bone/ HTTP/1.1" 302 0
+[WARNING] 2025-09-07 16:24:46,722 django.request log 3084 140564347971264 Not Found: /dicom-viewer/api/series/123/sr-export/
+[WARNING] 2025-09-07 16:24:46,722 django.server basehttp 3084 140564347971264 "GET /dicom-viewer/api/series/123/sr-export/ HTTP/1.1" 404 23607
+[INFO] 2025-09-07 16:26:25,157 django.server basehttp 3084 140564347971264 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-07 16:26:25,160 django.server basehttp 3084 140564338529984 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-07 16:26:25,162 django.server basehttp 3084 140564347971264 "GET /worklist/ HTTP/1.1" 302 0
+[INFO] 2025-09-07 16:26:25,164 django.server basehttp 3084 140564338529984 "GET /dicom-viewer/api/series/123/mpr/ HTTP/1.1" 302 0
+[INFO] 2025-09-07 16:26:25,165 django.server basehttp 3084 140564347971264 "GET /dicom-viewer/api/series/123/mip/ HTTP/1.1" 302 0
+[INFO] 2025-09-07 16:26:25,167 django.server basehttp 3084 140564338529984 "GET /dicom-viewer/api/series/123/bone/ HTTP/1.1" 302 0

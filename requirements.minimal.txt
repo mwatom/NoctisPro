@@ -23,6 +23,14 @@ django-cors-headers
 # DICOM processing (minimal)
 pydicom
 pynetdicom
+highdicom
+
+# Image processing and scientific computing (required by DICOM viewer)
+numpy
+scipy
+opencv-python
+scikit-image
+matplotlib
 
 # Utilities
 python-magic
