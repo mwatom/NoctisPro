@@ -323,3 +323,5 @@ django.template.exceptions.TemplateSyntaxError: Could not parse the remainder: '
 [INFO] 2025-09-07 21:47:38,214 django.server basehttp 9620 139705712985792 "GET / HTTP/1.1" 302 0
 [INFO] 2025-09-07 21:47:54,214 django.utils.autoreload autoreload 15096 139751050379520 Watching for file changes with StatReloader
 [INFO] 2025-09-07 21:48:02,942 django.server basehttp 9620 139705712985792 "GET / HTTP/1.1" 302 0
+[INFO] 2025-09-08 13:47:47,791 django.utils.autoreload autoreload 3498 140448816476416 Watching for file changes with StatReloader
+[INFO] 2025-09-08 13:48:05,402 django.channels.server runserver 3498 140448753030848 HTTP GET / 302 [0.02, 127.0.0.1:36148]
