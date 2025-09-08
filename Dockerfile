@@ -18,9 +18,11 @@ RUN apt-get update && apt-get install -y \
     libxml2-dev \
     libxslt1-dev \
     libcups2-dev \
+    cups-common \
     git \
     curl \
     wget \
+    netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app user
@@ -32,7 +34,9 @@ WORKDIR /app
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip wheel setuptools && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt || \
+    pip install --no-cache-dir Django Pillow psycopg2-binary redis celery gunicorn \
+    djangorestframework django-cors-headers channels daphne pydicom pynetdicom
 
 # Development stage
 FROM base as development

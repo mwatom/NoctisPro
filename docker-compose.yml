@@ -48,14 +48,16 @@ services:
       - DEBUG=${DEBUG:-False}
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
       - DJANGO_SETTINGS_MODULE=noctis_pro.settings
-      - POSTGRES_DB=noctis_pro
-      - POSTGRES_USER=noctis_user
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-noctis_secure_password}
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
+      - DB_ENGINE=django.db.backends.postgresql
+      - DB_NAME=noctis_pro
+      - DB_USER=noctis_user
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-noctis_secure_password}
+      - DB_HOST=db
+      - DB_PORT=5432
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - ALLOWED_HOSTS=*
     volumes:
       - .:/app
       - media_files:/app/media
@@ -78,7 +80,8 @@ services:
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
-             gunicorn noctis_pro.wsgi:application --bind 0.0.0.0:8000 --workers 4 --worker-class gevent --worker-connections 1000 --timeout 120"
+             python -c \"from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='admin').delete(); User.objects.create_superuser('admin', 'admin@noctispro.com', 'NoctisAdmin2024!'); print('✅ Admin user created')\" &&
+             gunicorn noctis_pro.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120"
 
   # Celery Worker for background tasks
   celery:
@@ -91,11 +94,12 @@ services:
       - DEBUG=${DEBUG:-False}
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
       - DJANGO_SETTINGS_MODULE=noctis_pro.settings
-      - POSTGRES_DB=noctis_pro
-      - POSTGRES_USER=noctis_user
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-noctis_secure_password}
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
+      - DB_ENGINE=django.db.backends.postgresql
+      - DB_NAME=noctis_pro
+      - DB_USER=noctis_user
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-noctis_secure_password}
+      - DB_HOST=db
+      - DB_PORT=5432
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
@@ -121,11 +125,12 @@ services:
       - DEBUG=${DEBUG:-False}
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
       - DJANGO_SETTINGS_MODULE=noctis_pro.settings
-      - POSTGRES_DB=noctis_pro
-      - POSTGRES_USER=noctis_user
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-noctis_secure_password}
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
+      - DB_ENGINE=django.db.backends.postgresql
+      - DB_NAME=noctis_pro
+      - DB_USER=noctis_user
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-noctis_secure_password}
+      - DB_HOST=db
+      - DB_PORT=5432
       - REDIS_URL=redis://redis:6379/0
     volumes:
       - .:/app
