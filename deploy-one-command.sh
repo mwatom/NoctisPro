@@ -66,6 +66,12 @@ else
   fi
 fi
 
+# Remove conflicting custom network if present (avoids Compose label mismatch)
+if docker network ls --format '{{.Name}}' | grep -q '^noctis_network$'; then
+  echo "🧹 Removing existing network noctis_network to avoid label conflicts..."
+  docker network rm noctis_network || true
+fi
+
 # Deploy with Docker
 echo "🚀 Deploying with Docker..."
 "${DC[@]}" down --remove-orphans 2>/dev/null || true
