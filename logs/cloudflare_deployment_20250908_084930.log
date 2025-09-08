@@ -1,0 +1,8 @@
+[2025-09-08 08:49:30] [SYSTEM_VALIDATION] Phase started: SYSTEM_VALIDATION
+[2025-09-08 08:49:30] [SYSTEM_VALIDATION] ERROR: Docker not found. Please install Docker first.
+[2025-09-08 08:49:30] [SYSTEM_VALIDATION] ERROR: Docker Compose not found. Please install Docker Compose first.
+[2025-09-08 08:49:30] [SYSTEM_VALIDATION] ✅ Python 3 found: Python 3.13.3
+[2025-09-08 08:49:30] [SYSTEM_VALIDATION] ✅ CloudFlare tunnel found: cloudflared version 2025.8.1 (built 2025-08-21-1535 UTC)
+[2025-09-08 08:49:30] [SYSTEM_VALIDATION] ✅ Sufficient disk space: 113GB available
+[2025-09-08 08:49:30] [SYSTEM_VALIDATION] ✅ Sufficient memory: 15GB available
+[2025-09-08 08:49:30] [SYSTEM_VALIDATION] ERROR: System validation failed. Please address the issues above.
