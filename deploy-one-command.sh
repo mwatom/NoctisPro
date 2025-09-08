@@ -20,76 +20,8 @@ POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 ADMIN_PASSWORD=NoctisAdmin2024!
 EOF
 
-# Create Docker Compose file
-cat > docker-compose.yml << 'EOF'
-version: '3.8'
-services:
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: noctis_pro
-      POSTGRES_USER: noctis_user
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U noctis_user -d noctis_pro"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  web:
-    build: .
-    environment:
-      - DEBUG=False
-      - SECRET_KEY=${SECRET_KEY}
-      - DB_ENGINE=django.db.backends.postgresql
-      - DB_NAME=noctis_pro
-      - DB_USER=noctis_user
-      - DB_PASSWORD=${POSTGRES_PASSWORD}
-      - DB_HOST=db
-      - DB_PORT=5432
-      - REDIS_URL=redis://redis:6379/0
-      - ALLOWED_HOSTS=*
-    ports:
-      - "8000:8000"
-      - "11112:11112"
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    command: >
-      sh -c "python manage.py migrate --noinput &&
-             python manage.py collectstatic --noinput &&
-             python manage.py shell -c \"
-from django.contrib.auth import get_user_model;
-User = get_user_model();
-User.objects.filter(username='admin').delete();
-User.objects.create_superuser('admin', 'admin@noctispro.com', 'NoctisAdmin2024!');
-print('✅ Admin created: admin/NoctisAdmin2024!')
-\" &&
-             gunicorn noctis_pro.wsgi:application --bind 0.0.0.0:8000 --workers 4 &
-             python dicom_receiver.py --port 11112 --aet NOCTIS_SCP --bind 0.0.0.0"
-    restart: unless-stopped
-
-volumes:
-  postgres_data:
-  redis_data:
-EOF
+# Use existing docker-compose.yml (don't overwrite)
+echo "📋 Using existing docker-compose.yml configuration..."
 
 # Install Docker if needed
 if ! command -v docker >/dev/null 2>&1; then
@@ -136,8 +68,8 @@ nohup cloudflared tunnel --url http://localhost:11112 > dicom_tunnel.log 2>&1 &
 sleep 15
 
 # Extract URLs
-WEB_URL=$(grep -o "https://[^[:space:]]*" web_tunnel.log 2>/dev/null | head -1)
-DICOM_URL=$(grep -o "https://[^[:space:]]*" dicom_tunnel.log 2>/dev/null | head -1)
+WEB_URL=$(grep "https://" web_tunnel.log 2>/dev/null | grep -o "https://[a-zA-Z0-9.-]*\.trycloudflare\.com" | head -1)
+DICOM_URL=$(grep "https://" dicom_tunnel.log 2>/dev/null | grep -o "https://[a-zA-Z0-9.-]*\.trycloudflare\.com" | head -1)
 
 # Display results
 echo ""
