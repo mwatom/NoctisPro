@@ -11,6 +11,12 @@ IFS=$'\n\t'
 echo "🚀 Starting NoctisPro PACS One-Command Deployment..."
 echo "===================================================="
 
+# Safe extractor for trycloudflare URL from a log file (does not fail the script)
+extract_trycloudflare_url() {
+  local file_path="$1"
+  awk 'match($0, /https:\/\/[A-Za-z0-9.-]*\.trycloudflare\.com/) {print substr($0, RSTART, RLENGTH); exit}' "$file_path" 2>/dev/null || true
+}
+
 # Generate secure credentials
 SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(50))" 2>/dev/null || echo "noctis-secret-$(date +%s)")
 POSTGRES_PASSWORD=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))" 2>/dev/null || echo "noctis-postgres-$(date +%s)")
@@ -117,12 +123,17 @@ pkill cloudflared 2>/dev/null || true
 nohup cloudflared tunnel --url http://localhost:8000 > web_tunnel.log 2>&1 &
 nohup cloudflared tunnel --url http://localhost:11112 > dicom_tunnel.log 2>&1 &
 
-# Wait for tunnels
-sleep 15
-
-# Extract URLs
-WEB_URL=$(grep "https://" web_tunnel.log 2>/dev/null | grep -o "https://[a-zA-Z0-9.-]*\.trycloudflare\.com" | head -1)
-DICOM_URL=$(grep "https://" dicom_tunnel.log 2>/dev/null | grep -o "https://[a-zA-Z0-9.-]*\.trycloudflare\.com" | head -1)
+# Wait for tunnels and try to extract URLs with retries (robust to transient errors)
+WEB_URL=""
+DICOM_URL=""
+for attempt in 1 2 3 4 5 6; do
+  sleep 5
+  WEB_URL="${WEB_URL:-$(extract_trycloudflare_url web_tunnel.log)}"
+  DICOM_URL="${DICOM_URL:-$(extract_trycloudflare_url dicom_tunnel.log)}"
+  if [ -n "$WEB_URL" ] && [ -n "$DICOM_URL" ]; then
+    break
+  fi
+done
 
 # Display results
 echo ""
