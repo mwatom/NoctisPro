@@ -1,3 +1,4 @@
+version: '3.8'
 
 services:
   # PostgreSQL Database
@@ -167,3 +168,7 @@ volumes:
     driver: local
   static_files:
     driver: local
+
+networks:
+  default:
+    name: noctis_network
