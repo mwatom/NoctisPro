@@ -120,8 +120,8 @@ fi
 # Start tunnels
 echo "🌐 Creating public URLs..."
 pkill cloudflared 2>/dev/null || true
-nohup cloudflared tunnel --url http://localhost:8000 > web_tunnel.log 2>&1 &
-nohup cloudflared tunnel --url http://localhost:11112 > dicom_tunnel.log 2>&1 &
+nohup cloudflared tunnel --url http://127.0.0.1:8000 --http-host-header 127.0.0.1 > web_tunnel.log 2>&1 &
+nohup cloudflared tunnel --url http://127.0.0.1:11112 --http-host-header 127.0.0.1 > dicom_tunnel.log 2>&1 &
 
 # Wait for tunnels and try to extract URLs with retries (robust to transient errors)
 WEB_URL=""
