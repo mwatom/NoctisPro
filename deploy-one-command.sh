@@ -95,6 +95,11 @@ echo "🚀 Deploying with Docker..."
 "${DC[@]}" build
 "${DC[@]}" up -d
 
+# Ensure static/media permissions and restart web once to apply
+echo "🔧 Ensuring static/media permissions..."
+docker exec --user root noctis_web sh -lc "mkdir -p /app/staticfiles /app/media && (chown -R app:app /app/staticfiles /app/media || chown -R 1000:1000 /app/staticfiles /app/media) && chmod -R u+rwX,g+rwX /app/staticfiles /app/media" 2>/dev/null || true
+docker restart noctis_web 1>/dev/null 2>&1 || true
+
 # Wait for services
 echo "⏳ Waiting for services to start..."
 sleep 5
