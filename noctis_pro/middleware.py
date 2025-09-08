@@ -452,7 +452,7 @@ class SessionTimeoutWarningMiddleware(MiddlewareMixin):
                 
                 function forceLogout() {{
                     alert('Your session has expired due to inactivity. You will be redirected to the login page.');
-                    window.location.href = '/accounts/login/';
+                    window.location.href = '/login/';
                 }}
                 
                 window.extendSession = function() {{

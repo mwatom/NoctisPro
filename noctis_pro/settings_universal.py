@@ -125,9 +125,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'accounts.User'
 
 # Login/logout URLs
-LOGIN_URL = '/accounts/login/'
-LOGIN_REDIRECT_URL = '/'
-LOGOUT_REDIRECT_URL = '/accounts/login/'
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/worklist/'
+LOGOUT_REDIRECT_URL = '/login/'
 
 # Email configuration (for notifications)
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

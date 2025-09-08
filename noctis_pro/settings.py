@@ -62,7 +62,7 @@ ALLOWED_HOSTS = list(filter(None, list(set(ALLOWED_HOSTS))))
 # Application definition
 
 INSTALLED_APPS = [
-    # 'daphne',  # Disabled temporarily to fix Redis dependency
+    'daphne',  # Re-enabled for ASGI support
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -71,7 +71,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',  # Re-enabled for API access
-    # 'channels',  # Disabled temporarily to fix Redis dependency
+    'channels',  # Re-enabled for WebSocket support
     
     # Custom apps - ENABLED FOR MEDICAL EMERGENCY
     'accounts',
@@ -114,7 +114,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'noctis_pro.wsgi.application'
-# ASGI_APPLICATION = 'noctis_pro.asgi.application'  # Disabled temporarily
+ASGI_APPLICATION = 'noctis_pro.asgi.application'  # Re-enabled for Daphne
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
