@@ -76,7 +76,7 @@ services:
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
-             python -c \"from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='admin').delete(); User.objects.create_superuser('admin', 'admin@noctispro.com', 'NoctisAdmin2024!'); print('✅ Admin user created')\" &&
+             python manage.py shell -c \"from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='admin').delete(); User.objects.create_superuser('admin', 'admin@noctispro.com', 'NoctisAdmin2024!'); print('✅ Admin user created')\" &&
              gunicorn noctis_pro.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120"
 
   # Celery Worker for background tasks

@@ -11,16 +11,33 @@ IFS=$'\n\t'
 echo "🚀 Starting NoctisPro PACS One-Command Deployment..."
 echo "===================================================="
 
-# Generate secure credentials
-SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(50))" 2>/dev/null || echo "noctis-secret-$(date +%s)")
-POSTGRES_PASSWORD=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))" 2>/dev/null || echo "noctis-postgres-$(date +%s)")
+# Safe extractor for trycloudflare URL from a log file (does not fail the script)
+extract_trycloudflare_url() {
+  local file_path="$1"
+  awk 'match($0, /https:\/\/[A-Za-z0-9.-]*\.trycloudflare\.com/) {print substr($0, RSTART, RLENGTH); exit}' "$file_path" 2>/dev/null || true
+}
 
-# Create environment file
-cat > .env << EOF
+# Environment handling: reuse existing .env if present to avoid breaking persisted DB
+if [ -f .env ]; then
+  echo "🔒 Using existing .env (not overwritten)..."
+  set -a
+  . ./.env
+  set +a
+  # Ensure required vars are set in the current shell; do not rewrite the file
+  : "${SECRET_KEY:=$(python3 -c \"import secrets; print(secrets.token_urlsafe(50))\" 2>/dev/null || echo \"noctis-secret-$(date +%s)\")}"
+  : "${POSTGRES_PASSWORD:=${POSTGRES_PASSWORD:-}}"
+  : "${ADMIN_PASSWORD:=NoctisAdmin2024!}"
+else
+  # Generate secure credentials and write a fresh .env
+  SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(50))" 2>/dev/null || echo "noctis-secret-$(date +%s)")
+  POSTGRES_PASSWORD=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))" 2>/dev/null || echo "noctis-postgres-$(date +%s)")
+  ADMIN_PASSWORD=NoctisAdmin2024!
+  cat > .env << EOF
 SECRET_KEY=${SECRET_KEY}
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-ADMIN_PASSWORD=NoctisAdmin2024!
+ADMIN_PASSWORD=${ADMIN_PASSWORD}
 EOF
+fi
 
 # Use existing docker-compose.yml (don't overwrite)
 echo "📋 Using existing docker-compose.yml configuration..."
@@ -78,6 +95,11 @@ echo "🚀 Deploying with Docker..."
 "${DC[@]}" build
 "${DC[@]}" up -d
 
+# Ensure static/media permissions and restart web once to apply
+echo "🔧 Ensuring static/media permissions..."
+docker exec --user root noctis_web sh -lc "mkdir -p /app/staticfiles /app/media && (chown -R app:app /app/staticfiles /app/media || chown -R 1000:1000 /app/staticfiles /app/media) && chmod -R u+rwX,g+rwX /app/staticfiles /app/media" 2>/dev/null || true
+docker restart noctis_web 1>/dev/null 2>&1 || true
+
 # Wait for services
 echo "⏳ Waiting for services to start..."
 sleep 5
@@ -114,15 +136,20 @@ fi
 # Start tunnels
 echo "🌐 Creating public URLs..."
 pkill cloudflared 2>/dev/null || true
-nohup cloudflared tunnel --url http://localhost:8000 > web_tunnel.log 2>&1 &
-nohup cloudflared tunnel --url http://localhost:11112 > dicom_tunnel.log 2>&1 &
+nohup cloudflared tunnel --url http://127.0.0.1:8000 --http-host-header 127.0.0.1 > web_tunnel.log 2>&1 &
+nohup cloudflared tunnel --url http://127.0.0.1:11112 --http-host-header 127.0.0.1 > dicom_tunnel.log 2>&1 &
 
-# Wait for tunnels
-sleep 15
-
-# Extract URLs
-WEB_URL=$(grep "https://" web_tunnel.log 2>/dev/null | grep -o "https://[a-zA-Z0-9.-]*\.trycloudflare\.com" | head -1)
-DICOM_URL=$(grep "https://" dicom_tunnel.log 2>/dev/null | grep -o "https://[a-zA-Z0-9.-]*\.trycloudflare\.com" | head -1)
+# Wait for tunnels and try to extract URLs with retries (robust to transient errors)
+WEB_URL=""
+DICOM_URL=""
+for attempt in 1 2 3 4 5 6; do
+  sleep 5
+  WEB_URL="${WEB_URL:-$(extract_trycloudflare_url web_tunnel.log)}"
+  DICOM_URL="${DICOM_URL:-$(extract_trycloudflare_url dicom_tunnel.log)}"
+  if [ -n "$WEB_URL" ] && [ -n "$DICOM_URL" ]; then
+    break
+  fi
+done
 
 # Display results
 echo ""
