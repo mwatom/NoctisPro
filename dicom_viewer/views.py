@@ -1824,7 +1824,7 @@ def process_dicom_study(study_uid, series_map, rep_ds, user, upload_id):
                 'body_part': getattr(ds0, 'BodyPartExamined', ''),
                 'slice_thickness': slice_thickness if slice_thickness is not None else None,
                 'pixel_spacing': pixel_spacing,
-                'image_orientation_patient': image_orientation,
+                'image_orientation': image_orientation,
             }
         )
         
@@ -4432,3 +4432,17 @@ def api_list_mounted_media(request):
     except Exception as e:
         logger.error(f"Failed to list mounted media: {e}")
         return JsonResponse({'success': False, 'error': f'Failed to list mounted media: {str(e)}'})
+
+@login_required
+def api_studies_redirect(request):
+    """Redirect to the worklist studies API to maintain compatibility"""
+    from django.http import HttpResponseRedirect
+    return HttpResponseRedirect('/worklist/api/studies/')
+
+@login_required
+def api_series_sr_export(request, series_id):
+    """Export measurements/annotations of a series to a DICOM SR"""
+    series = get_object_or_404(Series, id=series_id)
+    study = series.study
+    # Delegate to the study-level SR export
+    return api_export_dicom_sr(request, study.id)
