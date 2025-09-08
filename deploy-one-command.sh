@@ -28,7 +28,7 @@ echo "📋 Using existing docker-compose.yml configuration..."
 # Install Docker if needed
 if ! command -v docker >/dev/null 2>&1; then
     echo "📦 Installing Docker..."
-    sudo apt update && sudo apt install -y docker.io docker-compose
+    sudo apt update && sudo apt install -y docker.io docker-compose docker-compose-plugin
     sudo usermod -aG docker $USER
 fi
 
@@ -42,21 +42,35 @@ if ! docker info >/dev/null 2>&1; then
     }
 fi
 
-# Choose docker compose command
+# Choose docker compose command (array-safe despite IFS)
+DC=()
 if docker compose version >/dev/null 2>&1; then
-  DC="docker compose"
+  DC=(docker compose)
 elif docker-compose version >/dev/null 2>&1; then
-  DC="docker-compose"
+  DC=(docker-compose)
 else
-  echo "❌ Neither 'docker compose' nor 'docker-compose' is available."
-  exit 1
+  echo "⚙️ Docker Compose not found. Attempting to install..."
+  if command -v apt-get >/dev/null 2>&1; then
+    sudo apt-get update && sudo apt-get install -y docker-compose-plugin docker-compose || true
+  elif command -v apt >/dev/null 2>&1; then
+    sudo apt update && sudo apt install -y docker-compose-plugin docker-compose || true
+  fi
+  if docker compose version >/dev/null 2>&1; then
+    DC=(docker compose)
+  elif docker-compose version >/dev/null 2>&1; then
+    DC=(docker-compose)
+  else
+    echo "❌ Neither 'docker compose' nor 'docker-compose' is available after install."
+    echo "   Please install Docker Compose v2 plugin or legacy binary."
+    exit 1
+  fi
 fi
 
 # Deploy with Docker
 echo "🚀 Deploying with Docker..."
-$DC down --remove-orphans 2>/dev/null || true
-$DC build
-$DC up -d
+"${DC[@]}" down --remove-orphans 2>/dev/null || true
+"${DC[@]}" build
+"${DC[@]}" up -d
 
 # Wait for services
 echo "⏳ Waiting for services to start..."
@@ -64,13 +78,13 @@ sleep 5
 
 # Check container health/status
 echo "🔎 Checking container status..."
-$DC ps | sed -n '1,2p;3,$p' | cat
+"${DC[@]}" ps | sed -n '1,2p;3,$p' | cat
 
 # Fail if required services are not running
 for svc in noctis_db noctis_redis noctis_web; do
   if ! docker ps --format '{{.Names}}\t{{.Status}}' | grep -q "^${svc}\\b"; then
     echo "❌ Service ${svc} is not running. Aborting."
-    $DC logs --no-color ${svc} | tail -n 200 | cat || true
+    "${DC[@]}" logs --no-color ${svc} | tail -n 200 | cat || true
     exit 1
   fi
 done
@@ -78,8 +92,8 @@ done
 # Extra: surface unhealthy state
 if docker ps --format '{{.Names}}\t{{.Status}}' | grep -E '\\(unhealthy\\)' >/dev/null; then
   echo "❌ One or more services are unhealthy. Showing logs and exiting."
-  $DC ps | cat
-  $DC logs --no-color | tail -n 300 | cat
+  "${DC[@]}" ps | cat
+  "${DC[@]}" logs --no-color | tail -n 300 | cat
   exit 1
 fi
 
@@ -119,7 +133,7 @@ echo "   Username: admin"
 echo "   Password: NoctisAdmin2024!"
 echo ""
 echo "🐳 DOCKER STATUS:"
-$DC ps
+"${DC[@]}" ps
 echo ""
 echo "✅ Your NoctisPro PACS system is ready!"
 echo "   Access it now: ${WEB_URL:-http://localhost:8000}"
