@@ -17,16 +17,27 @@ extract_trycloudflare_url() {
   awk 'match($0, /https:\/\/[A-Za-z0-9.-]*\.trycloudflare\.com/) {print substr($0, RSTART, RLENGTH); exit}' "$file_path" 2>/dev/null || true
 }
 
-# Generate secure credentials
-SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(50))" 2>/dev/null || echo "noctis-secret-$(date +%s)")
-POSTGRES_PASSWORD=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))" 2>/dev/null || echo "noctis-postgres-$(date +%s)")
-
-# Create environment file
-cat > .env << EOF
+# Environment handling: reuse existing .env if present to avoid breaking persisted DB
+if [ -f .env ]; then
+  echo "🔒 Using existing .env (not overwritten)..."
+  set -a
+  . ./.env
+  set +a
+  # Ensure required vars are set in the current shell; do not rewrite the file
+  : "${SECRET_KEY:=$(python3 -c \"import secrets; print(secrets.token_urlsafe(50))\" 2>/dev/null || echo \"noctis-secret-$(date +%s)\")}"
+  : "${POSTGRES_PASSWORD:=${POSTGRES_PASSWORD:-}}"
+  : "${ADMIN_PASSWORD:=NoctisAdmin2024!}"
+else
+  # Generate secure credentials and write a fresh .env
+  SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(50))" 2>/dev/null || echo "noctis-secret-$(date +%s)")
+  POSTGRES_PASSWORD=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))" 2>/dev/null || echo "noctis-postgres-$(date +%s)")
+  ADMIN_PASSWORD=NoctisAdmin2024!
+  cat > .env << EOF
 SECRET_KEY=${SECRET_KEY}
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-ADMIN_PASSWORD=NoctisAdmin2024!
+ADMIN_PASSWORD=${ADMIN_PASSWORD}
 EOF
+fi
 
 # Use existing docker-compose.yml (don't overwrite)
 echo "📋 Using existing docker-compose.yml configuration..."
