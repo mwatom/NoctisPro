@@ -1,4 +1,6 @@
 #!/bin/bash
+set -euo pipefail
+IFS=$'\n\t'
 
 # =============================================================================
 # NoctisPro PACS - One Command Deployment
@@ -40,15 +42,46 @@ if ! docker info >/dev/null 2>&1; then
     }
 fi
 
+# Choose docker compose command
+if docker compose version >/dev/null 2>&1; then
+  DC="docker compose"
+elif docker-compose version >/dev/null 2>&1; then
+  DC="docker-compose"
+else
+  echo "❌ Neither 'docker compose' nor 'docker-compose' is available."
+  exit 1
+fi
+
 # Deploy with Docker
 echo "🚀 Deploying with Docker..."
-docker-compose down --remove-orphans 2>/dev/null || true
-docker-compose build
-docker-compose up -d
+$DC down --remove-orphans 2>/dev/null || true
+$DC build
+$DC up -d
 
 # Wait for services
 echo "⏳ Waiting for services to start..."
-sleep 30
+sleep 5
+
+# Check container health/status
+echo "🔎 Checking container status..."
+$DC ps | sed -n '1,2p;3,$p' | cat
+
+# Fail if required services are not running
+for svc in noctis_db noctis_redis noctis_web; do
+  if ! docker ps --format '{{.Names}}\t{{.Status}}' | grep -q "^${svc}\\b"; then
+    echo "❌ Service ${svc} is not running. Aborting."
+    $DC logs --no-color ${svc} | tail -n 200 | cat || true
+    exit 1
+  fi
+done
+
+# Extra: surface unhealthy state
+if docker ps --format '{{.Names}}\t{{.Status}}' | grep -E '\\(unhealthy\\)' >/dev/null; then
+  echo "❌ One or more services are unhealthy. Showing logs and exiting."
+  $DC ps | cat
+  $DC logs --no-color | tail -n 300 | cat
+  exit 1
+fi
 
 # Install and setup Cloudflare tunnel
 if ! command -v cloudflared >/dev/null 2>&1; then
@@ -86,7 +119,7 @@ echo "   Username: admin"
 echo "   Password: NoctisAdmin2024!"
 echo ""
 echo "🐳 DOCKER STATUS:"
-docker-compose ps
+$DC ps
 echo ""
 echo "✅ Your NoctisPro PACS system is ready!"
 echo "   Access it now: ${WEB_URL:-http://localhost:8000}"

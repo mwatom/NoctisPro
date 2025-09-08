@@ -1,4 +1,4 @@
-FROM python:3.11-slim as base
+FROM python:3.11-slim AS base
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -39,7 +39,7 @@ RUN pip install --no-cache-dir --upgrade pip wheel setuptools && \
     djangorestframework django-cors-headers channels daphne pydicom pynetdicom
 
 # Development stage
-FROM base as development
+FROM base AS development
 
 # Install development dependencies
 COPY requirements-dev.txt .
@@ -62,7 +62,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
 
 # Production stage
-FROM base as production
+FROM base AS production
 
 # Copy application code
 COPY --chown=app:app . .

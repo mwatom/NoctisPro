@@ -133,8 +133,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backups:/backups
-    ports:
-      - "5432:5432"
+    # Do not bind Postgres to host to avoid port conflicts
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U noctis_user -d noctis_pro"]
       interval: 10s
@@ -152,8 +151,7 @@ services:
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
+    # Do not bind Redis to host to avoid port conflicts
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -526,7 +524,7 @@ deploy_native() {
     python3 -m venv venv_docker
     source venv_docker/bin/activate
     pip install --upgrade pip
-    pip install -r requirements.txt || pip install Django Pillow psycopg2-binary redis celery gunicorn pydicom pynetdicom
+    pip install -r requirements.txt || pip install Django Pillow psycopg2-binary redis celery gunicorn daphne channels channels-redis django-redis djangorestframework django-cors-headers pydicom pynetdicom
     
     # Setup Django
     export DB_ENGINE=django.db.backends.postgresql

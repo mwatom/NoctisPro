@@ -12,8 +12,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backups:/backups
-    ports:
-      - "5432:5432"
+    # Do not bind Postgres to host to avoid port conflicts
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U noctis_user -d noctis_pro"]
       interval: 10s
@@ -28,8 +27,7 @@ services:
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
+    # Do not bind Redis to host to avoid port conflicts
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -64,7 +62,6 @@ services:
       - static_files:/app/staticfiles
     ports:
       - "8000:8000"
-      - "11112:11112"
     depends_on:
       db:
         condition: service_healthy
