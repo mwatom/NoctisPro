@@ -16,10 +16,10 @@ PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-# Configuration - YOUR EXACT SETTINGS
-NGROK_AUTHTOKEN="32E2HmoUqzrZxaYRNT77wAI0HQs_5N5QNSrxU4Z7d4MFSRF4x"
-STATIC_URL="mallard-shining-curiously.ngrok-free.app"
-PORT=8000
+# Configuration (can be overridden via environment)
+NGROK_AUTHTOKEN="${NGROK_AUTHTOKEN:-}"
+STATIC_URL="${STATIC_URL:-}"
+PORT="${PORT:-8000}"
 
 clear
 echo -e "${PURPLE}"
@@ -48,6 +48,12 @@ echo ""
 
 echo -e "${YELLOW}📋 PHASE 1: ENVIRONMENT SETUP${NC}"
 
+# Ensure basic tools
+if ! command -v curl >/dev/null 2>&1 || ! command -v tar >/dev/null 2>&1; then
+    echo -e "${BLUE}📦 Installing curl and tar...${NC}"
+    sudo apt-get update -qq && sudo apt-get install -y -qq curl tar >/dev/null 2>&1 || true
+fi
+
 # Auto-detect Python
 if command -v python3 &> /dev/null; then
     PYTHON="python3"
@@ -75,7 +81,7 @@ echo -e "${GREEN}✅ Virtual environment activated${NC}"
 
 # Install dependencies
 echo -e "${BLUE}📚 Installing dependencies...${NC}"
-$PIP install -r requirements.txt --quiet
+$PIP install -r requirements.txt --quiet || $PIP install --quiet Django Pillow requests
 echo -e "${GREEN}✅ Dependencies installed${NC}"
 
 # =============================================================================
@@ -107,15 +113,19 @@ if ! command -v ngrok &> /dev/null && [ ! -f "./ngrok" ]; then
     echo -e "${GREEN}✅ ngrok downloaded for ${OS}-${ARCH}${NC}"
 fi
 
-# Configure ngrok
+# Configure ngrok (if token provided)
 NGROK_CMD="ngrok"
 if [ -f "./ngrok" ]; then
     NGROK_CMD="./ngrok"
 fi
 
-echo -e "${BLUE}🔑 Configuring ngrok authtoken...${NC}"
-$NGROK_CMD config add-authtoken $NGROK_AUTHTOKEN
-echo -e "${GREEN}✅ ngrok authtoken configured${NC}"
+if [ -n "$NGROK_AUTHTOKEN" ]; then
+    echo -e "${BLUE}🔑 Configuring ngrok authtoken...${NC}"
+    $NGROK_CMD config add-authtoken "$NGROK_AUTHTOKEN"
+    echo -e "${GREEN}✅ ngrok authtoken configured${NC}"
+else
+    echo -e "${YELLOW}⚠️  NGROK_AUTHTOKEN not set; proceeding without reserved domains${NC}"
+fi
 
 # =============================================================================
 # PHASE 3: DJANGO CONFIGURATION
@@ -140,9 +150,16 @@ fi
 echo -e "${GREEN}✅ Project detected: ${PROJECT_DIR}${NC}"
 
 # Configure Django settings for ngrok
-echo -e "${BLUE}⚙️  Optimizing Django settings...${NC}"
-python3 masterpiece_auto_config.py
-echo -e "${GREEN}✅ Django settings optimized${NC}"
+if [ -f "masterpiece_auto_config.py" ]; then
+    echo -e "${BLUE}⚙️  Optimizing Django settings...${NC}"
+    $PYTHON masterpiece_auto_config.py || true
+    echo -e "${GREEN}✅ Django settings optimization step completed${NC}"
+fi
+
+# Export ALLOWED_HOSTS if STATIC_URL provided
+if [ -n "$STATIC_URL" ]; then
+    export ALLOWED_HOSTS="*,${STATIC_URL},localhost,127.0.0.1"
+fi
 
 # Run Django setup
 echo -e "${BLUE}🔄 Setting up Django...${NC}"
@@ -254,8 +271,12 @@ else
 fi
 
 # Start ngrok tunnel
-echo -e "${BLUE}🌐 Starting ngrok tunnel with static URL...${NC}"
-nohup $NGROK_CMD http --url=$STATIC_URL $PORT > ngrok.log 2>&1 &
+echo -e "${BLUE}🌐 Starting ngrok tunnel...${NC}"
+if [ -n "$STATIC_URL" ]; then
+    nohup $NGROK_CMD http --url="$STATIC_URL" "$PORT" > ngrok.log 2>&1 &
+else
+    nohup $NGROK_CMD http "$PORT" > ngrok.log 2>&1 &
+fi
 NGROK_PID=$!
 echo $NGROK_PID > .pids/ngrok.pid
 
@@ -263,10 +284,14 @@ echo $NGROK_PID > .pids/ngrok.pid
 sleep 8
 
 # Verify ngrok is running
-if curl -s "https://$STATIC_URL" > /dev/null 2>&1; then
-    echo -e "${GREEN}✅ ngrok tunnel online (PID: $NGROK_PID)${NC}"
+if [ -n "$STATIC_URL" ]; then
+    if curl -s "https://$STATIC_URL" > /dev/null 2>&1; then
+        echo -e "${GREEN}✅ ngrok tunnel online (PID: $NGROK_PID)${NC}"
+    else
+        echo -e "${YELLOW}⚠️  ngrok tunnel starting (may take a moment)${NC}"
+    fi
 else
-    echo -e "${YELLOW}⚠️  ngrok tunnel starting (may take a moment)${NC}"
+    echo -e "${GREEN}✅ ngrok tunnel started (dynamic URL in ngrok dashboard/log)${NC}"
 fi
 
 # =============================================================================
@@ -283,7 +308,9 @@ echo -e "${NC}"
 echo -e "${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║                    🌐 ACCESS INFORMATION                     ║${NC}"
 echo -e "${GREEN}╠══════════════════════════════════════════════════════════════╣${NC}"
+if [ -n "$STATIC_URL" ]; then
 echo -e "${GREEN}║  Public URL:  https://${STATIC_URL}  ║${NC}"
+fi
 echo -e "${GREEN}║  Local URL:   http://localhost:${PORT}                      ║${NC}"
 echo -e "${GREEN}╠══════════════════════════════════════════════════════════════╣${NC}"
 echo -e "${GREEN}║                    🏥 SYSTEM FEATURES                        ║${NC}"
