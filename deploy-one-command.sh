@@ -255,6 +255,19 @@ else
   fi
 fi
 
+# If no tunnel URL available, suggest sslip.io host based on public IP (no signup, static while IP stays same)
+if [ -z "${WEB_URL:-}" ]; then
+  PUB_IP="$(curl -s https://api.ipify.org || curl -s ifconfig.me || curl -s https://ipinfo.io/ip || true)"
+  if [ -n "$PUB_IP" ]; then
+    SSLIP_HOST="$(printf "%s" "$PUB_IP" | tr '.' '-')\.sslip.io"
+    WEB_URL="http://${SSLIP_HOST}:8000"
+    DICOM_URL="${SSLIP_HOST}:11112"
+    DETECTED_HOST="$SSLIP_HOST"
+    echo "ℹ️ No tunnel detected; suggesting sslip.io host: $SSLIP_HOST"
+    echo "   Note: You must expose ports externally (router/NAT port-forward or public IP)."
+  fi
+fi
+
 # Display results
 echo ""
 echo "🎉 DEPLOYMENT COMPLETE!"
