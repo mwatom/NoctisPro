@@ -146,8 +146,17 @@ class NoctisProButtonManager {
         
         button.classList.add('noctispro-button-enhanced');
         
-        // Add click ripple effect
-        button.addEventListener('mousedown', (e) => this.createRipple(e));
+        // Add click ripple effect with safe handler
+        button.addEventListener('mousedown', (e) => {
+            try {
+                // Prefer built-in method if present
+                if (typeof this.createRipple === 'function') {
+                    this.createRipple(e);
+                } else if (window.ProfessionalButtons && typeof window.ProfessionalButtons.createRipple === 'function') {
+                    window.ProfessionalButtons.createRipple(e);
+                }
+            } catch (_) {}
+        });
         
         // Wrap existing onclick handlers with error handling
         if (button.onclick) {
@@ -165,12 +174,12 @@ class NoctisProButtonManager {
     }
 
     createRipple(e) {
-        const button = e.currentTarget;
+        const button = e.currentTarget || e.target;
+        if (!button || button.disabled) return;
         const rect = button.getBoundingClientRect();
         const size = Math.max(rect.width, rect.height);
-        const x = e.clientX - rect.left - size / 2;
-        const y = e.clientY - rect.top - size / 2;
-        
+        const x = (e.clientX ?? (rect.left + rect.width / 2)) - rect.left - size / 2;
+        const y = (e.clientY ?? (rect.top + rect.height / 2)) - rect.top - size / 2;
         const ripple = document.createElement('span');
         ripple.className = 'noctispro-ripple';
         ripple.style.cssText = `
@@ -179,7 +188,9 @@ class NoctisProButtonManager {
             left: ${x}px;
             top: ${y}px;
         `;
-        
+        // Ensure container clips
+        button.style.position = button.style.position || 'relative';
+        button.style.overflow = 'hidden';
         button.appendChild(ripple);
         setTimeout(() => ripple.remove(), 600);
     }
@@ -277,17 +288,28 @@ class NoctisProButtonManager {
 
         try {
             const response = await fetch(url, finalOptions);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+
+            const contentType = response.headers.get('content-type') || '';
+            let payload = null;
+            try {
+                if (contentType.includes('application/json')) {
+                    payload = await response.json();
+                } else {
+                    payload = await response.text();
+                }
+            } catch (e) {
+                // ignore parse errors; keep payload as null
             }
 
-            const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('application/json')) {
-                return await response.json();
-            } else {
-                return { success: true, data: await response.text() };
+            if (!response.ok) {
+                const detail = payload && typeof payload === 'object' ? (payload.error || JSON.stringify(payload)) : (payload || response.statusText);
+                throw new Error(`HTTP ${response.status}: ${detail}`);
             }
+
+            if (contentType.includes('application/json')) {
+                return payload;
+            }
+            return { success: true, data: payload };
         } catch (error) {
             console.error('API request failed:', error);
             throw error;
@@ -419,21 +441,44 @@ class NoctisProActions {
         }
 
         try {
-            const data = await this.buttonManager.apiRequest(`/worklist/api/study/${studyId}/delete/`, {
-                method: 'DELETE'
+            // Prefer POST first for broader proxy compatibility
+            const postData = await this.buttonManager.apiRequest(`/worklist/api/study/${studyId}/delete/`, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
             });
 
-            if (data.success !== false) {
+            if (postData && postData.success !== false) {
                 this.buttonManager.showToast(`Study ${accessionNumber} deleted successfully`, 'success');
                 setTimeout(() => window.location.reload(), 1000);
-            } else {
-                throw new Error(data.error || 'Failed to delete study');
+                return;
             }
-        } catch (error) {
+            throw new Error((postData && postData.error) || 'Failed to delete study');
+        } catch (postError) {
+            // Fallback to DELETE only if POST not allowed
+            const msg = String(postError && postError.message || '');
+            if (/HTTP\s*405|method not allowed/i.test(msg)) {
+                try {
+                    const delData = await this.buttonManager.apiRequest(`/worklist/api/study/${studyId}/delete/`, {
+                        method: 'DELETE',
+                    });
+                    if (delData && delData.success !== false) {
+                        this.buttonManager.showToast(`Study ${accessionNumber} deleted successfully`, 'success');
+                        setTimeout(() => window.location.reload(), 1000);
+                        return;
+                    }
+                    throw new Error((delData && delData.error) || 'Failed to delete study');
+                } catch (delError) {
+                    if (buttonElement) {
+                        this.buttonManager.setButtonLoading(buttonElement, false);
+                    }
+                    this.buttonManager.showToast(`Delete failed: ${delError.message}`, 'error');
+                    return;
+                }
+            }
             if (buttonElement) {
                 this.buttonManager.setButtonLoading(buttonElement, false);
             }
-            this.buttonManager.showToast(`Delete failed: ${error.message}`, 'error');
+            this.buttonManager.showToast(`Delete failed: ${postError.message}`, 'error');
         }
     }
 

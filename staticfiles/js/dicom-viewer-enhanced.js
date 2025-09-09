@@ -308,34 +308,215 @@ class DicomViewerEnhanced {
             input.type = 'file';
             input.multiple = true;
             input.accept = '.dcm,.dicom';
-            
+            input.setAttribute('webkitdirectory', '');
+            input.setAttribute('directory', '');
             input.onchange = (e) => {
-                const files = Array.from(e.target.files);
-                if (files.length > 0) {
-                    this.showToast(`Loading ${files.length} DICOM file(s)...`, 'info');
-                    this.loadDicomFiles(files);
+                const files = Array.from(e.target.files || []);
+                if (!files.length) return;
+                const dicomFiles = files.filter(f => {
+                    const n = (f.name || '').toLowerCase();
+                    return n.endsWith('.dcm') || n.endsWith('.dicom') || (f.type === 'application/dicom') || (f.size > 132);
+                });
+                if (!dicomFiles.length) {
+                    this.showToast('No DICOM files detected in selection', 'warning');
+                    return;
+                }
+                this.showToast(`Loading ${dicomFiles.length} DICOM file(s) from folder...`, 'info');
+                // If many files, upload to server and open in full viewer. If few, render locally.
+                const LARGE_THRESHOLD = 50;
+                if (dicomFiles.length >= LARGE_THRESHOLD) {
+                    this.uploadLocalDicomToServer(dicomFiles);
+                } else {
+                    this.displayLocalDicomSeries(dicomFiles);
                 }
             };
-            
             input.click();
         } catch (error) {
             this.showToast('Failed to open file dialog', 'error');
         }
     }
 
-    loadDicomFiles(files) {
-        // Placeholder for DICOM file loading
-        // In a real implementation, this would parse DICOM files
-        files.forEach((file, index) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                // Here you would parse the DICOM data
-                console.log(`Loaded DICOM file ${index + 1}:`, file.name);
+    async displayLocalDicomSeries(files) {
+        try {
+            if (typeof dicomParser === 'undefined') {
+                this.showToast('DICOM parser not available', 'error');
+                return;
+            }
+            // Sort files for natural series order
+            files.sort((a, b) => (a.webkitRelativePath || a.name).localeCompare(b.webkitRelativePath || b.name, undefined, { numeric: true }));
+
+            const canvas = document.getElementById('dicomCanvas') || document.querySelector('canvas.dicom-canvas');
+            if (!canvas) {
+                this.showToast('No canvas available to render DICOM', 'error');
+                return;
+            }
+            const ctx = canvas.getContext('2d');
+            const overlayCurrent = document.getElementById('currentSlice');
+            const overlayTotal = document.getElementById('totalSlices');
+            const wwSlider = document.getElementById('windowWidthSlider');
+            const wlSlider = document.getElementById('windowLevelSlider');
+
+            // Parse all files (lightweight). Stop if too many errors.
+            const localImages = [];
+            for (let i = 0; i < files.length; i++) {
+                const f = files[i];
+                try {
+                    const buf = await f.arrayBuffer();
+                    const bytes = new Uint8Array(buf);
+                    const ds = dicomParser.parseDicom(bytes);
+                    const rows = ds.uint16('x00280010') || 0;
+                    const cols = ds.uint16('x00280011') || 0;
+                    const bitsAllocated = ds.uint16('x00280100') || 16;
+                    const pixelRep = ds.uint16('x00280103') || 0;
+                    const spp = ds.uint16('x00280002') || 1;
+                    const pixelEl = ds.elements.x7fe00010;
+                    if (!pixelEl || spp !== 1 || !rows || !cols) continue;
+                    const raw = new Uint8Array(ds.byteArray.buffer, pixelEl.dataOffset, pixelEl.length);
+                    let pixels;
+                    if (bitsAllocated === 8) {
+                        pixels = new Uint8Array(raw);
+                    } else if (bitsAllocated === 16) {
+                        const view = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
+                        const len = raw.byteLength / 2;
+                        pixels = new Float32Array(len);
+                        for (let j = 0; j < len; j++) {
+                            const v = pixelRep === 1 ? view.getInt16(j * 2, true) : view.getUint16(j * 2, true);
+                            pixels[j] = v;
+                        }
+                    } else {
+                        continue;
+                    }
+                    // WW/WL
+                    let ww = (ds.intString && ds.intString('x00281051')) || null;
+                    let wl = (ds.intString && ds.intString('x00281050')) || null;
+                    if (!ww || !wl) {
+                        let min = Infinity, max = -Infinity;
+                        for (let j = 0; j < pixels.length; j++) { const v = pixels[j]; if (v < min) min = v; if (v > max) max = v; }
+                        ww = Math.max(1, (max - min));
+                        wl = Math.round(min + ww / 2);
+                    }
+                    localImages.push({ rows, cols, pixels, ww, wl });
+                } catch (e) {
+                    // Skip corrupt file
+                }
+            }
+
+            if (!localImages.length) {
+                this.showToast('No renderable DICOM images found', 'warning');
+                return;
+            }
+
+            // Use first image to size canvas
+            canvas.width = localImages[0].cols;
+            canvas.height = localImages[0].rows;
+
+            let index = 0;
+            let ww = localImages[0].ww;
+            let wl = localImages[0].wl;
+
+            const render = () => {
+                const img = localImages[index];
+                if (!img) return;
+                const W = img.cols, H = img.rows;
+                if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
+                const imageData = ctx.createImageData(W, H);
+                const low = wl - ww / 2;
+                const high = wl + ww / 2;
+                for (let i = 0; i < W * H; i++) {
+                    const v = img.pixels[i];
+                    let g = Math.round(((v - low) / (high - low)) * 255);
+                    if (isNaN(g)) g = 0; if (g < 0) g = 0; if (g > 255) g = 255;
+                    const j = i * 4;
+                    imageData.data[j] = g;
+                    imageData.data[j + 1] = g;
+                    imageData.data[j + 2] = g;
+                    imageData.data[j + 3] = 255;
+                }
+                ctx.putImageData(imageData, 0, 0);
+                if (overlayCurrent) overlayCurrent.textContent = index + 1;
+                if (overlayTotal) overlayTotal.textContent = localImages.length;
             };
-            reader.readAsArrayBuffer(file);
-        });
-        
-        this.showToast(`Loaded ${files.length} DICOM files`, 'success');
+
+            const clampIndex = (v) => Math.max(0, Math.min(localImages.length - 1, v));
+            const changeSlice = (delta) => { index = clampIndex(index + delta); render(); };
+
+            // Mouse wheel for slice navigation
+            canvas.addEventListener('wheel', (e) => { e.preventDefault(); changeSlice(e.deltaY > 0 ? 1 : -1); }, { passive: false });
+            // Arrow keys
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowUp') { e.preventDefault(); changeSlice(-1); }
+                if (e.key === 'ArrowDown') { e.preventDefault(); changeSlice(1); }
+            });
+            // Hook WW/WL sliders if present
+            if (wwSlider) wwSlider.addEventListener('input', (e) => { ww = parseInt(e.target.value || ww, 10) || ww; render(); });
+            if (wlSlider) wlSlider.addEventListener('input', (e) => { wl = parseInt(e.target.value || wl, 10) || wl; render(); });
+
+            render();
+            this.showToast(`Loaded local series: ${localImages.length} image(s)`, 'success');
+        } catch (e) {
+            console.error(e);
+            this.showToast('Failed to open local DICOM series', 'error');
+        }
+    }
+
+    uploadLocalDicomToServer(files) {
+        try {
+            const url = '/worklist/upload/';
+            const token = (document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content')) || '';
+            // Chunk by total bytes to respect common reverse-proxy limits (~100MB)
+            const MAX_CHUNK_BYTES = 80 * 1024 * 1024;
+            const chunks = [];
+            let current = []; let bytes = 0;
+            for (const f of files) {
+                if (bytes + (f.size || 0) > MAX_CHUNK_BYTES && current.length) { chunks.push(current); current = []; bytes = 0; }
+                current.push(f); bytes += (f.size || 0);
+            }
+            if (current.length) chunks.push(current);
+
+            const uploadChunk = (chunk) => new Promise((resolve) => {
+                const formData = new FormData();
+                chunk.forEach(file => formData.append('dicom_files', file));
+                formData.append('priority', 'normal');
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', url, true);
+                if (token) xhr.setRequestHeader('X-CSRFToken', token);
+                xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+                xhr.timeout = 300000;
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        try {
+                            const data = JSON.parse(xhr.responseText || '{}');
+                            resolve({ ok: xhr.status >= 200 && xhr.status < 300 && data && data.success, data });
+                        } catch (_) { resolve({ ok: false, data: null }); }
+                    }
+                };
+                xhr.onerror = function() { resolve({ ok: false, data: null }); };
+                xhr.ontimeout = function() { resolve({ ok: false, data: null }); };
+                xhr.send(formData);
+            });
+
+            const run = async () => {
+                let createdIds = [];
+                for (let i = 0; i < chunks.length; i++) {
+                    this.showToast(`Uploading DICOM chunk ${i + 1}/${chunks.length}...`, 'info', 4000);
+                    const res = await uploadChunk(chunks[i]);
+                    if (!res.ok) { this.showToast('Upload failed. Try smaller selection.', 'error'); return; }
+                    if (Array.isArray(res.data && res.data.created_study_ids)) {
+                        createdIds = createdIds.concat(res.data.created_study_ids);
+                    }
+                }
+                if (createdIds.length) {
+                    this.showToast('Upload complete. Opening in viewer...', 'success');
+                    window.location.href = '/dicom-viewer/?study=' + createdIds[0];
+                } else {
+                    this.showToast('Upload finished but no study id returned', 'warning');
+                }
+            };
+            run();
+        } catch (e) {
+            console.error(e);
+            this.showToast('Failed to upload local DICOM to server', 'error');
+        }
     }
 
     loadFromExternalMedia() {

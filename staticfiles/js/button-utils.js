@@ -25,12 +25,12 @@ class ProfessionalButtons {
 
     enhanceButton(button) {
         // Add professional hover and click effects
-        button.addEventListener('mouseenter', this.handleButtonHover);
-        button.addEventListener('mouseleave', this.handleButtonLeave);
-        button.addEventListener('mousedown', this.handleButtonPress);
-        button.addEventListener('mouseup', this.handleButtonRelease);
+        button.addEventListener('mouseenter', this.handleButtonHover.bind(this));
+        button.addEventListener('mouseleave', this.handleButtonLeave.bind(this));
+        button.addEventListener('mousedown', this.handleButtonPress.bind(this));
+        button.addEventListener('mouseup', this.handleButtonRelease.bind(this));
         
-        // Add ripple effect capability
+        // Enable ripple containment
         button.style.position = 'relative';
         button.style.overflow = 'hidden';
     }
@@ -50,12 +50,15 @@ class ProfessionalButtons {
     }
 
     handleButtonPress(e) {
-        if (e.target.disabled) return;
-        
-        // Create ripple effect
-        this.createRipple(e);
-        
-        e.target.style.transform = 'translateY(0)';
+        const btn = e.currentTarget || e.target;
+        if (btn && btn.disabled) return;
+
+        // Trigger ripple with safe static method
+        ProfessionalButtons.createRipple(e);
+
+        if (btn) {
+            btn.style.transform = 'translateY(0)';
+        }
     }
 
     handleButtonRelease(e) {
@@ -66,13 +69,15 @@ class ProfessionalButtons {
         }, 100);
     }
 
-    createRipple(e) {
-        const button = e.target;
+    // Robust static ripple to avoid context issues
+    static createRipple(e) {
+        const button = (e && (e.currentTarget || e.target)) || null;
+        if (!button) return;
+        if (button.disabled) return;
         const rect = button.getBoundingClientRect();
         const size = Math.max(rect.width, rect.height);
-        const x = e.clientX - rect.left - size / 2;
-        const y = e.clientY - rect.top - size / 2;
-        
+        const x = (e.clientX ?? (rect.left + rect.width / 2)) - rect.left - size / 2;
+        const y = (e.clientY ?? (rect.top + rect.height / 2)) - rect.top - size / 2;
         const ripple = document.createElement('span');
         ripple.style.cssText = `
             position: absolute;
@@ -86,13 +91,11 @@ class ProfessionalButtons {
             animation: ripple 0.6s ease-out;
             pointer-events: none;
         `;
-        
         button.appendChild(ripple);
-        
-        setTimeout(() => {
-            ripple.remove();
-        }, 600);
+        setTimeout(() => ripple.remove(), 600);
     }
+
+    
 
     setupGlobalEventListeners() {
         // Add CSS for ripple animation
