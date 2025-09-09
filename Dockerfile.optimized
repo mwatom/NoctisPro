@@ -1,0 +1,56 @@
+# NoctisPro PACS - Optimized Production Dockerfile
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Set work directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    libjpeg-dev \
+    libpng-dev \
+    libtiff-dev \
+    libwebp-dev \
+    zlib1g-dev \
+    libffi-dev \
+    libssl-dev \
+    curl \
+    wget \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy project
+COPY . .
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/media /app/media/dicom /app/staticfiles /app/static
+
+# Set permissions
+RUN chmod +x /app/dicom_receiver.py && \
+    chown -R nobody:nogroup /app/logs /app/media /app/staticfiles
+
+# Create non-root user
+RUN useradd --create-home --shell /bin/bash noctis
+RUN chown -R noctis:noctis /app
+USER noctis
+
+# Expose ports
+EXPOSE 8000 11112
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8000/admin/login/ || exit 1
+
+# Default command
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "--timeout", "120", "--max-requests", "1000", "--access-logfile", "-", "--error-logfile", "-", "noctis_pro.wsgi:application"]
