@@ -2298,7 +2298,7 @@
             try {
                 showLoading('Generating MPR views...');
                 
-                const response = await fetch(`/dicom-viewer/api/mpr/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
+                const response = await fetch(`/dicom-viewer/api/series/${currentSeries.id}/mpr/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
                 const data = await response.json();
                 
                 if (data.views) {
@@ -2336,7 +2336,7 @@
             try {
                 showLoading('Generating MIP views...');
                 
-                const response = await fetch(`/dicom-viewer/api/mip/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
+                const response = await fetch(`/dicom-viewer/api/series/${currentSeries.id}/mip/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
                 const data = await response.json();
                 
                 if (data.success) {
@@ -2722,7 +2722,7 @@
             try {
                 showLoading('Generating bone 3D reconstruction...');
                 
-                const response = await fetch(`/dicom-viewer/api/bone/${currentSeries.id}/?threshold=200&mesh=true`);
+                const response = await fetch(`/dicom-viewer/api/series/${currentSeries.id}/bone/?threshold=200&mesh=true`);
                 const data = await response.json();
                 
                 if (data.bone_views) {
