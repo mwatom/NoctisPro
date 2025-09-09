@@ -38,6 +38,12 @@ declare -g SYSTEM_PROFILE=""
 declare -g VALIDATION_PASSED=false
 declare -g ROLLBACK_AVAILABLE=false
 
+# Optional DuckDNS configuration (via environment)
+declare -g DUCKDNS_SUBDOMAIN="${DUCKDNS_SUBDOMAIN:-}"
+declare -g DUCKDNS_TOKEN="${DUCKDNS_TOKEN:-}"
+declare -g PUBLIC_URL=""
+declare -g DUCKDNS_DOMAIN=""
+
 # =============================================================================
 # ENHANCED LOGGING SYSTEM
 # =============================================================================
@@ -459,6 +465,60 @@ generate_deployment_configurations() {
 }
 
 # =============================================================================
+# PUBLIC URL AND DUCKDNS CONFIGURATION
+# =============================================================================
+
+compute_public_url() {
+    log "Computing public access URL..."
+
+    PUBLIC_URL="http://localhost:8000/"
+    DUCKDNS_DOMAIN=""
+
+    if [[ -n "${DUCKDNS_SUBDOMAIN}" && -n "${DUCKDNS_TOKEN}" ]]; then
+        DUCKDNS_DOMAIN="${DUCKDNS_SUBDOMAIN}.duckdns.org"
+        PUBLIC_URL="https://${DUCKDNS_DOMAIN}/"
+        log "DuckDNS configured: ${DUCKDNS_DOMAIN}"
+    else
+        local fqdn
+        fqdn="$(hostname -f 2>/dev/null || true)"
+        if [[ -n "$fqdn" && "$fqdn" != "localhost" && "$fqdn" == *.* ]]; then
+            PUBLIC_URL="http://${fqdn}/"
+        fi
+        log "PUBLIC_URL set to: ${PUBLIC_URL}"
+    fi
+}
+
+configure_duckdns() {
+    if [[ -z "${DUCKDNS_SUBDOMAIN}" || -z "${DUCKDNS_TOKEN}" ]]; then
+        log "DuckDNS variables not provided; skipping DuckDNS setup"
+        return 0
+    fi
+
+    log "Configuring DuckDNS updater for ${DUCKDNS_SUBDOMAIN}.duckdns.org"
+    local ops_dir="${PROJECT_DIR}/ops"
+
+    if [[ ! -f "${ops_dir}/duckdns-update.sh" || ! -f "${ops_dir}/duckdns-update.service" || ! -f "${ops_dir}/duckdns-update.timer" ]]; then
+        warn "DuckDNS assets not found under ${ops_dir}; skipping DuckDNS setup"
+        return 0
+    fi
+
+    sudo install -d -m 0755 /etc/noctis
+    printf "DUCKDNS_SUBDOMAIN=%s\nDUCKDNS_TOKEN=%s\n" "${DUCKDNS_SUBDOMAIN}" "${DUCKDNS_TOKEN}" | sudo tee /etc/noctis/duckdns.env >/dev/null
+
+    sudo install -m 0755 "${ops_dir}/duckdns-update.sh" /usr/local/bin/duckdns-update.sh
+    sudo cp "${ops_dir}/duckdns-update.service" /etc/systemd/system/duckdns-update.service
+    sudo cp "${ops_dir}/duckdns-update.timer" /etc/systemd/system/duckdns-update.timer
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now duckdns-update.timer || true
+
+    # Perform an initial update immediately
+    sudo /usr/local/bin/duckdns-update.sh || true
+
+    success "DuckDNS updater installed and timer enabled"
+}
+
+# =============================================================================
 # DEPLOYMENT EXECUTION
 # =============================================================================
 
@@ -605,6 +665,11 @@ BUILD_TARGET=production
 DEPLOYMENT_MODE=${DEPLOYMENT_MODE}
 SYSTEM_PROFILE=${SYSTEM_PROFILE}
 DEPLOYED_AT=$(date -Iseconds)
+
+# Networking / URL
+PUBLIC_URL=${PUBLIC_URL:-http://localhost:8000/}
+DUCKDNS_SUBDOMAIN=${DUCKDNS_SUBDOMAIN}
+DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
 EOF
     
     # Append DuckDNS domain if configured earlier but env not created yet
@@ -1018,8 +1083,8 @@ generate_deployment_report() {
 
 ## Access Information
 
-- **Web Interface:** http://localhost:8000
-- **Admin Panel:** http://localhost:8000/admin/
+- **Public URL:** ${PUBLIC_URL:-http://localhost:8000/}
+- **Admin Panel:** ${PUBLIC_URL:-http://localhost:8000/}admin/
 - **DICOM Port:** localhost:11112
 - **Default Admin:** admin / admin123
 
@@ -1083,8 +1148,9 @@ display_deployment_summary() {
     echo "  Rollback Available: ${ROLLBACK_AVAILABLE}"
     echo ""
     echo "🌐 Access Information:"
-    echo "  Web Interface: ${GREEN}http://localhost:8000${NC}"
-    echo "  Admin Panel: ${GREEN}http://localhost:8000/admin/${NC}"
+    local shown_url="${PUBLIC_URL:-http://localhost:8000/}"
+    echo "  Public URL: ${GREEN}${shown_url}${NC}"
+    echo "  Admin Panel: ${GREEN}${shown_url%/}/admin/${NC}"
     echo "  DICOM Port: ${GREEN}localhost:11112${NC}"
     echo "  Default Login: ${GREEN}admin / admin123${NC}"
     echo ""
@@ -1104,7 +1170,7 @@ display_deployment_summary() {
     
     if [[ "${VALIDATION_PASSED}" == "true" ]]; then
         success "🎉 Deployment completed successfully!"
-        success "🔗 Access your NoctisPro PACS system at: http://localhost:8000"
+        success "🔗 Access: ${shown_url}"
     else
         warn "⚠️  Deployment completed with warnings. Please check the logs."
     fi
@@ -1170,7 +1236,11 @@ main() {
     
     # Phase 5: Configuration Generation
     generate_deployment_configurations
-    
+
+    # Compute public URL and configure DuckDNS (if provided)
+    compute_public_url
+    configure_duckdns
+
     # Phase 6: Deployment Execution
     execute_deployment
     
@@ -1211,6 +1281,13 @@ case "${1:-}" in
         echo "  --test-only         Run validation tests only"
         echo "  --update-only       Update existing deployment"
         echo "  --rollback          Rollback to previous deployment"
+        echo ""
+        echo "Environment variables (optional):"
+        echo "  DUCKDNS_SUBDOMAIN   Subdomain to register on DuckDNS (e.g., myapp)"
+        echo "  DUCKDNS_TOKEN       DuckDNS token for updates"
+        echo ""
+        echo "If DuckDNS variables are provided, the script configures a systemd timer"
+        echo "to keep the public DNS updated and sets PUBLIC_URL accordingly."
         echo ""
         echo "This script automatically detects your system capabilities and"
         echo "deploys NoctisPro PACS using the optimal configuration."
