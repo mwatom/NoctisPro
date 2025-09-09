@@ -36,6 +36,20 @@ else
 SECRET_KEY=${SECRET_KEY}
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 ADMIN_PASSWORD=${ADMIN_PASSWORD}
+# Optional: FRP (frpc) tunneling. Set FRP_ENABLED=True and configure below to use FRP instead of Cloudflare.
+FRP_ENABLED=False
+# Address of your FRP server (frps) - public IP or domain of your VPS
+FRP_SERVER_ADDR=
+# Port of frps (default 7000)
+FRP_SERVER_PORT=7000
+# Shared token that matches frps auth.token
+FRP_TOKEN=
+# If using HTTP via FRP with a domain handled by frps (nginx or subdomain_host), set this to your domain (e.g., app.example.com)
+FRP_WEB_CUSTOM_DOMAIN=
+# If not using a domain, set a TCP remote port to expose the web app over http://<FRP_SERVER_ADDR>:<FRP_WEB_REMOTE_PORT>
+FRP_WEB_REMOTE_PORT=18000
+# Remote TCP port for DICOM (11112 local)
+FRP_DICOM_REMOTE_PORT=61112
 EOF
 fi
 
@@ -125,31 +139,115 @@ if docker ps --format '{{.Names}}\t{{.Status}}' | grep -E '\\(unhealthy\\)' >/de
   exit 1
 fi
 
-# Install and setup Cloudflare tunnel
-if ! command -v cloudflared >/dev/null 2>&1; then
-    echo "🌐 Installing Cloudflare Tunnel..."
-    curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-    sudo dpkg -i cloudflared.deb
-    rm cloudflared.deb
-fi
+# Prefer FRP if enabled; otherwise fallback to Cloudflare tunnels
 
-# Start tunnels
-echo "🌐 Creating public URLs..."
-pkill cloudflared 2>/dev/null || true
-nohup cloudflared tunnel --url http://127.0.0.1:8000 --http-host-header 127.0.0.1 > web_tunnel.log 2>&1 &
-nohup cloudflared tunnel --url http://127.0.0.1:11112 --http-host-header 127.0.0.1 > dicom_tunnel.log 2>&1 &
+# Normalize boolean check for FRP
+_frp_enabled="${FRP_ENABLED:-${FRP_enabled:-${frp_enabled:-False}}}"
+_frp_enabled_lower=$(printf "%s" "$_frp_enabled" | tr '[:upper:]' '[:lower:]')
 
-# Wait for tunnels and try to extract URLs with retries (robust to transient errors)
-WEB_URL=""
-DICOM_URL=""
-for attempt in 1 2 3 4 5 6; do
-  sleep 5
-  WEB_URL="${WEB_URL:-$(extract_trycloudflare_url web_tunnel.log)}"
-  DICOM_URL="${DICOM_URL:-$(extract_trycloudflare_url dicom_tunnel.log)}"
-  if [ -n "$WEB_URL" ] && [ -n "$DICOM_URL" ]; then
-    break
+if [ "$_frp_enabled_lower" = "true" ]; then
+  echo "🌐 FRP enabled via .env — setting up frpc..."
+
+  # Validate minimal FRP variables
+  : "${FRP_SERVER_ADDR:?❌ FRP_SERVER_ADDR not set in .env when FRP_ENABLED=True}"
+  : "${FRP_SERVER_PORT:=7000}"
+  : "${FRP_TOKEN:?❌ FRP_TOKEN not set in .env when FRP_ENABLED=True}"
+  : "${FRP_WEB_REMOTE_PORT:=18000}"
+  : "${FRP_DICOM_REMOTE_PORT:=61112}"
+
+  # Install frpc if missing
+  if ! command -v frpc >/dev/null 2>&1; then
+    echo "📦 Installing frpc..."
+    tmpdir=$(mktemp -d)
+    ( set -e; cd "$tmpdir"; \
+      curl -sL https://api.github.com/repos/fatedier/frp/releases/latest \
+        | grep browser_download_url \
+        | grep linux_amd64.tar.gz \
+        | cut -d '"' -f 4 \
+        | xargs curl -LO; \
+      tar xzf frp_*.tar.gz; \
+      dir=$(find . -maxdepth 1 -type d -name 'frp_*' | head -n1); \
+      sudo mv "$dir/frpc" /usr/local/bin/frpc || cp "$dir/frpc" "$PWD/../frpc"; \
+      command -v frpc >/dev/null 2>&1 || export PATH="$PWD/..:$PATH" \
+    );
+    rm -rf "$tmpdir"
   fi
-done
+
+  # Generate frpc.ini next to the script
+  FRPC_INI="$(pwd)/frpc.ini"
+  echo "📝 Generating frpc.ini at $FRPC_INI"
+  cat > "$FRPC_INI" <<EOF
+[common]
+server_addr = ${FRP_SERVER_ADDR}
+server_port = ${FRP_SERVER_PORT}
+auth.method = token
+auth.token = ${FRP_TOKEN}
+
+[web]
+type = http
+local_ip = 127.0.0.1
+local_port = 8000
+EOF
+
+  if [ -n "${FRP_WEB_CUSTOM_DOMAIN:-}" ]; then
+    printf "custom_domains = %s\n" "${FRP_WEB_CUSTOM_DOMAIN}" >> "$FRPC_INI"
+  else
+    cat >> "$FRPC_INI" <<EOF
+[web-tcp]
+type = tcp
+local_ip = 127.0.0.1
+local_port = 8000
+remote_port = ${FRP_WEB_REMOTE_PORT}
+EOF
+  fi
+
+  cat >> "$FRPC_INI" <<EOF
+[dicom]
+type = tcp
+local_ip = 127.0.0.1
+local_port = 11112
+remote_port = ${FRP_DICOM_REMOTE_PORT}
+EOF
+
+  # Restart frpc
+  pkill -f "^frpc" 2>/dev/null || true
+  nohup frpc -c "$FRPC_INI" > frp_client.log 2>&1 &
+
+  # Prepare output URLs
+  if [ -n "${FRP_WEB_CUSTOM_DOMAIN:-}" ]; then
+    WEB_URL="http://${FRP_WEB_CUSTOM_DOMAIN}"
+  else
+    WEB_URL="http://${FRP_SERVER_ADDR}:${FRP_WEB_REMOTE_PORT}"
+  fi
+  DICOM_URL="${FRP_SERVER_ADDR}:${FRP_DICOM_REMOTE_PORT}"
+  echo "✅ FRP tunnels started (frpc)."
+else
+  # Install and setup Cloudflare tunnel
+  if ! command -v cloudflared >/dev/null 2>&1; then
+      echo "🌐 Installing Cloudflare Tunnel..."
+      curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+      sudo dpkg -i cloudflared.deb
+      rm cloudflared.deb
+  fi
+
+  # Start tunnels
+  echo "🌐 Creating public URLs (Cloudflare)..."
+  pkill cloudflared 2>/dev/null || true
+  nohup cloudflared tunnel --url http://127.0.0.1:8000 --http-host-header 127.0.0.1 > web_tunnel.log 2>&1 &
+  nohup cloudflared tunnel --url http://127.0.0.1:11112 --http-host-header 127.0.0.1 > dicom_tunnel.log 2>&1 &
+
+  # Wait for tunnels and try to extract URLs with retries (robust to transient errors)
+  WEB_URL=""
+  DICOM_URL=""
+  for attempt in 1 2 3 4 5 6; do
+    sleep 5
+    WEB_URL="${WEB_URL:-$(extract_trycloudflare_url web_tunnel.log)}"
+    DICOM_URL="${DICOM_URL:-$(extract_trycloudflare_url dicom_tunnel.log)}"
+    if [ -n "$WEB_URL" ] && [ -n "$DICOM_URL" ]; then
+      break
+    fi
+  done
+fi
 
 # Display results
 echo ""
@@ -159,7 +257,11 @@ echo ""
 echo "🌐 PUBLIC URLS:"
 echo "   Web App: ${WEB_URL:-http://localhost:8000}"
 echo "   Admin:   ${WEB_URL:-http://localhost:8000}/admin/"
-echo "   DICOM:   ${DICOM_URL:-http://localhost:11112}"
+if [ "$_frp_enabled_lower" = "true" ]; then
+  echo "   DICOM:   ${DICOM_URL}"
+else
+  echo "   DICOM:   ${DICOM_URL:-http://localhost:11112}"
+fi
 echo ""
 echo "🔐 ADMIN LOGIN:"
 echo "   Username: admin"
