@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  namespace: noctispro
+  labels:
+    app: nginx
+    component: proxy
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+        component: proxy
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+          name: http
+        - containerPort: 443
+          name: https
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d
+        - name: static-storage
+          mountPath: /app/staticfiles
+          readOnly: true
+        - name: media-storage
+          mountPath: /app/media
+          readOnly: true
+        - name: ssl-certs
+          mountPath: /etc/nginx/ssl
+          readOnly: true
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: nginx-ssl-config
+      - name: static-storage
+        emptyDir: {}
+      - name: media-storage
+        persistentVolumeClaim:
+          claimName: noctispro-media-pvc
+      - name: ssl-certs
+        secret:
+          secretName: noctispro-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  namespace: noctispro
+  labels:
+    app: nginx
+    component: proxy
+spec:
+  selector:
+    app: nginx
+  ports:
+  - port: 80
+    targetPort: 80
+    name: http
+  - port: 443
+    targetPort: 443
+    name: https
+  type: LoadBalancer
