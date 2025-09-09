@@ -189,6 +189,15 @@ local_ip = 127.0.0.1
 local_port = 8000
 EOF
 
+  # If no custom domain, auto-derive sslip.io from FRP_SERVER_ADDR if it's an IP
+  if [ -z "${FRP_WEB_CUSTOM_DOMAIN:-}" ]; then
+    if printf '%s' "${FRP_SERVER_ADDR}" | grep -Eq '^([0-9]{1,3}\.){3}[0-9]{1,3}$'; then
+      _sslip_host="$(printf "%s" "${FRP_SERVER_ADDR}" | tr '.' '-')\.sslip.io"
+      FRP_WEB_CUSTOM_DOMAIN="${_sslip_host}"
+      echo "ℹ️ Using auto-derived sslip.io host for FRP: ${FRP_WEB_CUSTOM_DOMAIN}"
+    fi
+  fi
+
   if [ -n "${FRP_WEB_CUSTOM_DOMAIN:-}" ]; then
     printf "custom_domains = %s\n" "${FRP_WEB_CUSTOM_DOMAIN}" >> "$FRPC_INI"
   else
