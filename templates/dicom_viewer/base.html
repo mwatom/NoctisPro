@@ -3142,7 +3142,7 @@
             try {
                 showLoading('Generating MPR views...');
                 
-                const response = await fetch(`/dicom_viewer/api/mpr/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
+                const response = await fetch(`/dicom-viewer/api/mpr/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
                 const data = await response.json();
                 
                 if (data.mpr_views) {
@@ -3243,7 +3243,7 @@
             try {
                 showLoading('Generating MIP views...');
                 
-                const response = await fetch(`/dicom_viewer/api/mip/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
+                const response = await fetch(`/dicom-viewer/api/mip/${currentSeries.id}/?ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`);
                 const data = await response.json();
                 
                 if (data.success && data.mip_views) {
@@ -3280,7 +3280,7 @@
             try {
                 showLoading('Generating bone 3D reconstruction...');
                 
-                const response = await fetch(`/dicom_viewer/api/bone/${currentSeries.id}/?threshold=200&mesh=true&quality=normal`);
+                const response = await fetch(`/dicom-viewer/api/bone/${currentSeries.id}/?threshold=200&mesh=true&quality=normal`);
                 const data = await response.json();
                 
                 if (data.bone_views) {
@@ -3786,7 +3786,7 @@
                 isLoadingMPRSlice = true;
                 
                 const response = await fetch(
-                    `/dicom_viewer/api/mpr/${currentSeries.id}/?plane=${plane}&slice=${sliceIndex}&ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`
+                    `/dicom-viewer/api/mpr/${currentSeries.id}/?plane=${plane}&slice=${sliceIndex}&ww=${windowWidth}&wl=${windowLevel}&invert=${inverted}`
                 );
                 const data = await response.json();
                 
