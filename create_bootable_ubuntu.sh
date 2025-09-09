@@ -26,9 +26,11 @@ ISO_DIR="/tmp/ubuntu_iso"
 CUSTOM_ISO_DIR="/tmp/noctispro_iso"
 LOG_FILE="/tmp/noctispro_bootable.log"
 
-# Ubuntu Server 22.04 LTS ISO URL
-UBUNTU_ISO_URL="https://releases.ubuntu.com/22.04/ubuntu-22.04.3-live-server-amd64.iso"
-UBUNTU_ISO_NAME="ubuntu-22.04.3-live-server-amd64.iso"
+# Ubuntu Server 22.04 LTS ISO URL (Latest)
+UBUNTU_ISO_BASE_URL="https://releases.ubuntu.com/22.04"
+UBUNTU_ISO_URL="$UBUNTU_ISO_BASE_URL/ubuntu-22.04.5-live-server-amd64.iso"
+UBUNTU_ISO_NAME="ubuntu-22.04.5-live-server-amd64.iso"
+UBUNTU_ISO_CHECKSUM="9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0"  # SHA256
 
 # Logging functions
 log() {
@@ -239,39 +241,142 @@ get_user_configuration() {
     fi
 }
 
+# Auto-detect latest Ubuntu 22.04 version (optional)
+detect_latest_ubuntu_version() {
+    log "Checking for latest Ubuntu 22.04 version..."
+    
+    # Try to get the latest version from the Ubuntu releases page
+    if command -v curl >/dev/null 2>&1; then
+        local latest_iso=$(curl -s "$UBUNTU_ISO_BASE_URL/" 2>/dev/null | \
+                          grep -o 'ubuntu-22\.04\.[0-9]*-live-server-amd64\.iso' | \
+                          sort -V | tail -1)
+        
+        if [[ -n "$latest_iso" && "$latest_iso" != "$UBUNTU_ISO_NAME" ]]; then
+            log "Found newer version: $latest_iso (current: $UBUNTU_ISO_NAME)"
+            
+            # Get checksum for the latest version
+            local latest_checksum=$(curl -s "$UBUNTU_ISO_BASE_URL/SHA256SUMS" 2>/dev/null | \
+                                   grep "$latest_iso" | cut -d' ' -f1)
+            
+            if [[ -n "$latest_checksum" ]]; then
+                log "Updating to latest version: $latest_iso"
+                UBUNTU_ISO_URL="$UBUNTU_ISO_BASE_URL/$latest_iso"
+                UBUNTU_ISO_NAME="$latest_iso"
+                UBUNTU_ISO_CHECKSUM="$latest_checksum"
+                success "Updated to latest Ubuntu 22.04 version"
+            else
+                warning "Could not retrieve checksum for latest version, using configured version"
+            fi
+        else
+            success "Using latest available version: $UBUNTU_ISO_NAME"
+        fi
+    else
+        log "curl not available, using configured version: $UBUNTU_ISO_NAME"
+    fi
+}
+
 # Download Ubuntu Server ISO
 download_ubuntu_iso() {
     header "Downloading Ubuntu Server ISO"
     
+    # Check for latest version first
+    detect_latest_ubuntu_version
+    
     mkdir -p "$WORK_DIR"
     cd "$WORK_DIR"
     
+    # Function to verify ISO integrity
+    verify_iso_integrity() {
+        local iso_file="$1"
+        
+        if [[ ! -f "$iso_file" ]]; then
+            return 1
+        fi
+        
+        # Check file size (Ubuntu Server 22.04.3 should be ~1.5GB)
+        local iso_size=$(stat -c%s "$iso_file")
+        local size_mb=$((iso_size / 1024 / 1024))
+        
+        log "ISO file size: ${size_mb}MB"
+        
+        # Ubuntu Server ISO should be between 1.2GB and 2GB
+        if [[ $iso_size -lt 1200000000 ]] || [[ $iso_size -gt 2000000000 ]]; then
+            warning "ISO file size seems unusual: ${size_mb}MB"
+            return 1
+        fi
+        
+        # Verify it's actually an ISO file
+        if ! file "$iso_file" | grep -q "ISO 9660"; then
+            warning "File doesn't appear to be a valid ISO image"
+            return 1
+        fi
+        
+        # Verify SHA256 checksum if available
+        if command -v sha256sum >/dev/null 2>&1; then
+            log "Verifying ISO checksum..."
+            local calculated_checksum=$(sha256sum "$iso_file" | cut -d' ' -f1)
+            
+            if [[ "$calculated_checksum" == "$UBUNTU_ISO_CHECKSUM" ]]; then
+                success "ISO checksum verification passed"
+                return 0
+            else
+                warning "ISO checksum verification failed"
+                warning "Expected: $UBUNTU_ISO_CHECKSUM"
+                warning "Got: $calculated_checksum"
+                return 1
+            fi
+        else
+            success "ISO file appears valid (checksum verification skipped - sha256sum not available)"
+            return 0
+        fi
+    }
+    
+    # Check if ISO already exists and is valid
     if [[ -f "$UBUNTU_ISO_NAME" ]]; then
         log "Ubuntu ISO already exists, checking integrity..."
-        # You could add checksum verification here
-        success "Ubuntu ISO found and ready"
-    else
-        log "Downloading Ubuntu Server 22.04 LTS..."
-        log "This may take a while depending on your internet connection..."
         
-        if wget -O "$UBUNTU_ISO_NAME" "$UBUNTU_ISO_URL"; then
-            success "Ubuntu ISO downloaded successfully"
+        if verify_iso_integrity "$UBUNTU_ISO_NAME"; then
+            success "Ubuntu ISO found and verified"
+            return 0
         else
-            error "Failed to download Ubuntu ISO"
+            warning "Existing ISO file appears corrupted, removing..."
+            rm -f "$UBUNTU_ISO_NAME"
         fi
     fi
     
-    # Verify ISO file
-    if [[ -f "$UBUNTU_ISO_NAME" ]]; then
-        iso_size=$(stat -c%s "$UBUNTU_ISO_NAME")
-        if [[ $iso_size -gt 1000000000 ]]; then  # Should be > 1GB
-            success "ISO file size looks correct: $(($iso_size / 1024 / 1024))MB"
+    # Download the ISO
+    log "Downloading Ubuntu Server 22.04 LTS..."
+    log "This may take a while depending on your internet connection..."
+    log "Download size: ~1.5GB"
+    
+    # Use wget with resume capability and progress bar
+    local download_attempts=0
+    local max_attempts=3
+    
+    while [[ $download_attempts -lt $max_attempts ]]; do
+        download_attempts=$((download_attempts + 1))
+        log "Download attempt $download_attempts of $max_attempts..."
+        
+        if wget -c -t 3 -T 30 --progress=bar:force -O "$UBUNTU_ISO_NAME" "$UBUNTU_ISO_URL"; then
+            log "Download completed, verifying integrity..."
+            
+            if verify_iso_integrity "$UBUNTU_ISO_NAME"; then
+                success "Ubuntu ISO downloaded and verified successfully"
+                return 0
+            else
+                warning "Downloaded ISO failed verification, retrying..."
+                rm -f "$UBUNTU_ISO_NAME"
+            fi
         else
-            error "ISO file seems too small, may be corrupted"
+            warning "Download attempt $download_attempts failed"
+            if [[ $download_attempts -lt $max_attempts ]]; then
+                log "Retrying in 5 seconds..."
+                sleep 5
+            fi
         fi
-    else
-        error "Ubuntu ISO file not found after download"
-    fi
+    done
+    
+    error "Failed to download Ubuntu ISO after $max_attempts attempts"
 }
 
 # Extract and modify Ubuntu ISO
@@ -622,8 +727,14 @@ cleanup() {
     umount "$ISO_DIR" 2>/dev/null || true
     umount "$USB_MOUNT" 2>/dev/null || true
     
-    # Remove temporary directories
+    # Remove temporary directories (but keep the downloaded ISO if valid)
     rm -rf "$ISO_DIR" "$CUSTOM_ISO_DIR" 2>/dev/null || true
+    
+    # Only remove the work directory if we're exiting due to error
+    # This preserves valid ISOs for future use
+    if [[ $? -ne 0 ]] && [[ -d "$WORK_DIR" ]]; then
+        log "Preserving work directory for debugging: $WORK_DIR"
+    fi
     
     success "Cleanup completed"
 }
@@ -681,6 +792,30 @@ EOF
     echo -e "${GREEN}Your NoctisPro PACS bootable media is ready for deployment!${NC}"
 }
 
+# Clean up any corrupted files from previous runs
+cleanup_previous_runs() {
+    log "Checking for corrupted files from previous runs..."
+    
+    # Check for partial downloads or corrupted ISOs in common locations
+    local locations=("/tmp/noctispro_bootable" "/tmp" ".")
+    
+    for location in "${locations[@]}"; do
+        if [[ -d "$location" ]]; then
+            find "$location" -name "$UBUNTU_ISO_NAME" -type f 2>/dev/null | while read iso_file; do
+                if [[ -f "$iso_file" ]]; then
+                    local iso_size=$(stat -c%s "$iso_file" 2>/dev/null || echo 0)
+                    # If file is smaller than 1GB or larger than 3GB, it's likely corrupted
+                    if [[ $iso_size -lt 1000000000 ]] || [[ $iso_size -gt 3000000000 ]]; then
+                        warning "Found potentially corrupted ISO: $iso_file ($(($iso_size / 1024 / 1024))MB)"
+                        log "Removing corrupted file: $iso_file"
+                        rm -f "$iso_file"
+                    fi
+                fi
+            done
+        fi
+    done
+}
+
 # Main function
 main() {
     # Check if running as root
@@ -694,6 +829,7 @@ main() {
     
     show_banner
     check_parrot_os
+    cleanup_previous_runs
     install_prerequisites
     get_user_configuration
     download_ubuntu_iso
