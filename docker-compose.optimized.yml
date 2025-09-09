@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.optimized
+    container_name: noctispro-web
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-auto-generated-change-in-production}
+      - DJANGO_SETTINGS_MODULE=noctis_pro.settings
+      - ALLOWED_HOSTS=*
+      - SECURE_PROXY_SSL_HEADER=HTTP_X_FORWARDED_PROTO,https
+      - SERVE_MEDIA_FILES=True
+    volumes:
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+      - ./logs:/app/logs
+      - ./db.sqlite3:/app/db.sqlite3
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/admin/login/', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      - db-setup
+
+  dicom:
+    build:
+      context: .
+      dockerfile: Dockerfile.optimized
+    container_name: noctispro-dicom
+    ports:
+      - "11112:11112"
+    environment:
+      - DEBUG=False
+      - DJANGO_SETTINGS_MODULE=noctis_pro.settings
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-auto-generated-change-in-production}
+    command: ["python", "dicom_receiver.py", "--port", "11112", "--aet", "NOCTIS_SCP"]
+    volumes:
+      - ./media:/app/media
+      - ./logs:/app/logs
+      - ./db.sqlite3:/app/db.sqlite3
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s = socket.socket(); s.connect(('localhost', 11112)); s.close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      - web
+
+  nginx:
+    image: nginx:alpine
+    container_name: noctispro-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deployment/nginx/nginx-optimized.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./staticfiles:/app/staticfiles:ro
+      - ./media:/app/media:ro
+    depends_on:
+      - web
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  db-setup:
+    build:
+      context: .
+      dockerfile: Dockerfile.optimized
+    container_name: noctispro-db-setup
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-auto-generated-change-in-production}
+      - DJANGO_SETTINGS_MODULE=noctis_pro.settings
+    volumes:
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+      - ./logs:/app/logs
+      - ./db.sqlite3:/app/db.sqlite3
+    command: >
+      bash -c "
+        echo 'Setting up database and static files...' &&
+        python manage.py collectstatic --noinput &&
+        python manage.py migrate &&
+        python manage.py shell -c \"
+from django.contrib.auth import get_user_model;
+User = get_user_model();
+if not User.objects.filter(username='admin').exists():
+    User.objects.create_superuser('admin', 'admin@noctispro.local', 'admin123');
+    print('✅ Admin user created: admin/admin123')
+else:
+    print('ℹ️  Admin user already exists')
+        \" &&
+        echo '✅ Database setup completed'
+      "
+    restart: "no"
+
+networks:
+  default:
+    name: noctispro-network

@@ -1,0 +1,63 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: noctispro-ingress
+  namespace: noctispro
+  annotations:
+    # Enable SSL redirect
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # Enable cert-manager for automatic SSL certificate generation
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    
+    # Increase client body size for DICOM uploads
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    
+    # WebSocket support for real-time features
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - your-domain.com  # Replace with your actual domain
+    - www.your-domain.com  # Replace with your actual domain
+    secretName: noctispro-tls
+  rules:
+  - host: your-domain.com  # Replace with your actual domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: noctispro-web
+            port:
+              number: 8000
+  - host: www.your-domain.com  # Replace with your actual domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: noctispro-web
+            port:
+              number: 8000
+---
+# TCP Ingress for DICOM traffic (requires nginx-ingress with TCP support)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tcp-services
+  namespace: ingress-nginx
+data:
+  11112: "noctispro/noctispro-dicom:11112"

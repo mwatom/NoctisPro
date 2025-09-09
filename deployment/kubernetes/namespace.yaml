@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: noctispro
+  labels:
+    name: noctispro
+    app: noctispro-pacs
