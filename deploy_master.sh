@@ -601,6 +601,9 @@ POSTGRES_PASSWORD=$(openssl rand -base64 32)
 WORKERS=${OPTIMAL_WORKERS}
 BUILD_TARGET=production
 
+# Networking / Public URL
+PUBLIC_URL=${PUBLIC_URL:-}
+
 # Deployment Metadata
 DEPLOYMENT_MODE=${DEPLOYMENT_MODE}
 SYSTEM_PROFILE=${SYSTEM_PROFILE}
@@ -792,6 +795,72 @@ setup_monitoring() {
     setup_health_monitoring
     
     success "Monitoring and management setup complete"
+}
+
+# =============================================================================
+# DYNAMIC DNS (DUCKDNS)
+# =============================================================================
+
+configure_duckdns() {
+    phase "DUCKDNS" "Configuring DuckDNS (optional)"
+
+    # Only proceed if environment variables are provided
+    if [[ -z "${DUCKDNS_TOKEN:-}" || -z "${DUCKDNS_SUBDOMAIN:-}" ]]; then
+        warn "DUCKDNS_TOKEN or DUCKDNS_SUBDOMAIN not set - skipping DuckDNS configuration"
+        return 0
+    fi
+
+    if [[ "${INTERNET_ACCESS}" != "true" ]]; then
+        warn "Internet access not detected - skipping DuckDNS configuration"
+        return 0
+    fi
+
+    if [[ "${HAS_SYSTEMD}" != "true" ]]; then
+        warn "Systemd not available - skipping DuckDNS timer setup"
+        return 0
+    fi
+
+    # Prepare environment directory
+    sudo mkdir -p /etc/noctis
+    echo "Writing DuckDNS environment to /etc/noctis/duckdns.env"
+    sudo bash -lc "cat > /etc/noctis/duckdns.env << EOF\nDUCKDNS_TOKEN=${DUCKDNS_TOKEN}\nDUCKDNS_SUBDOMAIN=${DUCKDNS_SUBDOMAIN}\nEOF"
+
+    # Install updater script and systemd units
+    if [[ -f "${PROJECT_DIR}/ops/duckdns-update.sh" ]]; then
+        sudo install -m 0755 "${PROJECT_DIR}/ops/duckdns-update.sh" /usr/local/bin/duckdns-update.sh
+    else
+        error "duckdns-update.sh not found in ops/ - cannot configure DuckDNS"
+        return 0
+    fi
+
+    if [[ -f "${PROJECT_DIR}/ops/duckdns-update.service" ]]; then
+        sudo cp "${PROJECT_DIR}/ops/duckdns-update.service" /etc/systemd/system/duckdns-update.service
+    else
+        error "duckdns-update.service not found in ops/ - cannot configure DuckDNS"
+        return 0
+    fi
+
+    if [[ -f "${PROJECT_DIR}/ops/duckdns-update.timer" ]]; then
+        sudo cp "${PROJECT_DIR}/ops/duckdns-update.timer" /etc/systemd/system/duckdns-update.timer
+    else
+        error "duckdns-update.timer not found in ops/ - cannot configure DuckDNS"
+        return 0
+    fi
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now duckdns-update.timer
+
+    # Perform an immediate update
+    if sudo /usr/local/bin/duckdns-update.sh; then
+        success "DuckDNS initial update successful"
+    else
+        warn "DuckDNS initial update may have failed; timer will retry periodically"
+    fi
+
+    # Set PUBLIC_URL for subsequent steps and reporting
+    PUBLIC_URL="https://${DUCKDNS_SUBDOMAIN}.duckdns.org"
+    export PUBLIC_URL
+    success "Public URL set to: ${PUBLIC_URL}"
 }
 
 create_management_script() {
@@ -1019,6 +1088,7 @@ generate_deployment_report() {
 ## Access Information
 
 - **Web Interface:** http://localhost:8000
+- **Public URL:** ${PUBLIC_URL}
 - **Admin Panel:** http://localhost:8000/admin/
 - **DICOM Port:** localhost:11112
 - **Default Admin:** admin / admin123
@@ -1088,6 +1158,10 @@ display_deployment_summary() {
     echo "  DICOM Port: ${GREEN}localhost:11112${NC}"
     echo "  Default Login: ${GREEN}admin / admin123${NC}"
     echo ""
+    if [[ -n "${PUBLIC_URL:-}" ]]; then
+        echo "  Public URL: ${GREEN}${PUBLIC_URL}${NC}"
+        echo ""
+    fi
     echo "🔧 Management:"
     echo "  Management Script: ${CYAN}${PROJECT_DIR}/manage_noctis.sh${NC}"
     echo "  Health Check: ${CYAN}${PROJECT_DIR}/manage_noctis.sh health${NC}"
@@ -1171,6 +1245,9 @@ main() {
     # Phase 5: Configuration Generation
     generate_deployment_configurations
     
+    # Optional: Configure DuckDNS if provided
+    configure_duckdns
+
     # Phase 6: Deployment Execution
     execute_deployment
     
