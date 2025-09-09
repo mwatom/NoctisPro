@@ -459,6 +459,56 @@ generate_deployment_configurations() {
 }
 
 # =============================================================================
+# DUCKDNS CONFIGURATION
+# =============================================================================
+
+configure_duckdns_access() {
+    phase "DUCKDNS_CONFIG" "Configuring DuckDNS for global access"
+    
+    echo ""
+    echo "${BOLD}${CYAN}🦆 DuckDNS Configuration (Recommended over Ngrok)${NC}"
+    echo ""
+    echo "DuckDNS provides free, permanent URLs with:"
+    echo "  ✅ No HTTP request limits (unlike ngrok)"
+    echo "  ✅ Permanent URL that never changes"
+    echo "  ✅ Free SSL certificates"
+    echo "  ✅ Production-ready configuration"
+    echo ""
+    
+    read -p "Would you like to configure DuckDNS for global access? (Y/n): " -n 1 -r
+    echo
+    
+    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+        log "Launching DuckDNS configuration..."
+        
+        # Check if DuckDNS deployment script exists
+        if [[ -f "${PROJECT_DIR}/deploy_duckdns_master.sh" ]]; then
+            # Make it executable
+            chmod +x "${PROJECT_DIR}/deploy_duckdns_master.sh"
+            
+            # Run DuckDNS configuration
+            if "${PROJECT_DIR}/deploy_duckdns_master.sh"; then
+                success "DuckDNS configured successfully"
+                
+                # Load the DuckDNS configuration
+                if [[ -f "/etc/noctis/duckdns.env" ]]; then
+                    source /etc/noctis/duckdns.env
+                    export PUBLIC_URL="https://${DUCKDNS_SUBDOMAIN}.duckdns.org"
+                    log "Public URL configured: ${PUBLIC_URL}"
+                fi
+            else
+                warn "DuckDNS configuration failed - continuing with local deployment"
+            fi
+        else
+            warn "DuckDNS deployment script not found - continuing with local deployment"
+        fi
+    else
+        info "Skipping DuckDNS configuration - deployment will be local only"
+        info "You can configure DuckDNS later by running: ./deploy_duckdns_master.sh"
+    fi
+}
+
+# =============================================================================
 # DEPLOYMENT EXECUTION
 # =============================================================================
 
@@ -1083,8 +1133,21 @@ display_deployment_summary() {
     echo "  Rollback Available: ${ROLLBACK_AVAILABLE}"
     echo ""
     echo "🌐 Access Information:"
-    echo "  Web Interface: ${GREEN}http://localhost:8000${NC}"
-    echo "  Admin Panel: ${GREEN}http://localhost:8000/admin/${NC}"
+    
+    # Check if DuckDNS is configured
+    if [[ -f "/etc/noctis/duckdns.env" ]]; then
+        source /etc/noctis/duckdns.env 2>/dev/null || true
+        if [[ -n "${DUCKDNS_SUBDOMAIN:-}" ]]; then
+            echo "  ${BOLD}Public URL: ${GREEN}https://${DUCKDNS_SUBDOMAIN}.duckdns.org${NC}"
+            echo "  Local Access: ${GREEN}http://localhost:8000${NC}"
+            echo "  Admin Panel: ${GREEN}https://${DUCKDNS_SUBDOMAIN}.duckdns.org/admin/${NC}"
+            echo "  DICOM Viewer: ${GREEN}https://${DUCKDNS_SUBDOMAIN}.duckdns.org/dicom-viewer/${NC}"
+        fi
+    else
+        echo "  Web Interface: ${GREEN}http://localhost:8000${NC}"
+        echo "  Admin Panel: ${GREEN}http://localhost:8000/admin/${NC}"
+    fi
+    
     echo "  DICOM Port: ${GREEN}localhost:11112${NC}"
     echo "  Default Login: ${GREEN}admin / admin123${NC}"
     echo ""
@@ -1174,16 +1237,19 @@ main() {
     # Phase 6: Deployment Execution
     execute_deployment
     
-    # Phase 7: Post-deployment Validation
+    # Phase 7: DuckDNS Configuration (for global access)
+    configure_duckdns_access
+    
+    # Phase 8: Post-deployment Validation
     validate_deployment
     
-    # Phase 8: Monitoring Setup
+    # Phase 9: Monitoring Setup
     setup_monitoring
     
-    # Phase 9: Reporting
+    # Phase 10: Reporting
     generate_deployment_report
     
-    # Phase 10: Summary
+    # Phase 11: Summary
     local end_time=$(date +%s)
     local duration=$((end_time - start_time))
     
