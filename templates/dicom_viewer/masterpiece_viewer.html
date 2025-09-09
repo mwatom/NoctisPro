@@ -819,9 +819,9 @@
                     Patient: - | Study Date: - | Modality: -
                 </div>
 
-                <button class="btn" onclick="window.location.href='{% url 'worklist:dashboard' %}'" title="Back to Dashboard">
+                <a class="btn" href="{% url 'worklist:dashboard' %}" title="Back to Dashboard">
                     <i class="fas fa-arrow-left"></i> Dashboard
-                </button>
+                </a>
                 <button class="btn" onclick="toggleUI()" title="Toggle UI Auto Hide">
                     <i class="fas fa-eye-slash"></i> UI
                 </button>
@@ -1117,7 +1117,7 @@
                 }
                 if (!query) {
                     const list = document.getElementById('referencesList');
-                    if (list) list.innerHTML = 'Add a query (e.g., “CT brain hemorrhage”).';
+                    if (list) list.innerHTML = 'Add a query (e.g., "CT brain hemorrhage").';
                     return;
                 }
                 const url = `/ai/api/references/?q=${encodeURIComponent(query)}`;
