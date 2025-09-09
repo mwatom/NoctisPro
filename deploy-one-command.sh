@@ -24,7 +24,9 @@ if [ -f .env ]; then
   . ./.env
   set +a
   # Ensure required vars are set in the current shell; do not rewrite the file
-  if [ -z "${SECRET_KEY:-}" ]; then SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))' 2>/dev/null || echo "noctis-secret-$(date +%s)"); fi
+  if [ -z "${SECRET_KEY:-}" ]; then
+    SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))' 2>/dev/null || echo "noctis-secret-$(date +%s)")
+  fi
   : "${POSTGRES_PASSWORD:=${POSTGRES_PASSWORD:-}}"
   : "${ADMIN_PASSWORD:=NoctisAdmin2024!}"
 else
