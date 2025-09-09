@@ -216,8 +216,10 @@ EOF
   # Prepare output URLs
   if [ -n "${FRP_WEB_CUSTOM_DOMAIN:-}" ]; then
     WEB_URL="http://${FRP_WEB_CUSTOM_DOMAIN}"
+    DETECTED_HOST="${FRP_WEB_CUSTOM_DOMAIN}"
   else
     WEB_URL="http://${FRP_SERVER_ADDR}:${FRP_WEB_REMOTE_PORT}"
+    DETECTED_HOST="${FRP_SERVER_ADDR}"
   fi
   DICOM_URL="${FRP_SERVER_ADDR}:${FRP_DICOM_REMOTE_PORT}"
   echo "✅ FRP tunnels started (frpc)."
@@ -247,6 +249,10 @@ else
       break
     fi
   done
+  # Derive detected host from Cloudflare URL
+  if [ -n "$WEB_URL" ]; then
+    DETECTED_HOST=$(printf "%s" "$WEB_URL" | sed -E 's#https?://([^/]+).*#\1#')
+  fi
 fi
 
 # Display results
@@ -261,6 +267,11 @@ if [ "$_frp_enabled_lower" = "true" ]; then
   echo "   DICOM:   ${DICOM_URL}"
 else
   echo "   DICOM:   ${DICOM_URL:-http://localhost:11112}"
+fi
+if [ -n "${DOMAIN_NAME:-}" ]; then
+  echo "   Host:   ${DOMAIN_NAME}"
+elif [ -n "${DETECTED_HOST:-}" ]; then
+  echo "   Host:   ${DETECTED_HOST}"
 fi
 echo ""
 echo "🔐 ADMIN LOGIN:"
