@@ -253,6 +253,23 @@ deploy_ssl_configuration() {
     esac
 }
 
+# Phase 2.5: HTTPS Internet Access Setup
+deploy_https_internet_access() {
+    header "Phase 2.5: HTTPS Internet Access Setup"
+    
+    log "Setting up automatic HTTPS internet access..."
+    
+    # Make the HTTPS setup script executable
+    chmod +x "$SCRIPT_DIR/setup_https_internet_access.sh"
+    
+    if [[ -f "$SCRIPT_DIR/setup_https_internet_access.sh" ]]; then
+        bash "$SCRIPT_DIR/setup_https_internet_access.sh"
+        success "HTTPS internet access setup completed"
+    else
+        warning "HTTPS internet access setup script not found"
+    fi
+}
+
 # Phase 3: Desktop integration
 deploy_desktop_integration() {
     header "Phase 3: Desktop Integration"
@@ -432,10 +449,9 @@ EOF
     
     echo ""
     echo -e "${CYAN}Access Information:${NC}"
-    echo -e "  🌐 Local URL: ${GREEN}http://localhost${NC}"
-    if [[ $INSTALL_SSL != "none" ]]; then
-        echo -e "  🔒 HTTPS URL: ${GREEN}https://localhost${NC}"
-    fi
+    echo -e "  🏠 Local HTTP: ${GREEN}http://localhost${NC}"
+    echo -e "  🔒 Local HTTPS: ${GREEN}https://localhost${NC}"
+    echo -e "  🌍 Public HTTPS: ${GREEN}Available after ngrok token setup${NC}"
     echo -e "  👤 System User: ${YELLOW}noctispro${NC} / ${YELLOW}noctispro123${NC}"
     echo -e "  🔑 Django Admin: ${YELLOW}admin${NC} / ${YELLOW}admin123${NC}"
     
@@ -448,10 +464,11 @@ EOF
     
     echo ""
     echo -e "${CYAN}Management Commands:${NC}"
-    echo "  📊 noctispro-admin status    - Check system status"
-    echo "  🔄 noctispro-admin restart   - Restart services"
-    echo "  📝 noctispro-admin logs      - View system logs"
-    echo "  🌐 noctispro-admin url       - Show access URLs"
+    echo "  📊 noctispro-admin status      - Check system status"
+    echo "  🔄 noctispro-admin restart     - Restart services"
+    echo "  📝 noctispro-admin logs        - View system logs"
+    echo "  🌐 noctispro-admin urls        - Show access URLs"
+    echo "  🔑 noctispro-admin setup-ngrok - Configure public HTTPS access"
     
     if [[ $INSTALL_SSL != "none" ]]; then
         echo ""
@@ -495,6 +512,7 @@ main() {
     # Execute deployment phases
     deploy_base_system
     deploy_ssl_configuration
+    deploy_https_internet_access
     deploy_desktop_integration
     optimize_system
     finalize_deployment

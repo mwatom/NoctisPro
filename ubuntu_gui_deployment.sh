@@ -180,6 +180,15 @@ deploy_noctispro() {
     sudo -u postgres psql -c "ALTER USER noctispro_user WITH PASSWORD 'noctispro_pass';"
     sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE noctispro_db TO noctispro_user;"
     
+    # Setup HTTPS Internet Access
+    log "Setting up HTTPS internet access..."
+    if [[ -f "$SCRIPT_DIR/setup_https_internet_access.sh" ]]; then
+        bash "$SCRIPT_DIR/setup_https_internet_access.sh"
+        success "HTTPS internet access configured"
+    else
+        warning "HTTPS setup script not found"
+    fi
+
     # Django setup
     cd "$APP_DIR"
     sudo -u "$SYSTEM_USER" "$VENV_DIR/bin/python" manage.py migrate

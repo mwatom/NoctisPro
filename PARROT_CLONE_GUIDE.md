@@ -49,6 +49,18 @@ Choose your options:
 2. **ISO File**: Creates ISO for DVD burning or VMs
 3. **Both**: Creates both USB and ISO
 
+### Step 4.5: Setup HTTPS Internet Access (Optional)
+```bash
+# Setup automatic HTTPS internet access (ngrok, SSL certificates)
+sudo ./setup_https_internet_access.sh
+```
+
+This adds:
+- ✅ Automatic ngrok tunnel for public HTTPS access
+- ✅ SSL certificate management
+- ✅ Desktop shortcuts for secure access
+- ✅ URL monitoring and notifications
+
 ### Step 5: Deploy on Target System
 1. Boot target system from created USB/DVD
 2. Select "Install NoctisPro PACS Server (Automatic)"
@@ -251,13 +263,22 @@ noctispro-pacs/
 
 ## 🌐 Access URLs (After Deployment)
 
-- **Main Application**: `http://localhost`
-- **Admin Panel**: `http://localhost/admin/`
+### Local Access
+- **Main Application**: `http://localhost` or `https://localhost`
+- **Admin Panel**: `http://localhost/admin/` or `https://localhost/admin/`
 - **DICOM Viewer**: `http://localhost/dicom_viewer/`
 - **Worklist**: `http://localhost/worklist/`
 - **AI Analysis**: `http://localhost/ai_analysis/`
 - **Reports**: `http://localhost/reports/`
 - **API Documentation**: `http://localhost/api/`
+
+### Public HTTPS Access (After ngrok token setup)
+- **Public Main**: `https://random-name.ngrok.io` (auto-generated)
+- **Public Admin**: `https://random-name.ngrok.io/admin/`
+- **Public DICOM**: `https://random-name.ngrok.io/dicom_viewer/`
+- **Public API**: `https://random-name.ngrok.io/api/`
+
+To get your public URL: `noctispro-admin urls`
 
 ## 🛠️ Management Commands
 
