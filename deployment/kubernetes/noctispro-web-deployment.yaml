@@ -1,0 +1,130 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: noctispro-media-pvc
+  namespace: noctispro
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: standard
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: noctispro-web
+  namespace: noctispro
+  labels:
+    app: noctispro-web
+    component: web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: noctispro-web
+  template:
+    metadata:
+      labels:
+        app: noctispro-web
+        component: web
+    spec:
+      initContainers:
+      - name: db-migrations
+        image: noctispro:latest
+        command: ["python", "manage.py", "migrate"]
+        envFrom:
+        - configMapRef:
+            name: noctispro-config
+        - secretRef:
+            name: noctispro-secrets
+        volumeMounts:
+        - name: media-storage
+          mountPath: /app/media
+      - name: collect-static
+        image: noctispro:latest
+        command: ["python", "manage.py", "collectstatic", "--noinput"]
+        envFrom:
+        - configMapRef:
+            name: noctispro-config
+        - secretRef:
+            name: noctispro-secrets
+        volumeMounts:
+        - name: static-storage
+          mountPath: /app/staticfiles
+        - name: media-storage
+          mountPath: /app/media
+      containers:
+      - name: noctispro-web
+        image: noctispro:latest
+        ports:
+        - containerPort: 8000
+          name: http
+        envFrom:
+        - configMapRef:
+            name: noctispro-config
+        - secretRef:
+            name: noctispro-secrets
+        command: ["gunicorn"]
+        args:
+        - "--bind"
+        - "0.0.0.0:8000"
+        - "--workers"
+        - "4"
+        - "--timeout"
+        - "120"
+        - "--max-requests"
+        - "1000"
+        - "--max-requests-jitter"
+        - "100"
+        - "noctis_pro.wsgi:application"
+        volumeMounts:
+        - name: static-storage
+          mountPath: /app/staticfiles
+        - name: media-storage
+          mountPath: /app/media
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /admin/login/
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /admin/login/
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+      volumes:
+      - name: static-storage
+        emptyDir: {}
+      - name: media-storage
+        persistentVolumeClaim:
+          claimName: noctispro-media-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: noctispro-web
+  namespace: noctispro
+  labels:
+    app: noctispro-web
+    component: web
+spec:
+  selector:
+    app: noctispro-web
+  ports:
+  - port: 8000
+    targetPort: 8000
+    name: http
+  type: ClusterIP

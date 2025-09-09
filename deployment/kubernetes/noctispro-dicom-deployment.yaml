@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: noctispro-dicom
+  namespace: noctispro
+  labels:
+    app: noctispro-dicom
+    component: dicom
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: noctispro-dicom
+  template:
+    metadata:
+      labels:
+        app: noctispro-dicom
+        component: dicom
+    spec:
+      containers:
+      - name: noctispro-dicom
+        image: noctispro:latest
+        ports:
+        - containerPort: 11112
+          name: dicom
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: noctispro-config
+        - secretRef:
+            name: noctispro-secrets
+        command: ["python"]
+        args:
+        - "dicom_receiver.py"
+        - "--port"
+        - "11112"
+        - "--aet"
+        - "NOCTIS_SCP"
+        volumeMounts:
+        - name: media-storage
+          mountPath: /app/media
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "400m"
+        livenessProbe:
+          tcpSocket:
+            port: 11112
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: 11112
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: media-storage
+        persistentVolumeClaim:
+          claimName: noctispro-media-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: noctispro-dicom
+  namespace: noctispro
+  labels:
+    app: noctispro-dicom
+    component: dicom
+spec:
+  selector:
+    app: noctispro-dicom
+  ports:
+  - port: 11112
+    targetPort: 11112
+    name: dicom
+    protocol: TCP
+  type: LoadBalancer  # Change to NodePort or ClusterIP based on your needs
