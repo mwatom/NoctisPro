@@ -1,7 +1,0 @@
-[2025-09-08 14:39:05 +0000] [8461] [INFO] Starting gunicorn 23.0.0
-[2025-09-08 14:39:05 +0000] [8461] [INFO] Listening at: http://0.0.0.0:8000 (8461)
-[2025-09-08 14:39:05 +0000] [8461] [INFO] Using worker: sync
-[2025-09-08 14:39:05 +0000] [8465] [INFO] Booting worker with pid: 8465
-[2025-09-08 14:39:05 +0000] [8466] [INFO] Booting worker with pid: 8466
-[2025-09-08 14:39:05 +0000] [8467] [INFO] Booting worker with pid: 8467
-[2025-09-08 14:39:05 +0000] [8468] [INFO] Booting worker with pid: 8468

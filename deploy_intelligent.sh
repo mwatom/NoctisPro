@@ -972,12 +972,25 @@ else:
 setup_django_native() {
     log "Setting up Django in native environment..."
     
+    # Setup PostgreSQL if not already configured
+    if [[ -f "${PROJECT_DIR}/setup_postgresql.sh" ]]; then
+        log "Setting up PostgreSQL database..."
+        bash "${PROJECT_DIR}/setup_postgresql.sh" || {
+            warn "PostgreSQL setup failed, but continuing with deployment..."
+        }
+    fi
+    
     source "${PROJECT_DIR}/venv_optimized/bin/activate"
     cd "${PROJECT_DIR}"
     
     # Set environment variables
     export DJANGO_SETTINGS_MODULE=noctis_pro.settings
     export DEBUG=False
+    
+    # Load environment variables from .env
+    if [[ -f .env ]]; then
+        export $(grep -v '^#' .env | xargs)
+    fi
     
     # Create logs directory
     mkdir -p logs
