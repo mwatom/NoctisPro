@@ -261,11 +261,13 @@ class DependencyOptimizer:
                 ]
             },
             'printing': {
-                'description': 'Printing support (Linux only)',
+                'description': 'Printing support (Linux only, requires CUPS libraries)',
                 'packages': [
-                    'pycups',
-                    'python-escpos',
-                ]
+                    # 'pycups',  # Commented out due to installation issues on some systems
+                    # 'python-escpos',  # Depends on pycups
+                ],
+                'system_packages': ['libcups2-dev', 'cups-dev'],  # Required system packages
+                'optional': True  # Mark as optional to prevent deployment failure
             }
         }
     
