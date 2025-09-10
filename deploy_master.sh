@@ -300,10 +300,16 @@ create_deployment_backup() {
     
     mkdir -p "${BACKUP_DIR}"
     
-    # Backup current state if it exists
+    # Backup current database state if it exists
     if [[ -f "${PROJECT_DIR}/db.sqlite3" ]]; then
         cp "${PROJECT_DIR}/db.sqlite3" "${BACKUP_DIR}/db.sqlite3.backup"
-        log "Database backup created"
+        log "Legacy SQLite database backup created"
+    fi
+    
+    # Backup PostgreSQL database if configured
+    if command -v pg_dump &> /dev/null && [[ -n "${DB_NAME:-}" ]]; then
+        PGPASSWORD="${DB_PASSWORD:-}" pg_dump -h "${DB_HOST:-localhost}" -U "${DB_USER:-}" "${DB_NAME:-}" > "${BACKUP_DIR}/postgresql_backup.sql" 2>/dev/null || true
+        log "PostgreSQL database backup created"
     fi
     
     # Backup configuration files
@@ -353,7 +359,13 @@ rollback_deployment() {
     # Restore database
     if [[ -f "${BACKUP_DIR}/db.sqlite3.backup" ]]; then
         cp "${BACKUP_DIR}/db.sqlite3.backup" "${PROJECT_DIR}/db.sqlite3"
-        log "Database restored"
+        log "Legacy SQLite database restored"
+    fi
+    
+    # Restore PostgreSQL database if available
+    if [[ -f "${BACKUP_DIR}/postgresql_backup.sql" ]] && command -v psql &> /dev/null && [[ -n "${DB_NAME:-}" ]]; then
+        PGPASSWORD="${DB_PASSWORD:-}" psql -h "${DB_HOST:-localhost}" -U "${DB_USER:-}" "${DB_NAME:-}" < "${BACKUP_DIR}/postgresql_backup.sql" 2>/dev/null || true
+        log "PostgreSQL database restored"
     fi
     
     # Restore configurations
