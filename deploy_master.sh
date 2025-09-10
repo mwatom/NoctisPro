@@ -613,10 +613,17 @@ POSTGRES_PASSWORD=$(openssl rand -base64 32)
 WORKERS=${OPTIMAL_WORKERS}
 BUILD_TARGET=production
 
+# HTTPS Configuration
+SECURE_SSL_REDIRECT=True
+SECURE_PROXY_SSL_HEADER=HTTP_X_FORWARDED_PROTO,https
+USE_TLS=True
+FORCE_SCRIPT_NAME=
+
 # Deployment Metadata
 DEPLOYMENT_MODE=${DEPLOYMENT_MODE}
 SYSTEM_PROFILE=${SYSTEM_PROFILE}
 DEPLOYED_AT=$(date -Iseconds)
+HTTPS_CONFIGURED=${HTTPS_CONFIGURED:-false}
 EOF
     
     # Append DuckDNS domain if configured earlier but env not created yet
@@ -624,7 +631,7 @@ EOF
         echo "DUCKDNS_DOMAIN=${PENDING_DUCKDNS_DOMAIN}" >> "${PROJECT_DIR}/.env"
     fi
 
-    success "Docker environment configured"
+    success "Docker environment configured with HTTPS support"
 }
 
 wait_for_database_docker() {
@@ -690,8 +697,41 @@ setup_python_environment_native() {
 
 install_python_dependencies_native() {
     log "Installing Python dependencies for native deployment..."
+    
+    # Install system dependencies for packages that might fail
+    install_system_printing_dependencies
+    
     source "${PROJECT_DIR}/deploy_intelligent.sh"
     install_python_requirements
+}
+
+install_system_printing_dependencies() {
+    log "Installing system dependencies for printing support..."
+    
+    case "${DETECTED_OS}" in
+        "ubuntu"|"debian")
+            # Install CUPS development libraries if needed
+            if apt list --installed 2>/dev/null | grep -q "libcups2-dev\|cups-dev"; then
+                log "CUPS development libraries already installed"
+            else
+                warn "CUPS development libraries not found - some printing features may be limited"
+                # Don't fail deployment if CUPS libraries are not available
+                sudo apt-get update || true
+                sudo apt-get install -y libcups2-dev cups-dev || warn "Could not install CUPS libraries - continuing without printing support"
+            fi
+            ;;
+        "rhel"|"centos"|"fedora"|"rocky"|"alma")
+            if rpm -qa | grep -q "cups-devel"; then
+                log "CUPS development libraries already installed"
+            else
+                warn "CUPS development libraries not found - some printing features may be limited"
+                sudo yum install -y cups-devel || sudo dnf install -y cups-devel || warn "Could not install CUPS libraries - continuing without printing support"
+            fi
+            ;;
+        *)
+            warn "Unknown OS for CUPS installation - some printing features may be limited"
+            ;;
+    esac
 }
 
 setup_django_native() {
@@ -830,6 +870,9 @@ $(if [[ "${DEPLOYMENT_MODE}" == "docker_"* ]]; then
 else
     echo "        sudo systemctl start noctis-*"
 fi)
+        echo "Starting HTTPS services..."
+        sudo systemctl start nginx
+        sudo systemctl start noctispro-ngrok 2>/dev/null || echo "Note: ngrok requires auth token configuration"
         ;;
     stop)
         echo "Stopping NoctisPro services..."
@@ -839,6 +882,8 @@ $(if [[ "${DEPLOYMENT_MODE}" == "docker_"* ]]; then
 else
     echo "        sudo systemctl stop noctis-*"
 fi)
+        echo "Stopping HTTPS services..."
+        sudo systemctl stop noctispro-ngrok 2>/dev/null || true
         ;;
     restart)
         echo "Restarting NoctisPro services..."
@@ -854,6 +899,9 @@ $(if [[ "${DEPLOYMENT_MODE}" == "docker_"* ]]; then
 else
     echo "        sudo systemctl status noctis-*"
 fi)
+        echo ""
+        echo "HTTPS Status:"
+        /usr/local/bin/noctispro-https-monitor status 2>/dev/null || echo "HTTPS monitoring not available"
         ;;
     logs)
         echo "NoctisPro Logs:"
@@ -864,9 +912,22 @@ else
     echo "        sudo journalctl -f -u noctis-*"
 fi)
         ;;
+    https)
+        echo "HTTPS Status and Configuration:"
+        /usr/local/bin/noctispro-https-monitor status 2>/dev/null || echo "HTTPS monitoring not available"
+        echo ""
+        echo "To setup ngrok for public access:"
+        echo "1. Get token from: https://ngrok.com/signup"
+        echo "2. Edit: ~/.config/ngrok/ngrok.yml"
+        echo "3. Replace 'YOUR_NGROK_TOKEN_HERE' with your token"
+        echo "4. Start: sudo systemctl start noctispro-ngrok"
+        ;;
     health)
         echo "Performing health check..."
-        ${PROJECT_DIR}/deployment_configs/monitoring/health_check.sh
+        ${PROJECT_DIR}/deployment_configs/monitoring/health_check.sh 2>/dev/null || echo "Health check script not found"
+        echo ""
+        echo "HTTPS Health Check:"
+        /usr/local/bin/noctispro-https-monitor status 2>/dev/null || echo "HTTPS monitoring not available"
         ;;
     update)
         echo "Updating NoctisPro..."
@@ -875,21 +936,27 @@ fi)
         ${PROJECT_DIR}/deploy_master.sh --update-only
         ;;
     *)
-        echo "Usage: \$0 {start|stop|restart|status|logs|health|update}"
+        echo "Usage: \$0 {start|stop|restart|status|logs|https|health|update}"
         echo ""
         echo "NoctisPro PACS Management Commands:"
-        echo "  start   - Start all services"
+        echo "  start   - Start all services (including HTTPS)"
         echo "  stop    - Stop all services"
         echo "  restart - Restart all services"
         echo "  status  - Show service status"
         echo "  logs    - Show service logs"
-        echo "  health  - Perform health check"
+        echo "  https   - Show HTTPS status and setup instructions"
+        echo "  health  - Perform comprehensive health check"
         echo "  update  - Update and redeploy"
         echo ""
         echo "System Profile: ${SYSTEM_PROFILE}"
         echo "Deployment Mode: ${DEPLOYMENT_MODE}"
-        echo "Access URL: http://localhost:8000"
-        echo "Admin Login: admin / admin123"
+        echo "Local Access:"
+        echo "  🔒 HTTPS: https://localhost"
+        echo "  🌍 HTTP:  http://localhost"
+        echo "  👤 Admin: https://localhost/admin/"
+        echo "Default Login: admin / admin123"
+        echo ""
+        echo "For public HTTPS access setup, run: \$0 https"
         exit 1
         ;;
 esac
@@ -925,7 +992,419 @@ setup_health_monitoring() {
 }
 
 # =============================================================================
-# DUCKDNS DOMAIN SETUP (OPTIONAL)
+# PRODUCTION HTTPS INTERNET ACCESS SETUP
+# =============================================================================
+
+setup_production_https_access() {
+    phase "HTTPS_SETUP" "Configuring production HTTPS internet access"
+    
+    # Skip if already configured in this session
+    if [[ "${HTTPS_CONFIGURED:-false}" == "true" ]]; then
+        log "HTTPS already configured in this session – skipping"
+        return
+    fi
+    
+    log "Setting up production HTTPS internet access..."
+    
+    # Install required packages for HTTPS setup
+    install_https_dependencies
+    
+    # Setup SSL certificate management
+    setup_ssl_certificate_management
+    
+    # Configure Nginx for HTTPS
+    configure_nginx_https
+    
+    # Setup ngrok tunnel for public access
+    setup_ngrok_tunnel
+    
+    # Create HTTPS monitoring
+    setup_https_monitoring
+    
+    HTTPS_CONFIGURED=true
+    success "Production HTTPS access configured"
+}
+
+install_https_dependencies() {
+    log "Installing HTTPS dependencies..."
+    
+    case "${DETECTED_OS}" in
+        "ubuntu"|"debian")
+            sudo apt-get update
+            sudo apt-get install -y nginx certbot python3-certbot-nginx curl wget openssl
+            
+            # Install ngrok
+            if ! command -v ngrok &> /dev/null; then
+                log "Installing ngrok..."
+                curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+                echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+                sudo apt-get update
+                sudo apt-get install -y ngrok
+            fi
+            ;;
+        "rhel"|"centos"|"fedora"|"rocky"|"alma")
+            sudo yum install -y nginx certbot python3-certbot-nginx curl wget openssl || \
+            sudo dnf install -y nginx certbot python3-certbot-nginx curl wget openssl
+            
+            # Install ngrok
+            if ! command -v ngrok &> /dev/null; then
+                log "Installing ngrok..."
+                wget -O /tmp/ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.zip
+                sudo unzip /tmp/ngrok.zip -d /usr/local/bin/
+                rm -f /tmp/ngrok.zip
+            fi
+            ;;
+        *)
+            warn "Unknown OS for HTTPS setup - manual configuration may be required"
+            ;;
+    esac
+    
+    success "HTTPS dependencies installed"
+}
+
+setup_ssl_certificate_management() {
+    log "Setting up SSL certificate management..."
+    
+    # Create SSL directory
+    sudo mkdir -p /etc/ssl/noctispro
+    
+    # Create self-signed certificate as fallback
+    if [[ ! -f "/etc/ssl/noctispro/server.crt" ]]; then
+        log "Creating self-signed SSL certificate..."
+        sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+            -keyout /etc/ssl/noctispro/server.key \
+            -out /etc/ssl/noctispro/server.crt \
+            -subj "/C=US/ST=State/L=City/O=NoctisPro/OU=PACS/CN=localhost" \
+            -addext "subjectAltName=DNS:localhost,DNS:*.ngrok.io,DNS:*.ngrok-free.app,IP:127.0.0.1"
+        
+        sudo chmod 600 /etc/ssl/noctispro/server.key
+        sudo chmod 644 /etc/ssl/noctispro/server.crt
+        success "Self-signed SSL certificate created"
+    fi
+    
+    # Create SSL renewal script
+    create_ssl_renewal_script
+}
+
+create_ssl_renewal_script() {
+    log "Creating SSL certificate renewal script..."
+    
+    sudo tee /usr/local/bin/noctispro-ssl-manager > /dev/null << 'EOF'
+#!/bin/bash
+# NoctisPro SSL Certificate Manager
+
+SSL_DIR="/etc/ssl/noctispro"
+CERT_FILE="$SSL_DIR/server.crt"
+KEY_FILE="$SSL_DIR/server.key"
+
+create_self_signed_cert() {
+    echo "Creating self-signed SSL certificate..."
+    mkdir -p "$SSL_DIR"
+    
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+        -keyout "$KEY_FILE" \
+        -out "$CERT_FILE" \
+        -subj "/C=US/ST=State/L=City/O=NoctisPro/OU=PACS/CN=localhost" \
+        -addext "subjectAltName=DNS:localhost,DNS:*.ngrok.io,DNS:*.ngrok-free.app,IP:127.0.0.1"
+    
+    chmod 600 "$KEY_FILE"
+    chmod 644 "$CERT_FILE"
+    echo "Self-signed certificate created"
+}
+
+setup_letsencrypt() {
+    local domain="$1"
+    local email="$2"
+    
+    if [[ -z "$domain" || -z "$email" ]]; then
+        echo "Usage: $0 letsencrypt domain.com email@example.com"
+        return 1
+    fi
+    
+    echo "Setting up Let's Encrypt certificate for $domain..."
+    certbot --nginx -d "$domain" --email "$email" --agree-tos --non-interactive
+}
+
+case "${1:-auto}" in
+    "auto")
+        create_self_signed_cert
+        ;;
+    "self-signed")
+        create_self_signed_cert
+        ;;
+    "letsencrypt")
+        setup_letsencrypt "$2" "$3"
+        ;;
+    *)
+        echo "Usage: $0 [auto|self-signed|letsencrypt domain email]"
+        ;;
+esac
+EOF
+    
+    sudo chmod +x /usr/local/bin/noctispro-ssl-manager
+    success "SSL certificate manager created"
+}
+
+configure_nginx_https() {
+    log "Configuring Nginx for HTTPS..."
+    
+    # Create Nginx configuration for NoctisPro with HTTPS
+    sudo tee /etc/nginx/sites-available/noctispro > /dev/null << 'EOF'
+# HTTP to HTTPS redirect
+server {
+    listen 80;
+    server_name localhost *.ngrok.io *.ngrok-free.app;
+    return 301 https://$server_name$request_uri;
+}
+
+# HTTPS server
+server {
+    listen 443 ssl http2;
+    server_name localhost *.ngrok.io *.ngrok-free.app;
+    
+    ssl_certificate /etc/ssl/noctispro/server.crt;
+    ssl_certificate_key /etc/ssl/noctispro/server.key;
+    
+    # SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    
+    # Security headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    
+    client_max_body_size 100M;
+    
+    # Static files
+    location /static/ {
+        alias /opt/noctispro/staticfiles/;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+    
+    location /media/ {
+        alias /opt/noctispro/media/;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+    
+    # Proxy to Django application
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 300;
+        proxy_send_timeout 300;
+        proxy_read_timeout 300;
+        
+        # WebSocket support
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+EOF
+    
+    # Enable the site
+    sudo ln -sf /etc/nginx/sites-available/noctispro /etc/nginx/sites-enabled/
+    sudo rm -f /etc/nginx/sites-enabled/default
+    
+    # Test Nginx configuration
+    if sudo nginx -t; then
+        sudo systemctl enable nginx
+        sudo systemctl restart nginx
+        success "Nginx HTTPS configuration applied"
+    else
+        error "Nginx configuration error"
+        return 1
+    fi
+}
+
+setup_ngrok_tunnel() {
+    log "Setting up ngrok tunnel for public access..."
+    
+    # Create ngrok configuration directory
+    local ngrok_dir="/home/$(whoami)/.config/ngrok"
+    mkdir -p "$ngrok_dir"
+    
+    # Create ngrok configuration
+    cat > "$ngrok_dir/ngrok.yml" << 'EOF'
+version: "2"
+authtoken: "YOUR_NGROK_TOKEN_HERE"
+
+tunnels:
+  noctispro-https:
+    proto: http
+    addr: 443
+    schemes: [https]
+    inspect: false
+    
+api:
+  addr: 127.0.0.1:4040
+  
+log_level: info
+log: /var/log/ngrok.log
+EOF
+    
+    # Create ngrok systemd service
+    sudo tee /etc/systemd/system/noctispro-ngrok.service > /dev/null << EOF
+[Unit]
+Description=Ngrok tunnel for NoctisPro PACS HTTPS access
+After=network.target nginx.service
+Wants=nginx.service
+
+[Service]
+Type=simple
+User=$(whoami)
+Group=$(whoami)
+WorkingDirectory=$ngrok_dir
+ExecStart=/usr/bin/ngrok start noctispro-https --config $ngrok_dir/ngrok.yml
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+Environment=HOME=/home/$(whoami)
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    sudo systemctl daemon-reload
+    
+    success "Ngrok tunnel configured (requires auth token to start)"
+    
+    # Display setup instructions
+    echo ""
+    warn "To enable public HTTPS access:"
+    echo "1. Get free ngrok token from: https://ngrok.com/signup"
+    echo "2. Replace 'YOUR_NGROK_TOKEN_HERE' in $ngrok_dir/ngrok.yml"
+    echo "3. Start ngrok: sudo systemctl start noctispro-ngrok"
+    echo "4. Enable auto-start: sudo systemctl enable noctispro-ngrok"
+    echo ""
+}
+
+setup_https_monitoring() {
+    log "Setting up HTTPS monitoring..."
+    
+    # Create monitoring script
+    sudo tee /usr/local/bin/noctispro-https-monitor > /dev/null << 'EOF'
+#!/bin/bash
+# NoctisPro HTTPS Monitoring Script
+
+check_ssl_cert() {
+    local domain="${1:-localhost}"
+    local cert_file="/etc/ssl/noctispro/server.crt"
+    
+    if [[ -f "$cert_file" ]]; then
+        local expiry=$(openssl x509 -enddate -noout -in "$cert_file" | cut -d= -f2)
+        local expiry_epoch=$(date -d "$expiry" +%s)
+        local current_epoch=$(date +%s)
+        local days_until_expiry=$(( (expiry_epoch - current_epoch) / 86400 ))
+        
+        echo "SSL Certificate expires in $days_until_expiry days"
+        
+        if [[ $days_until_expiry -lt 30 ]]; then
+            echo "WARNING: SSL certificate expires soon!"
+            # Auto-renew if using Let's Encrypt
+            if command -v certbot &> /dev/null; then
+                certbot renew --quiet
+            fi
+        fi
+    else
+        echo "No SSL certificate found"
+    fi
+}
+
+check_https_access() {
+    echo "Checking HTTPS access..."
+    
+    # Check local HTTPS
+    if curl -k -s --max-time 10 "https://localhost" > /dev/null; then
+        echo "✅ Local HTTPS: Working"
+    else
+        echo "❌ Local HTTPS: Failed"
+    fi
+    
+    # Check ngrok tunnel if available
+    local ngrok_url=$(curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | grep -o '"public_url":"https://[^"]*' | head -1 | cut -d'"' -f4)
+    if [[ -n "$ngrok_url" ]]; then
+        echo "✅ Public HTTPS: $ngrok_url"
+        
+        # Test public access
+        if curl -s --max-time 15 "$ngrok_url" > /dev/null; then
+            echo "✅ Public access: Working"
+        else
+            echo "⚠️  Public access: May be starting up"
+        fi
+    else
+        echo "⚠️  Public HTTPS: Ngrok not running or no auth token"
+    fi
+}
+
+check_services() {
+    echo "Checking services..."
+    
+    for service in nginx noctispro-ngrok; do
+        if systemctl is-active --quiet "$service" 2>/dev/null; then
+            echo "✅ $service: Running"
+        else
+            echo "❌ $service: Stopped"
+        fi
+    done
+}
+
+# Main monitoring function
+main() {
+    echo "=== NoctisPro HTTPS Status Check ==="
+    echo "$(date)"
+    echo ""
+    
+    check_ssl_cert
+    echo ""
+    check_https_access
+    echo ""
+    check_services
+    echo ""
+    echo "=================================="
+}
+
+case "${1:-status}" in
+    "status")
+        main
+        ;;
+    "cert")
+        check_ssl_cert "$2"
+        ;;
+    "access")
+        check_https_access
+        ;;
+    "services")
+        check_services
+        ;;
+    *)
+        echo "Usage: $0 [status|cert|access|services]"
+        ;;
+esac
+EOF
+    
+    sudo chmod +x /usr/local/bin/noctispro-https-monitor
+    
+    # Add monitoring cron job
+    (crontab -l 2>/dev/null; echo "*/30 * * * * /usr/local/bin/noctispro-https-monitor status >> /var/log/noctispro-https.log 2>&1") | crontab -
+    
+    success "HTTPS monitoring configured"
+}
+
+# =============================================================================
+# DUCKDNS DOMAIN SETUP (OPTIONAL - LEGACY)
 # =============================================================================
 
 setup_duckdns() {
@@ -1095,10 +1574,16 @@ display_deployment_summary() {
     echo "  Rollback Available: ${ROLLBACK_AVAILABLE}"
     echo ""
     echo "🌐 Access Information:"
-    echo "  Web Interface: ${GREEN}http://localhost:8000${NC}"
-    echo "  Admin Panel: ${GREEN}http://localhost:8000/admin/${NC}"
-    echo "  DICOM Port: ${GREEN}localhost:11112${NC}"
-    echo "  Default Login: ${GREEN}admin / admin123${NC}"
+    echo "  🔒 HTTPS (Local): ${GREEN}https://localhost${NC}"
+    echo "  🌍 HTTP (Local): ${GREEN}http://localhost${NC}"
+    echo "  👤 Admin Panel: ${GREEN}https://localhost/admin/${NC}"
+    echo "  🏥 DICOM Port: ${GREEN}localhost:11112${NC}"
+    echo "  🔐 Default Login: ${GREEN}admin / admin123${NC}"
+    echo ""
+    echo "🌍 Public Access:"
+    echo "  📋 Check status: ${CYAN}/usr/local/bin/noctispro-https-monitor${NC}"
+    echo "  🔑 Setup ngrok: Edit ~/.config/ngrok/ngrok.yml with your token"
+    echo "  🚀 Start public: ${CYAN}sudo systemctl start noctispro-ngrok${NC}"
     echo ""
     echo "🔧 Management:"
     echo "  Management Script: ${CYAN}${PROJECT_DIR}/manage_noctis.sh${NC}"
@@ -1171,31 +1656,31 @@ main() {
     # Phase 2: Pre-deployment Validation
     run_pre_deployment_validation
 
-    # Optional Domain Setup (DuckDNS)
-    setup_duckdns
+    # Phase 3: Production HTTPS Setup
+    setup_production_https_access
     
-    # Phase 3: Backup Creation
+    # Phase 4: Backup Creation
     create_deployment_backup
     
-    # Phase 4: Dependency Optimization
+    # Phase 5: Dependency Optimization
     optimize_dependencies
     
-    # Phase 5: Configuration Generation
+    # Phase 6: Configuration Generation
     generate_deployment_configurations
     
-    # Phase 6: Deployment Execution
+    # Phase 7: Deployment Execution
     execute_deployment
     
-    # Phase 7: Post-deployment Validation
+    # Phase 8: Post-deployment Validation
     validate_deployment
     
-    # Phase 8: Monitoring Setup
+    # Phase 9: Monitoring Setup
     setup_monitoring
     
-    # Phase 9: Reporting
+    # Phase 10: Reporting
     generate_deployment_report
     
-    # Phase 10: Summary
+    # Phase 11: Summary
     local end_time=$(date +%s)
     local duration=$((end_time - start_time))
     

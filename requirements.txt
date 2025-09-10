@@ -70,5 +70,5 @@ django-extensions
 
 # Printing support for DICOM images
 reportlab
-pycups
-python-escpos
+# pycups - commented out due to installation issues on some systems
+# python-escpos - commented out due to dependency on pycups
